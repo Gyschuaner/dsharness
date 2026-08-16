@@ -58,16 +58,13 @@ DSH Web GUI 的宿主进程运行的是 **npm 安装的预构建包**
 
 ## 上游源码（deepseek-harness）
 
-本仓库当前**不含**上游 `@deepseek-ai/dsh` 的完整源码树（约 114MB，本机网络
-拉取受限）。插件本身零裸依赖、自包含，可独立开发。后续如需连同上游一起开发，
-在能稳定访问 GitHub 的网络下：
-
-```powershell
-git clone https://github.com/deepseek-ai/deepseek-harness.git ../deepseek-harness
-# 再把本仓库 plugins/ 作为上游工作树的插件目录纳入其构建/加载链路
-```
-
-详见 `docs/dev-setup.md`。
+已落到本地（DSH-003 跟进项，2026-08-17）：`D:\Pythonproject\deepseek-harness`
+是上游 master 的 **tarball 快照**（pnpm monorepo，版本 0.1.0-rc.5；本机 npm
+运行时为 rc.6，差一个发布）。快照已建 git 基线（无上游 remote），本地改动可
+追溯；少数 `CLAUDE.md` 因本机文件过滤未解压。完整 git 历史（约 114MB）待网络
+稳定后克隆替换。插件零裸依赖、自包含，可独立开发；源码树已在本机跑通
+（install/build/次端口冒烟全过，插件双链路生效），详见 `docs/upstream-dev-loop.md`
+与 `docs/dev-setup.md` §5。
 
 ## 开发约定
 

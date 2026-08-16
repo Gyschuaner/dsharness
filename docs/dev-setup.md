@@ -64,14 +64,31 @@ git push
 
 ## 5. 上游源码（@deepseek-ai/dsh 完整仓库）
 
-本仓库**不含**上游源码树（约 114MB，本机网络拉取受限，见需求 DSH-003）。
-插件零裸依赖、自包含，可独立开发。若日后需要连同上游一起开发：
+已落到本地（DSH-003 跟进项，2026-08-17）：
 
-```powershell
-# 在能稳定访问 GitHub 的网络下
-git clone https://github.com/deepseek-ai/deepseek-harness.git D:\Pythonproject\deepseek-harness
-# 将本仓库 plugins/<name> 作为上游工作树的插件目录纳入其构建/加载链路
-```
+- `D:\Pythonproject\deepseek-harness`：上游 master 的 **tarball 快照**
+  （codeload，13.11MB），已 `git init` 并建基线提交（无上游 remote），
+  本地对它的改动从此可 diff/回滚。
+  - 快照版本 **0.1.0-rc.5**，本机 npm 运行时为 **0.1.0-rc.6**——差一个发布。
+    要改上游源码前，先确认要对齐哪一边（把快照升级到 rc.6+，或把 npm 运行时
+    降到与快照一致）。
+  - 本机文件过滤导致少数 `CLAUDE.md` 与 `examples/` 下 2 个 `AGENTS.md`
+    未解压成功（不影响代码开发；真克隆后自然补全）。
+  - 仓库形态：pnpm monorepo——`packages/<domain>/<pkg>`（两级目录，如
+    `packages/skill/skill-filesystem`）+ `apps/cli`（`dsh` bin）+ `apps/web`
+    （前端）。开发脚本：根目录 `pnpm dev:web`（`tsx scripts/dev-web.ts --poll`）。
+  - 完整 git 历史（约 114MB）待网络稳定后拉取：
+    ```powershell
+    git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git D:\Pythonproject\deepseek-harness-clone
+    ```
+    快照目录已是 git 仓库，可与克隆结果 diff 校验完整性，然后替换快照目录、
+    配置上游 remote。
+- 本仓库 `plugins/<name>` 如何并入上游构建/加载链路：插件零裸依赖、自包含，
+  短期走 junction（§3）独立开发即可；若要随上游版本化，把插件包作为
+  workspace 成员放入上游 `packages/` 并走其 `dsh.client` 声明机制（见上游
+  `.agents/notes/implemented/architecture/2026-07-23-client-plugin-loading-model.md`）。
+- **上游源码树已在本机跑通（2026-08-17 实测：install/build/3081 冒烟全过，
+  junction 插件在源码树加载）**：完整已验证链路见 `docs/upstream-dev-loop.md`。
 
 ## 6. 相关路径速查
 
