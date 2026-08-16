@@ -1,0 +1,5 @@
+node_modules/
+*.log
+*.tar.gz
+# junction 备份目录（位于 ~/.dsh/plugins，非仓库内；此行为防御性忽略）
+*.bak-*/

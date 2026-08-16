@@ -1,0 +1,21 @@
+{
+  "name": "dsh-skill-manager",
+  "version": "0.1.0",
+  "description": "Skill file manager for DeepSeek Harness: a Settings section that lists, edits, deletes, imports and exports DSH skills across project and user roots; preset-bundled skills are read-only.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ]
+    }
+  },
+  "license": "MIT"
+}
