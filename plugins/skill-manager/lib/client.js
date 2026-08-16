@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 9
+ * build: 10
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -36,6 +36,10 @@
  * fallback for old engines), 3px brand accent bar on the left, a small
  * crate icon; and within each root section package rows are sorted to
  * the top (standalone rows follow, both keeping relative order).
+ * build 10: the brand token in this theme is a near-black bluish gray,
+ * so the tint read as plain gray — switch to the theme's real blue
+ * scale (--dsw-static-blue-500), raise the tint to 10%, and redraw the
+ * icon as an outlined box with a lid line.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -87,9 +91,9 @@
 				'.smgr-empty{margin:0;font-size:12px;color:var(--dsw-alias-label-quaternary)}',
 				'.smgr-error{margin:0;font-size:13px;color:var(--dsw-alias-state-error-primary)}',
 				'.smgr-toast{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
-				'.smgr-pkgRow{display:flex;align-items:center;gap:8px;border:1px solid var(--dsw-alias-border-l2);border-left:3px solid var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-3);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 7%,var(--dsw-alias-bg-layer-3));border-radius:10px;padding:8px 12px;cursor:pointer}',
-				'.smgr-pkgIcon{flex:none;position:relative;width:14px;height:14px;border:1.5px solid var(--dsw-alias-brand-primary);border-radius:4px}',
-				'.smgr-pkgIcon:after{content:"";position:absolute;left:3px;top:3px;width:4px;height:4px;border-radius:1px;background:var(--dsw-alias-brand-primary)}',
+				'.smgr-pkgRow{display:flex;align-items:center;gap:8px;border:1px solid var(--dsw-alias-border-l2);border-left:3px solid var(--dsw-static-blue-500);background:var(--dsw-alias-bg-layer-3);background:color-mix(in srgb,var(--dsw-static-blue-500) 10%,var(--dsw-alias-bg-layer-3));border-radius:10px;padding:8px 12px;cursor:pointer}',
+				'.smgr-pkgIcon{flex:none;position:relative;width:13px;height:13px;border:1.5px solid var(--dsw-static-blue-500);border-radius:3px}',
+				'.smgr-pkgIcon:after{content:"";position:absolute;left:2px;right:2px;top:4px;height:1.5px;background:var(--dsw-static-blue-500)}',
 				'.smgr-pkgRow:hover{border-color:var(--dsw-alias-label-dimmed)}',
 				'.smgr-caret{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font-size:11px;line-height:1;padding:4px 5px;border-radius:6px;flex:none}',
 				'.smgr-caret:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
