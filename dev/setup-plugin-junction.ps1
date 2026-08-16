@@ -1,4 +1,4 @@
-<#
+﻿<#
 setup-plugin-junction.ps1 — 把运行时的 ~/.dsh/plugins/<name> 用 junction 指到本仓库
 
 背景：DSH web profile 通过 "dsh-<name>": "link:C:/Users/<user>/.dsh/plugins/<name>"
@@ -23,24 +23,30 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PluginName,
 
-    [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+    # 注意：默认值在脚本体内解析（Windows PowerShell 5.1 参数默认值作用域里 $PSScriptRoot 为空）
+    [string]$RepoRoot,
 
-    [string]$DshPluginsDir = (Join-Path $env:USERPROFILE '.dsh\plugins'),
+    [string]$DshPluginsDir,
 
     [switch]$DryRun,
 
-    [Parameter(ParameterSetName = 'Restore', Mandatory = $true)]
+    # 回退用：提供备份路径则进入恢复模式（同时需要 -PluginName 定位目标目录）
     [string]$Restore
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $RepoRoot) {
+    if (-not $PSScriptRoot) { throw "无法确定仓库根目录（$PSScriptRoot 为空），请显式传 -RepoRoot" }
+    $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+}
+if (-not $DshPluginsDir) { $DshPluginsDir = Join-Path $env:USERPROFILE '.dsh\plugins' }
 $repoPlugin = Join-Path $RepoRoot "plugins\$PluginName"
 $livePlugin = Join-Path $DshPluginsDir $PluginName
 
 function Step($m) { Write-Host "[junction] $m" -ForegroundColor Cyan }
 
-# ── 恢复模式 ────────────────────────────────────────────────────────────────
-if ($PSCmdlet.ParameterSetName -eq 'Restore') {
+# ── 恢复模式（提供 -Restore 备份路径时）─────────────────────────────────────
+if ($Restore) {
     if (-not (Test-Path $Restore)) { throw "备份不存在：$Restore" }
     if (Test-Path $livePlugin) {
         $item = Get-Item $livePlugin -Force
