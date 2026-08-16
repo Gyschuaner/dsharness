@@ -57,7 +57,7 @@ git push
 
 - 在 `plugins/<name>/` 下改代码 = 改运行时加载的文件（junction 透传）。
 - 改 **client**：保存后浏览器刷新页面即可看到。
-- 改 **host**：保存后运行 `.\dev\restart-dsh-web.ps1` 重启（会短暂打断当前 Web GUI，
+- 改 **host**：保存后运行 `.\restart-dsh-web.ps1` 重启（会短暂打断当前 Web GUI，
   会话持久化在磁盘，浏览器重连后恢复）。
 - `list` 响应的 `apiVersion` 是插件 host 的能力版本，client 用它判断运行中的 host
   是否已加载较新操作；升级 host 功能后应递增并在 client 侧处理兼容。

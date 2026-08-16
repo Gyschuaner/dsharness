@@ -9,6 +9,9 @@ DeepSeek Harness（DSH）本地统一开发仓库。
 
 ```
 dsharness/
+├── AGENTS.md                 # 项目协作规则（DP / 飞书 / Git 工作流约定）
+├── restart-dsh-web.bat       # Windows 一键重启 dsh web（调用同目录 ps1）
+├── restart-dsh-web.ps1       # 重启 127.0.0.1:3080 的 dsh web 并验证 skill-manager
 ├── plugins/
 │   └── skill-manager/        # skill 文件管理插件（DSH Web GUI 设置页）
 │       ├── package.json      #  包名 dsh-skill-manager，零裸依赖
@@ -17,7 +20,6 @@ dsharness/
 │       │   └── client.js     #  client 半：settings.section 页面
 │       └── README.md         #  插件功能 / 安装 / 技术说明
 ├── dev/
-│   ├── restart-dsh-web.ps1   # 一键重启 dsh web（127.0.0.1:3080）并验证
 │   └── setup-plugin-junction.ps1  # 把 ~/.dsh/plugins/<name> 指向本仓库的 junction
 └── docs/
     └── dev-setup.md          # 本地 DSH 开发链路说明
