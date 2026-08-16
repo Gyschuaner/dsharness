@@ -13,12 +13,17 @@ dsharness/
 ├── restart-dsh-web.bat       # Windows 一键重启 dsh web（调用同目录 ps1）
 ├── restart-dsh-web.ps1       # 重启 127.0.0.1:3080 的 dsh web 并验证 skill-manager
 ├── plugins/
-│   └── skill-manager/        # skill 文件管理插件（DSH Web GUI 设置页）
+│   ├── skill-manager/        # skill 文件管理插件（DSH Web GUI 设置页）
 │       ├── package.json      #  包名 dsh-skill-manager，零裸依赖
 │       ├── lib/
 │       │   ├── index.js      #  host 半：注册 /api/skill-manager JSON 路由
 │       │   └── client.js     #  client 半：settings.section 页面
 │       └── README.md         #  插件功能 / 安装 / 技术说明
+│   └── image-context-guard/  # 模型请求图片上限保护（最多 9 张）
+│       ├── package.json
+│       ├── lib/index.js      # host 半：llm/stream 请求边界裁剪
+│       ├── test/             # Node.js 自动化测试
+│       └── README.md
 ├── dev/
 │   └── setup-plugin-junction.ps1  # 把 ~/.dsh/plugins/<name> 指向本仓库的 junction
 └── docs/
@@ -41,6 +46,8 @@ DSH Web GUI 的宿主进程运行的是 **npm 安装的预构建包**
   也无需重启即可让当前运行实例继续工作；
 - 开发工具（重启脚本）随仓库版本化。
 
+当前还包含 `image-context-guard` 短期保护插件：它只裁剪发往模型的临时请求副本，保证一次请求不超过 9 张图片，不删除会话历史或附件。长期多模态上下文重构登记在 DP `DSH-005`。
+
 ## 快速开始（接入一个新插件到本仓库）
 
 1. 把插件源码复制到 `plugins/<name>/`（保持 `package.json` + `lib/` 结构）。
@@ -58,16 +65,12 @@ DSH Web GUI 的宿主进程运行的是 **npm 安装的预构建包**
 
 ## 上游源码（deepseek-harness）
 
-本仓库当前**不含**上游 `@deepseek-ai/dsh` 的完整源码树（约 114MB，本机网络
-拉取受限）。插件本身零裸依赖、自包含，可独立开发。后续如需连同上游一起开发，
-在能稳定访问 GitHub 的网络下：
-
-```powershell
-git clone https://github.com/deepseek-ai/deepseek-harness.git ../deepseek-harness
-# 再把本仓库 plugins/ 作为上游工作树的插件目录纳入其构建/加载链路
-```
-
-详见 `docs/dev-setup.md`。
+已落到本地（DSH-003 跟进项，2026-08-17）：`D:\Pythonproject\deepseek-harness`
+是上游 master 的 **tarball 快照**（pnpm monorepo，版本 0.1.0-rc.5；本机 npm
+运行时为 rc.6，差一个发布）。快照已建 git 基线（无上游 remote），本地改动可
+追溯；少数 `CLAUDE.md` 因本机文件过滤未解压。完整 git 历史（约 114MB）待网络
+稳定后克隆替换。插件零裸依赖、自包含，可独立开发；与上游联动方式见
+`docs/dev-setup.md` §5。
 
 ## 开发约定
 
