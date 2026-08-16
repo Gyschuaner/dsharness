@@ -22,7 +22,8 @@ dsharness/
 ├── dev/
 │   └── setup-plugin-junction.ps1  # 把 ~/.dsh/plugins/<name> 指向本仓库的 junction
 └── docs/
-    └── dev-setup.md          # 本地 DSH 开发链路说明
+    ├── dev-setup.md          # 本地 DSH 开发链路说明
+    └── installed-plugins.md  # web profile 已安装插件台账（版本/通道/回退，DSH-007）
 ```
 
 ## 这个仓库解决什么问题
