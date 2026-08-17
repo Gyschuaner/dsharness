@@ -12,6 +12,8 @@ dsharness/
 ├── AGENTS.md                 # 项目协作规则（DP / 飞书 / Git 工作流约定）
 ├── restart-dsh-web.bat       # Windows 一键重启 dsh web（调用同目录 ps1）
 ├── restart-dsh-web.ps1       # 重启 127.0.0.1:3080 的 dsh web 并验证 skill-manager
+├── upstream.lock.json        # 官方源码、工具链、补丁与最终 tree 锁定
+├── upstream-patches/         # 需要应用到官方源码的本地补丁
 ├── plugins/
 │   ├── skill-manager/        # skill 文件管理插件（DSH Web GUI 设置页）
 │       ├── package.json      #  包名 dsh-skill-manager，零裸依赖
@@ -25,19 +27,21 @@ dsharness/
 │       ├── test/             # Node.js 自动化测试
 │       └── README.md
 ├── dev/
+│   ├── install-dsh-source.ps1     # 拉取、打补丁、构建并注册 dsh
+│   ├── verify-dsh-source.ps1      # 校验工具链、源码 tree、补丁和 Web
 │   └── setup-plugin-junction.ps1  # 把 ~/.dsh/plugins/<name> 指向本仓库的 junction
 └── docs/
     ├── dev-setup.md          # 本地 DSH 开发链路说明
+    ├── reproducible-build.md # 新电脑可复现构建与更新方法
     └── installed-plugins.md  # web profile 已安装插件台账（版本/通道/回退，DSH-007）
 ```
 
 ## 这个仓库解决什么问题
 
-DSH Web GUI 的宿主进程运行的是 **npm 安装的预构建包**
-`@deepseek-ai/dsh`（`lib/` 为 bundle 产物、无 `.git`），上游源码仓库
-`github.com/deepseek-ai/deepseek-harness` 在本机没有克隆。而真正在本地
-持续开发、且未版本控制的代码是 **插件**（如 skill-manager），它原先直接放在
-`~/.dsh/plugins/skill-manager`，靠 `link:` 依赖挂进 web profile。
+DSH 的官方源码和本地插件原来分散在不同目录，本机能运行，但另一台电脑无法只靠
+Git 还原相同构建。`dsharness` 现在同时管理两类内容：仓库内直接维护插件源码；
+通过锁文件和补丁编排官方 `deepseek-harness` 源码。个人凭据、会话、附件和设置仍
+保留在各自电脑的 `~/.dsh`，不进入 Git。
 
 本仓库把这类"本地实际在改的代码"收进来：
 
@@ -46,10 +50,25 @@ DSH Web GUI 的宿主进程运行的是 **npm 安装的预构建包**
   使"仓库内开发"与"运行时加载"是同一份文件，无需改 profile 的 `link:` 路径，
   也无需重启即可让当前运行实例继续工作；
 - 开发工具（重启脚本）随仓库版本化。
+- 官方源码基线、Node/pnpm 版本、本地补丁和最终源码 tree 有明确校验值；
+- 新电脑可从空目录完成 frozen install、完整构建和 `dsh` 命令注册。
 
 当前还包含 `image-context-guard` 短期保护插件：它只裁剪发往模型的临时请求副本，保证一次请求不超过 9 张图片，不删除会话历史或附件。长期多模态上下文重构登记在 DP `DSH-005`。
 
-## 快速开始（接入一个新插件到本仓库）
+## 快速开始（构建 DSH）
+
+新电脑安装 Git 与 Node `24.11.1` 后执行：
+
+```powershell
+git clone https://github.com/Gyschuaner/dsharness.git
+cd dsharness
+.\dev\install-dsh-source.ps1 -StartWeb
+```
+
+脚本不会复制原电脑的 `~/.dsh`。安装与校验细节见
+[`docs/reproducible-build.md`](docs/reproducible-build.md)。
+
+## 接入一个新插件到本仓库
 
 1. 把插件源码复制到 `plugins/<name>/`（保持 `package.json` + `lib/` 结构）。
 2. 运行 junction 脚本，把运行时的 `~/.dsh/plugins/<name>` 指向仓库：
@@ -66,13 +85,11 @@ DSH Web GUI 的宿主进程运行的是 **npm 安装的预构建包**
 
 ## 上游源码（deepseek-harness）
 
-已落到本地（DSH-003 跟进项，2026-08-17）：`D:\Pythonproject\deepseek-harness`
-是上游 master 的 **tarball 快照**（pnpm monorepo，版本 0.1.0-rc.5；本机 npm
-运行时为 rc.6，差一个发布）。快照已建 git 基线（无上游 remote），本地改动可
-追溯；少数 `CLAUDE.md` 因本机文件过滤未解压。完整 git 历史（约 114MB）待网络
-稳定后克隆替换。插件零裸依赖、自包含，可独立开发；源码树已在本机跑通
-（install/build/次端口冒烟全过，插件双链路生效），详见 `docs/upstream-dev-loop.md`
-与 `docs/dev-setup.md` §5。
+当前锁定官方 `master` 提交 `99f6f02`（`0.1.0-rc.7`），随后应用 DSH-009 的
+流式活动保活补丁。最终源码 tree 为
+`81852018fb2884bf95655e3bfd3f07f87763f9b3`。`dev/install-dsh-source.ps1`
+只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
+[`docs/reproducible-build.md`](docs/reproducible-build.md)。
 
 ## 开发约定
 

@@ -6,10 +6,10 @@
 
 宿主环境：
 
-- **Windows（主开发机，chuansgu，2026-08-17）**：`@deepseek-ai/dsh` 0.1.0-rc.6
-  （npm 预构建包），Node v24.11.1，pnpm 10.22.0（`~/.dsh/profiles/web` 为
-  hoisted linker，`autoInstallPeers: false`，原生构建脚本经
-  `onlyBuiltDependencies` 白名单放行）。
+- **Windows（主开发机，chuansgu，2026-08-17）**：`@deepseek-ai/dsh` 0.1.0-rc.7
+  （`D:\Pythonproject\deepseek-harness` 源码构建，`dsh` 全局命令链接到
+  `apps/cli`），Node v24.11.1，源码构建使用 pnpm 11.7.0。当前源码与补丁由
+  `upstream.lock.json` 锁定；`~/.dsh/profiles/web` 继续作为独立运行配置维护。
 - **macOS（gys MacBook，2026-08-17）**：`@deepseek-ai/dsh` 0.1.0-rc.6
   （npm 预构建包，npx 缓存启动 `npm exec @deepseek-ai/dsh@latest web`），
   Node v22.15.0，pnpm 11.19.0。同为裸环境起步（零插件），上表 3 个插件

@@ -1,8 +1,8 @@
 # 上游源码本地开发链路（已验证）
 
 > 日期：2026-08-17。需求 DSH-003 跟进项。
-> 本文记录上游 `deepseek-harness` 源码树在本机的**已验证**开发链路。
-> 前置状态见 `dev-setup.md` §5（快照位置 / 版本差 / 解压缺口）。
+> 本文记录上游 `deepseek-harness` 源码树在本机的已验证开发链路。
+> 当前锁定版本和新电脑安装方法以 `reproducible-build.md` 为准。
 
 ## 1. 关键结论（为什么插件"天然"接入）
 
@@ -19,17 +19,14 @@
 ## 2. 已验证步骤（2026-08-17 实测）
 
 ```powershell
+cd D:\Pythonproject\dsharness
+
+# 从 dsharness 锁文件恢复上游源码、补丁和工具链
+.\dev\install-dsh-source.ps1 -SourceDirectory D:\Pythonproject\deepseek-harness
+
 cd D:\Pythonproject\deepseek-harness
 
-# a) 依赖安装（corepack 自动切 pnpm 11.7.0；registry npmmirror）
-pnpm install --frozen-lockfile        # 923 包，约 1.5 分钟，exit 0
-                                     # （examples/python 两个 demo 的 .bin 告警无害）
-
-# b) 全量构建（host lib + client lib + web 前端 vite）
-pnpm build                            # tsc -b + tsdown + vite，exit 0
-                                     # 产物：各包 lib/、apps/web/dist/
-
-# c) 用源码树起 Web（次端口，避开 3080 的 npm 运行时）
+# 安装脚本已完成 frozen install 与完整构建；需要隔离冒烟时使用次端口
 node apps/cli/lib/bin.js web --host 127.0.0.1 --port 3081
 ```
 
@@ -57,11 +54,11 @@ node apps/cli/lib/bin.js web --host 127.0.0.1 --port 3081
 - 停 3081 实例：`Get-NetTCPConnection -LocalPort 3081 -State Listen` 找 PID
   后 `Stop-Process`；`restart-dsh-web.ps1` 杀进程时也会把它一并停掉。
 
-## 4. 已知限制 / 待办
+## 4. 当前限制
 
-- 快照是 **rc.5**，npm 运行时是 **rc.6**：改上游前确认对齐方向
-  （升级快照 / 降级 npm）。
-- 完整 git 历史未拉（git 协议本机挂死）：换稳定网络后按 `dev-setup.md` §5
-  的克隆命令替换快照，并 `git remote add origin https://github.com/deepseek-ai/deepseek-harness.git`。
-- 快照缺少数个 `CLAUDE.md` / `examples` 下 `AGENTS.md`（本机文件过滤所致），
-  不影响构建与开发。
+- 构建锁定的是确定源码树，不复制个人 `~/.dsh`；新电脑需要重新配置模型凭据和
+  选择需要启用的本地插件。
+- Node 版本必须精确为 `24.11.1`。脚本发现版本不符时停止，不自动安装或替换
+  系统 Node。
+- 升级官方 DSH 或调整补丁后必须更新 `upstream.lock.json`，并从空目录重跑完整
+  构建和 Web 冒烟。

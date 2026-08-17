@@ -64,31 +64,20 @@ git push
 
 ## 5. 上游源码（@deepseek-ai/dsh 完整仓库）
 
-已落到本地（DSH-003 跟进项，2026-08-17）：
+DSH-003 已把上游源码接入方式改为可复现构建：
 
-- `D:\Pythonproject\deepseek-harness`：上游 master 的 **tarball 快照**
-  （codeload，13.11MB），已 `git init` 并建基线提交（无上游 remote），
-  本地对它的改动从此可 diff/回滚。
-  - 快照版本 **0.1.0-rc.5**，本机 npm 运行时为 **0.1.0-rc.6**——差一个发布。
-    要改上游源码前，先确认要对齐哪一边（把快照升级到 rc.6+，或把 npm 运行时
-    降到与快照一致）。
-  - 本机文件过滤导致少数 `CLAUDE.md` 与 `examples/` 下 2 个 `AGENTS.md`
-    未解压成功（不影响代码开发；真克隆后自然补全）。
-  - 仓库形态：pnpm monorepo——`packages/<domain>/<pkg>`（两级目录，如
-    `packages/skill/skill-filesystem`）+ `apps/cli`（`dsh` bin）+ `apps/web`
-    （前端）。开发脚本：根目录 `pnpm dev:web`（`tsx scripts/dev-web.ts --poll`）。
-  - 完整 git 历史（约 114MB）待网络稳定后拉取：
-    ```powershell
-    git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git D:\Pythonproject\deepseek-harness-clone
-    ```
-    快照目录已是 git 仓库，可与克隆结果 diff 校验完整性，然后替换快照目录、
-    配置上游 remote。
-- 本仓库 `plugins/<name>` 如何并入上游构建/加载链路：插件零裸依赖、自包含，
-  短期走 junction（§3）独立开发即可；若要随上游版本化，把插件包作为
-  workspace 成员放入上游 `packages/` 并走其 `dsh.client` 声明机制（见上游
-  `.agents/notes/implemented/architecture/2026-07-23-client-plugin-loading-model.md`）。
-- **上游源码树已在本机跑通（2026-08-17 实测：install/build/3081 冒烟全过，
-  junction 插件在源码树加载）**：完整已验证链路见 `docs/upstream-dev-loop.md`。
+- `upstream.lock.json` 锁定官方 `master` 提交 `99f6f02`、DSH `0.1.0-rc.7`、
+  Node `24.11.1`、pnpm `11.7.0`、本地补丁哈希和最终源码 tree；
+- `upstream-patches/` 保存需要叠加到官方源码的本地改动，当前包含 DSH-009
+  流式活动保活与截断工具调用保护；
+- `dev/install-dsh-source.ps1` 在空目录拉取源码、应用补丁、执行 frozen install、
+  完整构建并注册 `dsh`；
+- `dev/verify-dsh-source.ps1` 独立校验工具链、源码 tree、补丁、CLI 版本和 Web
+  冒烟。
+
+新电脑不再依赖 tarball 快照，也不用复制现有 `~/.dsh`。安装与升级锁定版本的
+完整方法见 [`reproducible-build.md`](reproducible-build.md)。本仓库插件继续通过
+junction 接入运行时；是否安装和启用某个插件属于每台电脑的新运行配置。
 
 ## 6. 图片上下文短期保护
 
@@ -105,5 +94,5 @@ git push
 | web profile 依赖声明 | `C:\Users\<user>\.dsh\profiles\web\package.json` |
 | web profile 用户层补丁 | `C:\Users\<user>\.dsh\profiles\web\cordis.patch.yml` |
 | 插件加载符号链接 | `C:\Users\<user>\.dsh\profiles\web\node_modules\dsh-<name>` |
-| 宿主进程 | `node .../npm/node_modules/@deepseek-ai/dsh/lib/bin.js web --host 127.0.0.1 --port 3080` |
+| 宿主进程 | `dsh web --host 127.0.0.1 --port 3080`（命令链接到锁定源码构建） |
 | 策略状态（skill-manager） | `C:\Users\<user>\.dsh\skill-manager.json` |
