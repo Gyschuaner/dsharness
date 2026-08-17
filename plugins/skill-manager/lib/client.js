@@ -1050,7 +1050,10 @@
 					seen[cwd] = true;
 					out.push({ cwd: cwd, title: (typeof title === 'string' && title !== '') ? title : (baseName(cwd) || cwd), kind: kind });
 				}
-				push(currentCwd(ctx), '当前工作区', 'current');
+				// Current workspace title = its name (the menu adds a
+				// "当前工作区" hint beside it), matching the visual target.
+				var cur = currentCwd(ctx);
+				push(cur, baseName(cur) || cur, 'current');
 				try {
 					var ws = ctx.get('workspaces');
 					var snap = ws && ws.list && typeof ws.list.getSnapshot === 'function' ? ws.list.getSnapshot() : null;
@@ -2069,17 +2072,26 @@
 				var api = props.api;
 				var ctx = props.ctx;
 				var onClose = props.onClose;
+				// Keep the latest onClose in a ref so the Esc listener is
+				// registered exactly once per mount. The inline onClose prop
+				// changes identity on every re-render of the sidebar entry;
+				// re-registering on each change drifted this page-level
+				// handler to AFTER the drawer's own Esc handler, whose React
+				// close flushes synchronously — so the page handler then saw
+				// no dialog left and closed the whole Extensions page.
+				var onCloseRef = React.useRef(onClose);
+				onCloseRef.current = onClose;
 				var [tab, setTab] = React.useState('skill');
 				React.useEffect(function () {
 					function onKey(event) {
 						if (event.key !== 'Escape') return;
-						// An inner dialog (import/delete confirm) owns Esc first.
+						// An inner dialog (the drawer) owns Esc first.
 						if (document.querySelector('[role="dialog"]') !== null) return;
-						onClose();
+						onCloseRef.current();
 					}
 					document.addEventListener('keydown', onKey);
 					return function () { document.removeEventListener('keydown', onKey); };
-				}, [onClose]);
+				}, []);
 				return h(
 					'div',
 					{ className: 'ext-page', role: 'region', 'aria-label': '扩展管理' },

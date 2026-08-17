@@ -1,0 +1,289 @@
+{
+  "steps": [
+    {
+      "step": "open-extensions",
+      "ok": true,
+      "detail": "项目管理/统一资源库"
+    },
+    {
+      "step": "c1-project-selector",
+      "ok": true,
+      "detail": "dsharness"
+    },
+    {
+      "step": "c1-project-menu",
+      "ok": true,
+      "detail": "dsharness | 当前工作区 | Deepseek Harness | co-agent-edu | 添加本地项目…"
+    },
+    {
+      "step": "c1-row-anatomy",
+      "ok": true,
+      "detail": "descs=68 switches=68"
+    },
+    {
+      "step": "c1-footer-git-note",
+      "ok": true,
+      "detail": "共 68 个 Skill · 已启用 0 个"
+    },
+    {
+      "step": "c1-search-filter",
+      "ok": true,
+      "detail": "rows=4 top=lark-base"
+    },
+    {
+      "step": "c1-enable-filter",
+      "ok": true,
+      "detail": "未启用 rows=68/68"
+    },
+    {
+      "step": "c1-library-tab",
+      "ok": true,
+      "detail": "资源库范围"
+    },
+    {
+      "step": "c1-preset-saved",
+      "ok": true,
+      "detail": "chips=1"
+    },
+    {
+      "step": "c1-preset-apply-modal",
+      "ok": true,
+      "detail": "replace/merge present"
+    },
+    {
+      "step": "c1-preset-deleted",
+      "ok": true,
+      "detail": "chip gone"
+    },
+    {
+      "step": "c3-enable-arxiv",
+      "ok": true,
+      "detail": "smgr-switch smgr-switchOn"
+    },
+    {
+      "step": "c4-manual-invocation-hint",
+      "ok": true,
+      "detail": "在本项目禁用（模型不再自动调用，仍可用 /arxiv 手动调用）"
+    },
+    {
+      "step": "c3-disable-arxiv",
+      "ok": true,
+      "detail": "smgr-switch"
+    },
+    {
+      "step": "c3-drawer-sections",
+      "ok": true,
+      "detail": "sections present"
+    },
+    {
+      "step": "c3-drawer-enable",
+      "ok": true,
+      "detail": "smgr-switch smgr-switchOn"
+    },
+    {
+      "step": "c3-drawer-esc",
+      "ok": true,
+      "detail": "drawer closed"
+    },
+    {
+      "step": "c3-dpc-sources",
+      "ok": true,
+      "detail": "options=3 :: 默认（按优先级自动选择）\n当前解析为：全局 · ~/.claude/skills | 全局 · ~/.claude/skills\n其他全局（只读） · 优先级 300 | 全局 · ~/.codex/skills\n其他全局（只读） · 优先"
+    },
+    {
+      "step": "c3-dpc-source-selected",
+      "ok": true,
+      "detail": "sk-src sk-srcOn"
+    },
+    {
+      "step": "c3-dpc-source-restored",
+      "ok": true,
+      "detail": "sk-src sk-srcOn"
+    },
+    {
+      "step": "c3-bulk-visible",
+      "ok": true,
+      "detail": "bulk bar shown"
+    },
+    {
+      "step": "c3-bulk-enabled",
+      "ok": true,
+      "detail": "已启用 2 个"
+    },
+    {
+      "step": "c3-bulk-disabled",
+      "ok": true,
+      "detail": "已启用 0 个"
+    },
+    {
+      "step": "c3-slim-preview",
+      "ok": true,
+      "detail": "一键精简"
+    },
+    {
+      "step": "c3-slim-applied",
+      "ok": true,
+      "detail": "arxiv off after slim"
+    },
+    {
+      "step": "c2-library-merge",
+      "ok": true,
+      "detail": "rows=68 multi-source=2"
+    },
+    {
+      "step": "c2-library-dpc-row",
+      "ok": true,
+      "detail": "developer-platform-cli\n来源 ×2\nOperate the internal Developer "
+    },
+    {
+      "step": "c2-library-priority-note",
+      "ok": true,
+      "detail": "默认优先级：项目专属 > DSH 用户级 > 其他全局 > 内置；未显式选择时使用第一个可用来源"
+    }
+  ],
+  "pass": [
+    {
+      "step": "open-extensions",
+      "ok": true,
+      "detail": "项目管理/统一资源库"
+    },
+    {
+      "step": "c1-project-selector",
+      "ok": true,
+      "detail": "dsharness"
+    },
+    {
+      "step": "c1-project-menu",
+      "ok": true,
+      "detail": "dsharness | 当前工作区 | Deepseek Harness | co-agent-edu | 添加本地项目…"
+    },
+    {
+      "step": "c1-row-anatomy",
+      "ok": true,
+      "detail": "descs=68 switches=68"
+    },
+    {
+      "step": "c1-footer-git-note",
+      "ok": true,
+      "detail": "共 68 个 Skill · 已启用 0 个"
+    },
+    {
+      "step": "c1-search-filter",
+      "ok": true,
+      "detail": "rows=4 top=lark-base"
+    },
+    {
+      "step": "c1-enable-filter",
+      "ok": true,
+      "detail": "未启用 rows=68/68"
+    },
+    {
+      "step": "c1-library-tab",
+      "ok": true,
+      "detail": "资源库范围"
+    },
+    {
+      "step": "c1-preset-saved",
+      "ok": true,
+      "detail": "chips=1"
+    },
+    {
+      "step": "c1-preset-apply-modal",
+      "ok": true,
+      "detail": "replace/merge present"
+    },
+    {
+      "step": "c1-preset-deleted",
+      "ok": true,
+      "detail": "chip gone"
+    },
+    {
+      "step": "c3-enable-arxiv",
+      "ok": true,
+      "detail": "smgr-switch smgr-switchOn"
+    },
+    {
+      "step": "c4-manual-invocation-hint",
+      "ok": true,
+      "detail": "在本项目禁用（模型不再自动调用，仍可用 /arxiv 手动调用）"
+    },
+    {
+      "step": "c3-disable-arxiv",
+      "ok": true,
+      "detail": "smgr-switch"
+    },
+    {
+      "step": "c3-drawer-sections",
+      "ok": true,
+      "detail": "sections present"
+    },
+    {
+      "step": "c3-drawer-enable",
+      "ok": true,
+      "detail": "smgr-switch smgr-switchOn"
+    },
+    {
+      "step": "c3-drawer-esc",
+      "ok": true,
+      "detail": "drawer closed"
+    },
+    {
+      "step": "c3-dpc-sources",
+      "ok": true,
+      "detail": "options=3 :: 默认（按优先级自动选择）\n当前解析为：全局 · ~/.claude/skills | 全局 · ~/.claude/skills\n其他全局（只读） · 优先级 300 | 全局 · ~/.codex/skills\n其他全局（只读） · 优先"
+    },
+    {
+      "step": "c3-dpc-source-selected",
+      "ok": true,
+      "detail": "sk-src sk-srcOn"
+    },
+    {
+      "step": "c3-dpc-source-restored",
+      "ok": true,
+      "detail": "sk-src sk-srcOn"
+    },
+    {
+      "step": "c3-bulk-visible",
+      "ok": true,
+      "detail": "bulk bar shown"
+    },
+    {
+      "step": "c3-bulk-enabled",
+      "ok": true,
+      "detail": "已启用 2 个"
+    },
+    {
+      "step": "c3-bulk-disabled",
+      "ok": true,
+      "detail": "已启用 0 个"
+    },
+    {
+      "step": "c3-slim-preview",
+      "ok": true,
+      "detail": "一键精简"
+    },
+    {
+      "step": "c3-slim-applied",
+      "ok": true,
+      "detail": "arxiv off after slim"
+    },
+    {
+      "step": "c2-library-merge",
+      "ok": true,
+      "detail": "rows=68 multi-source=2"
+    },
+    {
+      "step": "c2-library-dpc-row",
+      "ok": true,
+      "detail": "developer-platform-cli\n来源 ×2\nOperate the internal Developer "
+    },
+    {
+      "step": "c2-library-priority-note",
+      "ok": true,
+      "detail": "默认优先级：项目专属 > DSH 用户级 > 其他全局 > 内置；未显式选择时使用第一个可用来源"
+    }
+  ],
+  "fail": [],
+  "durationMs": 20263,
+  "pageErrors": []
+}
