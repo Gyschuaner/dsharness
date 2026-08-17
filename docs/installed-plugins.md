@@ -22,16 +22,18 @@
 | dsh-skill-manager | 0.1.0（build 10） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003 | 本地持续开发；`~/.dsh/plugins/skill-manager` 为指向本仓库的 junction |
 | dsh-image-context-guard | 0.1.0 | 本仓库（提交 aa85d62，已合并 main） | `link:` 指向 `~/.dsh/plugin-cache/image-context-guard-aa85d62` | cordis.patch.yml insert（手动，DSH-004 注释段） | DSH-004 / BUG-3E5CFD04 | 模型请求图片上限 9 张；cache 目录名 = 源提交短哈希 |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
+| dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
 ## 宿主差异（2026-08-17）
 
-- **Windows**：上表 3 个插件均已安装；skill-manager 为 junction 指向本仓库
-  checkout（拉到 main 后即 DSH-006 build 11 扩展页）。
-- **macOS**：3 个插件与 Windows 一致。skill-manager / image-context-guard
-  为 link 通道，`~/.dsh/plugins/<name>` 符号链接 → 本仓库 `plugins/<name>`
-  （macOS 下的 junction 等价物，`dev/setup-plugin-junction.ps1` 仅 Windows
-  可用，手工 `ln -sfn` 建链）；better-sidebar 0.12.3 走 npm 官方通道
-  （与 Windows 同版本）。
+- **Windows**：上表前 3 个插件均已安装；skill-manager 为 junction 指向本仓库
+  checkout（拉到 main 后即 DSH-006 build 11 扩展页）。better-sidebar-smooth
+  未安装（该胶囊动画撕裂在 Windows 宿主同样存在，需要时按 macOS 同法接入）。
+- **macOS**：上表 4 个插件全部安装。skill-manager / image-context-guard /
+  better-sidebar-smooth 为 link 通道，`~/.dsh/plugins/<name>` 符号链接 →
+  本仓库 `plugins/<name>`（macOS 下的 junction 等价物，
+  `dev/setup-plugin-junction.ps1` 仅 Windows 可用，手工 `ln -sfn` 建链）；
+  better-sidebar 0.12.3 走 npm 官方通道（与 Windows 同版本）。
 
 ## 安装 / 更新 / 回退约定
 
@@ -60,6 +62,14 @@
 
 ## 变更日志
 
+- **2026-08-17（macOS 宿主装 better-sidebar-smooth，BUG-1E130940）**：
+  本地 CSS 补丁插件修复 better-sidebar 0.12.3 侧面板开合时 Session log
+  胶囊动画撕裂（根因：session header `padding-right` 78px↔28px 翻转无
+  过渡，与 `#root` margin 300ms 动画失步；GUI 实测确认两态数值与
+  `transition: all` 0s）。插件仅 client 半（1 条 CSS，host 半 no-op），
+  走 link 通道 + cordis.patch.yml insert；用户层热监听，**无需重启**，
+  刷新页面即生效（离线树无警告、bundle HTTP 200、boot manifest 已含
+  插件行）。待上游修复后整体移除。
 - **2026-08-17（macOS 宿主装 better-sidebar，DSH-007）**：macOS 宿主安装
   dsh-better-sidebar 0.12.3（npm 官方通道，与 Windows 同版本；显式指定版本
   绕过 pnpm 11 minimumReleaseAge 门禁，见约定节）。pnpm-workspace.yaml
