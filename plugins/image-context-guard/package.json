@@ -1,0 +1,15 @@
+{
+  "name": "dsh-image-context-guard",
+  "version": "0.1.0",
+  "description": "Limits each DSH model request to the nine newest image blocks without mutating durable session history.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}

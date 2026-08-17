@@ -1,6 +1,6 @@
 # 本地 DSH 开发链路说明
 
-> 适用：在本机开发 DSH Web GUI 的**插件**（如 skill-manager）。
+> 适用：在本机开发 DSH Web GUI 的**插件**（如 skill-manager、image-context-guard）。
 > 目标：让"仓库内开发"与"运行时加载"是同一份文件，保留 Git 历史，不破坏正在运行的 Web GUI。
 
 ## 1. 运行时的加载链
@@ -11,7 +11,7 @@ dsh web 宿主进程（node .../@deepseek-ai/dsh/lib/bin.js web）
        ├─ package.json 的 dsh.profile.bundles（@deepseek-ai/* 官方 bundle）
        ├─ package.json 的 dependencies（"dsh-<name>": "link:<插件目录>"）
        └─ cordis.patch.yml（用户层 insert，把插件挂进组合树）
-            └─ ~/.dsh/profiles/node_modules/dsh-<name>（pnpm 符号链接）
+            └─ ~/.dsh/profiles/web/node_modules/dsh-<name>（pnpm 符号链接）
                  └─ <插件目录>/lib/{index.js, client.js}
 ```
 
@@ -90,7 +90,13 @@ git push
 - **上游源码树已在本机跑通（2026-08-17 实测：install/build/3081 冒烟全过，
   junction 插件在源码树加载）**：完整已验证链路见 `docs/upstream-dev-loop.md`。
 
-## 6. 相关路径速查
+## 6. 图片上下文短期保护
+
+`plugins/image-context-guard` 对应 DP `DSH-004` / `BUG-3E5CFD04`。它通过 `llm/stream` host 插件在模型适配器调用前生成安全副本，按“最新消息优先、消息内保持原顺序”保留最多 9 张图片。持久化会话、附件引用和前端历史不被改写。
+
+该插件是本地短期保护，不替代 DP `DSH-005` 中的长期方案（附件存储、视觉摘要、工具截图消费后退出上下文、按附件 ID 重注入）。接入步骤和 profile 配置见 `plugins/image-context-guard/README.md`。
+
+## 7. 相关路径速查
 
 | 用途 | 路径 |
 | --- | --- |
@@ -98,6 +104,6 @@ git push
 | 运行时插件目录（junction） | `C:\Users\<user>\.dsh\plugins\<name>` |
 | web profile 依赖声明 | `C:\Users\<user>\.dsh\profiles\web\package.json` |
 | web profile 用户层补丁 | `C:\Users\<user>\.dsh\profiles\web\cordis.patch.yml` |
-| 插件加载符号链接 | `C:\Users\<user>\.dsh\profiles\node_modules\dsh-<name>` |
+| 插件加载符号链接 | `C:\Users\<user>\.dsh\profiles\web\node_modules\dsh-<name>` |
 | 宿主进程 | `node .../npm/node_modules/@deepseek-ai/dsh/lib/bin.js web --host 127.0.0.1 --port 3080` |
 | 策略状态（skill-manager） | `C:\Users\<user>\.dsh\skill-manager.json` |

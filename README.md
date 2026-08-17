@@ -13,12 +13,17 @@ dsharness/
 ├── restart-dsh-web.bat       # Windows 一键重启 dsh web（调用同目录 ps1）
 ├── restart-dsh-web.ps1       # 重启 127.0.0.1:3080 的 dsh web 并验证 skill-manager
 ├── plugins/
-│   └── skill-manager/        # skill 文件管理插件（DSH Web GUI 设置页）
+│   ├── skill-manager/        # skill 文件管理插件（DSH Web GUI 设置页）
 │       ├── package.json      #  包名 dsh-skill-manager，零裸依赖
 │       ├── lib/
 │       │   ├── index.js      #  host 半：注册 /api/skill-manager JSON 路由
 │       │   └── client.js     #  client 半：settings.section 页面
 │       └── README.md         #  插件功能 / 安装 / 技术说明
+│   └── image-context-guard/  # 模型请求图片上限保护（最多 9 张）
+│       ├── package.json
+│       ├── lib/index.js      # host 半：llm/stream 请求边界裁剪
+│       ├── test/             # Node.js 自动化测试
+│       └── README.md
 ├── dev/
 │   └── setup-plugin-junction.ps1  # 把 ~/.dsh/plugins/<name> 指向本仓库的 junction
 └── docs/
@@ -41,6 +46,8 @@ DSH Web GUI 的宿主进程运行的是 **npm 安装的预构建包**
   使"仓库内开发"与"运行时加载"是同一份文件，无需改 profile 的 `link:` 路径，
   也无需重启即可让当前运行实例继续工作；
 - 开发工具（重启脚本）随仓库版本化。
+
+当前还包含 `image-context-guard` 短期保护插件：它只裁剪发往模型的临时请求副本，保证一次请求不超过 9 张图片，不删除会话历史或附件。长期多模态上下文重构登记在 DP `DSH-005`。
 
 ## 快速开始（接入一个新插件到本仓库）
 
