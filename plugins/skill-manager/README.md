@@ -1,24 +1,79 @@
 # dsh-skill-manager
 
 DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增「扩展」一级入口，
-点开全页「扩展」视图，统一管理 DSH 的扩展能力（DSH-006）。
+点开全页「扩展」视图，统一管理 DSH 的扩展能力（DSH-006；SKILL 管理中心 V1 重构 DSH-008）。
 
-- **SKILL 分区**（一期）：原「Skills 技能管理」页面整体迁入，功能不变（见下方功能列表）。
+- **SKILL 分区**（DSH-008 V1）：两个子页面 ——
+  - **项目管理**（默认）：按项目启用/禁用 Skill、批量启停、一键精简、
+    保存/应用自定义预设（替换/合并预览）、全局标签、项目选择器（复用 DSH 工作区 + 手动添加本地项目）。
+  - **统一资源库**：全部 DSH 支持目录中的 Skill 同名合并为一个身份，
+    详情列出全部来源，当前项目可显式选择来源。
+  - 运行中的 host 尚未加载 apiVersion 6（未重启 `dsh web`）时，自动降级为
+    旧版单页界面（见下方「旧版功能」）并显示提示条。
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 11 / DSH-006）
+## 页面结构（build 12 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
 - **全页视图**：fixed 全屏覆盖（z-index 200，位于侧边浮动面板(30)之上、Modal(1000)/toast(1100)
   之下，SKILL 分区内的导入/删除确认弹窗仍正常浮于其上）。顶栏标题 + 关闭按钮；
   左导航 SKILL / MCP / Plugin（建设中带徽标）；右内容区。Esc 或关闭按钮退出
-  （SKILL 分区内弹窗打开时 Esc 优先给弹窗）。
-- **SKILL 分区**：直接复用 `SkillManagerSection` 组件与既有 `/api/skill-manager`
-  host API（apiVersion 5），零 host 改动、零行为变化。
+  （弹窗打开时 Esc 优先给弹窗；详情抽屉打开时 Esc 先关抽屉）。
+- **SKILL 分区（V1）**：`项目管理 / 统一资源库` 两个子页签。
+  - **项目管理**：顶部「当前项目」选择器（当前 DSH 工作区 + 最近使用的工作区 +
+    添加本地项目）与「自定义预设」chip 行（默认精简预设带「默认精简」标记）；
+    工具栏为 搜索 / 全部·已启用·未启用 / 全部标签 筛选 / 一键精简；
+    行 = 图标 + 名称 + 项目特化/来源×N/未启用 徽标 + 完整描述 + 标签 + 启用开关；
+    勾选多行后可批量启用/禁用；底部说明「项目配置保存于 …/.dsh/skill-manager.json，
+    可纳入 Git 版本管理；启停在下一轮对话生效」。
+  - **统一资源库**：同名 Skill 合并为一行（「来源 ×N」徽标），搜索/标签筛选，
+    点击行打开右侧详情抽屉切换来源；默认优先级 项目专属 > DSH 用户级 > 其他全局 > 内置。
+  - **详情抽屉**：启用此 Skill 开关、完整描述、当前来源、可选来源（radio，
+    含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、标签编辑
+    （全局，跨项目共享）、更新状态（V1 不检测远端更新，不伪造数据）、
+    「为此项目特化」（V1.2 能力，只读展示 + 禁用按钮）、高级折叠（路径/格式/附属文件）。
+- **SKILL 分区（旧版降级）**：host 未加载 apiVersion 6 时渲染
+  `SkillManagerSection`（build 11 功能，见下），顶部显示重启提示条。
 
-## 功能
+## DSH-008 V1 核心机制
+
+- **项目配置是唯一真相**：`<项目根>/.dsh/skill-manager.json`（apiVersion 6，
+  原子写入，可纳入 Git）。记录已启用 Skill 身份集合、显式来源选择、最近应用的预设。
+  文件级开关（frontmatter 标志 / 派生开关文件）只是可重建的派生产物。
+- **新项目默认不暴露**：项目配置不存在时启用集合为空；`reconcile` 会为每个
+  「非项目来源且默认会被 DSH 自动选中」的 Skill 生成带稳定 marker 的派生开关文件
+  `<项目根>/.dsh/skills/<name>.md`（`disable-model-invocation: true` +
+  描述前缀 `[skill-manager] 本项目禁用开关`），使模型自动候选为空；
+  `user-invocable` 的 `/skill-name` 手动调用不受影响，下一轮对话生效、无需重启。
+  产品默认来源在 DSH rank 上输给更低 rank 的健康来源时（如用户级 400 输给
+  `~/.codex/skills` 300），reconcile 会把它物化为**受管副本**（rank 100）让项目
+  实际使用产品默认；该登记不带 `source` 字段（不是显式选择）。
+- **启停三机制**（按 Skill 自动归类）：
+  - `self`：项目原生 Skill（含用户已修改的受管副本）——原子改写其自身
+    frontmatter 标志（字节保真，永不加 `user-invocable`）。
+  - `copy`：未修改的受管副本——改副本标志并刷新登记的 `copyHash`。
+  - `original`：用户/全局/内置来源——生成/删除 marker 验证的派生开关文件。
+- **受管副本安全边界**：副本只凭 配置登记 + 精确 `copyHash`/`originHash` 识别，
+  永不凭路径/文件名猜测；内容被用户修改过的副本（`copyHash` 不一致）视为项目文件：
+  保留不动、来源切换报 409；`originHash` 不一致时行上显示「来源有更新」。
+  来源选择到 rank 更高的来源 = 纯记录（删除冗余的已验证副本）；rank 更低的来源 =
+  物化受管副本 + 删除被取代的 marker 开关。选择来源时开关状态同步进副本标志。
+- **一键精简**：存在默认精简预设（`defaultSlim`，至多一个）时按该预设替换；
+  否则关闭全部启用（两者都先出 diff 预览）。
+- **预设**：全局存储（`~/.dsh/skill-manager.json` 的 `presets`），跨项目复用；
+  只保存 Skill 身份 + 所选通用来源（不锁版本、不带项目特化内容）；
+  应用必须先预览 diff，可选 替换 / 合并。
+- **全局标签**：`~/.dsh/skill-manager.json` 的 `tags`（Skill 身份级，跨项目共享），
+  列表与资源库页均可按标签筛选；单个 32 字符上限、每 Skill 20 个上限。
+- **旧开关文件识别**：带 marker 的派生开关文件被明确识别；孤儿开关
+  （同名 Skill 已不存在）自动清理，外来同名文件永不触碰；旧版
+  `globalDefaultOff` 策略保持可用并协同（策略已处理的用户级 Skill 不重复生成开关）。
+- **可更新**：`updateInfo` 恒为 `null`（V1 不做远端更新检测）；UI 只在存在
+  真实更新数据时才显示浅红「可更新」标签。
+
+## 旧版功能（host < apiVersion 6 时的降级界面）
 
 - **浏览 / 搜索 / 详情**：列出全部 skill（项目级 2 个根 + 用户级 2 个根 + 各 preset 内置只读分组），
   关键词搜索，点开看完整文件内容；同名 skill 显示「被 … 遮蔽」提示。
@@ -84,7 +139,10 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 | 用户 · `~/.dsh/skills` | `C:\Users\<你>\.dsh\skills` | 所有项目 |
 | 用户 · `~/.agents/skills` | `C:\Users\<你>\.agents\skills` | 所有项目 |
 | 内置（只读） | 各 agent preset 的 `skills/` 目录 | 部署自带，升级会覆盖 |
-| 策略状态 | `~/.dsh/skill-manager.json` | 全局默认关闭开关 |
+| 策略状态 | `~/.dsh/skill-manager.json` | 全局默认关闭开关（旧版）+ 全局标签 + 自定义预设（V1） |
+| 项目配置（V1） | `<项目根>/.dsh/skill-manager.json` | 启用集合 / 来源选择 / 最近预设（可纳入 Git） |
+| 派生开关（V1） | `<项目根>/.dsh/skills/<name>.md` | marker 验证的禁用开关（可重建） |
+| 受管副本（V1） | `<项目根>/.dsh/skills/<name>(.md | /SKILL.md)` | 来源选择的生效载体（可重建，改过即成项目文件） |
 
 > 项目根按 DSH 的 `findProjectRoot` 解析（向上找 `.git`，找不到取 cwd），与 DSH
 > 实际扫描的目录一致；项目级「启用」生成的本地副本落在 `<项目根>/.dsh/skills`。
@@ -116,25 +174,46 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
 
 ## 技术说明
 
-- **Host 半**（`lib/index.js`）：在 `webServer` 上注册 JSON 路由 `/api/skill-manager`
-  （`list / read / save / delete / import / exportZip / setStatus / getPolicy / setPolicy`），
-  零裸依赖（只用 `node:` 内置模块），自带最小 frontmatter 解析器和 store-only ZIP 打包器
-  （UTF-8 文件名，CRC32 校验）。`list` 响应带 `apiVersion`（当前 5）与 `policy`，
-  client 用它判断运行中的 host 是否已加载较新操作，未加载时对应按钮/滑块置灰并给出提示。
-  内置 skill 列表来自 `agentPresets` 服务。策略执行（`enforceGlobalPolicy`）每次 `list`
-  幂等运行：给用户级 skill 补标志（带有限重试，单文件失败不阻断列表并记日志）、
-  清理冗余的旧版开关文件；Windows 上刚创建/修改的文件可能被 watcher 短暂占用，
-  故写入走 tmp+rename 原子替换并最多重试 3 次。
+- **Host 半**（`lib/index.js` + `lib/state.js` + `lib/catalog.js`）：在 `webServer`
+  上注册 JSON 路由 `/api/skill-manager`，零裸依赖（只用 `node:` 内置模块），
+  自带最小 frontmatter 解析器和 store-only ZIP 打包器（UTF-8 文件名，CRC32 校验）。
+  - 旧版操作（保持兼容）：`list / read / save / delete / import / exportZip /
+    setStatus / getPolicy / setPolicy`。
+  - V1 操作（apiVersion 6，DSH-008）：
+    - `catalog`：合并身份目录（同名来源合并、优先级排序、reconcile 后重扫），
+      返回 `identities`（每行含 `sources[]`、`defaultSourceKey`、`sourceKey`、
+      `effectiveSourceKey`、`specialized`、`enabled`、`tags`、`updateInfo:null`）+ `allTags`。
+    - `projectState`：项目配置 + 最近 reconcile 报告。
+    - `setEnabled` / `setMany`：单项/批量启停（返回更新后的 identity 行）。
+    - `setSource`：显式来源选择 / 重置默认（必要时物化受管副本）。
+    - `setTags`：全局标签（空数组 = 清除）。
+    - `presets.list / save / delete / setDefault / preview / apply`：
+      预设管理；preview 返回精确 diff（toEnable / toDisable / sourceChanges / finalEnabled）。
+    - `slim.preview / slim.apply`：一键精简（默认精简预设或全部关闭）。
+  - 响应信封统一 `{ ok:true, value }` / `{ ok:false, error:{ message } }`；
+    业务错误用 `ApiError` 携带 4xx（400 参数 / 404 不存在 / 409 冲突）。
+    `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
+  - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
+    `list` 幂等运行（旧版兼容）；Windows 文件锁问题由 tmp+rename 原子写入规避。
+- **测试**（`test/skill-manager.test.js`，`node --test`）：37 用例覆盖
+  状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
+  三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
+  标签、预设 diff/应用、一键精简、旧版兼容与只读根 403。
+  symlink 与 Windows chmod 只读 2 个用例按环境限制 skip。
 - **热更新边界**（实测）：client bundle 由进程按请求从磁盘读取 —— 改 client 刷新页面即生效；
   host 代码没有模块级 HMR（组合树中 hmr 服务 `disabled: true`）—— 改 host 需要重启 `dsh web`
   （会话持久化在磁盘，重启后原会话可恢复，仅进行中的轮次会中断）。
-  重启前：分组/包 UI 可用，zip 导出与按项目滑块置灰；重启后全部功能启用。
+  重启前：client 探测到 `catalog` 为未知操作，自动降级旧版界面并提示重启。
 - **Client 半**（`lib/client.js`）：classic-script bundle（`window.__ModuleLoader__.load`），
-  只 require 壳内 seed 词（`react`、`@deepseek-ai/dsh-client-ui-primitives`），
-  build 11 起在 `sidebar.footer.action` slot 注册「扩展」入口 + 全页视图
-  （build 10 及以前的 `settings.section` 注册已移除）；通过同源 `fetch` 调 host 路由。
+  只 require 壳内 seed 词（`react`、`@deepseek-ai/dsh-client-ui-primitives`），无 JSX/TS/构建；
+  build 12 起 SKILL 分区为 V1 双子页 + 详情抽屉（`SkillCenterV1`），
+  项目选择器复用 `ctx.get('sessions')` 当前工作区与 `ctx.get('workspaces')`
+  （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时安全降级；
+  主题只用 `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
+  入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，
-  目标路径做包含性校验；内置根一律只读（save/delete 返回 403）。
+  目标路径做包含性校验；内置根一律只读（save/delete 返回 403）；
+  V1 派生产物只增删 marker 验证过的文件，外来同名文件永不触碰。
 
 ## 规划（二期待立项）
 
