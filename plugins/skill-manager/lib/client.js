@@ -1,12 +1,13 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 10
+ * build: 11
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
  * window.__ModuleLoader__. The factory requires only shell seed words
  * (react, @deepseek-ai/dsh-client-ui-primitives) and registers a
- * `settings.section` entry: the Skills management page.
+ * `sidebar.footer.action` entry: the 「扩展」 sidebar-foot row that opens
+ * the frame-wide Extensions page (SKILL / MCP / Plugin).
  *
  * build 3: skill packages — skills sharing a prefix (first hyphen part)
  * with 3+ members collapse into one package row (default folded, per-root
@@ -110,7 +111,39 @@
 				'.smgr-bulkBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.smgr-policy{display:flex;align-items:center;gap:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;padding:8px 12px}',
 				'.smgr-policyMain{flex:1;min-width:0}',
-				'.smgr-policyDesc{display:block;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.5}'
+				'.smgr-policyDesc{display:block;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
+				// ── DSH-006: sidebar-foot 「扩展」 entry + full page ────────────
+				'.ext-layer{flex:none;align-items:center;width:100%;height:49px;margin:8px 0 0;display:flex;position:relative}',
+				'.ext-layerRail{width:36px;height:36px;margin:0}',
+				'.ext-trigger{width:100%;height:49px;color:var(--dsw-alias-label-primary);cursor:pointer;background:0 0;border:none;border-radius:12px;align-items:center;gap:8px;padding:0 8px 0 6px;font-family:inherit;font-size:14px;display:inline-flex;overflow:hidden}',
+				'.ext-trigger:hover{background:var(--dsw-alias-interactive-bg-hover-solid)}',
+				'.ext-triggerActive,.ext-triggerActive:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+				'.ext-triggerLabel{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}',
+				'.ext-layerRail .ext-trigger{border-radius:50%;justify-content:center;gap:0;width:36px;height:36px;padding:0}',
+				'.ext-icon{flex:none;color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;justify-content:center}',
+				'.ext-layerRail .ext-icon{color:var(--dsw-alias-label-primary)}',
+				'.ext-page{position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;background:var(--dsw-alias-bg-base);display:flex;flex-direction:column;color:var(--dsw-alias-label-primary)}',
+				'.ext-top{flex:none;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--dsw-alias-border-l2);padding:14px 20px}',
+				'.ext-topTitle{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}',
+				'.ext-topTitle .ext-icon{color:var(--dsw-alias-label-primary)}',
+				'.ext-topSub{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
+				'.ext-close{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 9px;font-size:15px;line-height:1;margin-left:auto}',
+				'.ext-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+				'.ext-body{flex:1;min-height:0;display:flex}',
+				'.ext-nav{flex:none;width:190px;border-right:1px solid var(--dsw-alias-border-l2);padding:12px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}',
+				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:10px;padding:9px 12px;text-align:left;font:inherit;display:flex;flex-direction:column;gap:2px;align-items:flex-start}',
+				'.ext-navBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+				'.ext-navBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary)}',
+				'.ext-navBtnActive:hover{background:var(--dsw-alias-fill-tsp-secondary)}',
+				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}',
+				'.ext-navDesc{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
+				'.ext-soon{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-tertiary);padding:0 6px;font-size:10px;font-weight:500;line-height:16px;white-space:nowrap}',
+				'.ext-main{flex:1;min-width:0;overflow-y:auto;padding:20px 24px}',
+				'.ext-placeholder{max-width:520px;display:flex;flex-direction:column;gap:10px;padding:48px 0}',
+				'.ext-phIcon{color:var(--dsw-alias-label-quaternary)}',
+				'.ext-placeholder h3{margin:0;font-size:16px;font-weight:600}',
+				'.ext-placeholder p{margin:0;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.7}',
+				'.ext-phSoon{color:var(--dsw-alias-label-quaternary);font-size:12px}'
 			].join('');
 			document.head.appendChild(style);
 
@@ -864,6 +897,139 @@
 				);
 			}
 
+			// ── DSH-006: 扩展 entry icon + full page ─────────────────────────
+			/** Extensions grid glyph: three filled tiles + one dashed "future" slot. */
+			function ExtIcon(props) {
+				var size = (props && props.size) || 16;
+				return h(
+					'svg',
+					{ width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
+					h('rect', { x: 1.5, y: 1.5, width: 5.5, height: 5.5, rx: 1.5, fill: 'currentColor' }),
+					h('rect', { x: 9, y: 1.5, width: 5.5, height: 5.5, rx: 1.5, fill: 'currentColor', opacity: 0.55 }),
+					h('rect', { x: 1.5, y: 9, width: 5.5, height: 5.5, rx: 1.5, fill: 'currentColor', opacity: 0.55 }),
+					h('rect', { x: 9, y: 9, width: 5.5, height: 5.5, rx: 1.5, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeDasharray: '2 1.8' })
+				);
+			}
+
+			var EXT_TABS = [
+				{ id: 'skill', label: 'SKILL', desc: 'Skills 技能管理' },
+				{ id: 'mcp', label: 'MCP', desc: 'Model Context Protocol 服务器', soon: true },
+				{ id: 'plugin', label: 'Plugin', desc: '已安装插件', soon: true }
+			];
+
+			function ExtPlaceholder(props) {
+				return h(
+					'div',
+					{ className: 'ext-placeholder' },
+					h('div', { className: 'ext-phIcon' }, h(ExtIcon, { size: 28 })),
+					h('h3', null, props.title),
+					h('p', null, props.body),
+					h('p', { className: 'ext-phSoon' }, '预计能力：' + props.planned)
+				);
+			}
+
+			/** The frame-wide Extensions page (SKILL / MCP / Plugin). */
+			function ExtensionsPage(props) {
+				var api = props.api;
+				var onClose = props.onClose;
+				var [tab, setTab] = React.useState('skill');
+				React.useEffect(function () {
+					function onKey(event) {
+						if (event.key !== 'Escape') return;
+						// An inner dialog (import/delete confirm) owns Esc first.
+						if (document.querySelector('[role="dialog"]') !== null) return;
+						onClose();
+					}
+					document.addEventListener('keydown', onKey);
+					return function () { document.removeEventListener('keydown', onKey); };
+				}, [onClose]);
+				return h(
+					'div',
+					{ className: 'ext-page', role: 'region', 'aria-label': '扩展管理' },
+					h(
+						'header',
+						{ className: 'ext-top' },
+						h('div', { className: 'ext-topTitle' }, h(ExtIcon, { size: 20 }), '扩展'),
+						h('span', { className: 'ext-topSub' }, '统一管理 DSH 的扩展能力：SKILL / MCP / Plugin'),
+						h('button', { type: 'button', className: 'ext-close', 'aria-label': '关闭扩展页', title: '关闭（Esc）', onClick: onClose }, '✕')
+					),
+					h(
+						'div',
+						{ className: 'ext-body' },
+						h(
+							'nav',
+							{ className: 'ext-nav', 'aria-label': '扩展类型' },
+							EXT_TABS.map(function (t) {
+								return h(
+									'button',
+									{
+										key: t.id,
+										type: 'button',
+										className: 'ext-navBtn' + (tab === t.id ? ' ext-navBtnActive' : ''),
+										onClick: function () { setTab(t.id); }
+									},
+									h(
+										'span',
+										{ className: 'ext-navLabel' },
+										t.label,
+										t.soon ? h('span', { className: 'ext-soon' }, '建设中') : null
+									),
+									h('span', { className: 'ext-navDesc' }, t.desc)
+								);
+							})
+						),
+						h(
+							'main',
+							{ className: 'ext-main' },
+							tab === 'skill'
+								? h(SkillManagerSection, { api: api })
+								: tab === 'mcp'
+									? h(ExtPlaceholder, {
+										key: 'mcp',
+										title: 'MCP 管理（建设中）',
+										body: 'MCP（Model Context Protocol）服务器把外部工具接入 DSH，模型会以原生工具形式调用它们。当前 MCP 服务器在 web profile 的 cordis 配置中以 dsh-mcp-client 插件行声明。',
+										planned: '服务器列表与连接状态、工具清单、新增/编辑/删除配置、保存后热加载（无需重启 dsh web）。'
+									})
+									: h(ExtPlaceholder, {
+										key: 'plugin',
+										title: '插件管理（建设中）',
+										body: '展示已安装到 web profile 的 DSH 插件（如 skill-manager、image-context-guard）：名称、版本、来源与启用状态。',
+										planned: '已安装插件列表、启用/停用（从组合树摘除/挂回）、安装来源与版本信息。'
+									})
+						)
+					)
+				);
+			}
+
+			/** Sidebar-foot 「扩展」 row: icon + label (wide) or round icon (rail). */
+			function ExtensionsEntry(props) {
+				var wide = props.wide;
+				var api = props.api;
+				var [open, setOpen] = React.useState(false);
+				return h(
+					React.Fragment,
+					null,
+					h(
+						'div',
+						{ className: 'ext-layer' + (wide ? '' : ' ext-layerRail') },
+						h(
+							'button',
+							{
+								type: 'button',
+								className: 'ext-trigger' + (open ? ' ext-triggerActive' : ''),
+								'aria-label': '扩展',
+								'aria-expanded': open,
+								title: wide ? '扩展' : undefined,
+								onClick: function () { setOpen(true); }
+							},
+							h(ExtIcon, { size: wide ? 16 : 18 }),
+							wide ? h('span', { className: 'ext-triggerLabel' }, '扩展') : null
+						)
+					),
+					open ? h(ExtensionsPage, { api: api, onClose: function () { setOpen(false); } }) : null
+				);
+			}
+
 			// ── plugin module (the client half of dsh-skill-manager) ──────────
 			var module = { exports: {} };
 			module.exports.name = 'skill-manager-ui';
@@ -871,13 +1037,16 @@
 			module.exports.apply = function (ctx) {
 				var slots = ctx.get('slots');
 				if (slots === undefined || typeof slots.register !== 'function') return;
-				slots.inject('settings.section', function () {
+				// DSH-006: the Skills management page moved out of Settings into
+				// the frame-wide Extensions page; the only entry is the
+				// sidebar-foot 「扩展」 row (additive seat, no shell change).
+				slots.inject('sidebar.footer.action', function () {
 					return slots.register(
 						{
-							name: 'settings.section',
-							id: 'skill-manager',
-							order: 30,
-							label: function () { return 'Skills 技能管理'; },
+							name: 'sidebar.footer.action',
+							id: 'extensions-page',
+							order: 100,
+							label: function () { return '扩展'; },
 							inject: function () {
 								return {
 									api: {
@@ -887,7 +1056,7 @@
 								};
 							}
 						},
-						SkillManagerSection
+						ExtensionsEntry
 					);
 				});
 			};
