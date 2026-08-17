@@ -12,8 +12,8 @@
   `onlyBuiltDependencies` 白名单放行）。
 - **macOS（gys MacBook，2026-08-17）**：`@deepseek-ai/dsh` 0.1.0-rc.6
   （npm 预构建包，npx 缓存启动 `npm exec @deepseek-ai/dsh@latest web`），
-  Node v22.15.0，pnpm 11.19.0。同为裸环境起步（零插件），两个 link 通道插件
-  于 2026-08-17 安装并验证（见变更日志）；未装 dsh-better-sidebar。
+  Node v22.15.0，pnpm 11.19.0。同为裸环境起步（零插件），上表 3 个插件
+  均已于 2026-08-17 安装（见变更日志与宿主差异）。
 
 ## 插件清单
 
@@ -27,11 +27,11 @@
 
 - **Windows**：上表 3 个插件均已安装；skill-manager 为 junction 指向本仓库
   checkout（拉到 main 后即 DSH-006 build 11 扩展页）。
-- **macOS**：仅 2 个 link 通道插件（skill-manager / image-context-guard），
-  `~/.dsh/plugins/<name>` 为符号链接 → 本仓库 `plugins/<name>`（macOS 下的
-  junction 等价物，`dev/setup-plugin-junction.ps1` 仅 Windows 可用，手工
-  `ln -sfn` 建链）。better-sidebar 未安装（其 node-pty 预编译产物为
-  Windows conpty 版，本机无需求）。
+- **macOS**：3 个插件与 Windows 一致。skill-manager / image-context-guard
+  为 link 通道，`~/.dsh/plugins/<name>` 符号链接 → 本仓库 `plugins/<name>`
+  （macOS 下的 junction 等价物，`dev/setup-plugin-junction.ps1` 仅 Windows
+  可用，手工 `ln -sfn` 建链）；better-sidebar 0.12.3 走 npm 官方通道
+  （与 Windows 同版本）。
 
 ## 安装 / 更新 / 回退约定
 
@@ -42,9 +42,16 @@
   - 版本事实以 profile `package.json` 的依赖声明 + npm 包内容为准；本表登记上游提交便于追溯。
 - **本仓库 link 插件**（skill-manager / image-context-guard）：按 DSH-003 流程
   （junction + 逐文件哈希校验），见 `dev/setup-plugin-junction.ps1` 与 README「快速开始」。
-- **node-pty 前置**：pnpm 10 默认拦截构建脚本；profile `pnpm-workspace.yaml` 已有
-  `onlyBuiltDependencies: [node-pty]`（DSH-007 添加，better-sidebar 终端所需）。
+- **node-pty 前置**：pnpm 默认拦截构建脚本，需白名单放行（DSH-007 添加，
+  better-sidebar 终端所需）：pnpm 10 用 `onlyBuiltDependencies: [node-pty]`，
+  **pnpm 11 改名为 `allowBuilds: { node-pty: true }`**（macOS 机实测，
+  旧键名在 11 下不生效且 pnpm 会在文件里留占位行）。node-pty 1.1.0 自带
+  in-tree prebuilds（含 darwin-arm64/pty.node），无需编译器。
   重装依赖后若终端报「node-pty 加载失败」：`pnpm rebuild node-pty` → 重启 dsh web。
+- **pnpm 11 供应链门禁（minimumReleaseAge）**：发布不足一定龄期的版本会被
+  `@latest` 解析跳过（macOS 机实测：0.12.3 发布次日 `@latest` 仍解析到
+  0.12.2）。显式 `add <name>@<版本>` 可绕过，pnpm 自动把该版本写入
+  `minimumReleaseAgeExclude`。
 - **双挂载检查**：`~/.dsh/profiles/web/cordis.patch.yml` 中不得出现与 npm 通道插件
   重复的手工 insert 行（better-sidebar 无手工行；skill-manager / image-context-guard
   为 link 通道，手工行是唯一挂载点）。
@@ -53,6 +60,17 @@
 
 ## 变更日志
 
+- **2026-08-17（macOS 宿主装 better-sidebar，DSH-007）**：macOS 宿主安装
+  dsh-better-sidebar 0.12.3（npm 官方通道，与 Windows 同版本；显式指定版本
+  绕过 pnpm 11 minimumReleaseAge 门禁，见约定节）。pnpm-workspace.yaml
+  添加 `allowBuilds: { node-pty: true }`（pnpm 11 键名）；`pnpm rebuild
+  node-pty` 走 in-tree darwin-arm64 prebuild，`require('node-pty')` 实测
+  加载成功。bundles 对账后 `dsh.profile.bundles` = base / web-app /
+  dsh-better-sidebar；`--dump-config` 离线树含 better-sidebar bundle 层、
+  无警告；双挂载检查通过（cordis.patch.yml 无其手工行）。
+  **bundle 层变更不热加载**（用户层 cordis.patch.yml 才热监听），需重启
+  dsh web 生效——macOS 无 restart 脚本，手动 Ctrl+C 后重跑
+  `npm exec @deepseek-ai/dsh@latest web`。
 - **2026-08-17（macOS 宿主接入，DSH-007 台账维护 / DSH-001 / DSH-004）**：
   macOS 宿主安装 dsh-skill-manager 0.1.0（build 11）与 dsh-image-context-guard
   0.1.0。通道：`~/.dsh/plugins/<name>` 符号链接 → 本仓库 +
