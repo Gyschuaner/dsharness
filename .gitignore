@@ -3,3 +3,7 @@ node_modules/
 *.tar.gz
 # junction 备份目录（位于 ~/.dsh/plugins，非仓库内；此行为防御性忽略）
 *.bak-*/
+
+# .dsh/skills runtime artifacts (DSH-008 P2-4): reserved stubs + dot staging/backup dirs
+.dsh/skills/__smgr-shadow-*.md
+.dsh/skills/.*

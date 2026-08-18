@@ -5,14 +5,14 @@
  * fake HOME (injected via opts.home), fake agent presets, scratch project
  * roots. Nothing in the real ~/.dsh or the user's projects is touched.
  *
- * Run: node --test plugins/skill-manager/test/
+ * Run: node --test plugins/skill-manager/test/*.test.js
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { internals } from '../lib/index.js';
 import {
@@ -92,7 +92,7 @@ async function makeEnv() {
 
 /** Drive makeHandler like HTTP. */
 function makeApi(opts) {
-	const handler = internals.makeHandler({ agentPresets: opts.agentPresets, logger: opts.logger, home: opts.home });
+	const handler = internals.makeHandler({ agentPresets: opts.agentPresets, logger: opts.logger, home: opts.home, faults: opts.faults });
 	return async (op, payload = {}) => {
 		let status;
 		let headers;
@@ -115,7 +115,12 @@ function makeApi(opts) {
 }
 
 const identity = (view, name) => view.identities.find((i) => i.name === name);
-const hasStub = async (projDsh, name) => stat(join(projDsh, `${name}.md`)).then(() => true, () => false);
+const stubPath = (projDsh, name) => join(projDsh, `${internals.SHADOW_STUB_PREFIX}${name}.md`);
+const hasStub = async (projDsh, name) => {
+	const current = await stat(stubPath(projDsh, name)).then(() => true, () => false);
+	if (current) return true;
+	return stat(join(projDsh, `${name}.md`)).then(() => true, () => false);
+};
 
 // ── S1: state model & persistence ───────────────────────────────────────────
 test('project config: fresh root defaults to empty enabled set', async (t) => {
@@ -145,17 +150,19 @@ test('project config: write/read round-trip keeps schema fields', async (t) => {
 	assert.equal(config.appliedPreset, '精简集');
 });
 
-test('project config: corrupt file degrades to empty and is rewritten', async (t) => {
+test('project config: corrupt file is visible, rejected on write, and preserved', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);
 	await writeFile(join(env.projectRoot, '.dsh', 'skill-manager.json'), '{ not json !!!', 'utf8');
 	const first = await readProjectConfig(env.projectRoot, env.opts);
 	assert.equal(first.existed, true);
+	assert.equal(first.corrupt, true);
 	assert.deepEqual(first.config.enabled, []);
-	await writeProjectConfig(env.projectRoot, { enabled: ['x'], sources: {} }, env.opts);
-	const second = await readProjectConfig(env.projectRoot, env.opts);
-	assert.equal(second.corrupt, false);
-	assert.deepEqual(second.config.enabled, ['x']);
+	await assert.rejects(
+		() => writeProjectConfig(env.projectRoot, { enabled: ['x'], sources: {} }, env.opts),
+		(error) => error instanceof ApiError && error.status === 409,
+	);
+	assert.equal(await readFile(join(env.projectRoot, '.dsh', 'skill-manager.json'), 'utf8'), '{ not json !!!');
 });
 
 test('project config: missing root is rejected with 400', async (t) => {
@@ -289,7 +296,7 @@ test('fresh project: default-off materializes marker stubs for non-project skill
 	assert.equal(await hasStub(env.projDsh, 'bundled-skill'), true);
 	assert.equal(await hasStub(env.projDsh, 'proj-skill'), false);
 	// Stubs carry the marker.
-	const stub = await readFile(join(env.projDsh, 'user-skill.md'), 'utf8');
+	const stub = await readFile(stubPath(env.projDsh, 'user-skill'), 'utf8');
 	assert.ok(stub.includes(internals.SHADOW_DESC_PREFIX));
 	assert.ok(stub.includes('disable-model-invocation: true'));
 	// Project skill is disabled via its own flag (no stub), and user-invocable
@@ -864,4 +871,246 @@ test('project config: read-only project root is rejected with 409', async (t) =>
 		() => writeProjectConfig(env.projectRoot, { enabled: [], sources: {} }, env.opts),
 		(error) => error instanceof ApiError && error.status === 409,
 	);
+});
+
+// ── Code-review regression matrix (BUG-3710B9A5) ────────────────────────────
+test('concurrent project mutations serialize without losing enabled skills', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.userDsh, 'race-a', 'race a');
+	await putSkill(env.userDsh, 'race-b', 'race b');
+	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	const [a, b] = await Promise.all([
+		api('setEnabled', { cwd: env.cwd, name: 'race-a', enabled: true }),
+		api('setEnabled', { cwd: env.cwd, name: 'race-b', enabled: true }),
+	]);
+	assert.equal(a.status, 200);
+	assert.equal(b.status, 200);
+	const { config } = await readProjectConfig(env.projectRoot, env.opts);
+	assert.deepEqual(config.enabled, ['race-a', 'race-b']);
+});
+
+test('concurrent global tag and preset writes preserve both fields', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.userDsh, 'global-race', 'global race');
+	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	await api('setEnabled', { cwd: env.cwd, name: 'global-race', enabled: true });
+	const [tagged, preset] = await Promise.all([
+		api('setTags', { cwd: env.cwd, name: 'global-race', tags: ['并发'] }),
+		api('presets.save', { cwd: env.cwd, name: '并发预设' }),
+	]);
+	assert.equal(tagged.status, 200);
+	assert.equal(preset.status, 200);
+	const { config } = await readGlobalConfig(env.opts);
+	assert.deepEqual(config.tags['global-race'], ['并发']);
+	assert.ok(config.presets['并发预设']);
+});
+
+test('same-rank global sources use Codex order and explicit Claude selection really wins', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.globalCodex, 'tie-skill', 'codex source');
+	await putSkill(env.globalClaude, 'tie-skill', 'claude source');
+	const api = makeApi(env.opts);
+	let row = identity((await api('catalog', { cwd: env.cwd })).value, 'tie-skill');
+	assert.deepEqual(row.sources.map((source) => source.key), ['global-codex', 'global-claude']);
+	assert.equal(row.defaultSourceKey, 'global-codex');
+	assert.equal(row.description, 'codex source');
+	const selected = await api('setSource', { cwd: env.cwd, name: 'tie-skill', source: 'global-claude' });
+	assert.equal(selected.status, 200);
+	row = selected.value.view;
+	assert.equal(row.sourceKey, 'global-claude');
+	assert.equal(row.effectiveSourceKey, 'project-dsh');
+	assert.equal(row.description, 'claude source');
+});
+
+test('hashSkillSource detects invalid UTF-8 binary attachment byte changes', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const skillPath = await putSkill(env.userDsh, 'binary-hash', 'binary hash', { format: 'dir' });
+	const attachment = join(env.userDsh, 'binary-hash', 'references', 'blob.bin');
+	await writeFile(attachment, Buffer.from([0x00, 0x80, 0xff]));
+	const before = await hashSkillSource(skillPath, 'dir');
+	await writeFile(attachment, Buffer.from([0x00, 0x81, 0xff]));
+	const after = await hashSkillSource(skillPath, 'dir');
+	assert.notEqual(after, before);
+});
+
+test('project config preserves unknown fields and rejects future apiVersion writes', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.userDsh, 'future-skill', 'future');
+	const path = projectConfigPath(env.projectRoot);
+	await writeFile(path, JSON.stringify({
+		schema: 'dsh-skill-manager/project',
+		apiVersion: 6,
+		enabled: [],
+		sources: { 'future-skill': { source: 'user-dsh', generated: false, futureSourceField: 7 } },
+		futureTopField: { keep: true },
+	}, null, 2), 'utf8');
+	const read = await readProjectConfig(env.projectRoot, env.opts);
+	read.config.enabled = ['future-skill'];
+	await writeProjectConfig(env.projectRoot, read.config, env.opts, read.raw);
+	let stored = JSON.parse(await readFile(path, 'utf8'));
+	assert.deepEqual(stored.futureTopField, { keep: true });
+	assert.equal(stored.sources['future-skill'].futureSourceField, 7);
+
+	stored.apiVersion = 7;
+	stored.futureOnly = 'do-not-clobber';
+	await writeFile(path, JSON.stringify(stored, null, 2), 'utf8');
+	const api = makeApi(env.opts);
+	const catalog = await api('catalog', { cwd: env.cwd });
+	assert.equal(catalog.status, 200);
+	assert.equal(catalog.value.configFuture, true);
+	const blocked = await api('setEnabled', { cwd: env.cwd, name: 'future-skill', enabled: false });
+	assert.equal(blocked.status, 409);
+	assert.equal(JSON.parse(await readFile(path, 'utf8')).futureOnly, 'do-not-clobber');
+});
+
+test('unreadable project config aborts catalog without reconciling empty state', async (t) => {
+	const env = await makeEnv();
+	await putSkill(env.userDsh, 'no-read', 'no read');
+	const path = projectConfigPath(env.projectRoot);
+	await writeFile(path, JSON.stringify({ apiVersion: 6, enabled: ['no-read'], sources: {} }), 'utf8');
+	let permissionBlocked = false;
+	try {
+		await chmod(path, 0o000);
+		try { await readFile(path, 'utf8'); } catch { permissionBlocked = true; }
+		if (!permissionBlocked) {
+			t.skip('filesystem does not enforce unreadable file permissions');
+			return;
+		}
+		const result = await makeApi(env.opts)('catalog', { cwd: env.cwd });
+		assert.equal(result.status, 409);
+		assert.equal(await hasStub(env.projDsh, 'no-read'), false);
+	} finally {
+		await chmod(path, 0o600).catch(() => {});
+		await env.cleanup();
+	}
+});
+
+test('target reconcile failure returns non-2xx instead of silent success', async (t) => {
+	const env = await makeEnv();
+	await putSkill(env.userDsh, 'blocked-side-effect', 'blocked');
+	await writeProjectConfig(env.projectRoot, { enabled: ['blocked-side-effect'], sources: {} }, env.opts);
+	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	let permissionBlocked = false;
+	try {
+		await chmod(env.projDsh, 0o555);
+		try { await writeFile(join(env.projDsh, '.permission-probe'), 'x'); } catch { permissionBlocked = true; }
+		await rm(join(env.projDsh, '.permission-probe'), { force: true }).catch(() => {});
+		if (!permissionBlocked) {
+			t.skip('filesystem does not enforce read-only skill directory');
+			return;
+		}
+		const result = await api('setEnabled', { cwd: env.cwd, name: 'blocked-side-effect', enabled: false });
+		assert.equal(result.status, 500);
+		assert.match(result.value.error.message, /未完全生效/);
+		assert.equal(await hasStub(env.projDsh, 'blocked-side-effect'), false);
+	} finally {
+		await chmod(env.projDsh, 0o755).catch(() => {});
+		await env.cleanup();
+	}
+});
+
+test('managed directory copy rejects bundles above 50MB without leaving a destination', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const source = await putSkill(join(env.root, 'large-source'), 'too-large', 'large', { format: 'dir' });
+	await writeFile(join(dirname(source), 'references', 'large.bin'), Buffer.alloc(50 * 1024 * 1024 + 1));
+	await assert.rejects(
+		() => internals.copySkillToProject(env.projectRoot, 'too-large', { path: source, format: 'dir' }, false, env.opts),
+		(error) => error instanceof ApiError && error.status === 413,
+	);
+	assert.equal(await stat(join(env.projDsh, 'too-large')).then(() => true, () => false), false);
+});
+
+test('source disappearance and swap failure leave no staging debris or damaged old copy', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const disappearing = await putSkill(join(env.root, 'vanish-source'), 'vanish', 'vanish', { format: 'dir', files: { 'references/gone.bin': 'gone' } });
+	const vanishOpts = Object.assign({}, env.opts, {
+		faults: {
+			afterSourcePrecheck: async () => rm(join(dirname(disappearing), 'references', 'gone.bin')),
+		},
+	});
+	await assert.rejects(
+		() => internals.copySkillToProject(env.projectRoot, 'vanish', { path: disappearing, format: 'dir' }, false, vanishOpts),
+		/error|变化|缺失|校验/,
+	);
+	assert.equal(await stat(join(env.projDsh, 'vanish')).then(() => true, () => false), false);
+
+	await putSkill(env.projDsh, 'swap-safe', 'old copy', { format: 'dir' });
+	const replacement = await putSkill(join(env.root, 'swap-source'), 'swap-safe', 'new copy', { format: 'dir' });
+	const swapOpts = Object.assign({}, env.opts, {
+		faults: { beforeCopySwap: async () => { throw new Error('injected rename failure'); } },
+	});
+	await assert.rejects(
+		() => internals.copySkillToProject(env.projectRoot, 'swap-safe', { path: replacement, format: 'dir' }, false, swapOpts),
+		/injected rename failure/,
+	);
+	assert.match(await readFile(join(env.projDsh, 'swap-safe', 'SKILL.md'), 'utf8'), /old copy/);
+	const debris = (await readdir(env.projDsh)).filter((entry) => entry.includes('.staging') || entry.includes('.backup'));
+	assert.deepEqual(debris, []);
+});
+
+test('config write failure rolls back a newly materialized source copy and stub removal', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.userDsh, 'rollback-copy', 'default');
+	await putSkill(env.userAgents, 'rollback-copy', 'selected losing source');
+	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	assert.equal(await hasStub(env.projDsh, 'rollback-copy'), true);
+	let armed = true;
+	env.opts.faults = {
+		beforeProjectConfigWrite: async () => {
+			if (!armed) return;
+			armed = false;
+			throw new Error('injected config write failure');
+		},
+	};
+	const faultApi = makeApi(env.opts);
+	const result = await faultApi('setSource', { cwd: env.cwd, name: 'rollback-copy', source: 'user-agents' });
+	assert.equal(result.status, 500);
+	delete env.opts.faults;
+	const { config } = await readProjectConfig(env.projectRoot, env.opts);
+	assert.equal(config.sources['rollback-copy'], undefined);
+	assert.equal(await stat(join(env.projDsh, 'rollback-copy.md')).then(() => true, () => false), false);
+	assert.equal(await hasStub(env.projDsh, 'rollback-copy'), true);
+});
+
+test('preset second-source conflict rolls back the first managed copy and project config', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.userDsh, 'aa-copy', 'aa default');
+	await putSkill(env.userAgents, 'aa-copy', 'aa selected');
+	await putSkill(env.userDsh, 'zz-conflict', 'zz user');
+	await putSkill(env.projDsh, 'zz-conflict', 'zz project');
+	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	await internals.writeGlobalConfig({
+		presets: {
+			'rollback-preset': {
+				name: 'rollback-preset',
+				defaultSlim: false,
+				skills: {
+					'aa-copy': { source: 'user-agents' },
+					'zz-conflict': { source: 'user-dsh' },
+				},
+				updatedAt: new Date().toISOString(),
+			},
+		},
+	}, env.opts);
+	const result = await api('presets.apply', { cwd: env.cwd, name: 'rollback-preset', mode: 'replace' });
+	assert.equal(result.status, 409);
+	const { config } = await readProjectConfig(env.projectRoot, env.opts);
+	assert.deepEqual(config.enabled, []);
+	assert.equal(config.sources['aa-copy'], undefined);
+	assert.equal(await stat(join(env.projDsh, 'aa-copy.md')).then(() => true, () => false), false);
+	assert.equal(await hasStub(env.projDsh, 'aa-copy'), true);
 });

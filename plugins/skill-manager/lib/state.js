@@ -10,15 +10,31 @@
  * Rules (handoff §9/§10):
  *   - project config is the only truth; file-level switches are rebuildable
  *     derived artifacts, never truth;
- *   - atomic writes (tmp + rename), JSON only, no live Host objects;
+ *   - atomic writes (tmp with a unique uuid suffix + rename), JSON only,
+ *     no live Host objects; two same-path writers never share one tmp
+ *     name (review P1-1);
  *   - paths are canonicalized and containment-checked; read-only or
  *     non-writable targets are rejected with explicit errors;
- *   - corrupt config degrades to defaults (project: empty enabled set) and
- *     is re-written on the next successful mutation;
- *   - unknown fields survive round-trips (forward compatibility);
+ *   - a corrupt (unparseable) project config degrades to a VISIBLE
+ *     empty enabled set and no reconcile rewrites disk from it; permission /
+ *     I/O read errors are actionable errors, never a silent "empty config"
+ *     (review P2-2);
+ *   - unknown top-level fields and unknown per-source fields survive
+ *     round-trips (forward compatibility, review P2-1); a stored
+ *     apiVersion higher than PROJECT_API_VERSION makes the config read-only:
+ *     reads report it, writes refuse instead of silently downgrading a
+ *     future version; lower versions migrate explicitly through
+ *     migrateProjectConfig;
+ *   - the persisted config never stores the project's absolute root: the
+ *     path is derived from the config file's own location, so a checked-in
+ *     config file stays portable across machines (review P2-4);
+ *   - access to one canonical config path is serialized
+ *     (withProjectConfigLock / withGlobalConfigLock): a read -> compute ->
+ *     write -> reconcile transaction never interleaves with another
+ *     mutation of the same config (review P1-1);
  *   - zero bare dependencies (node: builtins only).
  */
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { access, constants, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
@@ -95,7 +111,7 @@ export function globalConfigPath(opts) {
 
 /** Atomic write: tmp file in the same directory, then rename over the target. */
 export async function atomicWriteFile(path, content) {
-	const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+	const tmp = `${path}.tmp-${randomUUID()}`;
 	await mkdir(dirname(path), { recursive: true });
 	try {
 		await writeFile(tmp, content, 'utf8');
@@ -106,29 +122,127 @@ export async function atomicWriteFile(path, content) {
 }
 
 /**
+ * Per-canonical-config-path serialization (review P1-1): one mutation queue
+ * per key, so a read -> compute -> write -> reconcile transaction never
+ * interleaves with another mutation of the same config. A rejecting task
+ * still releases the queue and its rejection propagates to the caller.
+ * @param key - stable lock key (projectLockKey / globalLockKey).
+ * @param task - async unit of work.
+ * @returns the resolved value of `task`.
+ */
+export function withConfigLock(key, task) {
+	const prev = configLocks.get(key) || Promise.resolve();
+	const run = prev.then(() => task());
+	// The queue advances regardless of this task's outcome; prune on the tail.
+	const tail = run.catch(() => undefined).then(() => { if (configLocks.get(key) === tail) configLocks.delete(key); });
+	configLocks.set(key, tail);
+	return run;
+}
+/** Per-config-path queues, pruned when the last queued task settles. */
+const configLocks = new Map();
+/** Lock key for one project config, its canonical file path. */
+export function projectLockKey(projectRoot) {
+	return `project:${resolve(projectRoot)}`;
+}
+/** Lock key for the global config, its canonical file path. */
+export function globalLockKey(opts) {
+	return `global:${globalConfigPath(opts)}`;
+}
+/**
+ * Transaction ledger for derived-artifact file ops (review P1-4): a mutation
+ * plans, records undo + cleanup per file change, then commits (config persisted)
+ * or rolls back (config write failed), so a failure never leaves an unregistered
+ * copy shadowing other sources or loses a verified copy.
+ * @param returns { record(undo, cleanup), commit(), rollback() } - undo reverts
+ *   one file change, cleanup removes its backup; commit runs the cleanups,
+ *   rollback runs the undos (reverse order) then the cleanups of the reverted
+ *   changes, returning the rollback failure messages.
+ */
+export function createLedger() {
+	const ops = [];
+	return {
+		record(undo, cleanup) {
+			if (undo || cleanup) ops.push({ undo, cleanup });
+		},
+		async commit() {
+			const failures = [];
+			for (const op of ops) {
+				if (typeof op.cleanup === 'function') {
+					try {
+						await op.cleanup();
+					} catch (error) {
+						failures.push(error instanceof Error ? error.message : String(error));
+					}
+				}
+			}
+			return failures;
+		},
+		async rollback() {
+			const failures = [];
+			for (const op of [...ops].reverse()) {
+				let reverted = true;
+				if (typeof op.undo === 'function') {
+					try {
+						await op.undo();
+					} catch (error) {
+						reverted = false;
+						failures.push(`undo: ${error instanceof Error ? error.message : String(error)}`);
+					}
+				}
+				if (reverted && typeof op.cleanup === 'function') {
+					try {
+						await op.cleanup();
+					} catch (error) {
+						failures.push(`cleanup: ${error instanceof Error ? error.message : String(error)}`);
+					}
+				}
+			}
+			return failures;
+		},
+	};
+}
+
+
+/**
  * Read the project config.
- * @returns { config, path, existed, corrupt } — corrupt files degrade to an
- *   empty config (fresh project default: nothing enabled) so listing keeps
- *   working; the next successful mutation overwrites them.
+ * @returns { config, path, existed, corrupt, future, raw } — corrupt files
+ *   degrade to a VISIBLE empty config (configCorrupt in the view); no mutation
+ *   overwrites one (review P2-2). `future` flags a stored apiVersion newer than
+ *   PROJECT_API_VERSION: reads still normalize, writes refuse (P2-1). `raw`
+ *   is the on-disk object callers pass back to writeProjectConfig so unknown
+ *   fields survive the write (P2-1); undefined makes the write re-read.
  */
 export async function readProjectConfig(projectRoot, opts) {
 	const path = projectConfigPath(projectRoot);
 	try {
-		const raw = await readFile(path, 'utf8');
-		const parsed = JSON.parse(raw);
-		const config = normalizeProjectConfig(parsed, resolve(projectRoot));
-		return { config, path, existed: true, corrupt: false };
+		const rawText = await readFile(path, 'utf8');
+		const parsed = JSON.parse(rawText);
+		const obj = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+		const future = typeof obj.apiVersion === 'number' && obj.apiVersion > PROJECT_API_VERSION;
+		const config = migrateProjectConfig(obj, resolve(projectRoot));
+		return { config, path, existed: true, corrupt: false, future, raw: obj };
 	} catch (error) {
 		if (error && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) {
-			return { config: emptyProjectConfig(resolve(projectRoot)), path, existed: false, corrupt: false };
+			return { config: emptyProjectConfig(resolve(projectRoot)), path, existed: false, corrupt: false, future: false, raw: {} };
 		}
-		// Unreadable or invalid JSON: degrade, never crash the list path.
-		return { config: emptyProjectConfig(resolve(projectRoot)), path, existed: true, corrupt: error instanceof Error && error.name !== 'ENOENT' };
+		if (error instanceof SyntaxError) {
+			// Corrupt (unparseable) truth: degrade to a VISIBLE empty config
+			// (the view flags configCorrupt); nothing rewrites disk from it
+			// (review P2-2).
+			// raw: undefined so any write re-reads the truth file and refuses
+			// (P2-2): a corrupt config is never overwritten by a mutation.
+			return { config: emptyProjectConfig(resolve(projectRoot)), path, existed: true, corrupt: true, future: false, raw: undefined };
+		}
+		// Permission or I/O failure: a truth file this host cannot read is
+		// not a reason to reconcile an empty config over it (review P2-2).
+		const reason = error && error.code ? error.code : (error && error.message) || 'I/O';
+		throw new ApiError(409, `项目配置无法读取（${reason}），权限或 I/O 错误：请修复后重试，本次未做任何 reconcile 或写盘`);
 	}
 }
 
+
 /** Write the project config (atomic). Rejects when the root is not writable. */
-export async function writeProjectConfig(projectRoot, config, opts) {
+export async function writeProjectConfig(projectRoot, config, opts, raw) {
 	const root = resolve(projectRoot);
 	const st = await stat(root).catch(() => undefined);
 	if (st === undefined || !st.isDirectory()) throw new ApiError(400, `项目目录不存在：${root}`);
@@ -137,19 +251,67 @@ export async function writeProjectConfig(projectRoot, config, opts) {
 	} catch {
 		throw new ApiError(409, `项目目录不可写（只读根），无法保存配置：${root}`);
 	}
-	const next = {
-		schema: PROJECT_SCHEMA,
-		apiVersion: PROJECT_API_VERSION,
-		projectRoot: root,
-		enabled: Array.isArray(config.enabled) ? config.enabled.filter((n) => typeof n === 'string' && NAME_RE.test(n)) : [],
-		sources: config.sources && typeof config.sources === 'object' && !Array.isArray(config.sources) ? config.sources : {},
-		appliedPreset: typeof config.appliedPreset === 'string' && config.appliedPreset.length > 0 ? config.appliedPreset : null,
-		updatedAt: typeof config.updatedAt === 'string' ? config.updatedAt : new Date().toISOString(),
-	};
 	const path = projectConfigPath(root);
-	await atomicWriteFile(path, JSON.stringify(next, null, 2) + '\n');
+	// Never overwrite a truth file this host cannot read or understand
+	// (review P2-1 / P2-2 / P2-4):
+	//   - corrupt JSON: refusing avoids clobbering unread truth data;
+	//   - apiVersion newer than this host: refusing avoids a silent
+	//     downgrade of future-version fields;
+	//   - permission / I/O errors: no write at all.
+	let onDisk = raw;
+	if (onDisk === undefined) {
+		try {
+			onDisk = JSON.parse(await readFile(path, 'utf8'));
+		} catch (error) {
+			if (error && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) onDisk = null;
+			else if (error instanceof SyntaxError) throw new ApiError(409, '项目配置已损坏（JSON 无法解析）：为避免覆盖无法读取的真相文件，已拒绝写入；可手动删除该文件后重建空配置');
+			else {
+				const reason = error && error.code ? error.code : (error && error.message) || 'I/O';
+				throw new ApiError(409, `项目配置无法读取（${reason}），权限或 I/O 错误：已拒绝写入，未做任何改动`);
+			}
+		}
+	}
+	if (onDisk && typeof onDisk === 'object' && !Array.isArray(onDisk) && typeof onDisk.apiVersion === 'number' && onDisk.apiVersion > PROJECT_API_VERSION) {
+		throw new ApiError(409, `项目配置版本 apiVersion ${onDisk.apiVersion} 高于当前 host 支持的 ${PROJECT_API_VERSION}：为保护未来版本数据已拒绝写入；升级 host 后重试`);
+	}
+	const next = migrateProjectConfig(config, root);
+	// Forward compatibility (review P2-1): unknown top-level fields and
+	// unknown per-source fields round-trip.
+	if (onDisk && typeof onDisk === 'object' && !Array.isArray(onDisk)) {
+		for (const [k, v] of Object.entries(onDisk)) {
+			if (!(k in next)) next[k] = v;
+		}
+		if (onDisk.sources && typeof onDisk.sources === 'object' && !Array.isArray(onDisk.sources)) {
+			const knownSourceFields = new Set(['source', 'contentHash', 'originHash', 'copyHash', 'generated']);
+			for (const [name, onEntry] of Object.entries(onDisk.sources)) {
+				if (onEntry === null || typeof onEntry !== 'object') continue;
+				// An entry absent from the in-memory config was explicitly
+				// removed by this mutation (the config is initialized from
+				// disk): a deletion is not re-added from the stale raw.
+				const nextEntry = next.sources[name] && typeof next.sources[name] === 'object' ? next.sources[name] : undefined;
+				if (nextEntry === undefined) continue;
+				for (const [k, v] of Object.entries(onEntry)) {
+					// Known fields are controlled by the current mutation: an absent
+					// `source` or `generated` is an intentional reset, not an unknown
+					// field to resurrect from the stale raw object.
+					if (!knownSourceFields.has(k) && !(k in nextEntry)) nextEntry[k] = v;
+				}
+				if (Object.keys(nextEntry).length > 0) next.sources[name] = nextEntry;
+			}
+		}
+	}
+	// The persisted config never carries the project's absolute root; it is
+	// derived from the config file's own location (review P2-4), so a
+	// checked-in config stays portable across machines.
+	const serialized = Object.assign({}, next);
+	delete serialized.projectRoot;
+	if (opts && opts.faults && typeof opts.faults.beforeProjectConfigWrite === 'function') {
+		await opts.faults.beforeProjectConfigWrite({ path, config: serialized });
+	}
+	await atomicWriteFile(path, JSON.stringify(serialized, null, 2) + '\n');
 	return next;
 }
+
 
 /** The fresh-project default: no non-required skill enters the model catalog. */
 export function emptyProjectConfig(projectRoot) {
@@ -181,6 +343,10 @@ export function normalizeProjectConfig(parsed, projectRoot) {
 			if (typeof sel.originHash === 'string' && sel.originHash.length > 0) entry.originHash = sel.originHash;
 			if (typeof sel.copyHash === 'string' && sel.copyHash.length > 0) entry.copyHash = sel.copyHash;
 			if (sel.generated === true) entry.generated = true;
+			// A future schema may carry unknown-only source fields: keep
+			// the raw entry so such fields survive the round-trip
+			// (review P2-1).
+			if (Object.keys(entry).length === 0) Object.assign(entry, sel);
 			if (Object.keys(entry).length > 0) base.sources[name] = entry;
 		}
 	}
@@ -188,6 +354,18 @@ export function normalizeProjectConfig(parsed, projectRoot) {
 	if (typeof parsed.updatedAt === 'string') base.updatedAt = parsed.updatedAt;
 	return base;
 }
+
+export function migrateProjectConfig(parsed, projectRoot) {
+	// Explicit migration path (review P2-1): a missing apiVersion or a
+	// legacy (< PROJECT_API_VERSION) file uses the V1 field mapping, 1:1
+	// today; a future major bump changes this function, not the read/write
+	// call sites. apiVersion === PROJECT_API_VERSION normalizes as-is; a
+	// higher apiVersion still normalizes for a READ-ONLY report (the caller
+	// marks it `future` and writeProjectConfig refuses to write it).
+	const obj = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+	return normalizeProjectConfig(obj, projectRoot);
+}
+
 
 /** Tolerant coercion of a parsed global-config JSON object. */
 function normalizeGlobalConfig(parsed, empty) {
@@ -326,10 +504,11 @@ export function assertPresetName(name) {
 	return clean;
 }
 
-/** sha256 hex of a string. */
-export function sha256Hex(text) {
-	return createHash('sha256').update(text, 'utf8').digest('hex');
+/** sha256 hex of a Buffer/Uint8Array (raw bytes) or a string (utf8, legacy digest). */
+export function sha256Hex(data) {
+	return createHash('sha256').update(data).digest('hex');
 }
+
 
 /**
  * Content hash of one skill source: flat files hash their own text;
@@ -339,9 +518,13 @@ export function sha256Hex(text) {
  * @param format - 'dir' | 'flat'.
  */
 export async function hashSkillSource(path, format) {
+	// Raw-byte hashes (review P1-3): invalid UTF-8 sequences, NUL bytes and
+	// any real binary content change the digest. A toString('utf8')
+	// collapsed them (replacement char) and hid real content changes,
+	// breaking the "modified copies are never overwritten" boundary.
 	if (format === 'flat') {
-		const raw = await readFile(path, 'utf8');
-		return `sha256:${sha256Hex(raw)}`;
+		const data = await readFile(path);
+		return `sha256:${data.length}:${sha256Hex(data)}`;
 	}
 	const root = dirname(path);
 	const rootReal = await realpath(root).catch(() => resolve(root));
@@ -351,7 +534,7 @@ export async function hashSkillSource(path, format) {
 		if (depth > 8) return;
 		const entries = await readdir(d, { withFileTypes: true }).catch(() => []);
 		for (const entry of [...entries].sort((a, b) => a.name.localeCompare(b.name))) {
-			if (entry.name.startsWith('.') || /\.tmp-\d+-\d+$/.test(entry.name)) continue;
+			if (entry.name.startsWith('.') || /\.tmp-[^/]+$/.test(entry.name)) continue;
 			const p = join(d, entry.name);
 			const real = await realpath(p).catch(() => undefined);
 			if (real === undefined || seen.has(real)) continue;
@@ -360,10 +543,11 @@ export async function hashSkillSource(path, format) {
 			if (entry.isDirectory()) await rec(p, depth + 1);
 			else if (entry.isFile()) {
 				const data = await readFile(p);
-				lines.push(`${relative(root, p).split(sep).join('/')}=${sha256Hex(data.toString('utf8'))}`);
+				lines.push(`${relative(root, p).split(sep).join('/')}:${data.length}:${sha256Hex(data)}`);
 			}
 		}
 	}
 	await rec(root, 0);
-	return `sha256:${sha256Hex(lines.join('\n'))}`;
+	const manifest = Buffer.from(lines.join('\n'), 'utf8');
+	return `sha256:${manifest.length}:${sha256Hex(manifest)}`;
 }

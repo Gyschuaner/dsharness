@@ -1,7 +1,7 @@
 {
   "name": "dsh-skill-manager",
   "version": "0.1.0",
-  "description": "Skill file manager for DeepSeek Harness: a Settings section that lists, edits, deletes, imports and exports DSH skills across project and user roots; preset-bundled skills are read-only.",
+  "description": "DeepSeek Harness SKILL management center with per-project enablement, unified sources, tags, presets, and a web Extensions entry.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

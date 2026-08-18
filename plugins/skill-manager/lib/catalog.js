@@ -22,12 +22,14 @@
  * observed by DSH's skill watcher, so changes apply on the next model turn
  * without restarting DSH.
  */
-import { mkdir, readFile, readdir, realpath, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import {
 	ApiError,
 	NAME_RE,
+	createLedger,
 	findProjectRoot,
 	assertCwd,
 	atomicWriteFile,
@@ -36,6 +38,7 @@ import {
 	readGlobalConfig,
 	emptyProjectConfig,
 	hashSkillSource,
+	sha256Hex,
 } from './state.js';
 
 /** Precedence ranks mirroring dsh-skill-filesystem (lower wins). */
@@ -46,6 +49,23 @@ export const SHADOW_DESC_PREFIX = '[skill-manager] 本项目禁用开关';
 const SCOPE_ORDER = { project: 0, user: 1, global: 2, bundled: 3 };
 /** Copy size cap (bytes), same as the legacy copy mechanism. */
 const MAX_COPY_BYTES = 50 * 1024 * 1024;
+/** DSH's actual skill-resolution order (review P1-2): rank ascending, ties
+ * broken by root registration order in computeRoots. Modeled separately from
+ * the product display/selection order below so an explicit selection is
+ * reported against what DSH actually resolves. */
+const DSH_RESOLVER_ORDER = ['project-dsh', 'project-agents', 'global-codex', 'global-claude', 'user-dsh', 'user-agents'];
+/** Product priority order (handoff \u00a74.3, review P1-2): an explicit, stable
+ * table, never derived from scope plus alphabetical sort (that derivation put
+ * global-claude ahead of global-codex and the like). */
+const PRODUCT_SOURCE_ORDER = ['project-dsh', 'project-agents', 'user-dsh', 'user-agents', 'global-codex', 'global-claude'];
+function dshResolverIndex(key) {
+	const i = DSH_RESOLVER_ORDER.indexOf(key);
+	return i === -1 ? DSH_RESOLVER_ORDER.length : i;
+}
+function productOrderIndex(key) {
+	const i = PRODUCT_SOURCE_ORDER.indexOf(key);
+	return i === -1 ? PRODUCT_SOURCE_ORDER.length : i;
+}
 
 function optsOf(opts) {
 	const o = opts && typeof opts === 'object' ? opts : {};
@@ -177,6 +197,66 @@ export function markerContent(name, projectRoot) {
 	].join('\n');
 }
 
+/**
+ * Reserved flat-filename prefix for generated marker switch stubs
+ * (review P2-4): DSH resolves flat skills by their frontmatter name, so the
+ * file name itself is free to reserve. This distinguishes the rebuildable,
+ * gitignored generated stub from a hand-written project skill that a
+ * `.dsh/skills/<name>.md` alone cannot, and is the precise ignore pattern
+ * in .gitignore. The frontmatter name stays the shadowed skill name.
+ */
+export const SHADOW_STUB_PREFIX = '__smgr-shadow-';
+/** Marker switch stub location (reserved prefix, review P2-4). */
+export function shadowStubPath(projectRoot, name) {
+	return join(projectRoot, '.dsh', 'skills', `${SHADOW_STUB_PREFIX}${name}.md`);
+}
+/** Legacy stub location, migrated away by reconcileProject when marker-verified. */
+function legacyStubPath(projectRoot, name) {
+	return join(projectRoot, '.dsh', 'skills', `${name}.md`);
+}
+
+/** Atomic text rewrite with an optional transaction undo. */
+async function writeTextWithLedger(path, content, ledger) {
+	let previous = null;
+	let existed = false;
+	try {
+		previous = await readFile(path, 'utf8');
+		existed = true;
+	} catch (error) {
+		if (!error || (error.code !== 'ENOENT' && error.code !== 'ENOTDIR')) throw error;
+	}
+	await atomicWriteFile(path, content);
+	if (ledger !== undefined) {
+		ledger.record(existed
+			? () => atomicWriteFile(path, previous)
+			: () => rm(path, { force: true }));
+	}
+}
+
+/**
+ * Move a file or directory to an invisible sibling backup. The backup is
+ * deleted on commit and renamed back on rollback, so Windows never needs to
+ * rename over a non-empty destination.
+ */
+async function removePathWithLedger(path, ledger) {
+	const st = await stat(path).catch((error) => {
+		if (error && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) return undefined;
+		throw error;
+	});
+	if (st === undefined) return false;
+	if (ledger === undefined) {
+		await rm(path, { recursive: st.isDirectory(), force: true });
+		return true;
+	}
+	const backup = join(dirname(path), `.${relative(dirname(path), path)}.bak-${randomUUID()}`);
+	await rename(path, backup);
+	ledger.record(
+		() => rename(backup, path),
+		() => rm(backup, { recursive: true, force: true }),
+	);
+	return true;
+}
+
 /** External agent user-level skill roots, listed read-only. */
 function globalRoots(o) {
 	return [
@@ -245,6 +325,11 @@ export async function discoverInRoot(dir) {
 		try {
 			const raw = await readFile(path, 'utf8');
 			const parsed = parseSkill(raw);
+			// DSH resolves a skill by its frontmatter name (skill-filesystem),
+			// not the file or directory name; the reserved stub filename
+			// (SHADOW_STUB_PREFIX) resolves the same, and renamed project
+			// bundles match the runtime identity (review P2-4).
+			skill.name = parsed.name;
 			skill.title = parsed.name;
 			skill.description = parsed.description;
 			if (parsed.whenToUse !== undefined) skill.whenToUse = parsed.whenToUse;
@@ -306,7 +391,7 @@ export async function walkSkillFiles(dir) {
 			return;
 		}
 		for (const entry of [...entries].sort((a, b) => a.name.localeCompare(b.name))) {
-			if (entry.name.startsWith('.') || /\.tmp-\d+-\d+$/.test(entry.name)) continue;
+			if (entry.name.startsWith('.') || /\.tmp-[^/]+$/.test(entry.name)) continue;
 			const p = join(d, entry.name);
 			let real;
 			try {
@@ -343,7 +428,52 @@ function sourceRank(key) {
 }
 /** Stable product-priority sort for source keys. */
 function sourceKeysByPriority(keys) {
-	return [...keys].sort((a, b) => (SCOPE_ORDER[sourceScope(a)] - SCOPE_ORDER[sourceScope(b)]) || (sourceRank(a) - sourceRank(b)) || a.localeCompare(b));
+	return [...keys].sort((a, b) => productOrderIndex(a) - productOrderIndex(b) || sourceRank(a) - sourceRank(b) || a.localeCompare(b));
+}
+/**
+ * Reproduces the pre-raw-byte digest exactly (review P1-3): sha256 over the
+ * utf8 text, no file length, `rel=<utf8hex>` lines, so a registration written
+ * before that upgrade verifies as unmodified instead of reading as modified.
+ */
+export async function hashSkillSourceLegacy(path, format) {
+	if (format === 'flat') {
+		const raw = await readFile(path, 'utf8');
+		return `sha256:${sha256Hex(raw)}`;
+	}
+	const root = dirname(path);
+	const rootReal = await realpath(root).catch(() => resolve(root));
+	const lines = [];
+	const seen = new Set();
+	async function rec(d, depth) {
+		if (depth > 8) return;
+		const entries = await readdir(d, { withFileTypes: true }).catch(() => []);
+		for (const entry of [...entries].sort((a, b) => a.name.localeCompare(b.name))) {
+			if (entry.name.startsWith('.') || /^\.tmp-\d+-\d+$/.test(entry.name)) continue;
+			const p = join(d, entry.name);
+			const real = await realpath(p).catch(() => undefined);
+			if (real === undefined || seen.has(real)) continue;
+			seen.add(real);
+			if (real !== rootReal && !real.startsWith(rootReal + sep)) continue;
+			if (entry.isDirectory()) await rec(p, depth + 1);
+			else if (entry.isFile()) {
+				const data = await readFile(p);
+				lines.push(`${relative(root, p).split(sep).join('/')}=${sha256Hex(data.toString('utf8'))}`);
+			}
+		}
+	}
+	await rec(root, 0);
+	return `sha256:${sha256Hex(lines.join('\n'))}`;
+}
+/**
+ * Whether the stored digest (new raw-byte form or legacy utf8-text form, review
+ * P1-3) matches `current`.
+ */
+export async function hashMatches(stored, path, format, current) {
+	if (current === stored) return true;
+	const isLegacy = typeof stored === 'string' && /^sha256:[a-f0-9]{64}$/.test(stored);
+	if (!isLegacy) return false;
+	const legacy = await hashSkillSourceLegacy(path, format).catch(() => null);
+	return legacy === stored;
 }
 
 /** The standard location of a generated copy for one skill name. */
@@ -356,37 +486,139 @@ function copyLocation(projectRoot, name, format) {
  * directory bundle), with the invocation flag set to the project's desired
  * state. Bounded at 50MB. Returns the destination SKILL.md path.
  */
-export async function copySkillToProject(projectRoot, name, sourcePlan, flagSetTrue, opts) {
+export async function copySkillToProject(projectRoot, name, sourcePlan, flagSetTrue, opts, ledger) {
 	const o = optsOf(opts);
 	const dest = copyLocation(projectRoot, name, sourcePlan.format);
 	if (sourcePlan.format === 'flat') {
-		const raw = await readFile(sourcePlan.path, 'utf8');
+		const sourceData = await readFile(sourcePlan.path);
+		if (sourceData.length > MAX_COPY_BYTES) throw new ApiError(413, 'skill 副本超过 50MB 上限');
+		const raw = sourceData.toString('utf8');
 		const { content } = patchInvocationFlag(raw, flagSetTrue);
+		if (o.faults && typeof o.faults.beforeCopySwap === 'function') {
+			await o.faults.beforeCopySwap({ name, source: sourcePlan.path, destination: dest, format: 'flat' });
+		}
+		// The flat destination is a single atomic rename; on failure the prior
+		// content (real project skill is guarded by the caller, 409) survives.
+		const existed = (await stat(dest).catch(() => undefined)) !== undefined;
+		let backupContent = null;
+		if (existed) {
+			backupContent = await readFile(dest, 'utf8').catch(() => null);
+			if (ledger !== undefined && backupContent === null) {
+				throw new ApiError(409, `无法读取既有 ${dest} 内容，中止以避免覆盖：请检查权限`);
+			}
+		}
 		await atomicWriteFile(dest, content);
+		// On success register the undo for a failed later config commit: restore
+		// the replaced file and keep the ledger consistent.
+		if (ledger !== undefined) {
+			ledger.record(
+				backupContent !== null
+					? () => atomicWriteFile(dest, backupContent)
+					: () => rm(dest, { force: true }),
+			);
+		}
 		return dest;
 	}
 	const srcDir = dirname(sourcePlan.path);
 	const destDir = dirname(dest);
+	const skillsDir = dirname(destDir);
+	const uuid = randomUUID();
+	const stagingDir = join(skillsDir, `.${name}.${uuid}.staging`);
+	const backupDir = join(skillsDir, `.${name}.${uuid}.backup`);
+	// Pre-check (no file damage): source files readable + total size bounded.
+	const sourceHashBefore = await hashSkillSource(sourcePlan.path, 'dir').catch((error) => {
+		throw new ApiError(404, `来源目录无法完整读取：${error instanceof Error ? error.message : String(error)}`);
+	});
+	if (o.faults && typeof o.faults.afterSourcePrecheck === 'function') {
+		await o.faults.afterSourcePrecheck({ name, source: sourcePlan.path, format: 'dir' });
+	}
 	const files = await walkSkillFiles(srcDir);
+	if (files.length === 0 || !files.some((file) => relative(srcDir, file).split(sep).join('/') === 'SKILL.md')) {
+		throw new ApiError(404, '来源目录缺少可读取的 SKILL.md');
+	}
+	const entries = [];
 	let totalBytes = 0;
-	await rm(destDir, { recursive: true, force: true });
-	await mkdir(destDir, { recursive: true });
 	for (const file of files) {
-		const data = await readFile(file);
+		const data = await readFile(file).catch((error) => {
+			throw new ApiError(404, `来源文件缺失：${relative(srcDir, file).split(sep).join('/') || file}：${error.message}`);
+		});
 		totalBytes += data.length;
-		if (totalBytes > MAX_COPY_BYTES) {
-			await rm(destDir, { recursive: true, force: true }).catch(() => {});
-			throw new ApiError(413, 'skill 副本超过 50MB 上限');
+		if (totalBytes > MAX_COPY_BYTES) throw new ApiError(413, 'skill 副本超过 50MB 上限');
+		entries.push([file, data]);
+	}
+	// Write the full staging copy in the same parent directory; nothing of the
+	// existing destination is touched yet (review P1-4: a failed copy must not
+	// delete the old copy before the new one is verified in place).
+	await mkdir(stagingDir, { recursive: true });
+	try {
+		for (const [file, data] of entries) {
+			const rel = relative(srcDir, file).split(sep).join('/');
+			const target = join(stagingDir, rel);
+			await mkdir(dirname(target), { recursive: true });
+			const content = rel === 'SKILL.md'
+				? Buffer.from(patchInvocationFlag(data.toString('utf8'), flagSetTrue).content, 'utf8')
+				: data;
+			await writeFile(target, content);
 		}
+	} catch (error) {
+		await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+		throw error;
+	}
+	// Verify the staged bundle (file set + content) matches what was read; a
+	// source that changed mid-copy is rejected before anything is swapped.
+	const stagedHash = await hashSkillSource(join(stagingDir, 'SKILL.md'), 'dir');
+	const expectedLines = [];
+	for (const [file, data] of entries) {
 		const rel = relative(srcDir, file).split(sep).join('/');
-		const target = join(destDir, rel);
-		await mkdir(dirname(target), { recursive: true });
-		if (rel === 'SKILL.md') {
-			const { content } = patchInvocationFlag(data.toString('utf8'), flagSetTrue);
-			await writeFile(target, content, 'utf8');
-		} else {
-			await writeFile(target, data);
+		const content = rel === 'SKILL.md'
+			? Buffer.from(patchInvocationFlag(data.toString('utf8'), flagSetTrue).content, 'utf8')
+			: data;
+		expectedLines.push(`${rel}:${content.length}:${sha256Hex(content)}`);
+	}
+	const expectedManifest = Buffer.from(expectedLines.join('\n'), 'utf8');
+	const expectedHash = `sha256:${expectedManifest.length}:${sha256Hex(expectedManifest)}`;
+	const sourceHashAfter = await hashSkillSource(sourcePlan.path, 'dir').catch(() => null);
+	if (stagedHash !== expectedHash || sourceHashAfter === null || sourceHashAfter !== sourceHashBefore) {
+		await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+		throw new ApiError(500, '副本暂存校验失败：来源内容在复制期间发生变化');
+	}
+	if (o.faults && typeof o.faults.beforeCopySwap === 'function') {
+		try {
+			await o.faults.beforeCopySwap({ name, source: sourcePlan.path, destination: dest, format: 'dir' });
+		} catch (error) {
+			await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+			throw error;
 		}
+	}
+	// Swap: move the existing destination (if any) to a backup, rename staging in,
+	// and on any failure restore the backup and clean the staging dir.
+	const hadDest = (await stat(destDir).catch(() => undefined)) !== undefined;
+	if (hadDest) await rename(destDir, backupDir);
+	try {
+		await rename(stagingDir, destDir);
+	} catch (error) {
+		if (hadDest) await rename(backupDir, destDir).catch(() => {});
+		await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+		throw error;
+	}
+
+	if (hadDest) {
+		// The backup stays until the mutation commits (ledger cleanup) or a failed
+		// config commit rolls the swap back to the old copy (ledger undo). Dot
+		// names keep the backup and staging invisible to the skill scanner (dot
+		// entries are never discovered or hashed). Without a ledger (reconcile)
+		// the swap is already committed, so the backup is cleaned right away.
+		// undo/cleanup surface their failures: a restore or cleanup that fails is
+		// reported, not swallowed (review P1-4/P2-3).
+		const cleanup = () => rm(backupDir, { recursive: true, force: true });
+		const undo = async () => {
+			await rm(destDir, { recursive: true, force: true });
+			await rename(backupDir, destDir);
+		};
+		if (ledger !== undefined) ledger.record(undo, cleanup);
+		else await cleanup();
+	} else if (ledger !== undefined) {
+		ledger.record(() => rm(destDir, { recursive: true, force: true }));
 	}
 	return dest;
 }
@@ -490,10 +722,12 @@ function classifyIdentity(identity, projectConfig, projectRoot) {
 	const realHealthy = healthy.filter((s) => !s.generated);
 	const defaultSourceKey = realHealthy.length > 0 ? realHealthy[0].key
 		: (healthy.length > 0 ? healthy[0].key : (nonShadow.length > 0 ? nonShadow[0].key : null));
-	// DSH effective winner: lowest-rank healthy non-shadow source.
+	// DSH effective winner: lowest-rank healthy non-shadow source, ties broken by
+	// root registration order (review P1-2: model DSH's real winner order,
+	// not the product display order and not alphabetical sort).
 	let winner = null;
 	for (const s of healthy) {
-		if (winner === null || s.rank < winner.rank) winner = s;
+		if (winner === null || s.rank < winner.rank || (s.rank === winner.rank && dshResolverIndex(s.key) < dshResolverIndex(winner.key))) winner = s;
 	}
 	const explicit = projectConfig.sources[identity.name];
 	let sourceKey = null;
@@ -502,7 +736,9 @@ function classifyIdentity(identity, projectConfig, projectRoot) {
 	}
 	// What the project actually uses: a project-dsh copy (managed or
 	// user-modified) always wins rank 100; then a real project skill; then
-	// the explicit selection (falling back to default when broken).
+	// DSH's actual resolution winner (never the recorded selection intent, so
+	// a pure selection that DSH does not actually resolve to is reported as the
+	// winner it really is, review P1-2).
 	const copySource = healthy.find((s) => s.scope === 'project' && s.generated === true);
 	const projectSkill = healthy.find((s) => s.scope === 'project' && !s.generated);
 	const explicitBroken = sourceKey !== null && (sources.find((s) => s.key === sourceKey)?.broken !== undefined);
@@ -510,7 +746,7 @@ function classifyIdentity(identity, projectConfig, projectRoot) {
 		? copySource.key
 		: projectSkill
 			? projectSkill.key
-			: (explicitBroken ? defaultSourceKey : (sourceKey ?? defaultSourceKey));
+			: (explicitBroken ? defaultSourceKey : (winner ? winner.key : defaultSourceKey));
 	const effectiveSource = sources.find((s) => s.key === effectiveKey) || healthy[0] || null;
 	// Mechanism classification. A user-modified generated copy has become a
 	// project file: its own flag is the mechanism ('self'), never a stub.
@@ -534,13 +770,24 @@ function classifyIdentity(identity, projectConfig, projectRoot) {
  * @returns report { created: [path], removed: [path], rewritten: [path],
  *   conflicts: [{name, message}], failed: [{name, error}] }
  */
-export async function reconcileProject(projectRoot, projectConfig, identities, opts, logger) {
+export async function reconcileProject(projectRoot, projectConfig, identities, opts, logger, ledger) {
 	const report = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
 	const fail = (name, error) => {
 		report.failed.push({ name, error: error instanceof Error ? error.message : String(error) });
 	};
 	const stubDir = join(projectRoot, '.dsh', 'skills');
-	const stubPath = (name) => join(stubDir, `${name}.md`);
+	// Reserved-prefix stub (P2-4) plus the legacy <name>.md location: the
+	// legacy stub migrates to the reserved name on reconcile.
+	const stubPath = (name) => shadowStubPath(projectRoot, name);
+	const legacyStub = (name) => legacyStubPath(projectRoot, name);
+	const isStub = async (p) => {
+		try {
+			const st = await stat(p);
+			return st.isFile() && (await isShadowFile(p));
+		} catch {
+			return false;
+		}
+	};
 	const enabledSet = new Set(projectConfig.enabled);
 
 	for (const identity of identities.values()) {
@@ -548,18 +795,14 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 		try {
 			const { mechanism, defaultSourceKey, effectiveSource, winner } = classifyIdentity(identity, projectConfig, projectRoot);
 			const wantEnabled = enabledSet.has(name);
-			const stubExists = async () => {
-				try {
-					const st = await stat(stubPath(name));
-					return st.isFile() && (await isShadowFile(stubPath(name)));
-				} catch {
-					return false;
-				}
-			};
+			const stubExists = async () =>
+				(await isStub(stubPath(name))) || (await isStub(legacyStub(name)));
 			const removeStub = async () => {
-				if (await stubExists()) {
-					await unlink(stubPath(name));
-					report.removed.push(stubPath(name));
+				for (const p of [stubPath(name), legacyStub(name)]) {
+					if (await isStub(p)) {
+						await removePathWithLedger(p, ledger);
+						report.removed.push(p);
+					}
 				}
 			};
 
@@ -571,15 +814,17 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 			let copyModified = false;
 			if (genEntry && genEntry.generated === true && genEntry.copyHash !== undefined && genCopySrc !== undefined) {
 				const h = await hashSkillSource(genCopySrc.path, genCopySrc.format).catch(() => null);
-				copyModified = h !== null && h !== genEntry.copyHash;
+				// hashMatches also verifies legacy utf8-text registrations written
+				// before the raw-byte upgrade (review P1-3).
+				copyModified = h !== null && !(await hashMatches(genEntry.copyHash, genCopySrc.path, genCopySrc.format, h));
 			}
 			if (copyModified) {
 				await removeStub();
-				const raw = await readFile(genCopySrc.path, 'utf8');
-				const { content, changed } = patchInvocationFlag(raw, !wantEnabled);
-				if (changed) {
-					await atomicWriteFile(genCopySrc.path, content);
-					report.rewritten.push(genCopySrc.path);
+					const raw = await readFile(genCopySrc.path, 'utf8');
+					const { content, changed } = patchInvocationFlag(raw, !wantEnabled);
+					if (changed) {
+						await writeTextWithLedger(genCopySrc.path, content, ledger);
+						report.rewritten.push(genCopySrc.path);
 				}
 				continue;
 			}
@@ -594,7 +839,7 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 				const raw = await readFile(target.path, 'utf8');
 				const { content, changed } = patchInvocationFlag(raw, !wantEnabled);
 				if (changed) {
-					await atomicWriteFile(target.path, content);
+					await writeTextWithLedger(target.path, content, ledger);
 					report.rewritten.push(target.path);
 				}
 				continue;
@@ -608,7 +853,7 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 					const raw = await readFile(copySource.path, 'utf8');
 					const { content, changed } = patchInvocationFlag(raw, !wantEnabled);
 					if (changed) {
-						await atomicWriteFile(copySource.path, content);
+						await writeTextWithLedger(copySource.path, content, ledger);
 						// Refresh the managed-copy content marker.
 						const entry = projectConfig.sources[name];
 						if (entry && entry.generated === true) {
@@ -632,12 +877,22 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 			if (projectConfig.sources[name] === undefined) {
 				const defSource = identity.sources.find((s) => s.key === defaultSourceKey && !s.broken && !s.shadow && !s.generated);
 				if (defSource !== undefined) {
-					const beaten = identity.sources.some((s) => !s.shadow && !s.broken && !s.generated && s.key !== defSource.key && s.rank < defSource.rank);
-					if (beaten) {
+					// DSH's actual winner among all real (non-shadow, non-broken,
+					// non-generated) sources — including the product default itself —
+					// rank ascending, same-rank ties by the DSH resolver order
+					// (review P1-2). A managed copy of the product default is
+					// materialized exactly when that winner is a different source,
+					// i.e. DSH would otherwise resolve past the default.
+					let dshWinner = null;
+					for (const s of identity.sources) {
+						if (s.shadow || s.broken || s.generated) continue;
+						if (dshWinner === null || s.rank < dshWinner.rank || (s.rank === dshWinner.rank && dshResolverIndex(s.key) < dshResolverIndex(dshWinner.key))) dshWinner = s;
+					}
+					if (dshWinner !== null && dshWinner.key !== defSource.key) {
 						// Default materialization: NOT an explicit selection,
 						// so register the copy without a `source` field.
-						await ensureManagedCopy(projectRoot, projectConfig, identity, defSource.key, !wantEnabled, opts, report, false);
-						await removeMarkerStub(projectRoot, name, report);
+							await ensureManagedCopy(projectRoot, projectConfig, identity, defSource.key, !wantEnabled, opts, report, false, ledger);
+							await removeMarkerStub(projectRoot, name, report, ledger);
 						continue;
 					}
 				}
@@ -651,9 +906,9 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 				// Disabled and the original is invocable: materialize the stub.
 				// (A policy-flagged user original already excludes the skill —
 				// no redundant stub, matching the legacy enforcement cleanup.)
-				const existing = await stat(stubPath(name)).catch(() => undefined);
-				if (existing === undefined || !existing.isFile()) {
-					await atomicWriteFile(stubPath(name), markerContent(name, projectRoot));
+					const existing = await stat(stubPath(name)).catch(() => undefined);
+					if (existing === undefined || !existing.isFile()) {
+						await writeTextWithLedger(stubPath(name), markerContent(name, projectRoot), ledger);
 					report.created.push(stubPath(name));
 				} else if (!(await isShadowFile(stubPath(name)))) {
 					// Same-name file we did not generate: never clobber.
@@ -671,13 +926,22 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 		const entries = await readdir(stubDir, { withFileTypes: true }).catch(() => []);
 		for (const entry of entries) {
 			if (!entry.isFile() || entry.name.startsWith('.') || !entry.name.toLowerCase().endsWith('.md')) continue;
-			const name = entry.name.slice(0, entry.name.length - 3);
-			if (!NAME_RE.test(name)) continue;
 			const p = join(stubDir, entry.name);
-			if (!(await isShadowFile(p))) continue; // never touch foreign files
+			// never touch foreign files: marker-verified only.
+			if (!(await isShadowFile(p))) continue;
+			// the stub's skill name is the frontmatter name (runtime
+			// resolution), its file name is the reserved stub prefix (P2-4) or
+			// legacy; fall back to the file name for legacy stubs.
+			const frontName = await readFile(p, 'utf8').then((raw) => (parseSkill(raw).name ?? undefined)).catch(() => undefined);
+			const name = frontName ?? entry.name.slice(0, entry.name.length - 3);
+			if (!NAME_RE.test(name)) continue;
 			if (!identities.has(name)) {
-				await unlink(p).catch(() => {});
-				report.removed.push(p);
+				try {
+					await removePathWithLedger(p, ledger);
+					report.removed.push(p);
+				} catch (error) {
+					fail(name, error);
+				}
 			}
 		}
 	} catch (error) {
@@ -725,10 +989,15 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 			}
 			const copyPath = copySrc.path;
 			const copyHash = await hashSkillSource(copyPath, copySrc.format).catch(() => null);
-			if (entry.copyHash !== undefined && copyHash === entry.copyHash) {
-				if (copySrc.format === 'dir') await rm(dirname(copyPath), { recursive: true, force: true }).catch(() => {});
-				else await unlink(copyPath).catch(() => {});
-				report.removed.push(copyPath);
+			// legacy utf8-text registrations verify as unmodified (P1-3).
+			if (entry.copyHash !== undefined && copyHash !== null && (await hashMatches(entry.copyHash, copyPath, copySrc.format, copyHash))) {
+				try {
+					await removePathWithLedger(copySrc.format === 'dir' ? dirname(copyPath) : copyPath, ledger);
+					report.removed.push(copyPath);
+				} catch (error) {
+					fail(name, error);
+					continue;
+				}
 			} else {
 				report.conflicts.push({ name, message: `来源 ${originKey ?? '默认来源'} 已不存在，但项目副本已被修改，保留为项目文件，请手动处理` });
 			}
@@ -746,16 +1015,21 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
  * Remove the marker-verified flat switch stub for one skill, when a managed
  * copy takes over its role. Foreign same-name files are never touched.
  */
-async function removeMarkerStub(projectRoot, name, report) {
-	const stub = join(projectRoot, '.dsh', 'skills', `${name}.md`);
-	try {
-		const st = await stat(stub);
-		if (!st.isFile()) return;
-		if (!(await isShadowFile(stub))) return;
-		await unlink(stub);
-		report.removed.push(stub);
-	} catch {
-		// absent — nothing to do
+async function removeMarkerStub(projectRoot, name, report, ledger) {
+	// Reserved-prefix stub (P2-4) first, then the legacy <name>.md stub;
+	// marker-verified only, never a foreign same-name file.
+	for (const stub of [shadowStubPath(projectRoot, name), legacyStubPath(projectRoot, name)]) {
+		try {
+			const st = await stat(stub);
+			if (!st.isFile()) continue;
+			if (!(await isShadowFile(stub))) continue;
+			// keep the content for the mutation ledger (P1-4): undo
+			// restores the stub if the config write then fails.
+			await removePathWithLedger(stub, ledger);
+			report.removed.push(stub);
+		} catch (error) {
+			if (!error || (error.code !== 'ENOENT' && error.code !== 'ENOTDIR')) throw error;
+		}
 	}
 }
 
@@ -770,7 +1044,7 @@ async function removeMarkerStub(projectRoot, name, report) {
  * @returns { copyCreated, copyPath }
  * @throws ApiError(409/404) on conflicts.
  */
-export async function ensureManagedCopy(projectRoot, projectConfig, identity, sourceKey, flagSetTrue, opts, report, recordSource = true) {
+export async function ensureManagedCopy(projectRoot, projectConfig, identity, sourceKey, flagSetTrue, opts, report, recordSource = true, ledger) {
 	const name = identity.name;
 	const source = identity.sources.find((s) => s.key === sourceKey);
 	if (source === undefined) throw new ApiError(404, `来源不存在：${sourceKey}`);
@@ -788,25 +1062,33 @@ export async function ensureManagedCopy(projectRoot, projectConfig, identity, so
 	if (existingCopy !== undefined) {
 		const entry = projectConfig.sources[name];
 		const copyHash = await hashSkillSource(existingCopy.path, existingCopy.format).catch(() => null);
-		if (entry && entry.copyHash !== undefined && copyHash === entry.copyHash && existingCopy.key === sourceKey) {
-			// Already a managed copy of this origin: keep it (flag is synced
-			// by the caller afterwards). Promote a source-less (default)
-			// registration when the selection is now explicit.
-			if (recordSource === true && entry.source !== sourceKey) {
-				projectConfig.sources[name] = { source: sourceKey, generated: true, originHash: entry.originHash, copyHash: entry.copyHash };
+		// legacy utf8-text registrations verify as unmodified (P1-3).
+		const copyVerified = entry !== undefined && entry.copyHash !== undefined && copyHash !== null && (await hashMatches(entry.copyHash, existingCopy.path, existingCopy.format, copyHash));
+		if (copyVerified) {
+			// Same-origin check against the registered origin hash, not the
+			// source key: a default-materialized registration has no source
+			// field, and the key here is always the project-dsh copy key.
+			const sourceHash = await hashSkillSource(source.path, source.format).catch(() => null);
+			const sameOrigin = sourceHash !== null && (entry.originHash === sourceHash || (await hashMatches(entry.originHash, source.path, source.format, sourceHash)));
+			if (sameOrigin) {
+				// Already a managed copy of this origin: keep it (flag is synced
+				// by the caller afterwards). Promote a source-less (default)
+				// registration when the selection is now explicit.
+				if (recordSource === true && entry.source !== sourceKey) {
+					projectConfig.sources[name] = { source: sourceKey, generated: true, originHash: entry.originHash, copyHash: entry.copyHash };
+				}
+				return { copyCreated: false, copyPath: existingCopy.path };
 			}
-			return { copyCreated: false, copyPath: existingCopy.path };
-		}
-		if (entry && entry.copyHash !== undefined && copyHash === entry.copyHash) {
-			// Managed copy of a different origin: replace (marker-verified).
-			if (existingCopy.format === 'dir') await rm(dirname(existingCopy.path), { recursive: true, force: true });
-			else await unlink(existingCopy.path);
-			report.removed.push(existingCopy.path);
+			// Managed copy of a different origin: replace. No pre-deletion —
+			// copySkillToProject stages the new copy and moves the old one to
+			// a dot backup, restoring it when the config commit rolls back
+			// (review P1-4).
+			report.rewritten.push(existingCopy.path);
 		} else {
 			throw new ApiError(409, `「${name}」的来源副本内容与登记不一致（可能已被修改），不能自动覆盖`);
 		}
 	}
-	const dest = await copySkillToProject(projectRoot, name, { path: source.path, format: source.format }, flagSetTrue, opts);
+	const dest = await copySkillToProject(projectRoot, name, { path: source.path, format: source.format }, flagSetTrue, opts, ledger);
 	const copyHash = await hashSkillSource(dest, source.format);
 	const originHash = await hashSkillSource(source.path, source.format);
 	projectConfig.sources[name] = recordSource
@@ -824,7 +1106,7 @@ export async function ensureManagedCopy(projectRoot, projectConfig, identity, so
  * @throws ApiError(409) on conflicts (real project skill, modified copy,
  *   broken selection).
  */
-export async function applySourceSelection(projectRoot, projectConfig, identity, sourceKey, opts, logger) {
+export async function applySourceSelection(projectRoot, projectConfig, identity, sourceKey, opts, logger, ledger) {
 	const report = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
 	const name = identity.name;
 	const enabledSet = new Set(projectConfig.enabled);
@@ -840,9 +1122,22 @@ export async function applySourceSelection(projectRoot, projectConfig, identity,
 			}
 			if (copySrc !== undefined && !copySrc.modified) {
 				const copyHash = await hashSkillSource(copySrc.path, copySrc.format).catch(() => null);
-				if (entry.copyHash === undefined || copyHash === entry.copyHash) {
-					if (copySrc.format === 'dir') await rm(dirname(copySrc.path), { recursive: true, force: true });
-					else await unlink(copySrc.path);
+				// legacy utf8-text registrations verify as unmodified (P1-3).
+				if (entry.copyHash === undefined || copyHash !== null && (await hashMatches(entry.copyHash, copySrc.path, copySrc.format, copyHash))) {
+					// move the verified copy to a dot backup (invisible to the
+					// skill scanner); undo restores it when the config commit rolls
+					// back, cleanup removes the backup on commit (review P1-4).
+					const target = copySrc.format === 'dir' ? dirname(copySrc.path) : copySrc.path;
+					const parent = dirname(target);
+					const base = relative(parent, target);
+					const backup = join(parent, `.${base}.bak-${randomUUID()}`);
+					await rename(target, backup);
+					if (ledger !== undefined) {
+						ledger.record(
+							async () => rename(backup, target),
+							() => rm(backup, { recursive: true, force: true })
+						);
+					}
 					report.removed.push(copySrc.path);
 				} else {
 					throw new ApiError(409, `「${name}」的来源副本内容与登记不一致（可能已被修改），不能自动删除；请先手动删除项目副本再恢复默认来源`);
@@ -857,18 +1152,27 @@ export async function applySourceSelection(projectRoot, projectConfig, identity,
 	if (source === undefined) throw new ApiError(404, `来源不存在：${sourceKey}`);
 	if (source.broken) throw new ApiError(409, `来源 ${sourceKey} 的 skill 文件格式损坏，不能选择`);
 
-	// Does the selected source already win DSH resolution (no other healthy
-	// source has a lower rank)? If so, recording is enough.
-	const healthy = identity.sources.filter((s) => !s.shadow && !s.broken && !s.generated);
-	const beats = healthy.some((s) => s.key !== sourceKey && s.rank < source.rank);
+	// DSH would resolve (among healthy real sources — not the managed copy, which
+	// is itself rank-100 and would otherwise always win): lowest rank, same-rank
+	// ties by the DSH resolver order (review P1-2). The selection is a pure
+	// selection — and any now-redundant managed copy is removed — only when the
+	// selected source IS that winner; otherwise the rank-100 copy of the
+	// selected source is materialized so the explicit choice actually takes
+	// effect in DSH resolution.
+	const realHealthy = identity.sources.filter((s) => !s.shadow && !s.broken && !s.generated);
+	let dshWinner = null;
+	for (const s of realHealthy) {
+		if (dshWinner === null || s.rank < dshWinner.rank || (s.rank === dshWinner.rank && dshResolverIndex(s.key) < dshResolverIndex(dshWinner.key))) dshWinner = s;
+	}
+	const needsCopy = dshWinner === null || dshWinner.key !== sourceKey;
 
 	const prev = projectConfig.sources[name];
-	if (beats) {
-		await ensureManagedCopy(projectRoot, projectConfig, identity, sourceKey, !wantEnabled, opts, report);
+	if (needsCopy) {
+		const copyCreated = await ensureManagedCopy(projectRoot, projectConfig, identity, sourceKey, !wantEnabled, opts, report, true, ledger);
 		// The copy is the project's mechanism now; a legacy stub would
 		// shadow it (marker-verified removal only).
-		await removeMarkerStub(projectRoot, name, report);
-		return { changed: true, copyCreated: true, report };
+		await removeMarkerStub(projectRoot, name, report, ledger);
+		return { changed: true, copyCreated, report };
 	}
 
 	// Selected source wins on its own: pure selection (no copy).
@@ -879,10 +1183,10 @@ export async function applySourceSelection(projectRoot, projectConfig, identity,
 		const existingCopy = identity.sources.find((s) => s.scope === 'project' && s.generated && !s.broken);
 		if (existingCopy !== undefined && existingCopy.modified !== true) {
 			const copyHash = await hashSkillSource(existingCopy.path, existingCopy.format).catch(() => null);
-			if (prev.copyHash === undefined || copyHash === prev.copyHash) {
-				if (existingCopy.format === 'dir') await rm(dirname(existingCopy.path), { recursive: true, force: true });
-				else await unlink(existingCopy.path);
-				report.removed.push(existingCopy.path);
+			// legacy utf8-text registrations verify as unmodified (P1-3).
+			if (prev.copyHash === undefined || copyHash !== null && (await hashMatches(prev.copyHash, existingCopy.path, existingCopy.format, copyHash))) {
+					await removePathWithLedger(existingCopy.format === 'dir' ? dirname(existingCopy.path) : existingCopy.path, ledger);
+					report.removed.push(existingCopy.path);
 			}
 		}
 	}
@@ -902,22 +1206,40 @@ export async function applySourceSelection(projectRoot, projectConfig, identity,
 export async function buildProjectView(cwd, opts) {
 	const o = optsOf(opts);
 	const projectRoot = typeof cwd === 'string' && cwd.length > 0 ? await findProjectRoot(cwd) : null;
-	const { config, existed, corrupt } = projectRoot === null
-		? { config: emptyProjectConfig(''), existed: false, corrupt: false }
+	const { config, existed, corrupt, future, raw } = projectRoot === null
+		? { config: emptyProjectConfig(''), existed: false, corrupt: false, future: false, raw: undefined }
 		: await readProjectConfig(projectRoot, o);
+	// A corrupt (unreadable) or newer-version config must not be reconciled or
+	// written: reconcile from an empty truth would materialize stubs for every
+	// identity (all-off state), and a future version is read-only (review
+	// P2-1/P2-2). The view reports both; mutations refuse with actionable 409.
+	const readOnlyConfig = corrupt === true || future === true;
 	// Pass 1: scan + reconcile (materialize/clean derived artifacts).
 	const pre = await buildIdentityCatalog(cwd, o, config);
-	const sourcesBefore = JSON.stringify(config.sources);
-	const report = projectRoot === null
-		? { created: [], removed: [], rewritten: [], conflicts: [], failed: [] }
-		: await reconcileProject(projectRoot, config, pre.identities, o, o.logger);
-	if (projectRoot !== null && JSON.stringify(config.sources) !== sourcesBefore) {
-		// Reconcile changed the source registrations (managed copies
-		// created/removed, orphan registrations dropped, copyHash refreshed).
+	let report = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
+	if (projectRoot !== null && !readOnlyConfig) {
+		const ledger = createLedger();
+		const configBefore = JSON.parse(JSON.stringify(config));
 		try {
-			await writeProjectConfig(projectRoot, config, o);
+			report = await reconcileProject(projectRoot, config, pre.identities, o, o.logger, ledger);
+			if (JSON.stringify(config) !== JSON.stringify(configBefore)) {
+				// Reconcile changed source registrations (managed copies,
+				// orphan cleanup, copyHash refresh). File and config changes are one
+				// transaction: a failed config write rolls every derived artifact
+				// back instead of leaving an unregistered rank-100 copy.
+				await writeProjectConfig(projectRoot, config, o, raw);
+			}
+			const cleanupFailures = await ledger.commit();
+			cleanupFailures.forEach((failure) => report.failed.push({ name: '*', error: `副本备份清理失败：${failure}` }));
 		} catch (error) {
-			report.failed.push({ name: '*', error: `配置保存失败：${error instanceof Error ? error.message : String(error)}` });
+			const rollbackFailures = await ledger.rollback();
+			for (const key of Object.keys(config)) delete config[key];
+			Object.assign(config, configBefore);
+			report.created = [];
+			report.removed = [];
+			report.rewritten = [];
+			report.failed.push({ name: '*', error: `reconcile 已回滚：${error instanceof Error ? error.message : String(error)}` });
+			rollbackFailures.forEach((failure) => report.failed.push({ name: '*', error: `回滚失败：${failure}` }));
 		}
 	}
 	// Pass 2: rescan so the served view reflects the reconciled disk state.
@@ -933,7 +1255,9 @@ export async function buildProjectView(cwd, opts) {
 			const candidate = identity.sources.find((s) => s.scope === 'project' && s.generated === true && s.shadow === false && !s.broken);
 			if (candidate !== undefined) {
 				const copyHash = await hashSkillSource(candidate.path, candidate.format).catch(() => null);
-				candidate.modified = entry.copyHash !== undefined && copyHash !== entry.copyHash;
+				candidate.modified = entry.copyHash !== undefined
+					&& copyHash !== null
+					&& !(await hashMatches(entry.copyHash, candidate.path, candidate.format, copyHash));
 			}
 		}
 		const { mechanism, defaultSourceKey, sourceKey, effectiveSource, specialized, winner } = classifyIdentity(identity, config, projectRoot);
@@ -946,7 +1270,9 @@ export async function buildProjectView(cwd, opts) {
 				: undefined;
 			if (origin !== undefined) {
 				const originHash = await hashSkillSource(origin.path, origin.format).catch(() => null);
-				origin.stale = entry.originHash !== undefined && originHash !== entry.originHash;
+				origin.stale = entry.originHash !== undefined
+					&& originHash !== null
+					&& !(await hashMatches(entry.originHash, origin.path, origin.format, originHash));
 			}
 		}
 		const enabled = config.enabled.includes(identity.name);
@@ -956,9 +1282,17 @@ export async function buildProjectView(cwd, opts) {
 		// the marker stub on disk (rank 100) shadows every original.
 		let modelInvocable = winner !== null && winner.modelInvocable === true;
 		if (modelInvocable && projectRoot !== null) {
-			const stubP = join(projectRoot, '.dsh', 'skills', `${identity.name}.md`);
-			const stubSt = await stat(stubP).catch(() => undefined);
-			modelInvocable = !(stubSt !== undefined && stubSt.isFile() && (await isShadowFile(stubP).catch(() => false)));
+			// reserved-prefix stub or legacy stub on disk (P2-4) shadows the
+			// winner.
+			let stubPresent = false;
+			for (const stubP of [shadowStubPath(projectRoot, identity.name), legacyStubPath(projectRoot, identity.name)]) {
+				const stubSt = await stat(stubP).catch(() => undefined);
+				if (stubSt !== undefined && stubSt.isFile() && (await isShadowFile(stubP).catch(() => false))) {
+					stubPresent = true;
+					break;
+				}
+			}
+			modelInvocable = !stubPresent;
 		}
 		identity.v1 = {
 			description: described ? described.description : '',
@@ -1014,6 +1348,7 @@ export async function buildProjectView(cwd, opts) {
 		identities: list,
 		configExisted: existed,
 		configCorrupt: corrupt === true,
+		configFuture: future === true,
 	};
-	return { view, config, report, identities };
+	return { view, config, report, identities, raw };
 }
