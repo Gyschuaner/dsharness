@@ -12,9 +12,10 @@
 
 - DeepSeek Harness 官方基线 `99f6f02`，版本 `0.1.0-rc.7`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
-- `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁与 DSH-012
-  Qwen 原生 Agent preset 补丁，以及各自的 SHA-256；
-- 应用补丁后的 Git tree `85d75ae8df920229dccd8f6b2a93a5a7ac541ad3`。
+- `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
+  Qwen 原生 Agent preset 补丁与 BUG-B0EE8D2D Think 伪工具调用恢复补丁，以及
+  各自的 SHA-256；
+- 应用补丁后的 Git tree `4eecae3b5622163d57685b4a4b45958a99e1bf65`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -67,3 +68,10 @@ DSH-012 补丁，得到与锁文件一致的 tree
 `85d75ae8df920229dccd8f6b2a93a5a7ac541ad3`。锁定依赖安装与完整
 `build:lib + build:web` 通过；Qwen preset 聚焦单元测试 16 条、CLI 组合测试 30 条、
 Web preset 浏览器测试 13 条全部通过，相关 TypeScript 文件 lint 通过。
+
+2026-08-18 为 BUG-B0EE8D2D 增加第三个上游补丁。补丁只识别“正常 stop、仅含私有
+reasoning、且包含 Qwen 风格工具标签”的窄场景，不解释标签内容；标准重试策略只恢复
+一次，并在重试请求临时追加结构化工具调用提醒。相关 Agent loop、重试策略与 UI
+折叠回归共 992 条测试通过，TypeScript 类型检查、lint、完整 Host/Client/Web 构建及
+3092 端口浏览器冒烟通过；最终锁定 tree 为
+`4eecae3b5622163d57685b4a4b45958a99e1bf65`。
