@@ -12,9 +12,10 @@
 
 - DeepSeek Harness 官方基线 `99f6f02`，版本 `0.1.0-rc.7`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
-- `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁与 DSH-012
-  Qwen 原生 Agent preset 补丁，以及各自的 SHA-256；
-- 应用补丁后的 Git tree `85d75ae8df920229dccd8f6b2a93a5a7ac541ad3`。
+- `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
+  Qwen 原生 Agent preset 补丁与 BUG-B0EE8D2D Think 伪工具调用恢复补丁，以及
+  各自的 SHA-256；
+- 应用补丁后的 Git tree `4efd58a4d9b93061626f8d530080c608846e2ac9`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -67,3 +68,21 @@ DSH-012 补丁，得到与锁文件一致的 tree
 `85d75ae8df920229dccd8f6b2a93a5a7ac541ad3`。锁定依赖安装与完整
 `build:lib + build:web` 通过；Qwen preset 聚焦单元测试 16 条、CLI 组合测试 30 条、
 Web preset 浏览器测试 13 条全部通过，相关 TypeScript 文件 lint 通过。
+
+2026-08-19 更新 BUG-B0EE8D2D 的第三个上游补丁。补丁只识别“正常 stop、仅含私有
+reasoning、且包含 Qwen 风格工具标签”的窄场景，不解释标签内容；标准重试策略只恢复
+一次。恢复请求不再改写 system prompt，而是在完全不变的 system、tools 与持久消息
+前缀之后追加一条仅用于本次请求的 reminder；该消息不写入 Session，后续步骤自动
+消失，请求重建 invariant 只放行由 agent-loop 生成的精确尾缀。相关 Agent loop、LLM
+适配、重试策略与 UI 折叠回归共 50 个文件、993 条测试通过，TypeScript 类型检查、
+全仓 lint、中英配对、Markdown 链接检查及 Host/Client/Web 构建通过。随后从官方基线
+在全新 worktree 回放三个补丁，安装 923 个锁定依赖并完成完整构建；直接用该源码树
+启动 3092 验证实例，首页返回 HTTP 200，验证后已关闭。最终锁定 tree 为
+`4efd58a4d9b93061626f8d530080c608846e2ac9`。
+
+同日将本机 `D:\Pythonproject\deepseek-harness` 从第一个补丁后的干净中间 tree
+顺序更新到该最终 tree，重新执行 frozen install 与完整构建。安装脚本现在会识别
+已经指向同一 `apps/cli` 的全局 npm junction，跳过会触发 npm 11.6.2 reify 异常的
+重复 `npm link`，同时仍校验 `dsh --version`。3080 已从该源码目录的构建产物重启，
+首页返回 HTTP 200、Skill Manager apiVersion 为 6，应用内浏览器完成插件加载且控制台
+无 error。

@@ -86,8 +86,9 @@ cd dsharness
 ## 上游源码（deepseek-harness）
 
 当前锁定官方 `master` 提交 `99f6f02`（`0.1.0-rc.7`），随后依次应用 DSH-009 的
-流式活动保活补丁与 DSH-012 的 Qwen 原生 Agent preset 补丁。最终源码 tree 为
-`85d75ae8df920229dccd8f6b2a93a5a7ac541ad3`。`dev/install-dsh-source.ps1`
+流式活动保活补丁、DSH-012 的 Qwen 原生 Agent preset 补丁，以及
+BUG-B0EE8D2D 的 Think 伪工具调用恢复补丁。最终源码 tree 为
+`4eecae3b5622163d57685b4a4b45958a99e1bf65`。`dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。
 
@@ -95,6 +96,10 @@ DSH-012 随构建交付系统级 `qwen-native`（界面名称“Qwen 原生模�
 标准模式的工具与工作流，只替换 Qwen3.8 定向 persona；安装脚本不会把它设为默认，
 也不会改写 `~/.dsh/settings.yaml`。重新拉取本仓库并执行安装构建后即可在 Agent 预设
 列表中选择，无需复制原电脑的个人 preset。
+
+BUG-B0EE8D2D 的恢复逻辑不解析或执行 Think 中的 XML。仅当一次正常结束的响应只含
+私有推理且出现 Qwen 风格工具标签时，Agent 才通过现有重试策略恢复一次，并仅在该次
+重试临时加入 `system-reminder`；再次只返回推理时会显式报格式错误，避免假完成。
 
 ## 开发约定
 

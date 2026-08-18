@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca",
   "baseTree": "3bc8f89fe494a4755c188be354add4e8b1e7b188",
-  "resultTree": "85d75ae8df920229dccd8f6b2a93a5a7ac541ad3",
+  "resultTree": "4efd58a4d9b93061626f8d530080c608846e2ac9",
   "dshVersion": "0.1.0-rc.7",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -16,6 +16,10 @@
     {
       "path": "upstream-patches/0002-feat-DSH-012-ship-Qwen-native-agent-preset.patch",
       "sha256": "98CCEBF5F00327E7314A26D91A41DC1AD5822FAC35AEF4A50EF5379AB1D7EA0E"
+    },
+    {
+      "path": "upstream-patches/0003-fix-BUG-B0EE8D2D-recover-malformed-reasoning-tool-ca.patch",
+      "sha256": "9C4D76CFB11E5DAC60B204BA5CE2340F55B9C2F61F169C6DE4238D644F63C6C1"
     }
   ]
 }
