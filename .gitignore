@@ -4,6 +4,8 @@ node_modules/
 # junction 备份目录（位于 ~/.dsh/plugins，非仓库内；此行为防御性忽略）
 *.bak-*/
 
-# .dsh/skills runtime artifacts (DSH-008 P2-4): reserved stubs + dot staging/backup dirs
-.dsh/skills/__smgr-shadow-*.md
-.dsh/skills/.*
+# Skill Manager machine-local state and runtime artifacts (BUG-548E4FF4).
+# Keep real project Skills under .dsh/skills trackable.
+/.dsh/skill-manager.json
+/.dsh/skills/__smgr-shadow-*.md
+/.dsh/skills/.*
