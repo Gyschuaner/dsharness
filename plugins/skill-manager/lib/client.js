@@ -215,6 +215,8 @@
 				'.sk-error{margin:0 0 8px;font-size:13px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
 				'.sk-footer{flex:none;display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);margin-top:10px;padding-top:8px;font-size:11px;color:var(--dsw-alias-label-quaternary);flex-wrap:wrap;overflow-wrap:anywhere}',
 				'.sk-banner{margin:0 0 12px;font-size:12px;color:var(--dsw-alias-label-tertiary);border:1px dashed var(--dsw-alias-border-l2);border-radius:8px;padding:8px 10px;line-height:1.55}',
+				'.sk-bannerErr{border-style:solid;border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}',
+				'.sk-bannerWarn{border-style:solid;border-color:var(--dsw-alias-state-warn-primary);color:var(--dsw-alias-label-secondary)}',
 				'.sk-slimNote{margin:0;font-size:11px;color:var(--dsw-alias-label-quaternary);line-height:1.55}',
 				// drawer
 				'.sk-drawer{flex:none;width:370px;max-width:46%;border-left:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);overflow-y:auto;display:flex;flex-direction:column}',
@@ -1129,6 +1131,11 @@
 				var [saveDesc, setSaveDesc] = React.useState('');
 				var [tagDraft, setTagDraft] = React.useState('');
 				var [advOpen, setAdvOpen] = React.useState(false);
+				var genRef = React.useRef(0); // selected-project generation
+				var viewGenRef = React.useRef(0); // catalog request generation
+				var projectRef = React.useRef(null); // current project, kept in a ref for async guards
+				var [partialWarning, setPartialWarning] = React.useState(null); // P2-3 persistent partial-failure warning
+				React.useEffect(function () { projectRef.current = project; }, [project]);
 
 				function patchRow(row2) {
 					setView(function (v) {
@@ -1139,12 +1146,30 @@
 					});
 					setDrawerRow(function (d) { return d && d.name === row2.name ? row2 : d; });
 				}
+				function isCurrentProject(gen, cwd) {
+					var current = projectRef.current;
+					var currentCwd = current && current.cwd !== undefined ? current.cwd : '';
+					return genRef.current === gen && currentCwd === cwd;
+				}
 				var loadView = React.useCallback(function (proj) {
+					// Catalog request order is separate from project generation: a refresh
+					// must not invalidate concurrent mutations for the same project.
+					var gen = genRef.current;
+					var viewGen = viewGenRef.current + 1;
+					viewGenRef.current = viewGen;
+					var cwd = proj && proj.cwd !== undefined ? proj.cwd : '';
 					setViewBusy(true);
 					setViewError(null);
 					return apiCallAt('catalog', proj ? { cwd: proj.cwd } : {}, ctx).then(
-						function (value) { setView(value); setViewBusy(false); },
-						function (e) { setViewError(String((e && e.message) || e)); setViewBusy(false); }
+						function (value) {
+							if (viewGenRef.current === viewGen && isCurrentProject(gen, cwd)) { setView(value); setViewBusy(false); }
+						},
+						function (e) {
+							if (viewGenRef.current === viewGen && isCurrentProject(gen, cwd)) {
+								setViewError(String((e && e.message) || e));
+								setViewBusy(false);
+							}
+						}
 					);
 				}, [ctx]);
 				var loadPresets = React.useCallback(function () {
@@ -1167,6 +1192,7 @@
 						}
 					}
 					if (pick === null) pick = options[0] || null;
+					projectRef.current = pick;
 					setProject(pick);
 					void loadPresets();
 				}, [ctx, loadPresets]);
@@ -1200,10 +1226,28 @@
 				function chooseProject(p) {
 					setProjMenuOpen(false);
 					if (p === null || (project !== null && project.cwd === p.cwd)) return;
+					// Switching project: bump the generation, invalidate the in-flight
+					// view, and clear all selection/UI state so a stale response can never
+					// write into the new project's view (review P1-5).
+					genRef.current += 1;
+					viewGenRef.current += 1;
+					projectRef.current = p;
 					setProject(p);
+					setView(null);
+					setViewError(null);
+					setPartialWarning(null);
 					setSelectedRows({});
+					setToggling({});
+					setSourceBusy(null);
 					setDrawerName(null);
 					setDrawerRow(null);
+					setTagDraft('');
+					setPresetModal(null);
+					setPresetBusy(false);
+					setSlimModal(null);
+					setSlimBusy(false);
+					setSaveOpen(false);
+					setViewBusy(true);
 					try { window.localStorage.setItem('smgr.v1.project', p.cwd); } catch (error) {}
 				}
 				function addLocalProject() {
@@ -1235,51 +1279,87 @@
 
 				// ── row actions ───────────────────────────────────────────────
 				function doToggle(row, force) {
-					if (project === null || toggling[row.name] === true) return;
-					var want = typeof force === 'boolean' ? force : row.enabled !== true;
+					var proj = project;
+					if (proj === null || toggling[row.name] === true || viewBusy === true) return;
+					if (view && (view.configCorrupt === true || view.configFuture === true)) return;
+					var want = force === 'boolean' ? force : row.enabled !== true;
+					var gen = genRef.current;
 					setToggling(function (t) { var n = Object.assign({}, t); n[row.name] = true; return n; });
 					setViewError(null);
-					apiCallAt('setEnabled', { cwd: project.cwd, name: row.name, enabled: want }, ctx).then(
+					apiCallAt('setEnabled', { cwd: proj.cwd, name: row.name, enabled: want }, ctx).then(
 						function (value) {
+							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setToggling(function (t) { var n = Object.assign({}, t); delete n[row.name]; return n; });
-							if (value && value.view) patchRow(value.view);
+							if (value && value.view) { patchRow(value.view); }
+							if (value && value.partial === true) {
+								var rep = value.report || {};
+								var parts = [];
+								var failed = rep.failed || [];
+								var conflicts = rep.conflicts || [];
+								for (var pi = 0; pi < failed.length; pi += 1) { parts.push((failed[pi].name || '*') + '（' + (failed[pi].error || '失败') + '）'); }
+								for (var pj = 0; pj < conflicts.length; pj += 1) { parts.push((conflicts[pj].name || '*') + '（' + (conflicts[pj].message || '冲突') + '）'); }
+								setPartialWarning('部分变更未完全生效：' + (parts.length > 0 ? parts.join('、') : '存在失败或冲突') + '。请刷新查看真实状态。');
+								void loadView(proj);
+							}
 						},
 						function (e) {
+							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setToggling(function (t) { var n = Object.assign({}, t); delete n[row.name]; return n; });
 							setViewError(String((e && e.message) || e));
 						}
 					);
 				}
 				function doBulk(enabled) {
+					var proj = project;
 					var names = Object.keys(selectedRows);
-					if (names.length === 0 || project === null) return;
+					if (names.length === 0 || proj === null || viewBusy === true) return;
+					if (view && (view.configCorrupt === true || view.configFuture === true)) return;
+					var gen = genRef.current;
 					setViewError(null);
-					apiCallAt('setMany', { cwd: project.cwd, names: names, enabled: enabled }, ctx).then(
-						function () { setSelectedRows({}); void loadView(project); },
-						function (e) { setViewError(String((e && e.message) || e)); }
+					apiCallAt('setMany', { cwd: proj.cwd, names: names, enabled: enabled }, ctx).then(
+						function (value) {
+							if (!isCurrentProject(gen, proj.cwd)) { return; }
+							setSelectedRows({});
+							if (value && value.partial === true) {
+								setPartialWarning('批量变更未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
+							}
+							void loadView(proj);
+						},
+						function (e) { if (isCurrentProject(gen, proj.cwd)) { setViewError(String((e && e.message) || e)); } }
 					);
 				}
 				function doSource(name, sourceKey) {
-					if (project === null) return;
+					var proj = project;
+					if (proj === null || sourceBusy === name || viewBusy === true) return;
+					if (view && (view.configCorrupt === true || view.configFuture === true)) return;
+					var gen = genRef.current;
 					setSourceBusy(name);
 					setViewError(null);
-					apiCallAt('setSource', { cwd: project.cwd, name: name, source: sourceKey }, ctx).then(
+					apiCallAt('setSource', { cwd: proj.cwd, name: name, source: sourceKey }, ctx).then(
 						function (value) {
+							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setSourceBusy(null);
 							if (value && value.view) patchRow(value.view);
+							if (value && value.partial === true) {
+								setPartialWarning('来源变更未完全生效：文件副作用失败。请刷新查看真实状态。');
+							}
 						},
-						function (e) { setSourceBusy(null); setViewError(String((e && e.message) || e)); }
+						function (e) { if (isCurrentProject(gen, proj.cwd)) { setSourceBusy(null); setViewError(String((e && e.message) || e)); } }
 					);
 				}
 				function doTags(row, tags) {
+					var proj = project;
+					if (viewBusy === true) return;
+					var gen = genRef.current;
 					setViewError(null);
-					apiCallAt('setTags', { cwd: project ? project.cwd : undefined, name: row.name, tags: tags }, ctx).then(
+					apiCallAt('setTags', { cwd: proj ? proj.cwd : undefined, name: row.name, tags: tags }, ctx).then(
 						function (value) {
-							if (value && value.view) patchRow(value.view);
+							if (!isCurrentProject(gen, proj ? proj.cwd : '')) { return; }
+							if (value && value.view) { patchRow(value.view); }
 							setTagDraft('');
 							void loadPresets();
 						},
-						function (e) { setViewError(String((e && e.message) || e)); }
+						function (e) { if (isCurrentProject(gen, proj ? proj.cwd : '')) { setViewError(String((e && e.message) || e)); } }
 					);
 				}
 				function commitTag() {
@@ -1293,38 +1373,52 @@
 
 				// ── presets & 一键精简 ────────────────────────────────────────
 				function openPreset(p) {
-					if (project === null) { setViewError('请先选择项目，再应用预设'); return; }
+					var proj = project;
+					if (proj === null) { setViewError('请先选择项目，再应用预设'); return; }
+					var gen = genRef.current;
 					setViewError(null);
-					apiCallAt('presets.preview', { cwd: project.cwd, name: p.name, mode: 'replace' }, ctx).then(
+					apiCallAt('presets.preview', { cwd: proj.cwd, name: p.name, mode: 'replace' }, ctx).then(
 						function (value) {
-							setPresetModal({ name: p.name, desc: p.description || '', mode: 'replace', diff: value.diff });
+							if (!isCurrentProject(gen, proj.cwd)) return;
+							setPresetModal({ name: p.name, desc: p.description || '', mode: 'replace', diff: value.diff, cwd: proj.cwd, gen: gen });
 						},
-						function (e) { setViewError(String((e && e.message) || e)); }
+						function (e) { if (isCurrentProject(gen, proj.cwd)) setViewError(String((e && e.message) || e)); }
 					);
 				}
 				function switchPresetMode(mode) {
-					if (presetModal === null || project === null) return;
-					apiCallAt('presets.preview', { cwd: project.cwd, name: presetModal.name, mode: mode }, ctx).then(
+					var modal = presetModal;
+					var proj = project;
+					if (modal === null || proj === null || modal.cwd !== proj.cwd) return;
+					var gen = genRef.current;
+					apiCallAt('presets.preview', { cwd: proj.cwd, name: modal.name, mode: mode }, ctx).then(
 						function (value) {
+							if (!isCurrentProject(gen, proj.cwd)) return;
 							setPresetModal(function (m) {
-								return m && m.name === presetModal.name ? Object.assign({}, m, { mode: mode, diff: value.diff }) : m;
+								return m && m.name === modal.name && m.cwd === proj.cwd ? Object.assign({}, m, { mode: mode, diff: value.diff }) : m;
 							});
 						},
-						function (e) { setViewError(String((e && e.message) || e)); }
+						function (e) { if (isCurrentProject(gen, proj.cwd)) setViewError(String((e && e.message) || e)); }
 					);
 				}
 				function applyPreset() {
-					if (presetModal === null || project === null || presetBusy) return;
+					var proj = project;
+					if (presetModal === null || proj === null || presetModal.cwd !== proj.cwd || presetBusy || viewBusy === true) return;
+					if (view && (view.configCorrupt === true || view.configFuture === true)) return;
+					var gen = genRef.current;
 					setPresetBusy(true);
 					setViewError(null);
-					apiCallAt('presets.apply', { cwd: project.cwd, name: presetModal.name, mode: presetModal.mode }, ctx).then(
-						function () {
+					apiCallAt('presets.apply', { cwd: proj.cwd, name: presetModal.name, mode: presetModal.mode }, ctx).then(
+						function (value) {
+							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setPresetBusy(false);
 							setPresetModal(null);
 							setSelectedRows({});
-							void loadView(project);
+							if (value && value.partial === true) {
+								setPartialWarning('预设应用未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
+							}
+							void loadView(proj);
 						},
-						function (e) { setPresetBusy(false); setViewError(String((e && e.message) || e)); }
+						function (e) { if (isCurrentProject(gen, proj.cwd)) { setPresetBusy(false); setViewError(String((e && e.message) || e)); } }
 					);
 				}
 				function setDefaultPreset(name) {
@@ -1341,40 +1435,52 @@
 				}
 				function savePreset() {
 					var name = saveName.trim();
-					if (name === '' || project === null) return;
+					var proj = project;
+					if (name === '' || proj === null) return;
+					var gen = genRef.current;
 					setPresetBusy(true);
 					setViewError(null);
-					apiCallAt('presets.save', { cwd: project.cwd, name: name, description: saveDesc.trim() === '' ? undefined : saveDesc.trim() }, ctx).then(
+					apiCallAt('presets.save', { cwd: proj.cwd, name: name, description: saveDesc.trim() === '' ? undefined : saveDesc.trim() }, ctx).then(
 						function () {
+							if (!isCurrentProject(gen, proj.cwd)) return;
 							setPresetBusy(false);
 							setSaveOpen(false);
 							setSaveName('');
 							setSaveDesc('');
 							void loadPresets();
 						},
-						function (e) { setPresetBusy(false); setViewError(String((e && e.message) || e)); }
+						function (e) { if (isCurrentProject(gen, proj.cwd)) { setPresetBusy(false); setViewError(String((e && e.message) || e)); } }
 					);
 				}
 				function doSlimPreview() {
-					if (project === null) return;
+					var proj = project;
+					if (proj === null) return;
+					var gen = genRef.current;
 					setViewError(null);
-					apiCallAt('slim.preview', { cwd: project.cwd }, ctx).then(
-						function (value) { setSlimModal(value); },
-						function (e) { setViewError(String((e && e.message) || e)); }
+					apiCallAt('slim.preview', { cwd: proj.cwd }, ctx).then(
+						function (value) { if (isCurrentProject(gen, proj.cwd)) setSlimModal(Object.assign({}, value, { cwd: proj.cwd, gen: gen })); },
+						function (e) { if (isCurrentProject(gen, proj.cwd)) setViewError(String((e && e.message) || e)); }
 					);
 				}
 				function doSlimApply() {
-					if (project === null || slimBusy) return;
+					var proj = project;
+					if (proj === null || slimModal === null || slimModal.cwd !== proj.cwd || slimBusy || viewBusy === true) return;
+					if (view && (view.configCorrupt === true || view.configFuture === true)) return;
+					var gen = genRef.current;
 					setSlimBusy(true);
 					setViewError(null);
-					apiCallAt('slim.apply', { cwd: project.cwd }, ctx).then(
-						function () {
+					apiCallAt('slim.apply', { cwd: proj.cwd }, ctx).then(
+						function (value) {
+							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setSlimBusy(false);
 							setSlimModal(null);
 							setSelectedRows({});
-							void loadView(project);
+							if (value && value.partial === true) {
+								setPartialWarning('一键精简未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
+							}
+							void loadView(proj);
 						},
-						function (e) { setSlimBusy(false); setViewError(String((e && e.message) || e)); }
+						function (e) { if (isCurrentProject(gen, proj.cwd)) { setSlimBusy(false); setViewError(String((e && e.message) || e)); } }
 					);
 				}
 
@@ -1409,7 +1515,7 @@
 					return h('button', {
 						type: 'button',
 						className: 'smgr-switch' + (on ? ' smgr-switchOn' : '') + (dim ? ' smgr-switchDim' : ''),
-						disabled: dim,
+						disabled: dim || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)),
 						title: title,
 						onClick: function (event) { event.stopPropagation(); doToggle(row); }
 					}, h('span', { className: 'smgr-switchKnob' }));
@@ -1435,6 +1541,7 @@
 								type: 'checkbox',
 								className: 'sk-check' + (checked ? ' sk-checkOn' : ''),
 								checked: checked,
+								disabled: viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)),
 								'aria-label': '选择 ' + row.name,
 								onClick: function (event) { event.stopPropagation(); },
 								onChange: function () {
@@ -1486,7 +1593,9 @@
 					for (var j = 0; j < row.sources.length; j += 1) {
 						if (row.sources[j].key === row.defaultSourceKey) { defaultSrc = row.sources[j]; break; }
 					}
-					var canWrite = project !== null;
+					var canWrite = project !== null
+						&& viewBusy !== true
+						&& !(view && (view.configCorrupt === true || view.configFuture === true));
 					return h(
 						'aside',
 						{ className: 'sk-drawer', role: 'dialog', 'aria-label': 'Skill 详情：' + row.name },
@@ -1603,8 +1712,9 @@
 											t,
 											h('button', {
 												type: 'button',
-												className: 'sk-tagX',
-												title: '移除标签「' + t + '」',
+											className: 'sk-tagX',
+											title: '移除标签「' + t + '」',
+											disabled: !canWrite,
 												onClick: function () {
 													var rest = (row.tags || []).filter(function (x) { return x !== t; });
 													doTags(row, rest);
@@ -1686,6 +1796,19 @@
 				return h(
 					'div',
 					{ className: 'sk-root' },
+					view && view.configCorrupt === true
+					? h('div', { className: 'sk-banner sk-bannerErr', role: 'alert' },
+						h('strong', null, '项目配置已损坏'),
+						' .dsh/skill-manager.json 无法解析（JSON 错误）。当前按空配置展示，且所有修改被拒绝，未写入任何文件。请修复或删除该文件后重新打开本页面。')
+					: view && view.configFuture === true
+					? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' },
+						h('strong', null, '配置版本更高（只读）'),
+						' 项目配置 apiVersion 高于当前 DSH 版本。为保护数据，本页仅可查看；请升级 DSH 后再修改。')
+					: partialWarning !== null
+					? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' },
+						h('span', null, partialWarning),
+						h('button', { type: 'button', className: 'sk-chip', onClick: function () { setPartialWarning(null); } }, '知道了'))
+					: null,
 					h(
 						'div',
 						{ className: 'sk-tabs', role: 'tablist' },
@@ -1848,8 +1971,8 @@
 										'div',
 										{ className: 'sk-bulk' },
 										h('span', { className: 'sk-menuHint', style: { whiteSpace: 'nowrap' } }, '已选 ' + selectedCount + ' 个'),
-										h('button', { type: 'button', className: 'sk-chip', disabled: project === null, onClick: function () { doBulk(true); } }, '批量启用'),
-										h('button', { type: 'button', className: 'sk-chip', disabled: project === null, onClick: function () { doBulk(false); } }, '批量禁用'),
+									h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(true); } }, '批量启用'),
+									h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(false); } }, '批量禁用'),
 										h('button', { type: 'button', className: 'sk-chip sk-chipAdd', onClick: function () { setSelectedRows({}); } }, '清除')
 									)
 									: null,
@@ -1857,7 +1980,7 @@
 									? h('button', {
 										type: 'button',
 										className: 'sk-chip',
-										disabled: project === null || (view !== null && enabledCount === 0),
+									disabled: project === null || viewBusy === true || (view !== null && enabledCount === 0) || (view && (view.configCorrupt === true || view.configFuture === true)),
 										title: '存在默认精简预设时按预设精简；否则关闭全部启用',
 										onClick: doSlimPreview
 									}, '一键精简')
@@ -1907,7 +2030,7 @@
 									h(Button, { variant: 'outline', onClick: function () { setDefaultPreset(presetModal.name); } }, '设为默认精简预设'),
 									h(Button, { variant: 'outline', onClick: function () { deletePreset(presetModal.name); } }, '删除预设'),
 									h(Button, { variant: 'outline', onClick: function () { setPresetModal(null); } }, '取消'),
-									h(Button, { disabled: presetBusy, onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
+								h(Button, { disabled: presetBusy || viewBusy === true || (project !== null && presetModal.cwd !== project.cwd), onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
 								: null
 						)
 					},
@@ -1944,7 +2067,7 @@
 							React.Fragment,
 							null,
 							h(Button, { variant: 'outline', onClick: function () { setSlimModal(null); } }, '取消'),
-							h(Button, { disabled: slimBusy, onClick: doSlimApply }, slimBusy ? '精简中…' : '确认精简')
+							h(Button, { disabled: slimBusy || viewBusy === true || (project !== null && slimModal && slimModal.cwd !== project.cwd), onClick: doSlimApply }, slimBusy ? '精简中…' : '确认精简')
 						)
 					},
 						slimModal ? h(DiffView, { diff: slimModal.diff }) : null

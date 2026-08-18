@@ -19,6 +19,7 @@
 import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import {
 	NAME_RE,
 	ApiError,
@@ -36,10 +37,16 @@ import {
 	normalizeTagsMap,
 	normalizePresetsMap,
 	assertPresetName,
+	withConfigLock,
+	projectLockKey,
+	globalLockKey,
+	createLedger,
 } from './state.js';
 import {
 	RANKS,
 	SHADOW_DESC_PREFIX,
+	SHADOW_STUB_PREFIX,
+	shadowStubPath,
 	parseSkill,
 	patchInvocationFlag,
 	isShadowFile,
@@ -336,6 +343,13 @@ function presetDiff(currentConfig, preset, identities, mode) {
 	return { toEnable, toDisable, sourceChanges, finalEnabled };
 }
 
+/** Serialize read/reconcile views for the same project config path. */
+async function buildProjectViewLocked(cwd, opts) {
+	if (typeof cwd !== 'string' || cwd.length === 0) return buildProjectView(cwd, opts);
+	const projectRoot = await findProjectRoot(cwd);
+	return withConfigLock(projectLockKey(projectRoot), () => buildProjectView(cwd, opts));
+}
+
 /**
  * Mutate one project atomically: read view + config, apply the mutator,
  * persist the config, re-reconcile derived artifacts.
@@ -343,29 +357,74 @@ function presetDiff(currentConfig, preset, identities, mode) {
  *   May throw ApiError; the config is only persisted after fn succeeds.
  */
 async function mutateProject(cwd, opts, fn) {
-	const { view, config, report, identities } = await buildProjectView(cwd, opts);
-	if (view.projectRoot === null) throw new ApiError(400, '当前页没有会话工作区：按项目操作需要项目上下文');
-	await fn({ projectRoot: view.projectRoot, config, identities, view });
-	config.updatedAt = new Date().toISOString();
-	await writeProjectConfig(view.projectRoot, config, opts);
-	const sourcesBeforeReconcile = JSON.stringify(config.sources);
-	const report2 = await reconcileProject(view.projectRoot, config, identities, opts, opts.logger);
-	const reportAll = {
-		created: [...report.created, ...report2.created],
-		removed: [...report.removed, ...report2.removed],
-		rewritten: [...report.rewritten, ...report2.rewritten],
-		conflicts: [...report.conflicts, ...report2.conflicts],
-		failed: [...report.failed, ...report2.failed],
-	};
-	if (JSON.stringify(config.sources) !== sourcesBeforeReconcile) {
-		// Reconcile materialized/cleaned a managed copy: persist the new
-		// registration so the served view and later calls see it.
-		await writeProjectConfig(view.projectRoot, config, opts).catch((error) => {
-			reportAll.failed.push({ name: '*', error: `配置保存失败：${error instanceof Error ? error.message : String(error)}` });
-		});
+	const projectRoot = await findProjectRoot(cwd);
+	return withConfigLock(projectLockKey(projectRoot), async () => {
+		// The whole read -> compute -> persist -> reconcile -> view is one
+		// transaction under the project config lock (review P1-1), and the
+		// derived-artifact file ops are ledgered so a failed persist rolls
+		// them back instead of leaving unregistered copies or losing old
+		// verified copies (review P1-4).
+		const ledger = createLedger();
+		try {
+			// Re-read the truth file under the lock: a concurrent mutation
+			// committed while this one waited for the lock must be visible
+			// before this one computes its changes (review P1-1).
+			const locked = await buildProjectView(cwd, opts);
+			const config = locked.config;
+			const raw = locked.raw;
+			const report = locked.report;
+			const identities = locked.identities;
+			const view = locked.view;
+			if (view.projectRoot === null) throw new ApiError(400, '当前页没有会话工作区：按项目操作需要项目上下文');
+			if (view.configCorrupt === true) throw new ApiError(409, `项目配置已损坏（JSON 无法解析）：为避免覆盖无法读取的真相文件，本次未修改任何文件；请修复或删除 ${view.projectRoot}/.dsh/skill-manager.json 后重试`);
+			if (view.configFuture === true) throw new ApiError(409, `项目配置 apiVersion 高于当前 host 支持的 ${PROJECT_API_VERSION}：为保护未来版本数据，本次未修改任何文件；升级 host 后重试`);
+			await fn({ projectRoot: view.projectRoot, config, identities, view, ledger });
+			config.updatedAt = new Date().toISOString();
+			const report2 = await reconcileProject(view.projectRoot, config, identities, opts, opts.logger, ledger);
+			const reportAll = {
+				created: [...report.created, ...report2.created],
+				removed: [...report.removed, ...report2.removed],
+				rewritten: [...report.rewritten, ...report2.rewritten],
+				conflicts: [...report.conflicts, ...report2.conflicts],
+				failed: [...report.failed, ...report2.failed],
+			};
+			// Persist once, after every planned file side effect and source marker is
+			// ready. A failure falls into the catch below and rolls the entire ledger
+			// back, so no unregistered copy or mismatched invocation flag survives.
+			await writeProjectConfig(view.projectRoot, config, opts, raw);
+			const commitFailures = await ledger.commit();
+			commitFailures.forEach((f) => reportAll.failed.push({ name: '*', error: `副本备份清理失败：${f}` }));
+			const after = await buildProjectView(cwd, opts);
+			reportAll.created.push(...after.report.created);
+			reportAll.removed.push(...after.report.removed);
+			reportAll.rewritten.push(...after.report.rewritten);
+			reportAll.conflicts.push(...after.report.conflicts);
+			reportAll.failed.push(...after.report.failed);
+			const viewAfter = after.view;
+			return { view: viewAfter, report: reportAll };
+		} catch (error) {
+			const rollbackFailures = await ledger.rollback();
+			rollbackFailures.forEach((f) => opts.logger?.warn?.(`skill-manager: 回滚副本失败：${f}`));
+			throw error;
+		}
+	});
+}
+/**
+ * Review P2-3: a reconcile failure is visible, not hidden behind a 200. When
+ * the target skill's own file side effect failed (or hit a conflict), the op
+ * returns non-2xx so the client stops and shows the real state; other
+ * failures/conflicts in the report mark the response partial:true.
+ * @returns true when the op response carries partial:true.
+ */
+function targetReport(skillNames, report) {
+	const problems = report.failed.concat(report.conflicts);
+	const nameSet = new Set((Array.isArray(skillNames) ? skillNames : [skillNames]));
+	const targetProblems = problems.filter((p) => nameSet.has(p.name));
+	if (targetProblems.length > 0) {
+		const detail = targetProblems.map((p) => p.error ?? p.message).join('；');
+		throw new ApiError(500, `未完全生效：${targetProblems.map((p) => p.name).join('、')} 的文件副作用失败（${detail}）；请刷新查看真实状态`);
 	}
-	const { view: viewAfter } = await buildProjectView(cwd, opts);
-	return { view: viewAfter, report: reportAll };
+	return problems.length > 0;
 }
 
 /** Serialize the current project config for the API response. */
@@ -375,6 +434,7 @@ function configPayload(view, config) {
 		projectRoot: view.projectRoot,
 		configExisted: view.configExisted,
 		configCorrupt: view.configCorrupt,
+		configFuture: view.configFuture === true,
 		enabled: config.enabled,
 		sources: config.sources,
 		appliedPreset: config.appliedPreset,
@@ -388,14 +448,14 @@ function configPayload(view, config) {
  * @returns (req, res) => Promise<void>
  */
 function makeHandler(deps) {
-	const opts = { agentPresets: deps.agentPresets, logger: deps.logger, home: deps.home };
+	const opts = { agentPresets: deps.agentPresets, logger: deps.logger, home: deps.home, faults: deps.faults };
 	const ops = {
 		async list(body) {
 			const cwd = await assertCwd(body.cwd);
 			const { roots, projectRoot } = await computeRoots(cwd, opts);
 			// Legacy policy enforcement (idempotent, no-op unless the policy
 			// is on). V1 project state is reconciled by the new ops.
-			const enforcement = await enforceGlobalPolicy(cwd, opts).catch((e) => ({ changed: 0, markersRemoved: 0, failed: [{ error: e instanceof Error ? e.message : String(e) }] }));
+			const enforcement = await withConfigLock(globalLockKey(opts), () => enforceGlobalPolicy(cwd, opts)).catch((e) => ({ changed: 0, markersRemoved: 0, failed: [{ error: e instanceof Error ? e.message : String(e) }] }));
 			if (enforcement.failed !== undefined && enforcement.failed.length > 0) {
 				deps.logger?.warn?.(`skill-manager: policy enforcement skipped ${enforcement.failed.length} file(s): ${enforcement.failed.map((f) => f.name + ' (' + f.error + ')').join('; ')}`);
 			}
@@ -460,7 +520,7 @@ function makeHandler(deps) {
 					: '内置 skill 只读：部署升级会覆盖它，请改用导入创建自己的版本');
 			}
 			parseSkill(typeof body.content === 'string' ? body.content : '');
-			const tmp = `${plan.path}.tmp-${process.pid}-${Date.now()}`;
+			const tmp = `${plan.path}.tmp-${randomUUID()}`;
 			await mkdir(dirname(plan.path), { recursive: true });
 			try {
 				await writeFile(tmp, body.content, 'utf8');
@@ -510,7 +570,7 @@ function makeHandler(deps) {
 				const raw = await readFile(plan.path, 'utf8');
 				const { content, changed } = patchInvocationFlag(raw, wantDisabled);
 				if (changed) {
-					const tmp = `${plan.path}.tmp-${process.pid}-${Date.now()}`;
+					const tmp = `${plan.path}.tmp-${randomUUID()}`;
 					try {
 						await writeFile(tmp, content, 'utf8');
 						await rename(tmp, plan.path);
@@ -568,7 +628,7 @@ function makeHandler(deps) {
 			if (wantDisabled) {
 				if (ownShadow) return { name: name0, disabled: true, changed: false, where: 'shadow', path: shadowPath };
 				const content = markerContent(name0, projectRoot);
-				const tmp = `${shadowPath}.tmp-${process.pid}-${Date.now()}`;
+				const tmp = `${shadowPath}.tmp-${randomUUID()}`;
 				await mkdir(shadowDir, { recursive: true });
 				try {
 					await writeFile(tmp, content, 'utf8');
@@ -590,13 +650,15 @@ function makeHandler(deps) {
 		async setPolicy(body) {
 			const cwd = await assertCwd(body.cwd);
 			const want = body.globalDefaultOff === true;
-			const state = await readPolicyState(opts);
-			if (state.globalDefaultOff === want) return { ...state, changed: 0, markersRemoved: 0 };
-			await writePolicyState({ globalDefaultOff: want }, opts);
-			const report = want
-				? await enforceGlobalPolicy(cwd, opts).catch((e) => ({ changed: 0, markersRemoved: 0, failed: [{ error: e instanceof Error ? e.message : String(e) }] }))
-				: { changed: 0, markersRemoved: 0, failed: [] };
-			return { globalDefaultOff: want, changed: report.changed, markersRemoved: report.markersRemoved, failed: report.failed };
+			return withConfigLock(globalLockKey(opts), async () => {
+				const state = await readPolicyState(opts);
+				if (state.globalDefaultOff === want) return { ...state, changed: 0, markersRemoved: 0 };
+				await writePolicyState({ globalDefaultOff: want }, opts);
+				const report = want
+					? await enforceGlobalPolicy(cwd, opts).catch((e) => ({ changed: 0, markersRemoved: 0, failed: [{ error: e instanceof Error ? e.message : String(e) }] }))
+					: { changed: 0, markersRemoved: 0, failed: [] };
+				return { globalDefaultOff: want, changed: report.changed, markersRemoved: report.markersRemoved, failed: report.failed };
+				});
 		},
 		/* `import` is a reserved word; the API op name stays "import". */
 		async ['import'](body) {
@@ -609,7 +671,7 @@ function makeHandler(deps) {
 			if (plan.existing !== undefined) throw new ApiError(409, `skill 已存在：${parsed.name}`);
 			const path = join(plan.dir, parsed.name, 'SKILL.md');
 			assertContained({ dir: plan.dir, path });
-			const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+			const tmp = `${path}.tmp-${randomUUID()}`;
 			await mkdir(dirname(path), { recursive: true });
 			try {
 				await writeFile(tmp, body.content, 'utf8');
@@ -665,7 +727,7 @@ function makeHandler(deps) {
 		/** Merged identity catalog for one project context (runs reconcile). */
 		async catalog(body) {
 			const cwd = await assertCwd(body.cwd);
-			const { view } = await buildProjectView(cwd, opts);
+			const { view } = await buildProjectViewLocked(cwd, opts);
 			const { config: globalConfig } = await readGlobalConfig(opts);
 			const allTags = [...new Set(Object.values(globalConfig.tags || {}).flat())].sort((a, b) => a.localeCompare(b));
 			return Object.assign({}, view, { allTags });
@@ -673,7 +735,7 @@ function makeHandler(deps) {
 		/** Project config + last reconcile report. */
 		async projectState(body) {
 			const cwd = await assertCwd(body.cwd);
-			const { view, config, report } = await buildProjectView(cwd, opts);
+			const { view, config, report } = await buildProjectViewLocked(cwd, opts);
 			return Object.assign(configPayload(view, config), { report });
 		},
 		/** Enable or disable one skill for this project. */
@@ -690,7 +752,8 @@ function makeHandler(deps) {
 				else set.delete(skillName);
 				ctx.config.enabled = [...set].sort((a, b) => a.localeCompare(b));
 			});
-			return { name: skillName, enabled, view: summarizeIdentity(view, skillName), report };
+			const partial = targetReport(skillName, report);
+			return { name: skillName, enabled, partial, view: summarizeIdentity(view, skillName), report };
 		},
 		/** Bulk enable/disable for this project. */
 		async setMany(body) {
@@ -711,7 +774,8 @@ function makeHandler(deps) {
 				}
 				ctx.config.enabled = [...set].sort((a, b) => a.localeCompare(b));
 			});
-			return { names, enabled, report };
+			const partial = targetReport(names, report);
+			return { names, enabled, partial, report };
 		},
 		/** Explicitly select (or reset) the source used by this project. */
 		async setSource(body) {
@@ -723,9 +787,10 @@ function makeHandler(deps) {
 			const { view, report } = await mutateProject(cwd, opts, async (ctx) => {
 				const identity = ctx.identities.get(skillName);
 				if (identity === undefined) throw new ApiError(404, `skill 不存在：${skillName}`);
-				await applySourceSelection(ctx.projectRoot, ctx.config, identity, sourceKey, deps, deps.logger);
+				await applySourceSelection(ctx.projectRoot, ctx.config, identity, sourceKey, deps, deps.logger, ctx.ledger);
 			});
-			return { name: skillName, source: sourceKey, view: summarizeIdentity(view, skillName), report };
+			const partial = targetReport(skillName, report);
+			return { name: skillName, source: sourceKey, partial, view: summarizeIdentity(view, skillName), report };
 		},
 		/** Global tags for one skill identity (validates identity exists). */
 		async setTags(body) {
@@ -733,14 +798,16 @@ function makeHandler(deps) {
 			const skillName = typeof body.name === 'string' ? body.name : '';
 			if (!NAME_RE.test(skillName)) throw new ApiError(400, `skill 名不合法：${String(body.name)}`);
 			const tags = validateTagList(body.tags);
-			const { view } = await buildProjectView(cwd, opts);
+			const { view } = await buildProjectViewLocked(cwd, opts);
 			if (!view.identities.some((i) => i.name === skillName)) throw new ApiError(404, `skill 不存在：${skillName}`);
-			const { config } = await readGlobalConfig(opts);
-			const next = normalizeTagsMap(config.tags);
-			if (tags.length > 0) next[skillName] = tags;
-			else delete next[skillName];
-			await writeGlobalConfig({ tags: next }, opts);
-			const { view: viewAfter } = await buildProjectView(cwd, opts);
+			await withConfigLock(globalLockKey(opts), async () => {
+				const { config } = await readGlobalConfig(opts);
+				const next = normalizeTagsMap(config.tags);
+				if (tags.length > 0) next[skillName] = tags;
+				else delete next[skillName];
+				await writeGlobalConfig({ tags: next }, opts);
+			});
+			const { view: viewAfter } = await buildProjectViewLocked(cwd, opts);
 			return { name: skillName, tags, view: summarizeIdentity(viewAfter, skillName) };
 		},
 		/** List presets (global, cross-project). */
@@ -759,56 +826,62 @@ function makeHandler(deps) {
 		async ['presets.save'](body) {
 			const cwd = await assertCwd(body.cwd);
 			const presetName = assertPresetName(body.name);
-			const { view, config } = await buildProjectView(cwd, opts);
+			const { view, config } = await buildProjectViewLocked(cwd, opts);
 			const skills = {};
 			for (const n of config.enabled) {
 				if (!view.identities.some((i) => i.name === n)) continue;
 				const sel = config.sources[n];
 				skills[n] = sel && typeof sel.source === 'string' ? { source: sel.source } : {};
 			}
-			const { config: g } = await readGlobalConfig(opts);
-			const presets = normalizePresetsMap(g.presets);
-			const existed = presets[presetName] !== undefined;
-			presets[presetName] = {
-				name: presetName,
-				description: typeof body.description === 'string' && body.description.trim().length > 0 ? body.description.trim().slice(0, 200) : undefined,
-				defaultSlim: presets[presetName]?.defaultSlim === true,
-				skills,
-				updatedAt: new Date().toISOString(),
-			};
-			if (presets[presetName].description === undefined) delete presets[presetName].description;
-			await writeGlobalConfig({ presets }, opts);
-			return { name: presetName, existed, skillCount: Object.keys(skills).length };
+			return withConfigLock(globalLockKey(opts), async () => {
+				const { config: g } = await readGlobalConfig(opts);
+				const presets = normalizePresetsMap(g.presets);
+				const existed = presets[presetName] !== undefined;
+				presets[presetName] = {
+					name: presetName,
+					description: typeof body.description === 'string' && body.description.trim().length > 0 ? body.description.trim().slice(0, 200) : undefined,
+					defaultSlim: presets[presetName]?.defaultSlim === true,
+					skills,
+					updatedAt: new Date().toISOString(),
+				};
+				if (presets[presetName].description === undefined) delete presets[presetName].description;
+				await writeGlobalConfig({ presets }, opts);
+				return { name: presetName, existed, skillCount: Object.keys(skills).length };
+			});
 		},
 		/** Delete a preset. */
 		async ['presets.delete'](body) {
 			const presetName = assertPresetName(body.name);
-			const { config } = await readGlobalConfig(opts);
-			const presets = normalizePresetsMap(config.presets);
-			if (presets[presetName] === undefined) throw new ApiError(404, `预设不存在：${presetName}`);
-			delete presets[presetName];
-			await writeGlobalConfig({ presets }, opts);
-			return { name: presetName };
+			return withConfigLock(globalLockKey(opts), async () => {
+				const { config } = await readGlobalConfig(opts);
+				const presets = normalizePresetsMap(config.presets);
+				if (presets[presetName] === undefined) throw new ApiError(404, `预设不存在：${presetName}`);
+				delete presets[presetName];
+				await writeGlobalConfig({ presets }, opts);
+				return { name: presetName };
+			});
 		},
 		/** Mark (or clear) the default slim preset (at most one). */
 		async ['presets.setDefault'](body) {
-			const { config } = await readGlobalConfig(opts);
-			const presets = normalizePresetsMap(config.presets);
-			for (const p of Object.values(presets)) p.defaultSlim = false;
-			if (body.name !== null && body.name !== undefined && body.name !== '') {
-				const presetName = assertPresetName(body.name);
-				if (presets[presetName] === undefined) throw new ApiError(404, `预设不存在：${presetName}`);
-				presets[presetName].defaultSlim = true;
-			}
-			await writeGlobalConfig({ presets }, opts);
-			return { defaultSlim: body.name === null || body.name === undefined || body.name === '' ? null : assertPresetName(body.name) };
+			return withConfigLock(globalLockKey(opts), async () => {
+				const { config } = await readGlobalConfig(opts);
+				const presets = normalizePresetsMap(config.presets);
+				for (const p of Object.values(presets)) p.defaultSlim = false;
+				if (body.name !== null && body.name !== undefined && body.name !== '') {
+					const presetName = assertPresetName(body.name);
+					if (presets[presetName] === undefined) throw new ApiError(404, `预设不存在：${presetName}`);
+					presets[presetName].defaultSlim = true;
+				}
+				await writeGlobalConfig({ presets }, opts);
+				return { defaultSlim: body.name === null || body.name === undefined || body.name === '' ? null : assertPresetName(body.name) };
+			});
 		},
 		/** Preview applying a preset (accurate diff; nothing is written). */
 		async ['presets.preview'](body) {
 			const cwd = await assertCwd(body.cwd);
 			const presetName = assertPresetName(body.name);
 			const mode = body.mode === 'merge' ? 'merge' : 'replace';
-			const { view, config } = await buildProjectView(cwd, opts);
+			const { view, config } = await buildProjectViewLocked(cwd, opts);
 			const { config: g } = await readGlobalConfig(opts);
 			const preset = normalizePresetsMap(g.presets)[presetName];
 			if (preset === undefined) throw new ApiError(404, `预设不存在：${presetName}`);
@@ -839,15 +912,16 @@ function makeHandler(deps) {
 					if (current && current.source === sourceKey) continue;
 					if (sourceKey === null && current === undefined) continue;
 					const identity = ctx.identities.get(n);
-					await applySourceSelection(ctx.projectRoot, ctx.config, identity, sourceKey, deps, deps.logger);
+					await applySourceSelection(ctx.projectRoot, ctx.config, identity, sourceKey, deps, deps.logger, ctx.ledger);
 				}
 			});
-			return { preset: presetName, mode, view, report };
+			const partial = targetReport(Object.keys(preset.skills), report);
+			return { preset: presetName, mode, partial, view, report };
 		},
 		/** 一键精简 preview: default slim preset, or "disable all" when none. */
 		async ['slim.preview'](body) {
 			const cwd = await assertCwd(body.cwd);
-			const { view, config } = await buildProjectView(cwd, opts);
+			const { view, config } = await buildProjectViewLocked(cwd, opts);
 			const { config: g } = await readGlobalConfig(opts);
 			const presets = normalizePresetsMap(g.presets);
 			const def = Object.values(presets).find((p) => p.defaultSlim === true) || null;
@@ -881,7 +955,8 @@ function makeHandler(deps) {
 				ctx.config.enabled = [];
 				ctx.config.appliedPreset = null;
 			});
-			return { preset: null, mode: 'all', view, report };
+			const partial = targetReport([], report);
+			return { preset: null, mode: 'all', partial, view, report };
 		},
 	};
 	return async (req, res) => {
@@ -970,6 +1045,8 @@ export const internals = {
 	resolveTarget,
 	RANKS,
 	SHADOW_DESC_PREFIX,
+	SHADOW_STUB_PREFIX,
+	shadowStubPath,
 	STATE_PATH,
 	buildZip,
 	// V1 surface (DSH-008)

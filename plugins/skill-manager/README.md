@@ -195,11 +195,16 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
     `list` 幂等运行（旧版兼容）；Windows 文件锁问题由 tmp+rename 原子写入规避。
-- **测试**（`test/skill-manager.test.js`，`node --test`）：37 用例覆盖
+- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：48 用例覆盖
   状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
   三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
-  标签、预设 diff/应用、一键精简、旧版兼容与只读根 403。
-  symlink 与 Windows chmod 只读 2 个用例按环境限制 skip。
+  标签、预设 diff/应用、一键精简、旧版兼容与只读根 403；并覆盖并发写、
+  配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
+  多来源预设冲突。
+- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：3 用例直接执行
+  真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖双页面、
+  完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
+  丢弃过期 catalog、mutation、preset preview 响应和旧 Host 降级。
 - **热更新边界**（实测）：client bundle 由进程按请求从磁盘读取 —— 改 client 刷新页面即生效；
   host 代码没有模块级 HMR（组合树中 hmr 服务 `disabled: true`）—— 改 host 需要重启 `dsh web`
   （会话持久化在磁盘，重启后原会话可恢复，仅进行中的轮次会中断）。

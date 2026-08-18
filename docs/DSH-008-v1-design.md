@@ -36,7 +36,6 @@
   {
     "schema": "dsh-skill-manager/project",
     "apiVersion": 6,
-    "projectRoot": "C:/abs/project",
     "enabled": ["skill-a"],
     "sources": { "skill-c": { "source": "user-dsh", "contentHash": "sha256:...", "generated": true } },
     "appliedPreset": null,
@@ -61,6 +60,12 @@
   ```
 
 - 所有写操作：tmp + rename 原子替换；项目路径 canonicalize（`realpath`/`resolve` 后校验前缀）防穿越；项目根不可写时写操作返回 409 明确错误。
+- **损坏配置（P2-2）**：`.dsh/skill-manager.json` 为 JSON 无法解析时，`readProjectConfig` 降级为**可见空配置**（`view.configCorrupt:true`），**不**按空配置 reconcile（否则会为每个身份物化 stub / 覆盖真相文件）；所有项目变更 op（setEnabled/setMany/setSource/presets.apply/slim.apply 等）在 `mutateProject` 前置检测并返回 409 明确错误（「项目配置已损坏…未修改任何文件；请修复或删除该文件后重试」），不 reconcile、不写盘。client 顶部红色 banner 展示并禁用写操作。
+- **未来版本配置（P2-1）**：配置 `apiVersion` 高于当前 host 支持的 `PROJECT_API_VERSION` 时，读仍按归一化展示但 `view.configFuture:true` 标记只读；所有写操作拒绝（409「保护未来版本数据，升级 host 后重试」），`writeProjectConfig` 拒绝以旧 host 覆盖新字段。
+- **未知字段兼容（P2-1）**：`writeProjectConfig` 接受调用方回传的 `raw`（`readProjectConfig` 的磁盘对象），顶层与每个 `sources[name]` 条目中 host 不识别的字段原样 round-trip，避免未来版本字段被静默丢弃；未回传 `raw` 时写前重读磁盘对象合并。
+- **并发写串行化（P1-1）**：同一配置的 `read → compute → persist → reconcile → view` 在 `withConfigLock(projectLockKey(projectRoot))` 下整体串行，`mutateProject` 在锁内重读真相文件，保证等待锁期间提交的并发变更可见后再计算。
+- **文件副作用事务（P1-4）**：派生产物（stub/副本）的增删改经 `createLedger()` 记录 `undo` + `cleanup`；`mutateProject` 成功则 `commit()`（清理备份），`fn` 或持久化失败则 `rollback()`（逆序撤销、恢复被替换副本），杜绝失败留下未登记副本或丢失已校验副本。
+- **目标失败可见（P2-3）**：reconcile/文件副作用对**目标 skill** 自身失败或冲突时，op 返回非 2xx（ApiError 500/409 + 原因），client 停止并展示真实状态；其他 skill 的失败/冲突在响应中以 `partial:true` + `report.failed/conflicts` 返回，client 持久化警告并刷新。
 
 ### 2.2 来源模型（handoff §4.3）
 
@@ -83,6 +88,7 @@
 - 清理规则：stub 仅在（a）配置声明该身份 enabled，或（b）对应原件已不存在（孤儿）时删除，且删除前必须 `isShadowFile` marker 验证；普通 skill 文件、用户修改的副本永不被删除/覆盖。
 - 物化时机：`catalog` / `projectState` / `setEnabled` / `setMany` / `setSource` 等读项目状态的 op 触发一次幂等 reconcile（单文件失败不阻断、记日志、下轮自愈，与现行政策执行一致）。
 - 热加载：stub/副本/标志写入后 DSH 的 chokidar watcher 使 skill provider 失效 → **下一轮对话生效，无需重启 DSH**（skill-filesystem `watch:true`，已核实）。
+- **stub 保留前缀 + Git 精确区分（P2-4）**：开关 stub 一律落在保留前缀 `<projectRoot>/.dsh/skills/__smgr-shadow-<name>.md`（前缀 `__smgr-shadow-`），与真实项目 Skill / 生成副本的标准路径（`<name>.md`、`<name>/`）区分。三态精确区分：真实项目 Skill = 标准路径、无配置登记；生成副本 = 标准路径 + 配置 `sources[name].generated:true` + `copyHash` 与来源一致；stub = `__smgr-shadow-` 前缀 + marker。`isShadowFile`/`hasStub`/`removeMarkerStub` 同时识别保留前缀与旧 `<name>.md` 两个位置，旧 legacy stub 在 reconcile 时按 marker 校验迁移到保留前缀名。`.gitignore` 忽略 `.dsh/skills/__smgr-shadow-*.md`（stub 运行时产物，由配置重建）与 `.dsh/skills/.*`（点号暂存/备份目录），**不**用 `.dsh/skills/**` 整目录忽略（会误伤需要版本控制的项目专属 Skill）。git 只跟踪真实项目 Skill 与生成副本（二者均为项目文件、可版本控制、靠配置 `generated` 登记区分），不跟踪 stub。项目配置 `.dsh/skill-manager.json` 可纳入 Git 版本管理，但持久化时剥离 `projectRoot`（绝对根由配置文件自身位置推导，保持跨机可移植）。
 
 ### 2.4 「项目特化」与「可更新」徽标（handoff §4.4/§4.5）
 
@@ -110,6 +116,7 @@
 
 - 入口不变：`sidebar.footer.action`「扩展」全页；SKILL tab 内变为两个一级子页面（项目管理默认 / 统一资源库），MCP/Plugin 占位不变。
 - 状态：`activePage / selectedProject / selectedSkill / search / enableFilter / tagFilter / selectedRows / presetPreview / slimPreview / drawer`；页面/项目/抽屉切换清理无效选中；行点击与开关点击 `stopPropagation` 防串扰；description 完整多行、不截断不翻译。
+- **项目切换与过期响应丢弃（P1-5）**：`genRef`（单调递增 view 代）+ `projectRef`（当前项目 ref）。`chooseProject` 切换项目时递增 `genRef` 并清空 `view/viewError/drawer/selectedRows/toggling/sourceBusy/presetModal/slimModal` + `viewBusy`；`loadView` 捕获 `gen` 与 `cwd`，仅当代号一致时落地结果，慢 catalog 永不覆盖新项目的 view。所有写操作（`doToggle`/`doBulk`/`doSource`/`doTags`/`applyPreset`/`doSlimApply`）在发起时捕获 `proj` 快照与 `gen`，响应到达当代号不一致（项目已切换）则丢弃（不 patch、不刷新），一致才应用 + `partial` 警告 + `loadView(proj)`；`viewBusy`/`configCorrupt`/`configFuture` 期间写操作禁用。
 - 项目选择：`ctx.get('sessions')` 当前会话 cwd 为默认项目；`ctx.get('workspaces').list.getSnapshot()` 提供最近打开（`items` 按 `updatedAt` 降序，按 projectRoot 去重）；「添加本地项目」优先 `workspaces.pickDirectory()` + `workspaces.create({path})`，能力缺失/取消时降级为手动路径输入（能力不存在时安全降级，handoff §9.5）。
 - 旧 Host 降级：`apiVersion < 6` → 渲染原 `SkillManagerSection`（保留为 legacy 组件）+ 顶部「重启 dsh web 后启用新版」提示条。
 - 视觉：仅用 `--dsw-alias-*` / `--dsw-static-*` 令牌与官方 `ic_ds_*` 图标（IconSkillOutline16、IconSearchOutline16、IconPlusOutline16、IconFolderOpenOutline16、IconChevronDownOutline14、IconCheckOutline14、IconCloseOutline16、IconEllipsisOutline16 等）；紧凑 13px 行 + 1px 分隔线；`可更新` = `color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent)` 底 + 红字；明暗主题走令牌自动适配。
@@ -120,21 +127,20 @@
 - **Host**：`test/skill-manager.test.js`（node:test + 临时目录 + homedir 注入，不碰真实 `~/.dsh`），覆盖 handoff §12 自动化清单全部条目 + 旧 op 回归。
 - **Client**：`test/client.dom.test.js`（jsdom + 上游 node_modules 的 React 18.3.1 + fetch 桩 + `__ModuleLoader__` 桩）加载真实 `client.js` bundle，断言真实渲染/交互：双页切换、项目选择、搜索/筛选、开关写盘、抽屉打开/来源选择/标签编辑、预设预览 diff、旧 Host 降级、事件隔离。
 - **运行时**：重启后 `POST /api/skill-manager` 验证 apiVersion 6；client bundle 伺服内容 = 仓库文件（逐字节）。
-- **浏览器**：DOM 集成测试 + HTTP 冒烟为替代证据；GUI 内最终视觉/交互验收与截图对照由用户在 GUI 侧确认（见 §4 风险）。
+- **浏览器**：在内置浏览器直接验收 `http://127.0.0.1:3080/`；确认扩展 Slot 实际挂载、项目管理 / 统一资源库双页、完整 description、Cordis 两个 Skill、详情来源区与 V1.2 特化占位，检查 console 无新增页面错误。写操作与乱序响应由可重复的 Client DOM 套件覆盖。
 
 ## 3. 执行顺序与依赖
 
 ```
 S0 环境对齐 ─┬─> S1 数据模型 ─> S2 扫描合并 ─> S3 启停/reconcile ─> S4 标签 ─> S5 预设 ─> S6 API v6
              └─────────────────────────────────────────────> S7 项目管理页 ─> S8 资源库页
-S6+S7+S8 ─> 全部测试 ─> README ─> Git 提交 ─> 调度重启 ─> (下一轮) apiVersion 验证 + 浏览器验收 + design-qa.md
+S6+S7+S8 ─> 全部测试 ─> README ─> Git 提交 ─> 重启 apiVersion 验证 ─> 浏览器验收 ─> design-qa.md
 S9/S10 贯穿：DP 任务描述随进度更新；用例执行记录在验证证据齐后回写；飞书文档以本文为底稿
 ```
 
 ## 4. 风险与边界说明
 
-1. **重启会中断本 GUI 宿主进程**（进行中的轮次中断，会话持久化、浏览器重连恢复）：重启以完全分离的延迟进程在最终消息发出后 ~45s 执行，使用与当前一致的源码树命令 `node D:\Pythonproject\deepseek-harness\apps\cli\lib\bin.js web --host 127.0.0.1 --port 3080`。
-2. **origin push 不可用**（本机到 github.com 的 TLS 握手失败）：提交仅落本地；push 待网络恢复，属剩余风险。
-3. **GUI 侧真实视觉验收**：agent 无法驱动自身 GUI 截图，DOM 集成测试 + 令牌级 CSS 校验为替代证据；`design-qa.md` 中未截图项如实标注，由用户在 GUI 确认。
-4. **`pickDirectory` 依赖目录选择器插件**：不可用时降级手动路径输入（不阻塞 V1 验收 2）。
-5. 全局 `globalDefaultOff` 旧策略与新项目配置共存：语义已在 §2.3 对齐（冗余 stub 不创建、互不删除）。
+1. **重启会中断正在运行的轮次**（会话持久化、浏览器可重连恢复）；本次使用仓库 `restart-dsh-web.command` 重新启动 3080，并由脚本和 HTTP 验证 apiVersion 6。
+2. **真实 UI 写操作会改项目 Skill 状态**：本轮 3080 实机验收只做导航与详情读取，未改用户项目配置；启停、来源、标签和预设写操作由 48 个 Host 测试及 3 个真实 bundle DOM 测试覆盖。
+3. **`pickDirectory` 依赖目录选择器插件**：不可用时降级手动路径输入（不阻塞 V1 验收 2）。
+4. 全局 `globalDefaultOff` 旧策略与新项目配置共存：语义已在 §2.3 对齐（冗余 stub 不创建、互不删除）。
