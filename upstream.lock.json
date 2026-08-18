@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca",
   "baseTree": "3bc8f89fe494a4755c188be354add4e8b1e7b188",
-  "resultTree": "4eecae3b5622163d57685b4a4b45958a99e1bf65",
+  "resultTree": "4efd58a4d9b93061626f8d530080c608846e2ac9",
   "dshVersion": "0.1.0-rc.7",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -19,7 +19,7 @@
     },
     {
       "path": "upstream-patches/0003-fix-BUG-B0EE8D2D-recover-malformed-reasoning-tool-ca.patch",
-      "sha256": "9301A33059D51C64525041EF21661746F9DBE1950634A73E45BA7AF8903A37E9"
+      "sha256": "9C4D76CFB11E5DAC60B204BA5CE2340F55B9C2F61F169C6DE4238D644F63C6C1"
     }
   ]
 }

@@ -133,8 +133,39 @@ Write-Step '执行完整构建'
 Invoke-Native 'corepack' @('pnpm', 'run', 'build') $SourceDirectory
 
 if (-not $SkipRegister) {
-    Write-Step '注册全局 dsh 命令'
-    Invoke-Native 'npm' @('link') (Join-Path $SourceDirectory 'apps\cli')
+    $CliDirectory = [IO.Path]::GetFullPath((Join-Path $SourceDirectory 'apps\cli'))
+    $NpmGlobalPrefix = (& npm prefix --global).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($NpmGlobalPrefix)) {
+        throw '无法读取 npm 全局安装目录。'
+    }
+
+    $GlobalPackagePath = Join-Path $NpmGlobalPrefix 'node_modules\@deepseek-ai\dsh'
+    $AlreadyLinked = $false
+    if (Test-Path -LiteralPath $GlobalPackagePath) {
+        $GlobalPackage = Get-Item -LiteralPath $GlobalPackagePath -Force
+        foreach ($Target in @($GlobalPackage.Target)) {
+            if ([string]::IsNullOrWhiteSpace($Target)) {
+                continue
+            }
+            $ResolvedTarget = if ([IO.Path]::IsPathRooted($Target)) {
+                [IO.Path]::GetFullPath($Target)
+            } else {
+                [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $GlobalPackagePath) $Target))
+            }
+            if ($ResolvedTarget.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) -eq
+                $CliDirectory.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)) {
+                $AlreadyLinked = $true
+                break
+            }
+        }
+    }
+
+    if ($AlreadyLinked) {
+        Write-Step "全局 dsh 已指向 $CliDirectory，跳过重复注册"
+    } else {
+        Write-Step '注册全局 dsh 命令'
+        Invoke-Native 'npm' @('link') $CliDirectory
+    }
     $DshVersion = (& dsh --version).Trim()
     if ($LASTEXITCODE -ne 0 -or $DshVersion -ne $Lock.dshVersion) {
         throw "dsh 注册后版本异常，预期 $($Lock.dshVersion)，实际 $DshVersion。"
