@@ -13,9 +13,9 @@
 - DeepSeek Harness 官方基线 `99f6f02`，版本 `0.1.0-rc.7`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
 - `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
-  Qwen 原生 Agent preset 补丁与 BUG-B0EE8D2D Think 伪工具调用恢复补丁，以及
-  各自的 SHA-256；
-- 应用补丁后的 Git tree `4efd58a4d9b93061626f8d530080c608846e2ac9`。
+  Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用恢复与 JSDoc
+  补丁，以及 DSH-011 Compact 32K 摘要预算补丁和各自的 SHA-256；
+- 应用补丁后的 Git tree `caba0a03e3c151008951082a3485ee1972d48dc0`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -86,3 +86,12 @@ reasoning、且包含 Qwen 风格工具标签”的窄场景，不解释标签�
 重复 `npm link`，同时仍校验 `dsh --version`。3080 已从该源码目录的构建产物重启，
 首页返回 HTTP 200、Skill Manager apiVersion 为 6，应用内浏览器完成插件加载且控制台
 无 error。
+
+2026-08-19 为 DSH-011 从官方基线 `99f6f02` 在全新目录依次回放五个补丁，最终
+tree 为 `caba0a03e3c151008951082a3485ee1972d48dc0`。安装 923 个锁定依赖后，完整
+`build:lib + build:web` 通过；Compact 配置聚焦测试 80 条全部通过，目标配置文件覆盖率
+为 100%，全仓 lint 与 TypeScript 类型检查通过。文档同步门禁 27/28 通过，唯一未通过项
+是当前 Windows 环境无符号链接创建权限，测试夹具在 `symlinkSync` 处报 EPERM；JSDoc、
+中英配对与文档构建均通过。验证脚本同时检查源码和构建产物中的默认摘要预算均为
+32768 tokens。本次使用 `-SkipRegister`，没有更新全局 `dsh`，也没有启动或重启 Web
+服务；现有 3080 运行环境保持不变。

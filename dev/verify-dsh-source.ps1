@@ -49,6 +49,21 @@ foreach ($Patch in $Lock.patches) {
     Check $HashMatches "补丁校验 $($Patch.path)"
 }
 
+$CompactionConfigPath = Join-Path $SourceDirectory 'packages/compaction/compaction-basic/src/config.ts'
+$CompactionBundlePath = Join-Path $SourceDirectory 'packages/compaction/compaction-basic/lib/index.js'
+if (Test-Path -LiteralPath $CompactionConfigPath -PathType Leaf) {
+    $CompactionConfig = Get-Content -LiteralPath $CompactionConfigPath -Raw -Encoding UTF8
+    Check ($CompactionConfig -match 'maxTokens:\s*config\.maxTokens\s*\?\?\s*32768') 'Compact 源码默认摘要预算为 32768 tokens'
+} else {
+    Check $false 'Compact 源码配置存在'
+}
+if (Test-Path -LiteralPath $CompactionBundlePath -PathType Leaf) {
+    $CompactionBundle = Get-Content -LiteralPath $CompactionBundlePath -Raw -Encoding UTF8
+    Check ($CompactionBundle -match 'maxTokens:\s*config\.maxTokens\s*\?\?\s*32768') 'Compact 构建产物默认摘要预算为 32768 tokens'
+} else {
+    Check $false 'Compact 构建产物存在'
+}
+
 $QwenPresetDirectory = Join-Path $SourceDirectory 'apps/cli/config/agent-presets/qwen-native'
 $QwenCompositionPath = Join-Path $QwenPresetDirectory 'agent.cordis.yml'
 $QwenMetadataPath = Join-Path $QwenPresetDirectory 'preset.yml'
