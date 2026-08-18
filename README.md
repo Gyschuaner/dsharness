@@ -11,7 +11,7 @@ DeepSeek Harness（DSH）本地统一开发仓库。
 dsharness/
 ├── AGENTS.md                 # 项目协作规则（DP / 飞书 / Git 工作流约定）
 ├── restart-dsh-web.bat       # Windows 一键重启 dsh web（调用同目录 ps1）
-├── restart-dsh-web.ps1       # 重启 127.0.0.1:3080 的 dsh web 并验证 skill-manager
+├── restart-dsh-web.ps1       # 从本地源码隐藏启动 127.0.0.1:3080，记录日志并验证运行时
 ├── upstream.lock.json        # 官方源码、工具链、补丁与最终 tree 锁定
 ├── upstream-patches/         # 需要应用到官方源码的本地补丁
 ├── plugins/

@@ -8,24 +8,67 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
   .\restart-dsh-web.ps1 -Port 3080  端口可改（默认 3080）
 
 行为：
-  1. 停掉 3080 端口监听进程 + 命令行里带 dsh web 的 node 进程（含 npx 包装层），等端口释放
-  2. 新开一个 PowerShell 窗口运行 dsh web（日志可见，Ctrl+C 可停）
-  3. 轮询等待 HTTP 恢复（最多 60 秒），再调 /api/skill-manager 验证新 host 已加载
-     （本次功能需要 apiVersion >= 5；重启前运行中的进程是 4）
+  1. 校验本地 deepseek-harness 源码构建和 node.exe，再停止目标端口上的 dsh web
+  2. 直接用本地 apps/cli/lib/bin.js 启动独立 Node 进程，默认隐藏窗口并把日志写入 ~/.dsh/logs
+  3. 轮询等待 HTTP 恢复，再校验监听 PID、实际命令行和 skill-manager apiVersion
 
 注意：
   - 这会重启正在服务本 Web GUI 的宿主进程：进行中的轮次会中断，
     会话持久化在磁盘，浏览器重连后原会话可恢复。
-  - 用 dsh 直接启动，等价于之前的 npx -y @deepseek-ai/dsh web，但不经过 npx 网络解析。
+  - 默认源码目录是 dsharness 同级的 deepseek-harness，可用 -DshSourceDirectory 显式覆盖。
+  - 如果目标端口由非 DSH 进程占用，脚本会停止并保留该进程，不会强制结束未知服务。
 #>
 param(
+	[ValidateRange(1, 65535)]
 	[int]$Port = 3080,
 	[string]$HostAddr = '127.0.0.1',
+	[string]$DshSourceDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'deepseek-harness'),
+	[string]$LogDirectory = (Join-Path $env:USERPROFILE '.dsh\logs'),
+	[ValidateRange(1, 600)]
+	[int]$StartupTimeoutSeconds = 60,
+	[ValidateRange(0, 1000)]
+	[int]$MinimumSkillManagerApiVersion = 6,
 	[switch]$NoLaunch
 )
 
 $ErrorActionPreference = 'Stop'
 function Write-Step($m) { Write-Host "[restart] $m" -ForegroundColor Cyan }
+
+function Get-ProcessInfo([int]$ProcessId) {
+	Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+}
+
+function Test-DshWebCommandLine([string]$CommandLine, [int]$ExpectedPort) {
+	if ([string]::IsNullOrWhiteSpace($CommandLine)) { return $false }
+	$escapedPort = [regex]::Escape([string]$ExpectedPort)
+	$isDshWeb = $CommandLine -match '(?i)(?:bin\.js|@deepseek-ai[/\\]dsh|(?:^|\s)dsh(?:\.cmd)?)\s+web(?:\s|$)'
+	$portPattern = '(?i)--port(?:=|\s+)"?{0}"?(?:\s|$)' -f $escapedPort
+	$usesExpectedPort = $CommandLine -match $portPattern
+	return $isDshWeb -and $usesExpectedPort
+}
+
+function Get-LogTail([string]$Path) {
+	if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
+	return ((Get-Content -LiteralPath $Path -Tail 20 -ErrorAction SilentlyContinue) -join [Environment]::NewLine)
+}
+
+# 启动前先验证依赖，避免停掉健康服务后才发现本地源码不可用。
+$resolvedSourceDirectory = $null
+$cliEntry = $null
+$nodePath = $null
+$resolvedLogDirectory = $null
+if (-not $NoLaunch) {
+	$resolvedSourceDirectory = [IO.Path]::GetFullPath($DshSourceDirectory)
+	$cliEntry = Join-Path $resolvedSourceDirectory 'apps\cli\lib\bin.js'
+	if (-not (Test-Path -LiteralPath $cliEntry -PathType Leaf)) {
+		throw "找不到本地 DSH CLI 构建产物：$cliEntry。请先完成源码构建，或传入正确的 -DshSourceDirectory。"
+	}
+	$nodeCommand = Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+	$nodePath = $nodeCommand.Source
+	if (-not $nodePath) { throw '找不到 node.exe。' }
+	$resolvedLogDirectory = [IO.Path]::GetFullPath($LogDirectory)
+	New-Item -ItemType Directory -Path $resolvedLogDirectory -Force | Out-Null
+}
 
 # ── 1) 停止现有进程 ─────────────────────────────────────────────────────────
 $portPids = @()
@@ -34,9 +77,19 @@ if ($conn) { $portPids = @($conn | ForEach-Object OwningProcess | Sort-Object -U
 
 $webPids = @()
 Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object {
-	$_ -and $_.CommandLine -and
-	(($_.CommandLine -match 'bin\.js web') -or ($_.CommandLine -match '@deepseek-ai[/\\]dsh web'))
+	$_ -and (Test-DshWebCommandLine $_.CommandLine $Port)
 } | ForEach-Object { $webPids += $_.ProcessId }
+
+$unknownListeners = @()
+foreach ($listenerProcessId in $portPids) {
+	$listenerProcess = Get-ProcessInfo $listenerProcessId
+	if (-not $listenerProcess -or -not (Test-DshWebCommandLine $listenerProcess.CommandLine $Port)) {
+		$unknownListeners += $listenerProcessId
+	}
+}
+if ($unknownListeners.Count -gt 0) {
+	throw "端口 $Port 由非 DSH 进程占用（PID：$($unknownListeners -join ', ')），为避免误伤未停止它。"
+}
 
 $all = @($portPids + $webPids) | Where-Object { $_ } | Sort-Object -Unique
 
@@ -67,17 +120,43 @@ if ($all.Count -eq 0) {
 
 # ── 2) 启动 ─────────────────────────────────────────────────────────────────
 if ($NoLaunch) {
-	Write-Step "跳过启动（-NoLaunch），请自行运行：dsh web --host $HostAddr --port $Port"
+	Write-Step "跳过启动（-NoLaunch）"
 	exit 0
 }
-Write-Step "启动 dsh web（新开窗口，日志可见）"
-Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoExit', '-NoProfile', '-Command', "dsh web --host $HostAddr --port $Port") | Out-Null
+
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stdoutLog = Join-Path $resolvedLogDirectory "dsh-web-$Port-$timestamp.stdout.log"
+$stderrLog = Join-Path $resolvedLogDirectory "dsh-web-$Port-$timestamp.stderr.log"
+$metadataPath = Join-Path $resolvedLogDirectory "dsh-web-$Port.latest.json"
+$arguments = @("`"$cliEntry`"", 'web', '--host', $HostAddr, '--port', [string]$Port)
+
+Write-Step "隐藏启动本地源码 dsh web：$cliEntry"
+$startedProcess = Start-Process -FilePath $nodePath `
+	-ArgumentList $arguments `
+	-WorkingDirectory $resolvedSourceDirectory `
+	-WindowStyle Hidden `
+	-RedirectStandardOutput $stdoutLog `
+	-RedirectStandardError $stderrLog `
+	-PassThru
+
+[ordered]@{
+	pid = $startedProcess.Id
+	startedAt = (Get-Date).ToString('o')
+	host = $HostAddr
+	port = $Port
+	node = $nodePath
+	cli = $cliEntry
+	stdout = $stdoutLog
+	stderr = $stderrLog
+} | ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8
+Write-Step "后台 PID：$($startedProcess.Id)；日志：$stdoutLog / $stderrLog"
 
 # ── 3) 等待恢复 + 验证 ──────────────────────────────────────────────────────
-Write-Step "等待 http://${HostAddr}:${Port} 恢复（最多 60 秒）…"
-$deadline = (Get-Date).AddSeconds(60)
+Write-Step "等待 http://${HostAddr}:${Port} 恢复（最多 $StartupTimeoutSeconds 秒）…"
+$deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
 $up = $false
 while ((Get-Date) -lt $deadline) {
+	if ($startedProcess.HasExited) { break }
 	try {
 		$r = Invoke-WebRequest -Uri "http://${HostAddr}:${Port}/" -UseBasicParsing -TimeoutSec 3
 		if ($r.StatusCode -eq 200) { $up = $true; break }
@@ -85,18 +164,37 @@ while ((Get-Date) -lt $deadline) {
 	Start-Sleep -Milliseconds 500
 }
 if (-not $up) {
-	Write-Host "等待服务超时，请看新窗口里的日志" -ForegroundColor Red
-	exit 1
+	if (-not $startedProcess.HasExited) {
+		Stop-Process -Id $startedProcess.Id -Force -ErrorAction SilentlyContinue
+	}
+	$stderrTail = Get-LogTail $stderrLog
+	throw "服务未在限定时间内恢复。stderr 尾部：$stderrTail"
 }
-Write-Step "服务已起来"
+
+$listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $listener) {
+	Stop-Process -Id $startedProcess.Id -Force -ErrorAction SilentlyContinue
+	throw "HTTP 已响应，但没有找到端口 $Port 的监听进程。"
+}
+$actualProcess = Get-ProcessInfo $listener.OwningProcess
+if (-not $actualProcess -or $listener.OwningProcess -ne $startedProcess.Id) {
+	Stop-Process -Id $startedProcess.Id -Force -ErrorAction SilentlyContinue
+	throw "端口 $Port 的监听 PID 与刚启动的进程不一致。期望 $($startedProcess.Id)，实际 $($listener.OwningProcess)。"
+}
+if (-not (Test-DshWebCommandLine $actualProcess.CommandLine $Port) -or
+	$actualProcess.CommandLine.IndexOf($cliEntry, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+	Stop-Process -Id $startedProcess.Id -Force -ErrorAction SilentlyContinue
+	throw "监听进程没有使用期望的本地源码 CLI：$($actualProcess.CommandLine)"
+}
+Write-Step "服务已恢复：HTTP 200，PID $($startedProcess.Id)，本地源码命令行校验通过"
 
 try {
 	$j = Invoke-RestMethod -Uri "http://${HostAddr}:${Port}/api/skill-manager" -Method Post -ContentType 'application/json; charset=utf-8' -Body '{"op":"list"}'
 	$api = $j.value.apiVersion
-	if ($api -ge 5) {
-		Write-Host "skill-manager host：apiVersion $api ✓（全局默认关闭策略已生效，浏览器刷新页面即可用新功能）" -ForegroundColor Green
+	if ($api -ge $MinimumSkillManagerApiVersion) {
+		Write-Host "skill-manager host：apiVersion $api ✓" -ForegroundColor Green
 	} else {
-		Write-Host "skill-manager host：apiVersion $api —— 未加载到新版代码，请检查 ~/.dsh/plugins/skill-manager" -ForegroundColor Yellow
+		Write-Host "skill-manager host：apiVersion $api，低于期望的 $MinimumSkillManagerApiVersion；请检查 ~/.dsh/plugins/skill-manager" -ForegroundColor Yellow
 	}
 } catch {
 	Write-Host "skill-manager API 验证失败（不影响 dsh web 本身）：$($_.Exception.Message)" -ForegroundColor Yellow
