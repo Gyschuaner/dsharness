@@ -838,14 +838,18 @@ test('hashSkillSource: flat and dir bundles are stable and sensitive to edits', 
 
 test('project config: read-only project root is rejected with 409', async (t) => {
 	const env = await makeEnv();
-	t.after(env.cleanup);
+	// node:test after-hooks run FIFO, so the cleanup must restore the root permissions itself;
+	// a separate restore hook registered later would run after the cleanup on POSIX.
+	t.after(async () => {
+		await chmod(env.projectRoot, 0o755).catch(() => {});
+		await env.cleanup();
+	});
 	try {
 		await chmod(env.projectRoot, 0o555);
 	} catch {
 		t.skip('chmod not effective on this platform');
 		return;
 	}
-	t.after(async () => { await chmod(env.projectRoot, 0o755).catch(() => {}); });
 	let blocked = false;
 	try {
 		await access(env.projectRoot, constants.W_OK);
