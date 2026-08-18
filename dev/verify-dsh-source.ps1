@@ -49,6 +49,26 @@ foreach ($Patch in $Lock.patches) {
     Check $HashMatches "补丁校验 $($Patch.path)"
 }
 
+$QwenPresetDirectory = Join-Path $SourceDirectory 'apps/cli/config/agent-presets/qwen-native'
+$QwenCompositionPath = Join-Path $QwenPresetDirectory 'agent.cordis.yml'
+$QwenMetadataPath = Join-Path $QwenPresetDirectory 'preset.yml'
+Check (Test-Path -LiteralPath $QwenCompositionPath -PathType Leaf) '内置 qwen-native composition'
+Check (Test-Path -LiteralPath $QwenMetadataPath -PathType Leaf) '内置 qwen-native 元数据'
+if ((Test-Path -LiteralPath $QwenCompositionPath -PathType Leaf) -and (Test-Path -LiteralPath $QwenMetadataPath -PathType Leaf)) {
+    $QwenComposition = Get-Content -LiteralPath $QwenCompositionPath -Raw -Encoding UTF8
+    $QwenMetadata = Get-Content -LiteralPath $QwenMetadataPath -Raw -Encoding UTF8
+    Check ($QwenComposition -match 'You are Qwen' -and $QwenComposition -match '\{\{model\}\}' -and $QwenComposition -match '\{\{cwd\}\}') 'qwen-native persona 变量完整'
+    Check ($QwenMetadata -match '(?m)^name:\s*Qwen 原生模式\s*$') 'qwen-native 显示名称'
+}
+
+$WebAppPatchPath = Join-Path $SourceDirectory 'packages/bundle/web-app/cordis.patch.yml'
+if (Test-Path -LiteralPath $WebAppPatchPath -PathType Leaf) {
+    $WebAppPatch = Get-Content -LiteralPath $WebAppPatchPath -Raw -Encoding UTF8
+    Check ($WebAppPatch -match '(?s)id:\s*agent-presets.*?default:\s*standard') '默认 Agent preset 仍为 standard'
+} else {
+    Check $false 'Web App preset 默认配置存在'
+}
+
 if (Get-Command dsh -ErrorAction SilentlyContinue) {
     Check ((& dsh --version).Trim() -eq $Lock.dshVersion) "dsh $($Lock.dshVersion)"
 } else {

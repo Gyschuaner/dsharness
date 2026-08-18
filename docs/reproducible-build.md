@@ -12,10 +12,16 @@
 
 - DeepSeek Harness 官方基线 `99f6f02`，版本 `0.1.0-rc.7`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
-- `upstream-patches/` 中按顺序应用的补丁及其 SHA-256；
-- 应用补丁后的 Git tree `81852018fb2884bf95655e3bfd3f07f87763f9b3`。
+- `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁与 DSH-012
+  Qwen 原生 Agent preset 补丁，以及各自的 SHA-256；
+- 应用补丁后的 Git tree `85d75ae8df920229dccd8f6b2a93a5a7ac541ad3`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
+
+DSH-012 的 `qwen-native` 是构建产物中的系统级 preset，不存放在个人
+`~/.dsh/.agent-presets`。因此新电脑重新拉取本仓库并执行安装脚本后会自动包含它；
+该 preset 不会被设为默认，安装流程也不会读取或修改 `~/.dsh/settings.yaml` 中的
+模型、推理强度或 preset 默认值。
 
 ## 三、新电脑安装
 
@@ -55,3 +61,9 @@ cd dsharness
 升级官方 DSH 或新增上游补丁时，需要同步更新 `upstream.lock.json` 中的基线提交、补丁哈希和最终 tree，并从空目录重新执行安装脚本。只有干净构建、完整构建和 Web 冒烟都通过后，新的锁定结果才能合入 `main`。
 
 2026-08-17 已在一条全新目录链路上完成验证：官方源码浅拉取、DSH-009 补丁应用、923 个锁定依赖安装和完整 `build:lib + build:web` 均通过，总耗时约 166 秒；补丁涉及的 `adapter.spec.ts` 与 `convert.spec.ts` 共 119 条测试全部通过。随后直接使用新源码树启动 3083 验证实例，首页返回 HTTP 200；验证完成后仅关闭该实例，现有 3080 运行环境未被修改。
+
+2026-08-18 为 DSH-012 在全新 worktree 从官方基线按锁定顺序回放 DSH-009 与
+DSH-012 补丁，得到与锁文件一致的 tree
+`85d75ae8df920229dccd8f6b2a93a5a7ac541ad3`。锁定依赖安装与完整
+`build:lib + build:web` 通过；Qwen preset 聚焦单元测试 16 条、CLI 组合测试 30 条、
+Web preset 浏览器测试 13 条全部通过，相关 TypeScript 文件 lint 通过。
