@@ -30,7 +30,7 @@
 
 ### 2.1 数据边界（handoff §9.1）
 
-- **项目配置 = 唯一真相**：`<projectRoot>/.dsh/skill-manager.json`
+- **项目配置 = 本机唯一真相**：`<projectRoot>/.dsh/skill-manager.json`
 
   ```json
   {
@@ -45,6 +45,7 @@
 
   - `enabled`：进入本项目模型自动候选的 skill 身份（name）集合。文件缺失 = 空集合 = 全关（新项目默认）。
   - `sources`：显式来源选择 + 已生成副本登记（`generated:true` + 内容哈希，作为副本的「可验证 marker」：覆盖/删除前必须配置条目存在且内容哈希与来源一致，绝不按路径猜测删除）。
+  - 该文件是本机私有状态，由项目 `.gitignore` 精确忽略；真实项目 Skill 仍可正常提交。
   - 不迁移旧版启停状态；不迁移全局 `globalDefaultOff`（兼容保留）。
 - **全局配置**：`~/.dsh/skill-manager.json`（保留 `globalDefaultOff`，扩展）
 
@@ -88,7 +89,7 @@
 - 清理规则：stub 仅在（a）配置声明该身份 enabled，或（b）对应原件已不存在（孤儿）时删除，且删除前必须 `isShadowFile` marker 验证；普通 skill 文件、用户修改的副本永不被删除/覆盖。
 - 物化时机：`catalog` / `projectState` / `setEnabled` / `setMany` / `setSource` 等读项目状态的 op 触发一次幂等 reconcile（单文件失败不阻断、记日志、下轮自愈，与现行政策执行一致）。
 - 热加载：stub/副本/标志写入后 DSH 的 chokidar watcher 使 skill provider 失效 → **下一轮对话生效，无需重启 DSH**（skill-filesystem `watch:true`，已核实）。
-- **stub 保留前缀 + Git 精确区分（P2-4）**：开关 stub 一律落在保留前缀 `<projectRoot>/.dsh/skills/__smgr-shadow-<name>.md`（前缀 `__smgr-shadow-`），与真实项目 Skill / 生成副本的标准路径（`<name>.md`、`<name>/`）区分。三态精确区分：真实项目 Skill = 标准路径、无配置登记；生成副本 = 标准路径 + 配置 `sources[name].generated:true` + `copyHash` 与来源一致；stub = `__smgr-shadow-` 前缀 + marker。`isShadowFile`/`hasStub`/`removeMarkerStub` 同时识别保留前缀与旧 `<name>.md` 两个位置，旧 legacy stub 在 reconcile 时按 marker 校验迁移到保留前缀名。`.gitignore` 忽略 `.dsh/skills/__smgr-shadow-*.md`（stub 运行时产物，由配置重建）与 `.dsh/skills/.*`（点号暂存/备份目录），**不**用 `.dsh/skills/**` 整目录忽略（会误伤需要版本控制的项目专属 Skill）。git 只跟踪真实项目 Skill 与生成副本（二者均为项目文件、可版本控制、靠配置 `generated` 登记区分），不跟踪 stub。项目配置 `.dsh/skill-manager.json` 可纳入 Git 版本管理，但持久化时剥离 `projectRoot`（绝对根由配置文件自身位置推导，保持跨机可移植）。
+- **stub 保留前缀 + Git 精确区分（P2-4 / BUG-548E4FF4）**：开关 stub 一律落在保留前缀 `<projectRoot>/.dsh/skills/__smgr-shadow-<name>.md`（前缀 `__smgr-shadow-`），与真实项目 Skill / 生成副本的标准路径（`<name>.md`、`<name>/`）区分。三态精确区分：真实项目 Skill = 标准路径、无配置登记；生成副本 = 标准路径 + 本机配置 `sources[name].generated:true` + `copyHash` 与来源一致；stub = `__smgr-shadow-` 前缀 + marker。`isShadowFile`/`hasStub`/`removeMarkerStub` 同时识别保留前缀与旧 `<name>.md` 两个位置，旧 legacy stub 在 reconcile 时按 marker 校验迁移到保留前缀名。`.gitignore` 精确忽略 `.dsh/skill-manager.json`、`.dsh/skills/__smgr-shadow-*.md`（stub 运行时产物，由配置重建）与 `.dsh/skills/.*`（点号暂存/备份目录），**不**用 `.dsh/skills/**` 整目录忽略（会误伤需要版本控制的项目专属 Skill）。Git 只跟踪真实项目 Skill 与生成副本，不跟踪本机配置或 stub。配置持久化时仍剥离 `projectRoot`，避免项目在本机移动后保留失效的绝对路径。
 
 ### 2.4 「项目特化」与「可更新」徽标（handoff §4.4/§4.5）
 

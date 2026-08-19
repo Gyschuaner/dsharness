@@ -250,6 +250,8 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	await h.open();
 	assert.ok(h.button('项目管理'));
 	assert.ok(h.button('统一资源库'));
+	assert.ok(h.dom.window.document.body.textContent.includes('仅在本机使用且不提交 Git'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('可纳入 Git 版本管理'));
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, currentRow.description);
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-badgeUpdate')].length, 1);
 
