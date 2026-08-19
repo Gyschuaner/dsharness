@@ -69,7 +69,8 @@ DSH-003 已把上游源码接入方式改为可复现构建：
 - `upstream.lock.json` 锁定官方 `master` 提交 `99f6f02`、DSH `0.1.0-rc.7`、
   Node `24.11.1`、pnpm `11.7.0`、本地补丁哈希和最终源码 tree；
 - `upstream-patches/` 保存需要叠加到官方源码的本地改动，当前包含 DSH-009
-  流式活动保活与截断工具调用保护；
+  流式活动保活、DSH-012 Qwen 原生 preset，以及 BUG-B0EE8D2D 无效 Think
+  工具调用的持久历史恢复；
 - `dev/install-dsh-source.ps1` 在空目录拉取源码、应用补丁、执行 frozen install、
   完整构建并注册 `dsh`；
 - `dev/verify-dsh-source.ps1` 独立校验工具链、源码 tree、补丁、CLI 版本和 Web
