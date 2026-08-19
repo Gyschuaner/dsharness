@@ -214,7 +214,7 @@ Host 把单文件失败放进 `report.failed` 后仍返回 200；Client 对 `set
 结论与要求：
 
 - 41 个 marker stub 是设计明确声明“可重建”的派生产物，应从仓库移除。
-- 项目配置可继续纳入 Git，但 `projectRoot` 不应存绝对路径；运行时从配置所在目录推导，或持久化 `.`。
+- 后续 `BUG-548E4FF4` 将项目配置定义为本机私有状态并从 Git 移除；持久化时仍不保存 `projectRoot`，避免本机移动项目后留下失效绝对路径。
 - **不要直接 `.gitignore /.dsh/skills/**`**，否则会误伤真正需要版本控制的项目专属 Skill。请先设计能精确区分 generated stub/managed copy 与真实项目 Skill 的策略，再改 ignore/目录布局。
 - 不要把当前工作区里用户的 `.dsh` 删除、新增或 Mac 配置顺手提交。
 

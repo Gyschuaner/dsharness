@@ -27,7 +27,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     工具栏为 搜索 / 全部·已启用·未启用 / 全部标签 筛选 / 一键精简；
     行 = 图标 + 名称 + 项目特化/来源×N/未启用 徽标 + 完整描述 + 标签 + 启用开关；
     勾选多行后可批量启用/禁用；底部说明「项目配置保存于 …/.dsh/skill-manager.json，
-    可纳入 Git 版本管理；启停在下一轮对话生效」。
+    仅在本机使用且不提交 Git；启停在下一轮对话生效」。
   - **统一资源库**：同名 Skill 合并为一行（「来源 ×N」徽标），搜索/标签筛选，
     点击行打开右侧详情抽屉切换来源；默认优先级 项目专属 > DSH 用户级 > 其他全局 > 内置。
   - **详情抽屉**：启用此 Skill 开关、完整描述、当前来源、可选来源（radio，
@@ -39,12 +39,13 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 
 ## DSH-008 V1 核心机制
 
-- **项目配置是唯一真相**：`<项目根>/.dsh/skill-manager.json`（apiVersion 6，
-  原子写入，可纳入 Git）。记录已启用 Skill 身份集合、显式来源选择、最近应用的预设。
+- **项目配置是本机唯一真相**：`<项目根>/.dsh/skill-manager.json`（apiVersion 6，
+  原子写入，由仓库 `.gitignore` 精确忽略）。记录本机的已启用 Skill 身份集合、
+  显式来源选择、最近应用的预设，避免不同电脑的 Skill 集合和偏好相互覆盖。
   文件级开关（frontmatter 标志 / 派生开关文件）只是可重建的派生产物。
 - **新项目默认不暴露**：项目配置不存在时启用集合为空；`reconcile` 会为每个
   「非项目来源且默认会被 DSH 自动选中」的 Skill 生成带稳定 marker 的派生开关文件
-  `<项目根>/.dsh/skills/<name>.md`（`disable-model-invocation: true` +
+  `<项目根>/.dsh/skills/__smgr-shadow-<name>.md`（`disable-model-invocation: true` +
   描述前缀 `[skill-manager] 本项目禁用开关`），使模型自动候选为空；
   `user-invocable` 的 `/skill-name` 手动调用不受影响，下一轮对话生效、无需重启。
   产品默认来源在 DSH rank 上输给更低 rank 的健康来源时（如用户级 400 输给
@@ -140,8 +141,8 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 | 用户 · `~/.agents/skills` | `C:\Users\<你>\.agents\skills` | 所有项目 |
 | 内置（只读） | 各 agent preset 的 `skills/` 目录 | 部署自带，升级会覆盖 |
 | 策略状态 | `~/.dsh/skill-manager.json` | 全局默认关闭开关（旧版）+ 全局标签 + 自定义预设（V1） |
-| 项目配置（V1） | `<项目根>/.dsh/skill-manager.json` | 启用集合 / 来源选择 / 最近预设（可纳入 Git） |
-| 派生开关（V1） | `<项目根>/.dsh/skills/<name>.md` | marker 验证的禁用开关（可重建） |
+| 项目配置（V1） | `<项目根>/.dsh/skill-manager.json` | 本机私有的启用集合 / 来源选择 / 最近预设（不提交 Git） |
+| 派生开关（V1） | `<项目根>/.dsh/skills/__smgr-shadow-<name>.md` | marker 验证的禁用开关（可重建，不提交 Git） |
 | 受管副本（V1） | `<项目根>/.dsh/skills/<name>(.md | /SKILL.md)` | 来源选择的生效载体（可重建，改过即成项目文件） |
 
 > 项目根按 DSH 的 `findProjectRoot` 解析（向上找 `.git`，找不到取 cwd），与 DSH

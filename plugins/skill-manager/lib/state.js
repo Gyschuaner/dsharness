@@ -301,8 +301,9 @@ export async function writeProjectConfig(projectRoot, config, opts, raw) {
 		}
 	}
 	// The persisted config never carries the project's absolute root; it is
-	// derived from the config file's own location (review P2-4), so a
-	// checked-in config stays portable across machines.
+	// derived from the config file's own location (review P2-4). The file is
+	// machine-local state, and keeping the absolute path out also avoids stale
+	// roots after a workspace is moved on the same machine.
 	const serialized = Object.assign({}, next);
 	delete serialized.projectRoot;
 	if (opts && opts.faults && typeof opts.faults.beforeProjectConfigWrite === 'function') {

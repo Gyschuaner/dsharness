@@ -1775,7 +1775,7 @@
 											? h('div', { style: { color: 'var(--dsw-alias-state-warn-primary)' } }, '注意：项目配置文件已损坏，按空配置处理（可手动删除后重建）')
 											: null,
 										view && view.configExisted === false
-											? h('div', null, '该项目还没有配置文件；首次启停会在项目内创建 .dsh/skill-manager.json（可纳入 Git 版本管理）')
+											? h('div', null, '该项目还没有配置文件；首次启停会在项目内创建 .dsh/skill-manager.json（本机私有配置，不提交 Git）')
 											: null
 									)
 									: null
@@ -2006,7 +2006,7 @@
 								{ className: 'sk-footer' },
 								activePage === 'project'
 									? (view && view.projectRoot
-										? h('span', null, '项目配置保存于 ', h('code', null, view.projectRoot), '/.dsh/skill-manager.json，可纳入 Git 版本管理；启停在下一轮对话生效')
+										? h('span', null, '项目配置保存于 ', h('code', null, view.projectRoot), '/.dsh/skill-manager.json，仅在本机使用且不提交 Git；启停在下一轮对话生效')
 										: h('span', null, '未选择项目：仅显示用户级与内置 Skill'))
 									: h('span', null, '默认优先级：项目专属 > DSH 用户级 > 其他全局 > 内置；未显式选择时使用第一个可用来源'),
 								h('span', null, '共 ' + (view ? view.identities.length : 0) + ' 个 Skill'
