@@ -13,9 +13,9 @@
 - DeepSeek Harness 官方基线 `99f6f02`，版本 `0.1.0-rc.7`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
 - `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
-  Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用恢复与 JSDoc
-  补丁，以及 DSH-011 Compact 32K 摘要预算补丁和各自的 SHA-256；
-- 应用补丁后的 Git tree `caba0a03e3c151008951082a3485ee1972d48dc0`。
+  Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用持久历史恢复与
+  重试流 JSDoc 补丁，以及 DSH-011 Compact 32K 摘要预算补丁和各自的 SHA-256；
+- 应用补丁后的 Git tree `50da9c5101642d62baf200cb29449617737cd8f5`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -71,14 +71,16 @@ Web preset 浏览器测试 13 条全部通过，相关 TypeScript 文件 lint �
 
 2026-08-19 更新 BUG-B0EE8D2D 的第三个上游补丁。补丁只识别“正常 stop、仅含私有
 reasoning、且包含 Qwen 风格工具标签”的窄场景，不解释标签内容；标准重试策略只恢复
-一次。恢复请求不再改写 system prompt，而是在完全不变的 system、tools 与持久消息
-前缀之后追加一条仅用于本次请求的 reminder；该消息不写入 Session，后续步骤自动
-消失，请求重建 invariant 只放行由 agent-loop 生成的精确尾缀。相关 Agent loop、LLM
-适配、重试策略与 UI 折叠回归共 50 个文件、993 条测试通过，TypeScript 类型检查、
-全仓 lint、中英配对、Markdown 链接检查及 Host/Client/Web 构建通过。随后从官方基线
-在全新 worktree 回放三个补丁，安装 923 个锁定依赖并完成完整构建；直接用该源码树
-启动 3092 验证实例，首页返回 HTTP 200，验证后已关闭。最终锁定 tree 为
-`4efd58a4d9b93061626f8d530080c608846e2ac9`。
+一次。无效输出会先作为 assistant 消息持久化，并省略不可信的提供方 replay state；
+随后持久追加一条 user-role `<system-reminder>`，明确说明没有工具被执行。纠错请求复用
+原 system、tools 与 prompt assembly，在新步骤中读取“原历史 + 失败 Think + reminder”，
+这些内容也会继续进入后续轮次。Chat 投影保留失败 Think，不再用重试结果覆盖它。
+
+相关 Agent loop、LLM 适配、重试策略和 Chat 投影专项回归 165 条通过；全量 817 个测试
+文件中 808 个通过、9 个跳过，共 13,518 条测试通过、112 条跳过。TypeScript 类型检查、
+全仓 lint、中英配对、Markdown 换行与链接检查，以及 Host/Client/Web 完整构建通过。
+随后从官方基线在全新 worktree 顺序回放三个补丁（第三个补丁内含两次 BUG 修复提交），
+得到并锁定 tree `9f48dcf0fd3f10bf0566eb0256a4a65770776dd3`。
 
 同日将本机 `D:\Pythonproject\deepseek-harness` 从第一个补丁后的干净中间 tree
 顺序更新到该最终 tree，重新执行 frozen install 与完整构建。安装脚本现在会识别
@@ -95,3 +97,10 @@ tree 为 `caba0a03e3c151008951082a3485ee1972d48dc0`。安装 923 个锁定依赖
 中英配对与文档构建均通过。验证脚本同时检查源码和构建产物中的默认摘要预算均为
 32768 tokens。本次使用 `-SkipRegister`，没有更新全局 `dsh`，也没有启动或重启 Web
 服务；现有 3080 运行环境保持不变。
+
+2026-08-19 合并 BUG-B0EE8D2D 持久历史恢复后，保留主干已有的重试流 JSDoc 与
+DSH-011 Compact 32K 补丁，从官方基线依次回放五个补丁并锁定最终 tree
+`50da9c5101642d62baf200cb29449617737cd8f5`。Node `24.11.1` / pnpm `11.7.0`
+下 frozen install 与 Host/Client/Web 完整构建通过；Agent loop、pi-ai、重试、Chat
+投影及 Compact 7 个测试文件共 265 条回归通过。随后在持久 macOS 构建目录完成相同
+tree 的完整重建，并从该目录重启 3080；首页恢复，Skill Manager apiVersion 为 6。

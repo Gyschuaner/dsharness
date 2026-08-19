@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca",
   "baseTree": "3bc8f89fe494a4755c188be354add4e8b1e7b188",
-  "resultTree": "caba0a03e3c151008951082a3485ee1972d48dc0",
+  "resultTree": "50da9c5101642d62baf200cb29449617737cd8f5",
   "dshVersion": "0.1.0-rc.7",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -19,7 +19,7 @@
     },
     {
       "path": "upstream-patches/0003-fix-BUG-B0EE8D2D-recover-malformed-reasoning-tool-ca.patch",
-      "sha256": "9C4D76CFB11E5DAC60B204BA5CE2340F55B9C2F61F169C6DE4238D644F63C6C1"
+      "sha256": "E9A987F0B61ED8066FCCC2C50832A01E1C4335D9A533F5998A791750B0D2DF09"
     },
     {
       "path": "upstream-patches/0004-docs-BUG-B0EE8D2D-document-retry-stream-token-cap.patch",
