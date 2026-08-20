@@ -88,7 +88,8 @@ cd dsharness
 当前锁定官方 `master` 提交 `99f6f02`（`0.1.0-rc.7`），随后依次应用 DSH-009 的
 流式活动保活补丁、DSH-012 的 Qwen 原生 Agent preset 补丁，以及
 BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compact 32K
-摘要预算补丁。最终源码 tree 为 `caba0a03e3c151008951082a3485ee1972d48dc0`。
+摘要预算补丁，以及 DSH-014 的工具调用即时进度反馈补丁。最终源码 tree 为
+`b481531a81fa688c4367368cc448ae1ca14ce27f`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。
