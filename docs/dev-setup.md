@@ -66,7 +66,7 @@ git push
 
 DSH-003 已把上游源码接入方式改为可复现构建：
 
-- `upstream.lock.json` 锁定官方 `master` 提交 `99f6f02`、DSH `0.1.0-rc.7`、
+- `upstream.lock.json` 锁定官方 `master` 提交 `141eb6f`、DSH `0.1.0-rc.8`、
   Node `24.11.1`、pnpm `11.7.0`、本地补丁哈希和最终源码 tree；
 - `upstream-patches/` 保存需要叠加到官方源码的本地改动，当前包含 DSH-009
   流式活动保活、DSH-012 Qwen 原生 preset、BUG-B0EE8D2D 无效 Think 工具调用的

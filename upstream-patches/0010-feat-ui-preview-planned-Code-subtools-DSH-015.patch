@@ -1,4 +1,4 @@
-From ae6ab5aabdb6ad1aed04a036f38521e3bab90a5d Mon Sep 17 00:00:00 2001
+From ce25680ca7fdf3c3512557dbc198a953c0594ac9 Mon Sep 17 00:00:00 2001
 From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
 Date: Thu, 20 Aug 2026 17:34:15 +0800
 Subject: [PATCH] feat(ui): preview planned Code subtools (DSH-015)
@@ -139,22 +139,22 @@ index 0000000..639a640
 +
 +Code Mode 会在长程序到达首次分发前立即给出具体工具反馈，而已完成行仍依据真实执行时间保留毫秒精度。模型请求多携带一个有序字符串数组，模型仍可能遗漏或误报它；旧版校验兼容与保守扫描让这些情况保持可用，但间接调用或计算得到的调用仍可能直到分发才可发现。对话节点测试固定部分流式输入、序号替换、名称不匹配处理、清理与旧调用扫描；工具 UI 测试固定不带计时器的 `ing` 预告；Code Mode 和快照测试套件固定公开必填 schema 与旧回放兼容性。
 diff --git a/docs/tool-catalog.i18n.yaml b/docs/tool-catalog.i18n.yaml
-index 69b0495..7964b46 100644
+index c267c20..63f65d5 100644
 --- a/docs/tool-catalog.i18n.yaml
 +++ b/docs/tool-catalog.i18n.yaml
 @@ -2,5 +2,5 @@
  # side as of the last confirmed-consistent state. Both languages carry equal authority;
  # after editing either side, bring the other along and re-record with:
  #   pnpm run verify-translation-pairing --write docs/tool-catalog.md
--tool-catalog.md: 02501d0721768d38c1e51bdfb87dcc79696bfd04
--tool-catalog.zh.md: 3583662dbaf72ea78bddb6a2b7d6b18360f3f3e1
-+tool-catalog.md: e5102178a865d709ea1e78fa712a38ac0249b425
-+tool-catalog.zh.md: f11da449ba0809a5f7cbdcdc2feafbe253f3a1dc
+-tool-catalog.md: 92b6d8b92050d2dc822f016c18d31a81b43ef447
+-tool-catalog.zh.md: 97a202b86744a4cf63819a12586a061a5daaaed4
++tool-catalog.md: 21198d23be3ef03bdffd14ccb375d1a4f618c394
++tool-catalog.zh.md: 6be0fce75fc496e42b7387e75b3494626153b01b
 diff --git a/docs/tool-catalog.md b/docs/tool-catalog.md
-index 02501d0..e510217 100644
+index 92b6d8b..21198d2 100644
 --- a/docs/tool-catalog.md
 +++ b/docs/tool-catalog.md
-@@ -120,12 +120,19 @@ ask_user_question pauses the tool call until the active UI provider returns a hu
+@@ -122,12 +122,19 @@ ask_user_question pauses the tool call until the active UI provider returns a hu
  
  ### `run_code`
  
@@ -175,7 +175,7 @@ index 02501d0..e510217 100644
      "code": {
        "type": "string",
        "description": "The program: the body of an async TypeScript function."
-@@ -136,6 +143,7 @@ Execute a TypeScript program against the available tools. Takes two required arg
+@@ -138,6 +145,7 @@ Execute a TypeScript program against the available tools. Takes two required arg
      }
    },
    "required": [
@@ -184,10 +184,10 @@ index 02501d0..e510217 100644
      "description"
    ]
 diff --git a/docs/tool-catalog.zh.md b/docs/tool-catalog.zh.md
-index 3583662..f11da44 100644
+index 97a202b..6be0fce 100644
 --- a/docs/tool-catalog.zh.md
 +++ b/docs/tool-catalog.zh.md
-@@ -122,12 +122,19 @@ ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类
+@@ -124,12 +124,19 @@ ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类
  
  ### `run_code`
  
@@ -208,7 +208,7 @@ index 3583662..f11da44 100644
      "code": {
        "type": "string",
        "description": "The program: the body of an async TypeScript function."
-@@ -138,6 +145,7 @@ ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类
+@@ -140,6 +147,7 @@ ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类
      }
    },
    "required": [
@@ -305,7 +305,7 @@ index 545d3c8..a6b57ad 100644
            "description"
          ]
 diff --git a/examples/acp-agent/tests/snapshots/code-mode-read-image/system-prompt.expected.md b/examples/acp-agent/tests/snapshots/code-mode-read-image/system-prompt.expected.md
-index e96ddb1..985d1f6 100644
+index 786aa8f..6a98912 100644
 --- a/examples/acp-agent/tests/snapshots/code-mode-read-image/system-prompt.expected.md
 +++ b/examples/acp-agent/tests/snapshots/code-mode-read-image/system-prompt.expected.md
 @@ -27,7 +27,7 @@ Use subagent in the background by default. Start independent delegations togethe
@@ -932,7 +932,7 @@ index e097da8..dd012f6 100644
    },
  }
 diff --git a/packages/client/ui-conversation/src/client/index.ts b/packages/client/ui-conversation/src/client/index.ts
-index 0ce44d8..ad77da4 100644
+index 7cf42a4..295322c 100644
 --- a/packages/client/ui-conversation/src/client/index.ts
 +++ b/packages/client/ui-conversation/src/client/index.ts
 @@ -26,7 +26,7 @@ export type {
@@ -967,10 +967,10 @@ index 99f09de..5b4c87f 100644
    }
    for (const [turnNumber, endSeq] of legacy.turnEnds) {
 diff --git a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
-index 211e749..a98adae 100644
+index dbe8878..97ff214 100644
 --- a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
 +++ b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
-@@ -280,6 +280,7 @@ describe('built-in conversation node Definitions', () => {
+@@ -294,6 +294,7 @@ describe('built-in conversation node Definitions', () => {
          name: 'read',
          seq: 32,
          time: 1_700_000_000_032,
@@ -978,7 +978,7 @@ index 211e749..a98adae 100644
        }],
      })
      expect(toolOnlySnapshot.legacy.nodes).toMatchObject([{
-@@ -472,8 +473,8 @@ describe('built-in conversation node Definitions', () => {
+@@ -486,8 +487,8 @@ describe('built-in conversation node Definitions', () => {
      expect([assistant?.anchorSeq, activity?.anchorSeq]).toEqual([6, 6.1])
      expect(streaming.order).toEqual([assistant?.key, activity?.key])
      expect((activity?.data as ToolActivityChatData).calls).toEqual([
@@ -989,7 +989,7 @@ index 211e749..a98adae 100644
      ])
      expect((activity?.data as ToolActivityChatData).calls[0]).not.toHaveProperty('arguments')
  
-@@ -486,7 +487,10 @@ describe('built-in conversation node Definitions', () => {
+@@ -500,7 +501,10 @@ describe('built-in conversation node Definitions', () => {
      expect(firstFormal.order).toEqual([assistant?.key, firstTool?.key, activity?.key])
      expect((firstTool?.data as ToolChatData).startedTime).toBe(1_700_000_000_004)
      expect((node(firstFormal, 'tool-activity')?.data as ToolActivityChatData).calls)
@@ -1001,7 +1001,7 @@ index 211e749..a98adae 100644
  
      value.append(at(8, 'tool/call', {
        turn: 1, step: 1, callId: 'call-b', name: 'edit', arguments: '{"path":"b.ts"}',
-@@ -523,6 +527,76 @@ describe('built-in conversation node Definitions', () => {
+@@ -537,6 +541,76 @@ describe('built-in conversation node Definitions', () => {
      expect(node(snapshot(retried), 'tool-activity')?.visibility).toBe('hidden')
    })
  
@@ -1214,7 +1214,7 @@ index 029a0f4..e747fea 100644
 +  )
 +}
 diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
-index 29fcdef..fd7ca77 100644
+index dc65c97..e6344d5 100644
 --- a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
 +++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
 @@ -1,11 +1,14 @@
@@ -1233,22 +1233,23 @@ index 29fcdef..fd7ca77 100644
  import css from './ToolCallTree.module.css'
  
  /** Resolve a Tool call's wire name from either lifecycle form. */
-@@ -58,11 +61,13 @@ const ToolCall = memo(function ToolCall({
+@@ -60,12 +63,14 @@ const ToolCall = memo(function ToolCall({
  })
  
  const ToolCallBranch = memo(function ToolCallBranch({
--  renderSlot, block, startedTime, selectedCallId, cwd, openFile, inspectCall, t,
-+  renderSlot, block, startedTime, plannedSubCalls, selectedCallId, cwd, openFile, inspectCall, t,
+-  renderSlot, block, startedTime, selectedCallId, cwd, home, openFile, inspectCall, t,
++  renderSlot, block, startedTime, plannedSubCalls, selectedCallId, cwd, home, openFile, inspectCall, t,
  }: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 't'> & {
    block: ToolCallBlock
    startedTime: number
 +  plannedSubCalls: readonly PlannedToolCall[]
+   home?: string | undefined
  }) {
 +  const ownPlans = plannedSubCalls.filter(call => call.parentCallId === block.callId)
    return (
      <ToolCall
        renderSlot={renderSlot}
-@@ -76,7 +81,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
+@@ -80,7 +85,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
        inspectCall={inspectCall}
        t={t}
      >
@@ -1257,15 +1258,15 @@ index 29fcdef..fd7ca77 100644
          <div className={css.subCalls} data-subcalls>
            {block.subCalls.map(child => (
              <ToolCallBranch
-@@ -84,6 +89,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
+@@ -88,6 +93,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
                renderSlot={renderSlot}
                block={child}
                startedTime={'kind' in child ? child.callTime ?? child.time : child.time}
 +              plannedSubCalls={plannedSubCalls}
                selectedCallId={selectedCallId}
                cwd={cwd}
-               openFile={openFile}
-@@ -91,12 +97,36 @@ const ToolCallBranch = memo(function ToolCallBranch({
+               home={home}
+@@ -96,12 +102,36 @@ const ToolCallBranch = memo(function ToolCallBranch({
                t={t}
              />
            ))}
@@ -1302,14 +1303,14 @@ index 29fcdef..fd7ca77 100644
  /**
   * Render one root Tool call and its recursive children through the same
   * atomic keyed dispatch.
-@@ -112,6 +142,7 @@ export function ToolCallTree({
+@@ -118,6 +148,7 @@ export function ToolCallTree({
        renderSlot={renderSlot}
        block={block}
        startedTime={node.data.startedTime}
 +      plannedSubCalls={node.data.plannedSubCalls}
        selectedCallId={selectedCallId}
        cwd={cwd}
-       openFile={openFile}
+       home={home}
 diff --git a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
 index ec24063..1292572 100644
 --- a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
@@ -1346,10 +1347,10 @@ index ec24063..1292572 100644
          {state === 'running' ? 'ing' : 'Done'}
        </span>
 diff --git a/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts b/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts
-index a12e22b..910d884 100644
+index 8943c56..3b4e7ef 100644
 --- a/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts
 +++ b/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts
-@@ -68,7 +68,11 @@ const TOOL_TITLES: Record<string, string> = {
+@@ -69,7 +69,11 @@ const TOOL_TITLES: Record<string, string> = {
    pwsh: 'Pwsh',
  }
  
@@ -1402,10 +1403,10 @@ index 0e32fac..105ac98 100644
      const view = render(<ToolActivityChrome startedTime={8_000} state="running" />)
      expect(view.getByText('2s')).toBeTruthy()
 diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
-index 0652d8e..80a5645 100644
+index 63f23e1..70ea043 100644
 --- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
 +++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
-@@ -37,7 +37,7 @@ function props(
+@@ -39,7 +39,7 @@ function props(
        anchorSeq: block.seq,
        location: { kind: 'session' },
        visibility: 'visible',
@@ -1633,7 +1634,7 @@ index 8b4e145..1c2381e 100644
  
    it('is deterministic: same tool set, byte-identical text regardless of input order', () => {
 diff --git a/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts b/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
-index dbd3731..3727e03 100644
+index 90e7434..98ae8bd 100644
 --- a/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
 +++ b/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
 @@ -232,7 +232,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
@@ -1654,10 +1655,10 @@ index dbd3731..3727e03 100644
        'client-ui-workflow-run WorkflowRunPanel key \'workflow-run\'',
      ],
 diff --git a/packages/plan/plan-mode/tests/plan-mode.spec.ts b/packages/plan/plan-mode/tests/plan-mode.spec.ts
-index c4d41b1..a501439 100644
+index 8285147..7669358 100644
 --- a/packages/plan/plan-mode/tests/plan-mode.spec.ts
 +++ b/packages/plan/plan-mode/tests/plan-mode.spec.ts
-@@ -811,7 +811,11 @@ describe('exit_plan_mode', () => {
+@@ -877,7 +877,11 @@ describe('exit_plan_mode', () => {
      const result = await ctx.tools.execute({
        callId: CallId(`call-exit-${++callCounter}`),
        name: RUN_CODE_NAME,
@@ -1728,5 +1729,5 @@ index 8840e8b..e73900e 100644
      ], {
        toolMode: 'code',
 -- 
-2.50.1 (Apple Git-155)
+2.51.2.windows.1
 

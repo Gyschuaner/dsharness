@@ -1,4 +1,4 @@
-From fe130b1f9b5b93bf6e4f819e2137cb700c4a5e7f Mon Sep 17 00:00:00 2001
+From 76d5881d381ddb7d01676a8ccfcea35b00aa6eea Mon Sep 17 00:00:00 2001
 From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
 Date: Thu, 20 Aug 2026 15:14:36 +0800
 Subject: [PATCH] fix(ui): preserve fast tool running feedback (BUG-5F3BF25D)
@@ -87,19 +87,19 @@ index 051700d..737f8d0 100644
      if (MODE === 'record') {
        await recordFixture(scaffold, sessionId, FIXTURE)
 diff --git a/packages/client/ui-tool/README.i18n.yaml b/packages/client/ui-tool/README.i18n.yaml
-index 9c121f5..a222e5f 100644
+index 104d4d4..8677394 100644
 --- a/packages/client/ui-tool/README.i18n.yaml
 +++ b/packages/client/ui-tool/README.i18n.yaml
 @@ -2,5 +2,5 @@
  # side as of the last confirmed-consistent state. Both languages carry equal authority;
  # after editing either side, bring the other along and re-record with:
  #   pnpm run verify-translation-pairing --write packages/client/ui-tool/README.md
--README.md: 1cef7cc901e06f733e7cbed656b02280bc7c4dbc
--README.zh.md: cb3a1ee19798f5c0ba640aeb5910bcc3a1c049d9
-+README.md: f0fd068b05fc67846c1ca93aa3cb4645903be340
-+README.zh.md: 13732cd79788bc251747c238cae39bce34fc728c
+-README.md: a0d6404a285f63074242bba59b6beae49830f901
+-README.zh.md: 85bbbe23f94b315bc8172881dff07a6d1f2e3867
++README.md: 1d8e6ff1b0851de7f8fd33179caf0176fcd8f77a
++README.zh.md: dc690aa2acb2b0aeefa28318c067d27494b8cb72
 diff --git a/packages/client/ui-tool/README.md b/packages/client/ui-tool/README.md
-index 1cef7cc..f0fd068 100644
+index a0d6404..1d8e6ff 100644
 --- a/packages/client/ui-tool/README.md
 +++ b/packages/client/ui-tool/README.md
 @@ -10,7 +10,7 @@ Business UI packages register only their wire Tool names and atomic views. They
@@ -112,7 +112,7 @@ index 1cef7cc..f0fd068 100644
  Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and `data-chat-call-id` DOM contract used for paging and selection.
  
 diff --git a/packages/client/ui-tool/README.zh.md b/packages/client/ui-tool/README.zh.md
-index cb3a1ee..13732cd 100644
+index 85bbbe2..dc690aa 100644
 --- a/packages/client/ui-tool/README.zh.md
 +++ b/packages/client/ui-tool/README.zh.md
 @@ -10,7 +10,7 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` 
@@ -138,7 +138,7 @@ index d3e4b8b..029a0f4 100644
          )
        })}
 diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
-index fd4e83b..29fcdef 100644
+index 15600fd..dc65c97 100644
 --- a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
 +++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
 @@ -2,7 +2,9 @@
@@ -152,8 +152,8 @@ index fd4e83b..29fcdef 100644
  import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
  import css from './ToolCallTree.module.css'
  
-@@ -22,6 +24,8 @@ const ToolCall = memo(function ToolCall({
-   selected: boolean
+@@ -23,6 +25,8 @@ const ToolCall = memo(function ToolCall({
+   home?: string | undefined
    children?: ReactNode
  }) {
 +  const finishedTime = 'kind' in block ? block.time : undefined
@@ -161,7 +161,7 @@ index fd4e83b..29fcdef 100644
    const owner: ToolCallOwnerProps = useMemo(() => ({
      callId,
      toolName,
-@@ -37,14 +41,15 @@ const ToolCall = memo(function ToolCall({
+@@ -39,14 +43,15 @@ const ToolCall = memo(function ToolCall({
        data-chat-call-id={callId}
        data-selected={selected || undefined}
      >
@@ -309,5 +309,5 @@ index ff97e69..016ec77 100644
 +  })
  })
 -- 
-2.50.1 (Apple Git-155)
+2.51.2.windows.1
 

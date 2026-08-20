@@ -1,8 +1,29 @@
-From 2c6db791f8baf41662b88c9080786193e8873e5d Mon Sep 17 00:00:00 2001
+From 26d3ec9a92d76d17e3f0f9e5026cf3044732a8af Mon Sep 17 00:00:00 2001
 From: chuansgu <506946815@qq.com>
 Date: Mon, 17 Aug 2026 22:41:07 +0800
 Subject: [PATCH] fix(DSH-009): refresh idle on raw stream activity
 
+---
+ ...activity-refreshes-idle-deadline.i18n.yaml |  6 ++
+ ...stream-activity-refreshes-idle-deadline.md | 36 ++++++++
+ ...eam-activity-refreshes-idle-deadline.zh.md | 36 ++++++++
+ THIRD_PARTY_NOTICES.md                        |  1 +
+ packages/llm/llm-pi-ai/README.i18n.yaml       |  4 +-
+ packages/llm/llm-pi-ai/README.md              |  3 +
+ packages/llm/llm-pi-ai/README.zh.md           |  3 +
+ packages/llm/llm-pi-ai/src/adapter.ts         | 10 ++-
+ packages/llm/llm-pi-ai/src/stream.ts          | 22 ++++-
+ packages/llm/llm-pi-ai/tests/adapter.spec.ts  | 22 +++++
+ packages/llm/llm-pi-ai/tests/convert.spec.ts  | 11 +++
+ packages/llm/llm-pi-ai/tests/mock-server.ts   | 20 +++--
+ patches/@earendil-works__pi-ai@0.82.1.patch   | 90 +++++++++++++++++++
+ pnpm-lock.yaml                                | 13 +--
+ pnpm-workspace.yaml                           |  3 +
+ 15 files changed, 261 insertions(+), 19 deletions(-)
+ create mode 100644 .agents/notes/implemented/bug-fix/2026-08-17-raw-stream-activity-refreshes-idle-deadline.i18n.yaml
+ create mode 100644 .agents/notes/implemented/bug-fix/2026-08-17-raw-stream-activity-refreshes-idle-deadline.md
+ create mode 100644 .agents/notes/implemented/bug-fix/2026-08-17-raw-stream-activity-refreshes-idle-deadline.zh.md
+ create mode 100644 patches/@earendil-works__pi-ai@0.82.1.patch
 
 diff --git a/.agents/notes/implemented/bug-fix/2026-08-17-raw-stream-activity-refreshes-idle-deadline.i18n.yaml b/.agents/notes/implemented/bug-fix/2026-08-17-raw-stream-activity-refreshes-idle-deadline.i18n.yaml
 new file mode 100644
@@ -101,10 +122,10 @@ index 0000000..8227d8c
 +
 +适配器测试服务会在超过已配置空闲间隔的总时长内只发送 SSE heartbeat 注释，然后继续输出模型内容。请求可以完成，装配后的助手消息只包含模型文本。流转换测试还固定了两种结果：工具调用在请求上限处结束时得到 `max-tokens`，低于上限时仍得到 `tool-calls`。
 diff --git a/THIRD_PARTY_NOTICES.md b/THIRD_PARTY_NOTICES.md
-index d672d46..df130b8 100644
+index 295eb18..b2b8770 100644
 --- a/THIRD_PARTY_NOTICES.md
 +++ b/THIRD_PARTY_NOTICES.md
-@@ -93,6 +93,7 @@ External packages that a workspace package resolves at runtime. The tier covers
+@@ -95,6 +95,7 @@ External packages that a workspace package resolves at runtime. The tier covers
  
  pnpm applies local patches to the following packages at install time, so shipped artifacts carry modified copies; each patch file is the complete record of the modification:
  
@@ -113,31 +134,31 @@ index d672d46..df130b8 100644
  
  ## Official Claude Code platform payloads
 diff --git a/packages/llm/llm-pi-ai/README.i18n.yaml b/packages/llm/llm-pi-ai/README.i18n.yaml
-index 553b7d4..53a8ba2 100644
+index 6ea6905..b6a6082 100644
 --- a/packages/llm/llm-pi-ai/README.i18n.yaml
 +++ b/packages/llm/llm-pi-ai/README.i18n.yaml
 @@ -2,5 +2,5 @@
  # side as of the last confirmed-consistent state. Both languages carry equal authority;
  # after editing either side, bring the other along and re-record with:
  #   pnpm run verify-translation-pairing --write packages/llm/llm-pi-ai/README.md
--README.md: d775e72616822ce0deee063ac0f3fc453af1a126
--README.zh.md: 621d67d1c181c6d4c78ea0078f521acccce92653
-+README.md: b08ee034c4299096a7da26813784044abc11856b
-+README.zh.md: 274e4e58580eb14ae5eb609aa31af909691ccca1
+-README.md: 6d62aabf954a80120bacc9049a7498af269dd067
+-README.zh.md: e7e832fa356c48bf14d7aebac7351b259b924214
++README.md: 47efe360974e6d0d5d2164865af8a5d43fdb71bd
++README.zh.md: 6029fa171e63973df6aafd1fdb25243081011857
 diff --git a/packages/llm/llm-pi-ai/README.md b/packages/llm/llm-pi-ai/README.md
-index d775e72..b08ee03 100644
+index 6d62aab..47efe36 100644
 --- a/packages/llm/llm-pi-ai/README.md
 +++ b/packages/llm/llm-pi-ai/README.md
-@@ -115,6 +115,8 @@ A model **without** that metadata — a hand-declared one whose entry declares n
+@@ -122,6 +122,8 @@ A model **without** that metadata — a hand-declared one whose entry declares n
  
- Supported profile fields are `apiKeyEnv`, `displayName`, `api`, `baseURL`, `models`, `modelOverrides`, `compat`, `defaultContextWindow`, `defaultMaxTokens`, `defaultInput`, `headers`, `reasoning`, `thinkingBudgets`, `cacheRetention`, `transport`, `timeoutMs`, `websocketConnectTimeoutMs`, `streamIdleTimeoutMs`, and `retryPolicy`. Each profile's optional retry policy is captured with that provider route; omission uses bounded normal defaults. The stream-idle interval is a positive finite Node timer delay, defaults to five minutes, and covers only an outstanding provider read, not consumer think time. Harness app attribution wins a conflicting configured header name.
+ Supported profile fields are `apiKeyEnv`, `displayName`, `api`, `baseURL`, `models`, `modelOverrides`, `compat`, `defaultContextWindow`, `defaultMaxTokens`, `defaultInput`, `headers`, `reasoning`, `thinkingBudgets`, `cacheRetention`, `transport`, `timeoutMs`, `websocketConnectTimeoutMs`, `streamIdleTimeoutMs`, `maxRequestImageBytes`, and `retryPolicy`. Each resolved profile retry policy is captured with that provider route; omission uses the shared bounded normal default of five retries. The stream-idle interval is a positive finite Node timer delay, defaults to five minutes, and covers only an outstanding provider read, not consumer think time. `maxRequestImageBytes` bounds one request's base64-encoded image payload (default 20MiB, a positive integer): every image in history is re-encoded into every request, so when the accumulated payload exceeds the bound, the oldest images are replaced by a fixed text placeholder until the request fits, keeping an image-heavy session serviceable instead of permanently rejected by a gateway request-size cap. The default leaves capacity for system prompts, history, tools, and JSON; deployments behind stricter gateways lower it per route. Harness app attribution wins a conflicting configured header name.
  
 +For OpenAI-compatible Chat Completions, every received response-body chunk refreshes the stream-idle interval before pi-ai parses SSE. Upstream comment heartbeats therefore keep a live generation open without becoming assistant content, replay state, or session events; a truly silent upstream still expires normally. The transport callback is supplied by the pinned pi-ai dependency patch and can be removed when the dependency exposes equivalent raw activity directly.
 +
  The adapter forces pi-ai's SDK `maxRetries` to zero so one `stream()` call makes one provider request. The removed profile fields `maxRetries` and `maxRetryDelayMs` fail load instead of silently multiplying or hiding the separately composed agent-level retry budget. Idle expiry aborts the SDK's stable request signal and surfaces `TIMEOUT`; an earlier caller abort remains `ABORTED`.
  
  ## Endpoint interrogation
-@@ -144,6 +146,7 @@ Durable content is the authoritative record; replay state only restores native f
+@@ -151,6 +153,7 @@ Durable content is the authoritative record; replay state only restores native f
  ## Vocabulary differences
  
  - pi-ai tool-call arguments are parsed objects; the harness stores raw JSON strings. The adapter parses input and re-stringifies output.
@@ -146,19 +167,19 @@ index d775e72..b08ee03 100644
  - pi-ai folds reasoning tokens into output usage; there is no separate reasoning count to map.
  - pi-ai's `off` thinking level crosses the Harness capability seam unchanged and becomes an omitted pi-ai common `reasoning` option at dispatch.
 diff --git a/packages/llm/llm-pi-ai/README.zh.md b/packages/llm/llm-pi-ai/README.zh.md
-index 621d67d..274e4e5 100644
+index e7e832f..6029fa1 100644
 --- a/packages/llm/llm-pi-ai/README.zh.md
 +++ b/packages/llm/llm-pi-ai/README.zh.md
-@@ -116,6 +116,8 @@ profile 的 `models` 列表是*替换*该路由已安装 catalog，而不是扩
+@@ -123,6 +123,8 @@ pi-ai 依据提供方 id 与 baseURL 决定每个请求的形状：系统提示
  
- 受支持的 profile 字段是 `apiKeyEnv`、`displayName`、`api`、`baseURL`、`models`、`modelOverrides`、`compat`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`headers`、`reasoning`、`thinkingBudgets`、`cacheRetention`、`transport`、`timeoutMs`、`websocketConnectTimeoutMs`、`streamIdleTimeoutMs` 和 `retryPolicy`。每个 profile 的可选重试策略都会与该提供方路由一同捕获；省略时使用有界的常规默认值。流空闲间隔必须是正的有限 Node 定时器延迟，默认为五分钟，且只覆盖未完成提供方读取，不包括消费方思考时间。若已配置标头中有同名项，则以 Harness 应用归因为准。
+ 受支持的 profile 字段是 `apiKeyEnv`、`displayName`、`api`、`baseURL`、`models`、`modelOverrides`、`compat`、`defaultContextWindow`、`defaultMaxTokens`、`defaultInput`、`headers`、`reasoning`、`thinkingBudgets`、`cacheRetention`、`transport`、`timeoutMs`、`websocketConnectTimeoutMs`、`streamIdleTimeoutMs`、`maxRequestImageBytes` 和 `retryPolicy`。每条 profile 解析后的重试策略会随该提供方路由一同捕获；省略时使用共享的有界 normal 默认值并重试五次。流空闲间隔必须是正的有限 Node 定时器延迟，默认为五分钟，且只覆盖未完成提供方读取，不包括消费方思考时间。`maxRequestImageBytes` 约束单个请求的 base64 编码图片载荷（默认 20MiB，正整数）：历史中的每张图片都会重新编码进每个请求，累积载荷超过上限时，从最老的图片开始替换为固定文本占位，直到请求装得下，使图片较多的会话保持可用，而不是被网关请求体上限永久拒绝。默认值为系统提示词、历史、工具与 JSON 保留请求容量；网关更严格的部署按路由调低该值。若已配置标头中有同名项，则以 Harness 应用归因为准。
  
 +对于 OpenAI-compatible Chat Completions，pi-ai 解析 SSE 之前，每一个实际收到的响应体数据块都会刷新流空闲间隔。因此，上游的注释心跳可以维持仍在生成的请求，但不会成为助手内容、replay state 或会话事件；真正静默的上游仍会正常超时。该传输回调由锁定版本的 pi-ai 依赖补丁提供，依赖原生暴露等效的原始活动后即可移除。
 +
  适配器强制 pi-ai SDK `maxRetries` 为零，因此一次 `stream()` 调用只会发起一次提供方请求。已移除 profile 字段 `maxRetries` 和 `maxRetryDelayMs` 会使加载失败，而不是静默倍增或隐藏单独组合的 agent（智能体）级重试预算。空闲超时会 abort SDK 的稳定请求信号，并以 `TIMEOUT` 呈现；较早的调用方 abort 仍为 `ABORTED`。
  
  ## 端点询问
-@@ -145,6 +147,7 @@ profile 的 `models` 列表是*替换*该路由已安装 catalog，而不是扩
+@@ -152,6 +154,7 @@ pi-ai 依据提供方 id 与 baseURL 决定每个请求的形状：系统提示
  ## 词汇差异
  
  - pi-ai 工具调用参数是已解析对象；harness 存储原始 JSON 字符串。适配器会解析输入，并将输出重新字符串化。
@@ -167,7 +188,7 @@ index 621d67d..274e4e5 100644
  - pi-ai 将推理 token 折叠到输出 usage 中；没有可映射的独立推理计数。
  - pi-ai 的 `off` 思考级别会原样穿过 Harness 能力 seam，并在分派时变为被省略的 pi-ai 通用 `reasoning` 选项。
 diff --git a/packages/llm/llm-pi-ai/src/adapter.ts b/packages/llm/llm-pi-ai/src/adapter.ts
-index ab1c784..cce4942 100644
+index 5ecec59..b822107 100644
 --- a/packages/llm/llm-pi-ai/src/adapter.ts
 +++ b/packages/llm/llm-pi-ai/src/adapter.ts
 @@ -301,6 +301,7 @@ export class PiAiAdapter extends LlmAdapter {
@@ -201,10 +222,10 @@ index ab1c784..cce4942 100644
        try {
          while (true) {
 diff --git a/packages/llm/llm-pi-ai/src/stream.ts b/packages/llm/llm-pi-ai/src/stream.ts
-index 22aa7cb..e8c1bf0 100644
+index d45df45..277c2e5 100644
 --- a/packages/llm/llm-pi-ai/src/stream.ts
 +++ b/packages/llm/llm-pi-ai/src/stream.ts
-@@ -65,12 +65,17 @@ function classifyPiAiError(message: string): string {
+@@ -68,12 +68,17 @@ function classifyPiAiError(message: string): string {
   * Map a terminal pi-ai event to the harness finish reason.
   * @param message - the assistant message carried by the `done` or `error` event.
   * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
@@ -223,7 +244,7 @@ index 22aa7cb..e8c1bf0 100644
    const piAiOverflow = isContextOverflow(message, contextWindow)
    const harnessOverflow = message.stopReason === 'error'
      && message.errorMessage !== undefined
-@@ -100,7 +105,15 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
+@@ -103,7 +108,15 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
        }
        return { kind: 'stop' }
      case 'length': return { kind: 'max-tokens' }
@@ -240,7 +261,7 @@ index 22aa7cb..e8c1bf0 100644
      case 'aborted': return {
        kind: 'aborted',
        failure: { message: message.errorMessage ?? 'pi-ai stream aborted', code: 'ABORTED' },
-@@ -124,6 +137,7 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
+@@ -127,6 +140,7 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
  export async function* toStreamChunks(
    events: AsyncIterable<AssistantMessageEvent>,
    contextWindow?: number,
@@ -248,7 +269,7 @@ index 22aa7cb..e8c1bf0 100644
  ): AsyncGenerator<StreamChunk> {
    // pi-ai contentIndex ↔ our block index map 1:1 (both count blocks from 0
    // in stream order), but we track ids per index for tool calls.
-@@ -189,7 +203,7 @@ export async function* toStreamChunks(
+@@ -192,7 +206,7 @@ export async function* toStreamChunks(
          yield { type: 'usage', usage: mapUsage(event.message.usage) }
          yield {
            type: 'finish',
@@ -257,7 +278,7 @@ index 22aa7cb..e8c1bf0 100644
            replayState: toPiReplayState(event.message),
          }
          return
-@@ -197,7 +211,7 @@ export async function* toStreamChunks(
+@@ -200,7 +214,7 @@ export async function* toStreamChunks(
          // In-stream error delivery (pi-ai's style) → error finish chunk
          // (the harness's other sanctioned error path besides throwing).
          yield { type: 'usage', usage: mapUsage(event.error.usage) }
@@ -267,10 +288,10 @@ index 22aa7cb..e8c1bf0 100644
        // no default: AssistantMessageEvent is pi-ai's closed union; a new
        // event type should fail compilation here via tsc's exhaustiveness
 diff --git a/packages/llm/llm-pi-ai/tests/adapter.spec.ts b/packages/llm/llm-pi-ai/tests/adapter.spec.ts
-index 51ce347..8df46fb 100644
+index 2446b10..ec6618b 100644
 --- a/packages/llm/llm-pi-ai/tests/adapter.spec.ts
 +++ b/packages/llm/llm-pi-ai/tests/adapter.spec.ts
-@@ -350,6 +350,28 @@ describe('PiAiAdapter provider routing', () => {
+@@ -351,6 +351,28 @@ describe('PiAiAdapter provider routing', () => {
      expect(server.paths).toEqual(['/chat/completions'])
      expect(server.closedResponses).toBe(1)
    })
@@ -300,10 +321,10 @@ index 51ce347..8df46fb 100644
  
  describe('provider profile lifecycle', () => {
 diff --git a/packages/llm/llm-pi-ai/tests/convert.spec.ts b/packages/llm/llm-pi-ai/tests/convert.spec.ts
-index 1a42e4b..7179378 100644
+index 2a3b41b..d91aa38 100644
 --- a/packages/llm/llm-pi-ai/tests/convert.spec.ts
 +++ b/packages/llm/llm-pi-ai/tests/convert.spec.ts
-@@ -831,6 +831,17 @@ describe('mapStopReason / mapUsage', () => {
+@@ -841,6 +841,17 @@ describe('mapStopReason / mapUsage', () => {
      })
    })
  
@@ -460,7 +481,7 @@ index 0000000..0794174
 +      * Optional custom HTTP headers to include in API requests.
 +      * Merged with provider defaults; caller values override default headers.
 diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
-index bcc517d..85e76bf 100644
+index 02e1555..47c6f5f 100644
 --- a/pnpm-lock.yaml
 +++ b/pnpm-lock.yaml
 @@ -9,6 +9,7 @@ overrides:
@@ -471,7 +492,7 @@ index bcc517d..85e76bf 100644
    node-pty@1.2.0-beta.15: b40ae545608897914bd25fb009c97eeac478c34e8a910298ddcb01b746534bb0
  
  importers:
-@@ -5253,7 +5254,7 @@ importers:
+@@ -5509,7 +5510,7 @@ importers:
          version: link:../../../vendor/schemastery
        '@earendil-works/pi-ai':
          specifier: ^0.82.1
@@ -480,7 +501,7 @@ index bcc517d..85e76bf 100644
      devDependencies:
        '@deepseek-ai/cordis':
          specifier: workspace:^
-@@ -12962,8 +12963,8 @@ packages:
+@@ -13355,8 +13356,8 @@ packages:
    mdn-data@2.27.1:
      resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
  
@@ -491,7 +512,7 @@ index bcc517d..85e76bf 100644
      engines: {node: '>= 0.8'}
  
    merge-descriptors@2.0.0:
-@@ -14894,7 +14895,7 @@ snapshots:
+@@ -15303,7 +15304,7 @@ snapshots:
      transitivePeerDependencies:
        - '@algolia/client-search'
  
@@ -500,7 +521,7 @@ index bcc517d..85e76bf 100644
      dependencies:
        '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
        '@aws-sdk/client-bedrock-runtime': 3.1048.0
-@@ -18275,7 +18276,7 @@ snapshots:
+@@ -18709,7 +18710,7 @@ snapshots:
  
    mdn-data@2.27.1: {}
  
@@ -509,7 +530,7 @@ index bcc517d..85e76bf 100644
  
    merge-descriptors@2.0.0: {}
  
-@@ -19380,7 +19381,7 @@ snapshots:
+@@ -19827,7 +19828,7 @@ snapshots:
    type-is@2.1.0:
      dependencies:
        content-type: 2.0.0

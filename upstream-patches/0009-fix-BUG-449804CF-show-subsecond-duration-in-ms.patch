@@ -1,4 +1,4 @@
-From 6462544e0ec37ffc81217ffb9564219b679afdd5 Mon Sep 17 00:00:00 2001
+From cf5445094041315efe62b7ebf4dc939e47f57cd2 Mon Sep 17 00:00:00 2001
 From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
 Date: Thu, 20 Aug 2026 16:35:23 +0800
 Subject: [PATCH] fix(ui): show subsecond tool duration in milliseconds
@@ -53,17 +53,18 @@ index 016ec77..0e32fac 100644
    })
  })
 diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
-index d152427..0652d8e 100644
+index 8e3f9db..63f23e1 100644
 --- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
 +++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
-@@ -84,6 +84,6 @@ describe('ToolCallTree', () => {
+@@ -87,7 +87,7 @@ describe('ToolCallTree', () => {
      expect(view.container.querySelector('[data-chat-call-id="parent:code:1"]')?.hasAttribute('data-selected')).toBe(false)
      expect(view.container.querySelector('[data-chat-call-id="parent:code:1:code:1"]')?.getAttribute('data-selected')).toBe('true')
      expect(nests).toHaveLength(2)
 -    expect(view.getByText('<1s')).toBeTruthy()
 +    expect(view.getByText('250ms')).toBeTruthy()
    })
- })
+ 
+   it('abbreviates a POSIX home path in the generic tool summary', () => {
 -- 
-2.50.1 (Apple Git-155)
+2.51.2.windows.1
 

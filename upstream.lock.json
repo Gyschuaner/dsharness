@@ -2,56 +2,60 @@
   "schemaVersion": 1,
   "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
   "baseBranch": "master",
-  "baseCommit": "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca",
-  "baseTree": "3bc8f89fe494a4755c188be354add4e8b1e7b188",
-  "resultTree": "7ce3a3665ab6845ad2852389736fcbbb19d29493",
-  "dshVersion": "0.1.0-rc.7",
+  "baseCommit": "141eb6fef83422698aef7a981029e843e8161534",
+  "baseTree": "24a3336d5c32b32ca7e01a84a08c757bd788c624",
+  "resultTree": "9fd6590c3056bc9b07ce575bf23f82b20419a9a5",
+  "dshVersion": "0.1.0-rc.8",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
   "patches": [
     {
       "path": "upstream-patches/0001-fix-DSH-009-refresh-idle-on-raw-stream-activity.patch",
-      "sha256": "68069E1C009FCB78A5DF984D84C4BAAC64BB274957C27CB57097D1DD2CAC45F0"
+      "sha256": "35D4BCA8F1E991B6A5FCC335F1BD6B17C41CAD6ECA2CF01D10B93B1B28A6231B"
     },
     {
       "path": "upstream-patches/0002-feat-DSH-012-ship-Qwen-native-agent-preset.patch",
-      "sha256": "98CCEBF5F00327E7314A26D91A41DC1AD5822FAC35AEF4A50EF5379AB1D7EA0E"
+      "sha256": "0E9FB582F984E86DF1EB31D404A917287CEA79405ECB32898B9EFAA452E17ED1"
     },
     {
       "path": "upstream-patches/0003-fix-BUG-B0EE8D2D-recover-malformed-reasoning-tool-ca.patch",
-      "sha256": "E9A987F0B61ED8066FCCC2C50832A01E1C4335D9A533F5998A791750B0D2DF09"
+      "sha256": "3B657DD5EF94C4E365C5CEFD46C9ED5AC9AC07B626CB552050F38BA9D8984145"
+    },
+    {
+      "path": "upstream-patches/0003b-fix-BUG-B0EE8D2D-retain-malformed-retry-history.patch",
+      "sha256": "24C350C15BF59720B3C6E0C23DFD4DA614F8DC79E5BE311868E6EDB26AFCE5E5"
     },
     {
       "path": "upstream-patches/0004-docs-BUG-B0EE8D2D-document-retry-stream-token-cap.patch",
-      "sha256": "6E17CCCA4DF3BD627ED97F6F432A5A01EA716E47932A56F1A42E269BEF0B731C"
+      "sha256": "D8FCBB1D734D00AE98941E84DAC17A025DA53D5337ADABA05A117AAB50E00D78"
     },
     {
       "path": "upstream-patches/0005-feat-DSH-011-raise-compact-summary-budget-to-32K.patch",
-      "sha256": "BC78EB2A1FFF0B20DE10272BF9410DE061FB319ED088CFAAC6D30103295E2EEB"
+      "sha256": "B8A933B474F14E44A0F128F215928EB495FE55FCF3AEA74B284321771E913CBF"
     },
     {
       "path": "upstream-patches/0006-feat-DSH-014-show-streamed-tool-activity.patch",
-      "sha256": "18E49A42C4B7EC895A5CD6893741552BA08CEF9B7DCEC7FCA36C7BA177D00E68"
+      "sha256": "2C0B92E3F645D728E41ACA805C8C86666505EE2817493DF3366B0DF321727049"
     },
     {
       "path": "upstream-patches/0007-fix-BUG-449804CF-tool-duration-layout.patch",
-      "sha256": "8A5293FD6C693EAD04E3CB6E7DE9FCCBADB9525FD835511127D474B21AB56E87"
+      "sha256": "29AAFC127189F17A4F896410ADB4277735653CE5677A3219870140E353784D34"
     },
     {
       "path": "upstream-patches/0008-fix-BUG-5F3BF25D-preserve-fast-tool-running-feedback.patch",
-      "sha256": "4B6411860BB1D354600115F51A7D71DEBD0925AB7561941C80C33EE7161614B3"
+      "sha256": "B059B7AC51D4B020FD17B264E82E34F81D267EA49103EEDD3D1E5AF49E20AFAF"
     },
     {
       "path": "upstream-patches/0009-fix-BUG-449804CF-show-subsecond-duration-in-ms.patch",
-      "sha256": "C3537932F1C5AF38E55B7FBED44BE52C5967DFD1953F27F1F82033F45700C035"
+      "sha256": "5120FCC73A3460B5409A8D848C760F4D78237873811A407BDF0F66A3C5273BA2"
     },
     {
       "path": "upstream-patches/0010-feat-ui-preview-planned-Code-subtools-DSH-015.patch",
-      "sha256": "8EEEA188FAC2D61365CF7ECA6384782496EB73EEB1F1125C10D487CD1BEE83CC"
+      "sha256": "DC8AF9F683CA7CFBE829376895EBCF54A977CEB43928EF5C16ADC18DD90575FC"
     },
     {
       "path": "upstream-patches/0011-feat-DSH-016-align-Think-timing-and-tool-status.patch",
-      "sha256": "CAFF9075B5BA4B949B0FFDCCF22DFDDDA637A97A1C1DDE1D135206FB9D9B702A"
+      "sha256": "D2F05C362824AA7AABA5EA0090A94FF2C62E5F8935162EFCC9EE7DCD1A9A5E7E"
     }
   ]
 }

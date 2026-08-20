@@ -6,7 +6,7 @@
 
 宿主环境：
 
-- **Windows（主开发机，chuansgu，2026-08-17）**：`@deepseek-ai/dsh` 0.1.0-rc.7
+- **Windows（主开发机，chuansgu，2026-08-20）**：`@deepseek-ai/dsh` 0.1.0-rc.8
   （`D:\Pythonproject\deepseek-harness` 源码构建，`dsh` 全局命令链接到
   `apps/cli`），Node v24.11.1，源码构建使用 pnpm 11.7.0。当前源码与补丁由
   `upstream.lock.json` 锁定；`~/.dsh/profiles/web` 继续作为独立运行配置维护。

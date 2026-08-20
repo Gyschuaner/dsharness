@@ -10,7 +10,7 @@
 
 `upstream.lock.json` 是构建事实来源，当前锁定内容包括：
 
-- DeepSeek Harness 官方基线 `99f6f02`，版本 `0.1.0-rc.7`；
+- DeepSeek Harness 官方基线 `141eb6f`，版本 `0.1.0-rc.8`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
 - `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
   Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用持久历史恢复与
@@ -18,7 +18,7 @@
   进度反馈补丁、BUG-449804CF 工具耗时与行内状态布局修复、BUG-5F3BF25D 快速工具
   运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
   DSH-016 Think 独立计时和工具活动状态布局及各自的 SHA-256；
-- 应用补丁后的 Git tree `7ce3a3665ab6845ad2852389736fcbbb19d29493`。
+- 应用补丁后的 Git tree `9fd6590c3056bc9b07ce575bf23f82b20419a9a5`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -155,3 +155,16 @@ Web 关键回放 16 个文件共 75 条用例、TypeScript、lint、文档同步
 意图即时出现、完成工具的 `Done` 悬停不造成位移。滚动契约浏览器套件因测试会话搜索
 索引在入口阶段持续为空而未进入本次断言，保留为 SIT 前环境复验项。最终 tree 锁定为
 `7ce3a3665ab6845ad2852389736fcbbb19d29493`。
+
+2026-08-20 为 DSH-017 将官方基线升级到 `dsh-v0.1.0-rc.8` 提交 `141eb6f`。
+RC8 将 normal provider retry 默认预算从两次提高到五次，并新增图片渲染与 Home
+路径缩写等接口；补丁迁移保留这些上游变化，同时继续把 malformed tool call 限制为
+一次纠错恢复。原 BUG-B0EE8D2D 双提交补丁拆成两个独立补丁文件，整条补丁链共
+12 个可校验文件，最终 tree 为 `9fd6590c3056bc9b07ce575bf23f82b20419a9a5`。
+
+全新目录从官方 RC8 基线回放补丁后精确命中该 tree，935 个锁定依赖完成 frozen
+install，Host/Client/Web 完整构建通过。Agent loop、重试、pi-ai、Compact、Think
+计时和工具活动 15 个测试文件共 409 条用例通过；lint、990 组中英配对、584 份
+Agent Note 格式及工具目录门禁通过。三组 Playwright Web 回放未完成：RC8 对应的
+Chromium 尚未下载，Skill fixture 另受 Windows 路径反斜杠未转义影响；本机 3080
+切换后使用应用内真实浏览器补充运行时冒烟。

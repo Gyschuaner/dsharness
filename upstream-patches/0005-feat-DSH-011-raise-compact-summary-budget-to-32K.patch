@@ -1,7 +1,7 @@
-From f1e18261377a4ed57b9161e28a1f053b95003b88 Mon Sep 17 00:00:00 2001
+From e7ac49dc17a58538d08b34d7270cae95d2131d90 Mon Sep 17 00:00:00 2001
 From: chuansgu <506946815@qq.com>
 Date: Wed, 19 Aug 2026 01:52:50 +0800
-Subject: [PATCH 5/5] feat(DSH-011): raise compact summary budget to 32K
+Subject: [PATCH] feat(DSH-011): raise compact summary budget to 32K
 
 ---
  packages/compaction/compaction-basic/README.i18n.yaml         | 4 ++--

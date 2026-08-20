@@ -1,4 +1,4 @@
-From 586a4b2d42c92236858e320ea9daada4a6d28904 Mon Sep 17 00:00:00 2001
+From a5322b9d81a537647c8755109acd141973666554 Mon Sep 17 00:00:00 2001
 From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
 Date: Thu, 20 Aug 2026 14:32:21 +0800
 Subject: [PATCH] feat(ui): show streamed tool activity immediately (DSH-014)
@@ -219,40 +219,40 @@ index 2e1892f..d92743c 100644
          const flow = row.closest<HTMLElement>('[data-chat-anchor-key]')
          const host = row.closest<HTMLElement>('[data-conversation-scroll]')
 diff --git a/packages/client/ui-conversation/README.i18n.yaml b/packages/client/ui-conversation/README.i18n.yaml
-index b16b544..042e0e4 100644
+index 5a4bffe..86cf178 100644
 --- a/packages/client/ui-conversation/README.i18n.yaml
 +++ b/packages/client/ui-conversation/README.i18n.yaml
 @@ -2,5 +2,5 @@
  # side as of the last confirmed-consistent state. Both languages carry equal authority;
  # after editing either side, bring the other along and re-record with:
  #   pnpm run verify-translation-pairing --write packages/client/ui-conversation/README.md
--README.md: f7a51437f7c4aee2ae3aa520f01a42ff130ff3c9
--README.zh.md: 394c4f3779ef64e6c63c8079d3652f368c163764
-+README.md: 8fcbd474076b210accd6664be42cfd38a93a96aa
-+README.zh.md: 6a4abe09eceb3ba1aa6d15e318d9f8b5b0852dc3
+-README.md: 588a8f1d3576aa1d651de09d2a82c6be170a0875
+-README.zh.md: c885c4704ce891c2d5385a8b68da9a5627fb0720
++README.md: c5d8436a9e569ec46ac3974252960d5c335d2138
++README.zh.md: 48e1967afce64155ee1d00411c1236720683d995
 diff --git a/packages/client/ui-conversation/README.md b/packages/client/ui-conversation/README.md
-index f7a5143..8fcbd47 100644
+index 588a8f1..c5d8436 100644
 --- a/packages/client/ui-conversation/README.md
 +++ b/packages/client/ui-conversation/README.md
 @@ -22,7 +22,7 @@ Logged non-user messages render as a default-collapsed disclosure whose header n
  
  A Think row stays collapsed by default and exposes live reasoning throughput without expanding the chain of thought: while its reasoning block is the streaming tail, the summary switches from the settled first line to the latest non-blank line and its one-line scrollport follows each delta to the inline end. Expanding the row removes the moving summary and leaves the full reasoning in ordinary page flow, so page reading never fights an internal follower; settlement restores the stable first-line summary at the left edge ([decision](../../../.agents/notes/implemented/feature/2026-08-02-web-thinking-tail-scroll.md)).
  
--The chat view keeps Tool placement but delegates Tool presentation. Each ordered `tool-call` Conversation Node dispatches through the matching key of `conversation.chat.node`, while the details shell passes the selected call through `conversation.details.tool`. The assembled Web bundle registers [`ui-tool`](../ui-tool/README.md) for that Chat Node key; it renders the Runtime-projected recursive root/child tree and owns per-name dispatch, generic rendering, and render-intent cards. The details seat alone retains a raw-result fallback when that renderer is absent.
-+The chat view owns Tool placement and the streamed-to-formal handoff while delegating presentation. A step-local `tool-activity` Conversation Node becomes visible on the first `tool-call-delta`, carries only the Tool identity and first-delta timing boundary, and never publishes incomplete arguments. The formal `tool-call` Node inherits that start time and replaces its pending row in the same assembly flush; pending rows retain first-delta order, while finalized Assistant and formal Tool event sequences remain authoritative for transcript placement, and retry or step closure retires unexecuted activity ([decision](../../../.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md)). Both Node kinds dispatch through their matching keys of `conversation.chat.node`, while the details shell passes the selected formal call through `conversation.details.tool`. The assembled Web bundle registers [`ui-tool`](../ui-tool/README.md) for those Chat Node keys; it renders pending rows and the Runtime-projected recursive root/child tree, and owns per-name dispatch, generic rendering, render-intent cards, and activity chrome. The details seat alone retains a raw-result fallback when that renderer is absent.
+-The chat view keeps Tool placement but delegates Tool presentation. Each ordered `tool-call` Conversation Node dispatches through the matching key of `conversation.chat.node`, while the details shell passes the selected call through `conversation.details.tool`. The assembled Web bundle registers [`ui-tool`](../ui-tool/README.md) for that Chat Node key; it renders the Runtime-projected recursive root/child tree and owns per-name dispatch, generic rendering, and render-intent cards. The details seat alone retains a raw-result fallback when that renderer is absent. A path click through the injected `openFile` asks the Host to open that path (relative paths resolve against the session cwd). A Host or OS refusal opens an in-page dialog with the thrown reason and a Retry of the same path; Cancel, Escape, the close control, and a mask click dismiss it ([decision](../../../.agents/notes/implemented/bug-fix/2026-08-18-tool-row-file-open-failure.md)).
++The chat view owns Tool placement and the streamed-to-formal handoff while delegating presentation. A step-local `tool-activity` Conversation Node becomes visible on the first `tool-call-delta`, carries only the Tool identity and first-delta timing boundary, and never publishes incomplete arguments. The formal `tool-call` Node inherits that start time and replaces its pending row in the same assembly flush; pending rows retain first-delta order, while finalized Assistant and formal Tool event sequences remain authoritative for transcript placement, and retry or step closure retires unexecuted activity ([decision](../../../.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md)). Both Node kinds dispatch through their matching keys of `conversation.chat.node`, while the details shell passes the selected formal call through `conversation.details.tool`. The assembled Web bundle registers [`ui-tool`](../ui-tool/README.md) for those Chat Node keys; it renders pending rows and the Runtime-projected recursive root/child tree, and owns per-name dispatch, generic rendering, render-intent cards, and activity chrome. The details seat alone retains a raw-result fallback when that renderer is absent. A path click through the injected `openFile` asks the Host to open that path (relative paths resolve against the session cwd). A Host or OS refusal opens an in-page dialog with the thrown reason and a Retry of the same path; Cancel, Escape, the close control, and a mask click dismiss it ([decision](../../../.agents/notes/implemented/bug-fix/2026-08-18-tool-row-file-open-failure.md)).
  
  The chat flow projects consecutive model-retry nodes across retry turns into one stable, muted status row updated to the latest attempt; every retry event remains in the runtime snapshot and session log. Its frontend countdown anchors the scheduled delay to client receipt, avoiding host/browser clock skew, rounds remaining time up to seconds, and has a one-second floor. The latest unresolved retry uses a left-to-right text shimmer. Subsequent turn facts distinguish an attempt that started from one cancelled during backoff, while the Host running bit only controls the live animation; the row then shows a static completed or cancelled label. Normal policy rows show the finite retry maximum; always policy rows show `∞`. Activating the row reveals the latest exact retry delay and failure message. The client runtime removes a failed transport attempt's uncommitted streaming tail before its retry node arrives. When a semantic retry follows a completed but invalid assistant message, that settled Think remains visible in its original step and the corrective output owns the next step. The status remains visible after a later attempt succeeds. An unretried terminal failure renders as a persistent inline status at its turn boundary, showing the display-safe durable message and optional error code without offering an action the Host cannot fulfill; AUTH copy never echoes provider-supplied credential fragments.
  
 diff --git a/packages/client/ui-conversation/README.zh.md b/packages/client/ui-conversation/README.zh.md
-index 394c4f3..6a4abe0 100644
+index c885c47..48e1967 100644
 --- a/packages/client/ui-conversation/README.zh.md
 +++ b/packages/client/ui-conversation/README.zh.md
 @@ -20,7 +20,7 @@ Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。
  
  Think 行默认保持折叠，并在不展开思维链的情况下暴露实时推理（reasoning）吞吐：当推理块是流式输出尾部时，摘要从结算后的首行切换到最新的非空行，其单行滚动区会随每个 delta 追到行内末端。展开该行会移除移动摘要，让完整推理进入普通页面流，因此页面阅读不会与内部跟随器争夺滚动；结算后恢复左对齐的稳定首行摘要（[决策](../../../.agents/notes/implemented/feature/2026-08-02-web-thinking-tail-scroll.md)）。
  
--聊天视图保留工具的消息流位置，但委托其展示。每个已排序的 `tool-call` Conversation Node 都通过 `conversation.chat.node` 的同名 key 分发；详情壳层则通过 `conversation.details.tool` 传递当前选中的调用。组装后的 Web bundle 为该 Chat Node key 注册 [`ui-tool`](../ui-tool/README.md)，由后者渲染运行时已投影的递归 root/child 树，并负责按名称分发、通用展示和 render-intent 卡片；只有详情席位会在该 renderer 缺席时保留 raw-result fallback。
-+聊天视图拥有工具在消息流中的位置及从流式状态到正式调用的交接，但委托具体展示。步骤本地的 `tool-activity` Conversation Node 会在首个 `tool-call-delta` 到达时可见，只携带工具身份与首个 delta 计时边界，绝不发布未完成参数。正式 `tool-call` Node 会继承该开始时间，并在同一次组装 flush 中替换待处理行；待处理行保持首个 delta 的顺序，最终 Assistant 与正式 Tool 事件序号继续对 transcript 位置拥有最终决定权，重试或步骤关闭则清退未执行活动（[决策](../../../.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md)）。两种 Node 都通过 `conversation.chat.node` 中各自匹配的 key 分发；详情壳层则通过 `conversation.details.tool` 传递当前选中的正式调用。组装后的 Web bundle 为这些 Chat Node key 注册 [`ui-tool`](../ui-tool/README.md)，由后者渲染待处理行与运行时已投影的递归 root/child 树，并负责按名称分发、通用展示、render-intent 卡片和活动 chrome；只有详情席位会在该 renderer 缺席时保留 raw-result fallback。
+-聊天视图保留工具的消息流位置，但委托其展示。每个已排序的 `tool-call` Conversation Node 都通过 `conversation.chat.node` 的同名 key 分发；详情壳层则通过 `conversation.details.tool` 传递当前选中的调用。组装后的 Web bundle 为该 Chat Node key 注册 [`ui-tool`](../ui-tool/README.md)，由后者渲染运行时已投影的递归 root/child 树，并负责按名称分发、通用展示和 render-intent 卡片；只有详情席位会在该 renderer 缺席时保留 raw-result fallback。经注入的 `openFile` 点击路径会请 Host 打开该路径（相对路径按会话 cwd 解析）。Host 或操作系统拒绝时，页面内对话框展示抛出的原因，并提供对同一路径的重试；取消、Escape、关闭控件和点击遮罩会关掉对话框（[决策](../../../.agents/notes/implemented/bug-fix/2026-08-18-tool-row-file-open-failure.md)）。
++聊天视图拥有工具在消息流中的位置及从流式状态到正式调用的交接，但委托具体展示。步骤本地的 `tool-activity` Conversation Node 会在首个 `tool-call-delta` 到达时可见，只携带工具身份与首个 delta 计时边界，绝不发布未完成参数。正式 `tool-call` Node 会继承该开始时间，并在同一次组装 flush 中替换待处理行；待处理行保持首个 delta 的顺序，最终 Assistant 与正式 Tool 事件序号继续对 transcript 位置拥有最终决定权，重试或步骤关闭则清退未执行活动（[决策](../../../.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md)）。两种 Node 都通过 `conversation.chat.node` 中各自匹配的 key 分发；详情壳层则通过 `conversation.details.tool` 传递当前选中的正式调用。组装后的 Web bundle 为这些 Chat Node key 注册 [`ui-tool`](../ui-tool/README.md)，由后者渲染待处理行与运行时已投影的递归 root/child 树，并负责按名称分发、通用展示、render-intent 卡片和活动 chrome；只有详情席位会在该 renderer 缺席时保留 raw-result fallback。经注入的 `openFile` 点击路径会请 Host 打开该路径（相对路径按会话 cwd 解析）。Host 或操作系统拒绝时，页面内对话框展示抛出的原因，并提供对同一路径的重试；取消、Escape、关闭控件和点击遮罩会关掉对话框（[决策](../../../.agents/notes/implemented/bug-fix/2026-08-18-tool-row-file-open-failure.md)）。
  
  聊天流会将跨重试轮次连续出现的模型重试节点投影为一个稳定的弱化状态行，并用最新一次尝试更新该行；每个重试事件仍保留在运行时快照与会话日志中。前端倒计时以客户端收到事件的时刻为计划延迟的起点，避免 Host 与浏览器的时钟偏差；剩余时间向上取整到秒，且下限为 1 秒。最近一次尚未完成的重试会显示从左到右的文字渐变动画。后续轮次事实用于区分已开始的尝试与在退避期间取消的尝试，Host 的 running 位只控制实时动画；随后该行会显示静态的已完成或已取消标签。normal 策略行显示有限重试上限；always 策略行显示 `∞`。激活该行会显示最近一次重试的精确延迟和失败消息。客户端运行时会在相应重试节点到达前移除失败传输尝试尚未提交的流式输出尾部；语义重试若发生在一条已完成但无效的 assistant 消息之后，该条已结算 Think 会继续显示在原步骤中，纠错输出则归属下一步骤。后续某次尝试成功后，重试状态仍保持可见。未进入重试的终态失败会在其轮次边界渲染为持久的内联状态，展示适合显示的持久消息与可选错误码，但不会提供 Host 无法兑现的操作；AUTH 文案绝不会回显提供方给出的凭据片段。
  
@@ -542,7 +542,7 @@ index 0d6fb57..e097da8 100644
  }
  
 diff --git a/packages/client/ui-conversation/src/client/index.ts b/packages/client/ui-conversation/src/client/index.ts
-index 0574aa8..0ce44d8 100644
+index 8147344..7cf42a4 100644
 --- a/packages/client/ui-conversation/src/client/index.ts
 +++ b/packages/client/ui-conversation/src/client/index.ts
 @@ -9,6 +9,7 @@ export type {} from './conversation-nodes/compaction.ts'
@@ -590,7 +590,7 @@ index fb343f0..99f09de 100644
    }
    for (const [turnNumber, endSeq] of legacy.turnEnds) {
 diff --git a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
-index 44aa510..211e749 100644
+index 8115b7b..dbe8878 100644
 --- a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
 +++ b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
 @@ -12,12 +12,14 @@ import { unknownFallbackDefinition } from '../src/client/conversation-nodes/fall
@@ -617,7 +617,7 @@ index 44aa510..211e749 100644
    toolDefinition,
    commandDefinition,
    compactionDefinition,
-@@ -268,8 +271,17 @@ describe('built-in conversation node Definitions', () => {
+@@ -282,8 +285,17 @@ describe('built-in conversation node Definitions', () => {
        }, { surfaceOp: 'append' }),
      ])
      const toolOnlySnapshot = snapshot(toolOnlyValue)
@@ -636,7 +636,7 @@ index 44aa510..211e749 100644
      expect(toolOnlySnapshot.legacy.nodes).toMatchObject([{
        kind: 'assistant',
        seq: 33,
-@@ -289,6 +301,7 @@ describe('built-in conversation node Definitions', () => {
+@@ -303,6 +315,7 @@ describe('built-in conversation node Definitions', () => {
      const interruptedToolOnly = node(snapshot(interruptedToolOnlyValue), 'assistant-step')
      expect(interruptedToolOnly?.visibility).toBe('visible')
      expect(interruptedToolOnly?.data).toMatchObject({ status: 'interrupted' })
@@ -644,7 +644,7 @@ index 44aa510..211e749 100644
  
      const retryTimingValue = assembler([
        at(50, 'turn/start', { turn: 6 }),
-@@ -416,6 +429,100 @@ describe('built-in conversation node Definitions', () => {
+@@ -430,6 +443,100 @@ describe('built-in conversation node Definitions', () => {
      expect((withSecondChild?.data as ToolChatData).root.subCalls[0]).toBe(firstChild)
    })
  
@@ -746,19 +746,19 @@ index 44aa510..211e749 100644
      const value = assembler([
        at(20, 'turn/start', { turn: 2 }),
 diff --git a/packages/client/ui-tool/README.i18n.yaml b/packages/client/ui-tool/README.i18n.yaml
-index b41ee17..eae098d 100644
+index 678a276..e6f3fad 100644
 --- a/packages/client/ui-tool/README.i18n.yaml
 +++ b/packages/client/ui-tool/README.i18n.yaml
 @@ -2,5 +2,5 @@
  # side as of the last confirmed-consistent state. Both languages carry equal authority;
  # after editing either side, bring the other along and re-record with:
  #   pnpm run verify-translation-pairing --write packages/client/ui-tool/README.md
--README.md: 6e2bef2f5ad4b136510c3acbb8f8b8e83c4c9212
--README.zh.md: 169417747541db9e02cb552b175ca7c100420aeb
-+README.md: 1e97396d4086265ff39185c0a8b0ccfc4e59b6a6
-+README.zh.md: 0ca33867d15ad726d84adebc614fe2c21c994408
+-README.md: b87236309c9bafe3e35d3d5977d56bd62a24de31
+-README.zh.md: 3bae0b3f4cb3ad695371ec7a66fb531a935a4d2f
++README.md: 5091423166dba818d2ed690161ba5a3ef715721e
++README.zh.md: b6d48681ce109afed094464afe5758103dd80c99
 diff --git a/packages/client/ui-tool/README.md b/packages/client/ui-tool/README.md
-index 6e2bef2..1e97396 100644
+index b872363..5091423 100644
 --- a/packages/client/ui-tool/README.md
 +++ b/packages/client/ui-tool/README.md
 @@ -2,13 +2,15 @@
@@ -780,7 +780,7 @@ index 6e2bef2..1e97396 100644
  Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and `data-chat-call-id` DOM contract used for paging and selection.
  
 diff --git a/packages/client/ui-tool/README.zh.md b/packages/client/ui-tool/README.zh.md
-index 1694177..0ca3386 100644
+index 3bae0b3..b6d4868 100644
 --- a/packages/client/ui-tool/README.zh.md
 +++ b/packages/client/ui-tool/README.zh.md
 @@ -2,13 +2,15 @@
@@ -802,10 +802,10 @@ index 1694177..0ca3386 100644
  每个 root 和 child 包装层都保留 `data-chat-anchor-key="call:<id>"` 与 `data-chat-call-id` DOM 约定，供分页和 selection 使用。
  
 diff --git a/packages/client/ui-tool/src/client/apply.ts b/packages/client/ui-tool/src/client/apply.ts
-index ec2f0b8..1b345d3 100644
+index a2cc912..7394572 100644
 --- a/packages/client/ui-tool/src/client/apply.ts
 +++ b/packages/client/ui-tool/src/client/apply.ts
-@@ -2,6 +2,7 @@
+@@ -3,6 +3,7 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
  import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
  import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
  import { ToolCallTree } from './tool/ToolCallTree.tsx'
@@ -813,10 +813,10 @@ index ec2f0b8..1b345d3 100644
  import { ToolDetails } from './tool/ToolDetails.tsx'
  import { CONVERSATION_NS as NS } from './locale.ts'
  import { askQuestionToolview } from './tool/toolviews/ask-question-row.tsx'
-@@ -20,6 +21,12 @@ export const inject = ['slots']
-  * @param ctx - Client root context.
-  */
+@@ -23,6 +24,12 @@ export const inject = ['slots', 'connection']
  export function apply(ctx: ClientContext): void {
+   const connection = ctx.get('connection') as ConnectionHandle
+   const toolInject = () => ({ hooks: { hostDescription: connection.hostDescription } })
 +  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
 +    name: 'conversation.chat.node',
 +    key: 'tool-activity',
@@ -827,19 +827,20 @@ index ec2f0b8..1b345d3 100644
      name: 'conversation.chat.node',
      key: 'tool-call',
 diff --git a/packages/client/ui-tool/src/client/contract/slots.ts b/packages/client/ui-tool/src/client/contract/slots.ts
-index 04af306..d5afa38 100644
+index a6cdd1f..32d0d12 100644
 --- a/packages/client/ui-tool/src/client/contract/slots.ts
 +++ b/packages/client/ui-tool/src/client/contract/slots.ts
-@@ -48,5 +48,9 @@ export type ToolTreeProps = PropsRuntime<'conversation.chat.node', 'tool-call'>
-   & PropsRenderSlots<'tool.call.toolview'>
+@@ -60,6 +60,10 @@ export type ToolTreeProps = PropsRuntime<'conversation.chat.node', 'tool-call'>
    & PropsLocale<'conversation'>
+   & InjectFace<ToolHostDescriptionInjected>
  
 +/** Full props of the streamed Tool activity renderer. */
 +export type ToolActivityProps = PropsRuntime<'conversation.chat.node', 'tool-activity'>
 +  & PropsLocale<'conversation'>
 +
  /** Full props of the selected Tool output renderer in the details panel. */
- export type ToolDetailsProps = PropsRuntime<'conversation.details.tool'> & PropsLocale<'conversation'>
+ export type ToolDetailsProps = PropsRuntime<'conversation.details.tool'>
+   & PropsLocale<'conversation'>
 diff --git a/packages/client/ui-tool/src/client/tool/ToolActivityView.tsx b/packages/client/ui-tool/src/client/tool/ToolActivityView.tsx
 new file mode 100644
 index 0000000..d3e4b8b
@@ -947,7 +948,7 @@ index b33fb47..4c527c4 100644
    display: flex;
    flex-direction: column;
 diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
-index db3ed0a..fd4e83b 100644
+index 3ed5fb9..15600fd 100644
 --- a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
 +++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
 @@ -2,6 +2,7 @@
@@ -962,17 +963,17 @@ index db3ed0a..fd4e83b 100644
  
  /** One atomic call dispatched through the Tool-owned keyed slot. */
  const ToolCall = memo(function ToolCall({
--  renderSlot, callId, toolName, block, openFile, selected, cwd, inspectCall, t, children,
-+  renderSlot, callId, toolName, block, startedTime, openFile, selected, cwd, inspectCall, t, children,
+-  renderSlot, callId, toolName, block, openFile, selected, cwd, home, inspectCall, t, children,
++  renderSlot, callId, toolName, block, startedTime, openFile, selected, cwd, home, inspectCall, t, children,
  }: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 't'> & {
    callId: string
    toolName: string
    block: ToolCallBlock
 +  startedTime: number
    selected: boolean
+   home?: string | undefined
    children?: ReactNode
- }) {
-@@ -35,19 +37,26 @@ const ToolCall = memo(function ToolCall({
+@@ -37,19 +39,26 @@ const ToolCall = memo(function ToolCall({
        data-chat-call-id={callId}
        data-selected={selected || undefined}
      >
@@ -996,15 +997,15 @@ index db3ed0a..fd4e83b 100644
  })
  
  const ToolCallBranch = memo(function ToolCallBranch({
--  renderSlot, block, selectedCallId, cwd, openFile, inspectCall, t,
-+  renderSlot, block, startedTime, selectedCallId, cwd, openFile, inspectCall, t,
+-  renderSlot, block, selectedCallId, cwd, home, openFile, inspectCall, t,
++  renderSlot, block, startedTime, selectedCallId, cwd, home, openFile, inspectCall, t,
  }: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 't'> & {
    block: ToolCallBlock
 +  startedTime: number
+   home?: string | undefined
  }) {
    return (
-     <ToolCall
-@@ -55,6 +64,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
+@@ -58,6 +67,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
        callId={block.callId}
        toolName={callName(block)}
        block={block}
@@ -1012,22 +1013,22 @@ index db3ed0a..fd4e83b 100644
        openFile={openFile}
        selected={block.callId === selectedCallId}
        cwd={cwd}
-@@ -68,6 +78,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
+@@ -72,6 +82,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
                key={child.callId}
                renderSlot={renderSlot}
                block={child}
 +              startedTime={'kind' in child ? child.callTime ?? child.time : child.time}
                selectedCallId={selectedCallId}
                cwd={cwd}
-               openFile={openFile}
-@@ -95,6 +106,7 @@ export function ToolCallTree({
+               home={home}
+@@ -101,6 +112,7 @@ export function ToolCallTree({
      <ToolCallBranch
        renderSlot={renderSlot}
        block={block}
 +      startedTime={node.data.startedTime}
        selectedCallId={selectedCallId}
        cwd={cwd}
-       openFile={openFile}
+       home={home}
 diff --git a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.module.css b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.module.css
 new file mode 100644
 index 0000000..a67834e
@@ -1151,10 +1152,10 @@ index 9d9bce9..60e7ce8 100644
    flex-shrink: 0;
  }
 diff --git a/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts b/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts
-index fa7cb27..a12e22b 100644
+index 02d3d56..8943c56 100644
 --- a/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts
 +++ b/packages/client/ui-tool/src/client/tool/models/tool-call-model.ts
-@@ -68,6 +68,12 @@ const TOOL_TITLES: Record<string, string> = {
+@@ -69,6 +69,12 @@ const TOOL_TITLES: Record<string, string> = {
    pwsh: 'Pwsh',
  }
  
@@ -1167,10 +1168,10 @@ index fa7cb27..a12e22b 100644
  /**
   * Classify a tool name into its row variant.
   * @param toolName - wire tool name.
-@@ -216,10 +222,10 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
-     : block.error?.code === 'interrupted' ? 'stopped'
-       : block.isError ? 'error' : 'ok'
-   const base = argsRaw === '' ? block.callId : relativizeToCwd(deriveSummary(variant, argsRaw), cwd)
+@@ -224,10 +230,10 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
+   const base = argsRaw === ''
+     ? block.callId
+     : abbreviateHomePath(relativizeToCwd(deriveSummary(variant, argsRaw), cwd), home)
 -  const toolTitle = TOOL_TITLES[toolName]
 +  const ownedTitle = TOOL_TITLES[toolName]
    // Others keeps the static "Tool call" title (figma literal); the real tool
@@ -1180,7 +1181,7 @@ index fa7cb27..a12e22b 100644
      ? `${toolName} · ${base}`
      : base
    // The empty string is "no text" for both derived result fields: a settled
-@@ -229,7 +235,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
+@@ -237,7 +243,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
    const errorSummary = state === 'error' && output !== null ? firstLine(output) : null
    return {
      variant,
@@ -1190,7 +1191,7 @@ index fa7cb27..a12e22b 100644
      filePath: deriveFilePath(variant, argsRaw),
      body: deriveBody(variant, argsRaw),
 diff --git a/packages/client/ui-tool/src/client/tool/toolviews/GenericToolCard.tsx b/packages/client/ui-tool/src/client/tool/toolviews/GenericToolCard.tsx
-index ae4d18e..c29be8c 100644
+index 99fb68b..2fc93a6 100644
 --- a/packages/client/ui-tool/src/client/tool/toolviews/GenericToolCard.tsx
 +++ b/packages/client/ui-tool/src/client/tool/toolviews/GenericToolCard.tsx
 @@ -18,7 +18,7 @@ import { toolRowModel, type ToolRowVariant } from '../models/tool-call-model.ts'
@@ -1202,7 +1203,7 @@ index ae4d18e..c29be8c 100644
    search: <IconSearchOutline16 size={14} />,
    read: <IconBrowseOutline16 size={14} />,
    bash: <IconApiOutline14 size={14} />,
-@@ -51,7 +51,7 @@ export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }:
+@@ -51,7 +51,7 @@ export function GenericToolCard({ toolName, block, cwd, home, openFile, inspect,
        t={t}
        variant={model.variant}
        toolName={toolName}
@@ -1338,10 +1339,10 @@ index 0000000..d98a389
 +  })
 +})
 diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
-index 44f4231..b1c9c7c 100644
+index 7f18800..bf50548 100644
 --- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
 +++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
-@@ -37,7 +37,7 @@ function props(
+@@ -39,7 +39,7 @@ function props(
        anchorSeq: block.seq,
        location: { kind: 'session' },
        visibility: 'visible',
@@ -1350,7 +1351,7 @@ index 44f4231..b1c9c7c 100644
      },
      selectedCallId,
      openFile: vi.fn(),
-@@ -57,6 +57,9 @@ describe('ToolCallTree', () => {
+@@ -60,6 +60,9 @@ describe('ToolCallTree', () => {
      expect(row?.getAttribute('data-selected')).toBe('true')
      expect(view.container.querySelector('[data-variant="others"]')).not.toBeNull()
      expect(view.getByText('w1')).toBeTruthy()
@@ -1393,5 +1394,5 @@ index d187941..cbba203 100644
 +  })
  })
 -- 
-2.50.1 (Apple Git-155)
+2.51.2.windows.1
 
