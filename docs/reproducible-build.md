@@ -14,8 +14,9 @@
 - Node `24.11.1` 与 pnpm `11.7.0`；
 - `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
   Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用持久历史恢复与
-  重试流 JSDoc 补丁，以及 DSH-011 Compact 32K 摘要预算补丁和各自的 SHA-256；
-- 应用补丁后的 Git tree `50da9c5101642d62baf200cb29449617737cd8f5`。
+  重试流 JSDoc 补丁、DSH-011 Compact 32K 摘要预算补丁、DSH-014 工具调用即时
+  进度反馈补丁和各自的 SHA-256；
+- 应用补丁后的 Git tree `b481531a81fa688c4367368cc448ae1ca14ce27f`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -104,3 +105,11 @@ DSH-011 Compact 32K 补丁，从官方基线依次回放五个补丁并锁定最
 下 frozen install 与 Host/Client/Web 完整构建通过；Agent loop、pi-ai、重试、Chat
 投影及 Compact 7 个测试文件共 265 条回归通过。随后在持久 macOS 构建目录完成相同
 tree 的完整重建，并从该目录重启 3080；首页恢复，Skill Manager apiVersion 为 6。
+
+2026-08-20 为 DSH-014 增加第六个上游补丁。工具调用从首个参数增量开始展示普通
+工具行、灰色计时器、`ing` 和 Think 同款扫描光；正式结束后计时冻结并隐藏状态词，
+悬停或键盘聚焦时显示 `Done`。补丁保留正式工具事件的历史排序，只继承首个增量的
+计时起点，并覆盖并行调用、空调用 ID、重试清理与回放。Node `24.11.1` / pnpm
+`11.7.0` 下 Host/Client/Web 完整构建通过；GUI 274 个测试文件共 3792 条用例通过，
+Web 回放 75 个测试文件共 253 条用例通过。最终 tree 锁定为
+`b481531a81fa688c4367368cc448ae1ca14ce27f`，未部署或重启现有运行环境。
