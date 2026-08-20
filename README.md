@@ -89,8 +89,9 @@ cd dsharness
 流式活动保活补丁、DSH-012 的 Qwen 原生 Agent preset 补丁，以及
 BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compact 32K
 摘要预算补丁、DSH-014 的工具调用即时进度反馈补丁，以及 BUG-449804CF 的工具耗时
-与行内状态布局修复、BUG-5F3BF25D 的快速工具运行态可感知性修复，以及亚秒耗时的
-毫秒精度展示修复。最终源码 tree 为 `ec315d1fb86ed652d27e2fadaeffc512e09158aa`。
+与行内状态布局修复、BUG-5F3BF25D 的快速工具运行态可感知性修复、亚秒耗时的毫秒
+精度展示修复和 DSH-015 的 Code 子工具计划提前展示。最终源码 tree 为
+`5318e889f9b40cef8d3c1d3c8ae4b44a1a43a525`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。

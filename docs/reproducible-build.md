@@ -16,8 +16,9 @@
   Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用持久历史恢复与
   重试流 JSDoc 补丁、DSH-011 Compact 32K 摘要预算补丁、DSH-014 工具调用即时
   进度反馈补丁、BUG-449804CF 工具耗时与行内状态布局修复、BUG-5F3BF25D 快速工具
-  运行态可感知性修复及各自的 SHA-256；
-- 应用补丁后的 Git tree `6dd55f428bd50bdea594886d5de84dc12bce0a1b`。
+  运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示及
+  各自的 SHA-256；
+- 应用补丁后的 Git tree `5318e889f9b40cef8d3c1d3c8ae4b44a1a43a525`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -136,3 +137,11 @@ Web 回放 75 个测试文件共 253 条用例通过。最终 tree 锁定为
 通过，Web 前端和 ui-tool 动态模块构建通过；本地 3081 历史回放确认 Bash 显示
 `16ms` / `21ms`、Read 显示 `3ms`、Write 显示 `8ms` / `12ms`，父级 Code 秒数不变。
 最终 tree 锁定为 `ec315d1fb86ed652d27e2fadaeffc512e09158aa`。
+
+2026-08-20 为 DSH-015 增加第十个上游补丁。`run_code` 新增位于 `code` 前的有序
+`plannedTools`，模型参数流每完成一个名称就投影一条无计时器的 `ing` 子工具预览；
+真实 `tool/code-dispatch-start` 到达后按序替换预览并开始计时。旧记录通过保守静态扫描
+直接 `tools.name(...)` 调用兼容，字符串、注释和间接引用不会产生误报。相关 48 个测试
+文件共 787 条用例、Host/Client/Web 完整构建、文档同步门禁和真实 PTC 浏览器验证均
+通过；浏览器确认 Read、Bash 在执行前先出现且无计时器，随后分别按真实 dispatch
+计时。最终 tree 锁定为 `5318e889f9b40cef8d3c1d3c8ae4b44a1a43a525`。
