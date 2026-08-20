@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca",
   "baseTree": "3bc8f89fe494a4755c188be354add4e8b1e7b188",
-  "resultTree": "b481531a81fa688c4367368cc448ae1ca14ce27f",
+  "resultTree": "bc31435a3eb8ed9b000562207db21cb1628ef148",
   "dshVersion": "0.1.0-rc.7",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -32,6 +32,10 @@
     {
       "path": "upstream-patches/0006-feat-DSH-014-show-streamed-tool-activity.patch",
       "sha256": "18E49A42C4B7EC895A5CD6893741552BA08CEF9B7DCEC7FCA36C7BA177D00E68"
+    },
+    {
+      "path": "upstream-patches/0007-fix-BUG-449804CF-tool-duration-layout.patch",
+      "sha256": "8A5293FD6C693EAD04E3CB6E7DE9FCCBADB9525FD835511127D474B21AB56E87"
     }
   ]
 }

@@ -1,0 +1,316 @@
+From 132477ce8c8570460c9c85cba39b9ffd4f8fd84c Mon Sep 17 00:00:00 2001
+From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
+Date: Thu, 20 Aug 2026 14:54:20 +0800
+Subject: [PATCH] fix(ui): keep tool duration meaningful and inline
+ (BUG-449804CF)
+
+---
+ ...-streamed-tool-activity-feedback.i18n.yaml |  4 +--
+ ...6-08-20-streamed-tool-activity-feedback.md |  2 +-
+ ...8-20-streamed-tool-activity-feedback.zh.md |  2 +-
+ apps/web/tests/chat-scroll-contract.e2e.ts    | 20 +++++++++++++-
+ packages/client/ui-tool/README.i18n.yaml      |  4 +--
+ packages/client/ui-tool/README.md             |  2 +-
+ packages/client/ui-tool/README.zh.md          |  2 +-
+ .../src/client/tool/ToolCallTree.module.css   |  8 ++++--
+ .../components/ToolActivityChrome.module.css  | 11 ++++----
+ .../tool/components/ToolActivityChrome.tsx    |  4 ++-
+ .../tests/tool-activity.client.spec.tsx       |  6 +++++
+ .../tests/tool-call-tree.client.spec.tsx      |  7 ++++-
+ .../tests/tool-row-styles.client.spec.ts      | 26 +++++++++++++++++--
+ 13 files changed, 77 insertions(+), 21 deletions(-)
+
+diff --git a/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.i18n.yaml b/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.i18n.yaml
+index ef8b719..85c6b33 100644
+--- a/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.i18n.yaml
++++ b/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md
+-2026-08-20-streamed-tool-activity-feedback.md: 5c27ed34b2d72b06f8c93326a3277821081d6e84
+-2026-08-20-streamed-tool-activity-feedback.zh.md: 28232284735c642bcbce2b2a495f335cde14610e
++2026-08-20-streamed-tool-activity-feedback.md: 05da49465bfdb8bb79e0ed99cdf133aa7a3ead62
++2026-08-20-streamed-tool-activity-feedback.zh.md: 0073309ad6f97e44f8f145cef66f8c7b1a5c81da
+diff --git a/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md b/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md
+index 5c27ed3..05da494 100644
+--- a/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md
++++ b/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.md
+@@ -16,7 +16,7 @@ The feedback must span argument generation and execution as one continuous activ
+ 
+ The formal Tool Definition reads the preceding activity state when its `tool/call` start is assembled. It inherits the first-delta time as its presentation start, then removes the matching pending value in the same assembly flush. Pending calls are keyed by stream index and kept in insertion order; after the Assistant finalizes, their synthetic placement advances behind that Assistant and then behind each emitted formal call. Formal nodes keep their authoritative `tool/call` sequence, so parallel calls preserve product transcript order while each replaces exactly one pending row. The retained start facts survive step closure so replay and interruption do not reset elapsed time.
+ 
+-`ui-tool` renders a pending value as the same non-expandable title and icon row used by ordinary Tools, with no argument summary or body. One wrapper-owned activity chrome follows both pending and formal rows: a gray elapsed timer and gray `ing` remain visible throughout argument generation and execution, and a Think-style scanning glare crosses the running row. Settlement freezes the timer and stops the glare. The status position is empty by default and reveals gray `Done` only while the finished row is hovered or keyboard-focused. Existing error and interrupted row semantics remain authoritative, and reduced-motion preferences remove the scanning glare.
++`ui-tool` renders a pending value as the same non-expandable title and icon row used by ordinary Tools, with no argument summary or body. One wrapper-owned activity chrome follows both pending and formal rows: a gray elapsed timer and gray `ing` sit inline immediately after the Tool title or summary throughout argument generation and execution, and a Think-style scanning glare crosses the running row. Settlement freezes the timer, formats positive subsecond work as `<1s`, and stops the glare. The status position is empty by default and reveals gray `Done` only while the finished row is hovered or keyboard-focused. Existing error and interrupted row semantics remain authoritative, and reduced-motion preferences remove the scanning glare.
+ 
+ ## Verification
+ 
+diff --git a/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.zh.md b/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.zh.md
+index 2823228..0073309 100644
+--- a/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.zh.md
++++ b/.agents/notes/implemented/feature/2026-08-20-streamed-tool-activity-feedback.zh.md
+@@ -16,7 +16,7 @@ Status: implemented
+ 
+ 正式 Tool Definition 在组装其 `tool/call` start 时读取前置活动状态。它继承首个 delta 的时间作为展示起点，然后在同一次组装 flush 中移除匹配的待处理值。待处理调用以流 index 为 key 并保持插入顺序；Assistant 最终完成后，它们的合成位置会推进到该 Assistant 之后，随后再推进到每个已发出的正式调用之后。正式节点保留具有最终决定权的 `tool/call` 序号，因此并行调用会保持产品 transcript 顺序，而每个调用只替换一条待处理行。保留的起点事实会跨过步骤关闭，因此 replay 与中断不会重置已用时间。
+ 
+-`ui-tool` 把待处理值渲染为与普通工具相同的不可展开标题和图标行，不提供参数摘要或正文。一套由包装层拥有的活动 chrome 同时跟随待处理行和正式行：参数生成与执行期间始终显示灰色已用时间和灰色 `ing`，运行行上还有 Think 风格的扫描光。结算会冻结计时器并停止扫描光。状态位置默认留空，只在已完成行悬停或键盘聚焦时显示灰色 `Done`。既有错误和中断行语义仍具有最终决定权，减少动态效果偏好会移除扫描光。
++`ui-tool` 把待处理值渲染为与普通工具相同的不可展开标题和图标行，不提供参数摘要或正文。一套由包装层拥有的活动 chrome 同时跟随待处理行和正式行：灰色已用时间和灰色 `ing` 在参数生成与执行期间紧跟工具标题或摘要，运行行上还有 Think 风格的扫描光。结算会冻结计时器，把不足一秒的正耗时显示为 `<1s`，并停止扫描光。状态位置默认留空，只在已完成行悬停或键盘聚焦时显示灰色 `Done`。既有错误和中断行语义仍具有最终决定权，减少动态效果偏好会移除扫描光。
+ 
+ ## 验证
+ 
+diff --git a/apps/web/tests/chat-scroll-contract.e2e.ts b/apps/web/tests/chat-scroll-contract.e2e.ts
+index d92743c..3696a83 100644
+--- a/apps/web/tests/chat-scroll-contract.e2e.ts
++++ b/apps/web/tests/chat-scroll-contract.e2e.ts
+@@ -5,7 +5,7 @@
+ import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
+ import { tmpdir } from 'node:os'
+ import { join } from 'node:path'
+-import type { Browser, Page } from 'playwright'
++import type { Browser, Locator, Page } from 'playwright'
+ import { chromium } from 'playwright'
+ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+@@ -449,6 +449,16 @@ async function fileExists(path: string): Promise<boolean> {
+   }
+ }
+ 
++async function inlineGap(text: Locator, timer: Locator): Promise<number> {
++  const textRight = await text.evaluate((element) => {
++    const range = document.createRange()
++    range.selectNodeContents(element)
++    return range.getBoundingClientRect().right
++  })
++  const timerLeft = await timer.evaluate(element => element.getBoundingClientRect().left)
++  return timerLeft - textRight
++}
++
+ function eventCarries(event: SessionEvent, marker: string): boolean {
+   return JSON.stringify(event).includes(marker)
+ }
+@@ -576,6 +586,10 @@ describe('web e2e: long Chat scroll contract', () => {
+         const pendingChrome = pendingCall.locator('[data-tool-activity-state="running"]')
+         expect(await pendingChrome.getByText('ing', { exact: true }).count()).toBe(1)
+         expect(await pendingChrome.locator('[data-tool-timer]').count()).toBe(1)
++        expect(await inlineGap(
++          pendingCall.getByText('Bash', { exact: true }),
++          pendingChrome.locator('[data-tool-timer]'),
++        )).toBeLessThan(32)
+ 
+         await expect.poll(() => fileExists(readyPath), { timeout: 15_000 }).toBe(true)
+         const liveCall = world.page.locator(`[data-chat-call-id="${LIVE_TOOL_CALL_ID}"]`)
+@@ -584,6 +598,10 @@ describe('web e2e: long Chat scroll contract', () => {
+         expect(await liveRow.getAttribute('data-state')).toBe('running')
+         expect(await liveCall.locator('[data-tool-activity-state="running"]')
+           .getByText('ing', { exact: true }).count()).toBe(1)
++        expect(await inlineGap(
++          liveRow.getByText(LIVE_TOOL_RESULT, { exact: true }),
++          liveCall.locator('[data-tool-timer]'),
++        )).toBeLessThan(32)
+         await expectBottom(world.page)
+ 
+         await wheelTranscript(world.page, -1_200)
+diff --git a/packages/client/ui-tool/README.i18n.yaml b/packages/client/ui-tool/README.i18n.yaml
+index eae098d..9c121f5 100644
+--- a/packages/client/ui-tool/README.i18n.yaml
++++ b/packages/client/ui-tool/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/client/ui-tool/README.md
+-README.md: 1e97396d4086265ff39185c0a8b0ccfc4e59b6a6
+-README.zh.md: 0ca33867d15ad726d84adebc614fe2c21c994408
++README.md: 1cef7cc901e06f733e7cbed656b02280bc7c4dbc
++README.zh.md: cb3a1ee19798f5c0ba640aeb5910bcc3a1c049d9
+diff --git a/packages/client/ui-tool/README.md b/packages/client/ui-tool/README.md
+index 1e97396..1cef7cc 100644
+--- a/packages/client/ui-tool/README.md
++++ b/packages/client/ui-tool/README.md
+@@ -10,7 +10,7 @@ Business UI packages register only their wire Tool names and atomic views. They
+ 
+ `ToolActivityView` receives name-only pending calls from the first streamed Tool delta and renders ordinary non-expandable rows without parsing or displaying partial arguments. `ToolCallTree` receives one root `ToolCallBlock` that already contains recursive `subCalls`, selection state, the first streamed start time, the session `cwd`, and Host callbacks for opening files and inspecting calls. It recursively walks the standard call blocks and sends the root and children at every depth through the same atomic dispatch path, without subscribing to a separate parent-to-children map.
+ 
+-Every pending or running row shows a quiet gray elapsed timer followed by gray `ing`, and the whole row carries the same scanning glare as a running Think row. Formal settlement freezes the timer, stops the glare, and removes persistent status copy; hovering or focusing the settled row reveals gray `Done` in the reserved status position. Reduced-motion preferences disable the glare.
++Every pending or running row shows a quiet gray elapsed timer followed by gray `ing`, placed inline immediately after the Tool title or summary, and the whole row carries the same scanning glare as a running Think row. Formal settlement freezes the timer, renders positive subsecond work as `<1s` instead of `0s`, stops the glare, and removes persistent status copy; hovering or focusing the settled row reveals gray `Done` in the reserved status position. Reduced-motion preferences disable the glare.
+ 
+ Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and `data-chat-call-id` DOM contract used for paging and selection.
+ 
+diff --git a/packages/client/ui-tool/README.zh.md b/packages/client/ui-tool/README.zh.md
+index 0ca3386..cb3a1ee 100644
+--- a/packages/client/ui-tool/README.zh.md
++++ b/packages/client/ui-tool/README.zh.md
+@@ -10,7 +10,7 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` 
+ 
+ `ToolActivityView` 从首个流式工具 delta 接收只有名称的待处理调用，并渲染普通的不可展开行，不解析或展示部分参数。`ToolCallTree` 接收一个已经包含递归 `subCalls` 的 root `ToolCallBlock`、selection 状态、首个流式开始时间、会话 `cwd`，以及用于打开文件和检查调用的 Host 回调。它递归遍历标准调用块，让 root 与任意深度的 child 经过同一条原子分发路径，不订阅独立的 parent-to-children map。
+ 
+-每条待处理或运行中行都会显示弱化的灰色已用时间，后接灰色 `ing`，整行同时带有与运行中 Think 行一致的扫描光。正式结算会冻结计时器、停止扫描光并移除常驻状态文案；悬停或聚焦已结算行时，预留的状态位置才显示灰色 `Done`。减少动态效果偏好会关闭扫描光。
++每条待处理或运行中行都会在工具标题或摘要后紧跟弱化的灰色已用时间，再接灰色 `ing`，整行同时带有与运行中 Think 行一致的扫描光。正式结算会冻结计时器，把不足一秒的正耗时显示为 `<1s` 而不是 `0s`，停止扫描光并移除常驻状态文案；悬停或聚焦已结算行时，预留的状态位置才显示灰色 `Done`。减少动态效果偏好会关闭扫描光。
+ 
+ 每个 root 和 child 包装层都保留 `data-chat-anchor-key="call:<id>"` 与 `data-chat-call-id` DOM 约定，供分页和 selection 使用。
+ 
+diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css b/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css
+index 4c527c4..a787684 100644
+--- a/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css
++++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css
+@@ -4,13 +4,17 @@
+ 
+ .callHead {
+   position: relative;
+-  display: grid;
+-  grid-template-columns: minmax(0, 1fr) auto;
++  display: flex;
+   column-gap: 8px;
+   align-items: start;
++  min-width: 0;
+   overflow: hidden;
+ }
+ 
++.callHead > :first-child {
++  min-width: 0;
++}
++
+ /* The Think-style sweep belongs to the whole call seat, so built-in and
+    package-contributed Tool views receive one identical in-flight signal. */
+ .callHead[data-state='running']::after {
+diff --git a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.module.css b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.module.css
+index a67834e..34c9eae 100644
+--- a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.module.css
++++ b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.module.css
+@@ -2,24 +2,23 @@
+   display: inline-flex;
+   flex: none;
+   align-items: center;
+-  justify-content: flex-end;
++  justify-content: flex-start;
+   gap: 5px;
+-  min-width: 58px;
+   height: 24px;
+   color: var(--dsw-alias-label-caption);
+-  font-size: 11px;
+-  line-height: 16px;
++  font-size: 14px;
++  line-height: 24px;
+   font-variant-numeric: tabular-nums;
+   white-space: nowrap;
+ }
+ 
+ .timer {
+   min-width: 20px;
+-  text-align: right;
++  text-align: left;
+ }
+ 
+ .status {
+-  width: 28px;
++  width: 34px;
+   text-align: left;
+   transition: opacity 100ms ease;
+ }
+diff --git a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
+index e38f590..3e17eb1 100644
+--- a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
++++ b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
+@@ -7,7 +7,9 @@ export interface ToolActivityChromeProps {
+ }
+ 
+ function formatElapsed(milliseconds: number): string {
+-  const seconds = Math.max(0, Math.floor(milliseconds / 1_000))
++  const elapsed = Math.max(0, milliseconds)
++  if (elapsed > 0 && elapsed < 1_000) return '<1s'
++  const seconds = Math.floor(elapsed / 1_000)
+   if (seconds < 60) return `${seconds}s`
+   const minutes = Math.floor(seconds / 60)
+   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+diff --git a/packages/client/ui-tool/tests/tool-activity.client.spec.tsx b/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
+index d98a389..ff97e69 100644
+--- a/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
+@@ -75,4 +75,10 @@ describe('streamed Tool activity', () => {
+     act(() => { vi.advanceTimersByTime(5_000) })
+     expect(view.getByText('3s')).toBeTruthy()
+   })
++
++  it('keeps a completed subsecond call meaningful instead of rounding it to zero', () => {
++    const view = render(<ToolActivityChrome startedTime={9_500} finishedTime={9_850} />)
++    expect(view.getByText('<1s')).toBeTruthy()
++    expect(view.queryByText('0s')).toBeNull()
++  })
+ })
+diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+index b1c9c7c..d152427 100644
+--- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+@@ -63,7 +63,11 @@ describe('ToolCallTree', () => {
+   })
+ 
+   it('recursively renders a selected leaf without selecting its ancestors', () => {
+-    const leaf = root('parent:code:1:code:1', { name: 'read', argsRaw: '{"path":"a.ts"}' })
++    const leaf = {
++      ...root('parent:code:1:code:1', { name: 'read', argsRaw: '{"path":"a.ts"}' }),
++      time: 2_750,
++      callTime: 2_500,
++    }
+     const child = {
+       ...root('parent:code:1', { name: 'run_code', argsRaw: '{"code":"return 1"}' }),
+       subCalls: [leaf],
+@@ -80,5 +84,6 @@ describe('ToolCallTree', () => {
+     expect(view.container.querySelector('[data-chat-call-id="parent:code:1"]')?.hasAttribute('data-selected')).toBe(false)
+     expect(view.container.querySelector('[data-chat-call-id="parent:code:1:code:1"]')?.getAttribute('data-selected')).toBe('true')
+     expect(nests).toHaveLength(2)
++    expect(view.getByText('<1s')).toBeTruthy()
+   })
+ })
+diff --git a/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts b/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts
+index cbba203..558c0aa 100644
+--- a/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts
++++ b/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts
+@@ -10,15 +10,18 @@ import { describe, expect, it } from 'vitest'
+ 
+ const css = readFileSync(fileURLToPath(new URL('../src/client/tool/components/ToolRow.module.css', import.meta.url)), 'utf8')
+ const treeCss = readFileSync(fileURLToPath(new URL('../src/client/tool/ToolCallTree.module.css', import.meta.url)), 'utf8')
++const activityCss = readFileSync(fileURLToPath(new URL('../src/client/tool/components/ToolActivityChrome.module.css', import.meta.url)), 'utf8')
+ const bashCss = readFileSync(fileURLToPath(new URL('../src/client/tool/toolviews/bash-sample.module.css', import.meta.url)), 'utf8')
+ /** Declarations only: the sheet's prose names the properties it explains. */
+ const declarationText = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
++const treeDeclarationText = treeCss.replace(/\/\*[\s\S]*?\*\//g, ' ')
++const activityDeclarationText = activityCss.replace(/\/\*[\s\S]*?\*\//g, ' ')
+ 
+-function declarations(selector: string): string[] {
++function declarations(selector: string, source = declarationText): string[] {
+   // Anchored at a rule boundary: an unanchored match would silently read a
+   // compound rule that merely contains the selector (`.root:hover .summarySuffix`)
+   // if one ever lands above the base rule.
+-  const rule = new RegExp(`(?:^|\\})\\s*\\${selector}\\s*\\{([^{}]*)\\}`).exec(declarationText)
++  const rule = new RegExp(`(?:^|\\})\\s*\\${selector}\\s*\\{([^{}]*)\\}`).exec(source)
+   if (rule === null) throw new Error(`ToolRow.module.css has no \`${selector}\` rule`)
+   return (rule[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)
+ }
+@@ -51,6 +54,25 @@ describe('ToolRow.module.css summary line', () => {
+     expect(treeCss).not.toContain(".callHead[data-state='running']:hover [data-tool-activity-status]")
+   })
+ 
++  it('keeps elapsed chrome inline after the Tool view instead of in a trailing column', () => {
++    expect(declarations('.callHead', treeDeclarationText)).toEqual(expect.arrayContaining([
++      'display: flex',
++      'column-gap: 8px',
++      'min-width: 0',
++    ]))
++    expect(declarations('.callHead', treeDeclarationText)).not.toEqual(expect.arrayContaining([
++      'grid-template-columns: minmax(0, 1fr) auto',
++    ]))
++  })
++
++  it('matches the tool row typography while keeping the activity color quiet', () => {
++    expect(declarations('.root', activityDeclarationText)).toEqual(expect.arrayContaining([
++      'font-size: 14px',
++      'line-height: 24px',
++      'color: var(--dsw-alias-label-caption)',
++    ]))
++  })
++
+   it('owns one wrapper-level running sweep with a reduced-motion exit', () => {
+     expect(treeCss).toContain(".callHead[data-state='running']::after")
+     expect(treeCss).toContain('animation: dsh-tool-row-sweep 2.6s ease-out infinite')
+-- 
+2.50.1 (Apple Git-155)
+
