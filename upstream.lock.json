@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "99f6f02fecdb7dff40c3fbc9470f5907c29f74ca",
   "baseTree": "3bc8f89fe494a4755c188be354add4e8b1e7b188",
-  "resultTree": "6dd55f428bd50bdea594886d5de84dc12bce0a1b",
+  "resultTree": "ec315d1fb86ed652d27e2fadaeffc512e09158aa",
   "dshVersion": "0.1.0-rc.7",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -40,6 +40,10 @@
     {
       "path": "upstream-patches/0008-fix-BUG-5F3BF25D-preserve-fast-tool-running-feedback.patch",
       "sha256": "4B6411860BB1D354600115F51A7D71DEBD0925AB7561941C80C33EE7161614B3"
+    },
+    {
+      "path": "upstream-patches/0009-fix-BUG-449804CF-show-subsecond-duration-in-ms.patch",
+      "sha256": "C3537932F1C5AF38E55B7FBED44BE52C5967DFD1953F27F1F82033F45700C035"
     }
   ]
 }
