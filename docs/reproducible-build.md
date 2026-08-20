@@ -17,8 +17,9 @@
   重试流 JSDoc 补丁、DSH-011 Compact 32K 摘要预算补丁、DSH-014 工具调用即时
   进度反馈补丁、BUG-449804CF 工具耗时与行内状态布局修复、BUG-5F3BF25D 快速工具
   运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
-  DSH-016 Think 独立计时和工具活动状态布局及各自的 SHA-256；
-- 应用补丁后的 Git tree `9fd6590c3056bc9b07ce575bf23f82b20419a9a5`。
+  DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
+  以及各自的 SHA-256；
+- 应用补丁后的 Git tree `ae9a489ce67185e057510f54709a127d60a89f83`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -168,3 +169,15 @@ install，Host/Client/Web 完整构建通过。Agent loop、重试、pi-ai、Com
 Agent Note 格式及工具目录门禁通过。三组 Playwright Web 回放未完成：RC8 对应的
 Chromium 尚未下载，Skill fixture 另受 Windows 路径反斜杠未转义影响；本机 3080
 切换后使用应用内真实浏览器补充运行时冒烟。
+
+2026-08-20 为 DSH-018 增加第十二个编号补丁（整条链第十三个文件）。当一轮以
+`max-tokens` 结束时，Host 先记录续跑意图，待同一 Agent 回到 idle 且没有已排队的人类
+下一轮后，持久追加精确的 `system-reminder` 并唤醒下一轮；连续触顶默认不设轮数上限。
+错误、正常结束、插件卸载或竞争输入会停止自动续跑，系统不解析也不执行截断文本中的
+工具调用。界面截断提示同步删除“发送继续”的手工操作文案。
+
+新包 4 条 Agent loop 测试、UI 52 条测试和发布组合 1 条测试通过；TypeScript、全仓
+lint、workspace constraints、227 份包不变式及 Host/Client/Web 完整构建通过。文档同步
+27/28 通过，唯一失败仍是当前 Windows 会话无符号链接创建权限，临时目录 symlink
+安全测试在 `symlinkSync` 处报 EPERM。最终 tree 锁定为
+`ae9a489ce67185e057510f54709a127d60a89f83`；验证过程使用隔离源码和端口，不修改 3080。

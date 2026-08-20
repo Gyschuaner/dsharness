@@ -84,6 +84,29 @@ if (Test-Path -LiteralPath $WebAppPatchPath -PathType Leaf) {
     Check $false 'Web App preset 默认配置存在'
 }
 
+$ContinuationSourcePath = Join-Path $SourceDirectory 'packages/guard/max-token-continuation/src/index.ts'
+$ContinuationBundlePath = Join-Path $SourceDirectory 'packages/guard/max-token-continuation/lib/index.js'
+$ConversationLocalePath = Join-Path $SourceDirectory 'packages/client/ui-conversation/src/client/locales.ts'
+$ContinuationReminder = '上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。'
+if (Test-Path -LiteralPath $ContinuationSourcePath -PathType Leaf) {
+    $ContinuationSource = Get-Content -LiteralPath $ContinuationSourcePath -Raw -Encoding UTF8
+    Check ($ContinuationSource.Contains($ContinuationReminder) -and $ContinuationSource -match "reason\.kind\s*!==\s*'max-tokens'") 'Max-token 自动续跑源码与精确 reminder'
+} else {
+    Check $false 'Max-token 自动续跑源码存在'
+}
+if (Test-Path -LiteralPath $ContinuationBundlePath -PathType Leaf) {
+    $ContinuationBundle = Get-Content -LiteralPath $ContinuationBundlePath -Raw -Encoding UTF8
+    Check ($ContinuationBundle.Contains($ContinuationReminder)) 'Max-token 自动续跑构建产物包含精确 reminder'
+} else {
+    Check $false 'Max-token 自动续跑构建产物存在'
+}
+if (Test-Path -LiteralPath $ConversationLocalePath -PathType Leaf) {
+    $ConversationLocale = Get-Content -LiteralPath $ConversationLocalePath -Raw -Encoding UTF8
+    Check ($ConversationLocale.Contains('回答被截断，已有输出保留在对话中。') -and -not $ConversationLocale.Contains('发送“继续”可让模型接着输出。')) '截断提示无需手工发送继续'
+} else {
+    Check $false '会话界面 locale 源码存在'
+}
+
 if (Get-Command dsh -ErrorAction SilentlyContinue) {
     Check ((& dsh --version).Trim() -eq $Lock.dshVersion) "dsh $($Lock.dshVersion)"
 } else {

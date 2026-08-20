@@ -91,8 +91,8 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 摘要预算补丁、DSH-014 的工具调用即时进度反馈补丁，以及 BUG-449804CF 的工具耗时
 与行内状态布局修复、BUG-5F3BF25D 的快速工具运行态可感知性修复、亚秒耗时的毫秒
 精度展示修复、DSH-015 的 Code 子工具计划提前展示，以及 DSH-016 的 Think 独立计时
-和工具活动状态布局。最终源码 tree 为
-`9fd6590c3056bc9b07ce575bf23f82b20419a9a5`。
+和工具活动状态布局，再叠加 DSH-018 的输出 token 上限自动持续续跑。最终源码 tree 为
+`ae9a489ce67185e057510f54709a127d60a89f83`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。
@@ -105,6 +105,10 @@ DSH-012 随构建交付系统级 `qwen-native`（界面名称“Qwen 原生模�
 BUG-B0EE8D2D 的恢复逻辑不解析或执行 Think 中的 XML。仅当一次正常结束的响应只含
 私有推理且出现 Qwen 风格工具标签时，Agent 才通过现有重试策略恢复一次，并仅在该次
 重试临时加入 `system-reminder`；再次只返回推理时会显式报格式错误，避免假完成。
+
+DSH-018 在一轮因 `max-tokens` 结束后等待 Agent 回到 idle，再通过持久消息加入精确的
+`system-reminder` 并启动下一轮；连续触顶会默认一直续跑。已排队的人类输入优先，
+错误、正常结束和插件卸载不会续跑，也不会解析或执行被截断的工具调用文本。
 
 ## 开发约定
 

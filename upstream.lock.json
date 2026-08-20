@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "141eb6fef83422698aef7a981029e843e8161534",
   "baseTree": "24a3336d5c32b32ca7e01a84a08c757bd788c624",
-  "resultTree": "9fd6590c3056bc9b07ce575bf23f82b20419a9a5",
+  "resultTree": "ae9a489ce67185e057510f54709a127d60a89f83",
   "dshVersion": "0.1.0-rc.8",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -56,6 +56,10 @@
     {
       "path": "upstream-patches/0011-feat-DSH-016-align-Think-timing-and-tool-status.patch",
       "sha256": "D2F05C362824AA7AABA5EA0090A94FF2C62E5F8935162EFCC9EE7DCD1A9A5E7E"
+    },
+    {
+      "path": "upstream-patches/0012-feat-DSH-018-continue-max-token-turns-automatically.patch",
+      "sha256": "851C9842265A4EF4125104335FA34AFF7B67F091A0D879A6A9744AC01BCF714C"
     }
   ]
 }

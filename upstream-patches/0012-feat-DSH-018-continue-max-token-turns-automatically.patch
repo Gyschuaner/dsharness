@@ -1,0 +1,1178 @@
+From fa31832e579124ce064b551546f5c4a152305a10 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Thu, 20 Aug 2026 23:06:48 +0800
+Subject: [PATCH] feat(DSH-018): continue max-token turns automatically
+
+---
+ ...026-08-20-max-token-continuation.i18n.yaml |   6 +
+ .../2026-08-20-max-token-continuation.md      |  45 ++++++
+ .../2026-08-20-max-token-continuation.zh.md   |  45 ++++++
+ apps/cli/composition.md                       |   3 +
+ apps/web/tests/shipped-composition.e2e.ts     |  68 ++++++++-
+ docs/config-catalog.i18n.yaml                 |   4 +-
+ docs/config-catalog.md                        |   1 +
+ docs/config-catalog.zh.md                     |   1 +
+ docs/event-producer-consumer.i18n.yaml        |   4 +-
+ docs/event-producer-consumer.md               |   6 +-
+ docs/event-producer-consumer.zh.md            |   6 +-
+ docs/module-graph.i18n.yaml                   |   4 +-
+ docs/module-graph.md                          |   6 +
+ docs/module-graph.zh.md                       |   6 +
+ packages/bundle/base/cordis.patch.yml         |   6 +
+ packages/bundle/base/package.json             |   1 +
+ .../ui-conversation/src/client/locales.ts     |   4 +-
+ .../tests/chat-view.client.spec.tsx           |   2 +-
+ .../src/client/slot-catalog.ts                |   2 +-
+ packages/guard/README.i18n.yaml               |   4 +-
+ packages/guard/README.md                      |   1 +
+ packages/guard/README.zh.md                   |   1 +
+ .../max-token-continuation/README.i18n.yaml   |   6 +
+ .../guard/max-token-continuation/README.md    |  42 ++++++
+ .../guard/max-token-continuation/README.zh.md |  42 ++++++
+ .../guard/max-token-continuation/package.json |  50 +++++++
+ .../guard/max-token-continuation/src/index.ts |  56 ++++++++
+ .../max-token-continuation/src/invariant.ts   |  61 ++++++++
+ .../tests/max-token-continuation.spec.ts      | 132 ++++++++++++++++++
+ .../max-token-continuation/tsconfig.json      |  30 ++++
+ pnpm-lock.yaml                                |  51 +++++--
+ tsconfig.host.json                            |   1 +
+ 32 files changed, 669 insertions(+), 28 deletions(-)
+ create mode 100644 .agents/notes/implemented/feature/2026-08-20-max-token-continuation.i18n.yaml
+ create mode 100644 .agents/notes/implemented/feature/2026-08-20-max-token-continuation.md
+ create mode 100644 .agents/notes/implemented/feature/2026-08-20-max-token-continuation.zh.md
+ create mode 100644 packages/guard/max-token-continuation/README.i18n.yaml
+ create mode 100644 packages/guard/max-token-continuation/README.md
+ create mode 100644 packages/guard/max-token-continuation/README.zh.md
+ create mode 100644 packages/guard/max-token-continuation/package.json
+ create mode 100644 packages/guard/max-token-continuation/src/index.ts
+ create mode 100644 packages/guard/max-token-continuation/src/invariant.ts
+ create mode 100644 packages/guard/max-token-continuation/tests/max-token-continuation.spec.ts
+ create mode 100644 packages/guard/max-token-continuation/tsconfig.json
+
+diff --git a/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.i18n.yaml b/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.i18n.yaml
+new file mode 100644
+index 0000000..f5354b2
+--- /dev/null
++++ b/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-max-token-continuation.md
++2026-08-20-max-token-continuation.md: 517240460a22882430dd7b2e19c4da3219e7b4a9
++2026-08-20-max-token-continuation.zh.md: e4f8538acf1ef042398c74d706d0ce5111d8616d
+diff --git a/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.md b/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.md
+new file mode 100644
+index 0000000..5172404
+--- /dev/null
++++ b/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.md
+@@ -0,0 +1,45 @@
++# Agent Note: Automatic continuation after output-token truncation
++
++Status: implemented
++
++English | [中文](2026-08-20-max-token-continuation.zh.md)
++
++## Problem
++
++A conversation model can spend an entire per-request output budget on reasoning or a long answer and finish with `max-tokens` before completing the task. The durable partial output is useful, but requiring a human to submit “continue” turns an expected model limit into manual supervision and leaves long-running tasks stalled.
++
++## Decision
++
++The shipped base composition mounts [`@deepseek-ai/dsh-max-token-continuation`](../../../../packages/guard/max-token-continuation/README.md) in the host plane. The plugin listens to durable `turn/end` events and, for `max-tokens`, queues one ordinary next-turn message through `agent.followup()`. Every later max-token ending repeats the same operation without a plugin-level round cap; any non-max-token ending stops the chain naturally.
++
++The message is plugin-sourced, retained as `user/message`, and contains exactly:
++
++```markdown
++<system-reminder>
++上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。
++</system-reminder>
++```
++
++The plugin reacts only to the typed finish reason. It does not inspect reasoning, parse XML or JSON-like text, recover partial tool-call arguments, or execute any tool call. The LLM assembler remains responsible for dropping unfinished tool-call blocks before the safe assistant prefix is committed.
++
++## Turn ownership and takeover
++
++The session publishes `turn/end` inside append publication, where a nested durable inbox write is forbidden. The listener records continuation intent without writing. When the exact live agent enters `idle`, the plugin rechecks competing `nextTurn` work and then calls `followup()`; this replacement activity is tracked by `whenIdle()`. Existing `nextTurn` work takes precedence. Input submitted after the continuation request starts follows normal steering and cancellation semantics.
++
++## Alternatives considered
++
++**Teach the Web client to submit “continue”.** This would duplicate host lifecycle policy in one client, fail for headless and SDK callers, and make replay depend on UI timing.
++
++**Parse tool-call markup from truncated reasoning and execute it.** A truncated payload is not a trustworthy tool request, and textual examples are indistinguishable from intent without model-native structure. Executing it would turn presentation text into authority.
++
++**Change the core agent loop.** The loop already exposes the durable session event and public inbox operation needed for continuation. A host plugin keeps the mechanism composable and avoids adding policy to the driver.
++
++**Cap automatic continuation rounds.** A fixed cap merely moves the manual stall to a later request and has no task-independent correct value. Unlimited continuation matches the requested unattended behavior; cancellation and human takeover are the explicit controls.
++
++## Verification
++
++Package tests run the real agent loop against a keyless scripted adapter and cover repeated max-token endings, eventual normal completion, already queued human work, request failure, and plugin disposal. The shipped Web composition test boots the built bundle and snapshots two automatic continuations before completion. Client rendering tests pin the shortened truncation notice.
++
++## Consequences
++
++Long reasoning tasks continue without human input, and each partial assistant response plus reminder remains reconstructable from the event log. Requests stay prefix-stable for KV Cache reuse because the system prompt and earlier messages do not change; the retained partial output and reminder extend the tail. A model that perpetually reaches its output limit can issue unbounded requests until cancellation, failure, disposal, competing work, or another non-max-token ending intervenes.
+diff --git a/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.zh.md b/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.zh.md
+new file mode 100644
+index 0000000..e4f8538
+--- /dev/null
++++ b/.agents/notes/implemented/feature/2026-08-20-max-token-continuation.zh.md
+@@ -0,0 +1,45 @@
++# Agent Note: 输出 token 截断后的自动续跑
++
++Status: implemented
++
++[English](2026-08-20-max-token-continuation.md) | 中文
++
++## 问题
++
++对话模型可能把一次请求的全部输出预算用在推理或长答案上，并在任务完成前以 `max-tokens` 结束。持久化的部分输出仍有价值，但要求人类提交“继续”会把正常的模型限制变成人工看守，并使长任务停滞。
++
++## 决策
++
++随附的基础 composition 在 host 侧挂载 [`@deepseek-ai/dsh-max-token-continuation`](../../../../packages/guard/max-token-continuation/README.md)。插件监听持久化 `turn/end` 事件；遇到 `max-tokens` 时，通过 `agent.followup()` 排入一条普通的下一轮消息。之后每次达到 max-token 上限都会重复同一操作，不设置插件级轮数限制；任何非 max-token 结束都会自然停止这条链。
++
++这条消息来源于插件，以 `user/message` 保留，且内容严格为：
++
++```markdown
++<system-reminder>
++上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。
++</system-reminder>
++```
++
++插件只响应类型化的结束原因。它不检查推理，不解析类似 XML 或 JSON 的文本，不恢复不完整的工具调用参数，也不执行任何工具调用。LLM assembler 仍负责在提交安全的 assistant 前缀前丢弃未完成的工具调用块。
++
++## 轮次所有权与接管
++
++会话在 append 发布期间发布 `turn/end`，此时禁止嵌套写入持久化 inbox。监听器只记录续跑意图，不执行写入。同一个存活 agent 进入 `idle` 时，插件重新检查竞争的 `nextTurn` 工作，再调用 `followup()`；`whenIdle()` 会跟踪这项替代活动。已有 `nextTurn` 工作优先。续跑请求开始后提交的输入遵循普通的 steering 与取消语义。
++
++## 考虑过的替代方案
++
++**让 Web 客户端提交“继续”。** 这会在单个客户端中复制 host 生命周期策略，对 headless 和 SDK 调用方无效，并使回放依赖 UI 时序。
++
++**解析截断推理中的工具调用标记并执行。** 截断载荷不是可信的工具请求；如果没有模型原生结构，就无法区分文本示例与调用意图。执行这类内容会把展示文本变成操作权限。
++
++**修改核心 agent loop。** 现有循环已经提供续跑需要的持久化会话事件和公共 inbox 操作。host 插件可以保持机制可组合，并避免把策略加入 driver。
++
++**限制自动续跑轮数。** 固定上限只会把人工停滞推迟到稍后的请求，而且不存在与任务无关的正确数值。无限续跑符合无人值守的目标；取消和人类接管是明确的控制方式。
++
++## 验证
++
++包测试使用真实 agent loop 和无密钥脚本适配器，覆盖连续 max-token 结束、最终正常完成、已排队的人类工作、请求失败以及插件 dispose。随附的 Web composition 测试启动构建后的组合包，并对正常完成前的两次自动续跑生成快照。客户端渲染测试固定缩短后的截断提示。
++
++## 后果
++
++长推理任务无需人类输入即可继续，每段 assistant 部分响应及 reminder 都能从事件日志重建。系统提示词和更早的消息不变，请求对 KV Cache 复用保持前缀稳定；保留的部分输出和 reminder 只扩展尾部。持续达到输出上限的模型可以发出无上限请求，直到取消、失败、dispose、竞争工作或其他非 max-token 结束介入。
+diff --git a/apps/cli/composition.md b/apps/cli/composition.md
+index 4d37b91..739dbd9 100644
+--- a/apps/cli/composition.md
++++ b/apps/cli/composition.md
+@@ -146,6 +146,8 @@ flowchart LR
+   cfg --> plugin_dsh_base_tool_ralph
+   plugin_dsh_base_tool_str_replace_editor["tool-str-replace-editor<br/>@deepseek-ai/dsh-tool-str-replace-editor"]
+   cfg --> plugin_dsh_base_tool_str_replace_editor
++  plugin_dsh_base_max_token_continuation["max-token-continuation<br/>@deepseek-ai/dsh-max-token-continuation"]
++  cfg --> plugin_dsh_base_max_token_continuation
+   plugin_dsh_base_repeat_tool_reminder["repeat-tool-reminder<br/>@deepseek-ai/dsh-repeat-tool-reminder"]
+   cfg --> plugin_dsh_base_repeat_tool_reminder
+   plugin_dsh_base_web["web<br/>@deepseek-ai/dsh-web"]
+@@ -237,6 +239,7 @@ flowchart LR
+ | `tool-goal` | `@deepseek-ai/dsh-tool-goal` |
+ | `tool-ralph` | `@deepseek-ai/dsh-tool-ralph` |
+ | `tool-str-replace-editor` | `@deepseek-ai/dsh-tool-str-replace-editor` |
++| `max-token-continuation` | `@deepseek-ai/dsh-max-token-continuation` |
+ | `repeat-tool-reminder` | `@deepseek-ai/dsh-repeat-tool-reminder` |
+ | `web` | `@deepseek-ai/dsh-web` |
+ | `web-search-deepseek` | `@deepseek-ai/dsh-web-search-deepseek` |
+diff --git a/apps/web/tests/shipped-composition.e2e.ts b/apps/web/tests/shipped-composition.e2e.ts
+index 295e861..8a96e81 100644
+--- a/apps/web/tests/shipped-composition.e2e.ts
++++ b/apps/web/tests/shipped-composition.e2e.ts
+@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs'
+ import { tmpdir } from 'node:os'
+ import { fileURLToPath } from 'node:url'
+ import { afterEach, expect, it } from 'vitest'
+-import { CallId } from '@deepseek-ai/dsh-llm'
++import { CallId, createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
++import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
+ import { canonicalPath, writableRoots } from '@deepseek-ai/dsh-sandbox'
+ import { SessionId } from '@deepseek-ai/dsh-session'
+ import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+@@ -66,6 +67,30 @@ const EXPECTED_TOOLS = [
+  * dependency.
+  */
+ const RIPGREP_TOOLS = ['glob', 'grep']
++const MAX_TOKEN_PROVIDER = 'shipped-max-token-continuation'
++
++/** Keyless adapter that reaches the output limit twice, then completes. */
++class MaxTokenContinuationAdapter extends LlmAdapter {
++  readonly requests: GenerateOptions[] = []
++
++  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
++    return Promise.resolve({ provider, id: model, name: model })
++  }
++
++  async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
++    this.requests.push(options)
++    const request = this.requests.length
++    const text = request < 3 ? `partial-${request}` : 'done'
++    yield { type: 'block-start', index: 0, blockType: 'text' }
++    yield { type: 'text-delta', index: 0, text }
++    yield { type: 'block-end', index: 0, block: { type: 'text', text } }
++    yield { type: 'usage', usage: { inputTokens: 10, outputTokens: 2 } }
++    yield {
++      type: 'finish',
++      reason: request < 3 ? { kind: 'max-tokens' } : { kind: 'stop' },
++    }
++  }
++}
+ 
+ let scaffold: WebScaffold | undefined
+ 
+@@ -244,3 +269,44 @@ it('lets a preset producer reach the background-job registry', async () => {
+     await handle.dispose()
+   }
+ }, 120_000)
++
++it('ships unlimited max-token continuation through the host composition', async () => {
++  scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
++  const adapter = new MaxTokenContinuationAdapter()
++  const disposeAdapter = scaffold.ctx.llm.registerAdapter([MAX_TOKEN_PROVIDER], adapter)
++  const handle = await scaffold.ctx.agents.create({
++    sessionId: SessionId('shipped-max-token-continuation'),
++    meta: { cwd: scaffold.workspaceCwd },
++    agentOptions: { provider: MAX_TOKEN_PROVIDER, model: 'scripted' },
++  })
++  try {
++    handle.agent.followup(createUserMessage({
++      content: [{ type: 'text', text: 'finish the task' }],
++      source: { kind: 'user' },
++    }))
++    await handle.agent.whenIdle()
++
++    expect(adapter.requests).toHaveLength(3)
++    expect(handle.agent.session.events.flatMap((event): string[] => {
++      if (event.type === 'turn/end') return [`turn/end:${event.data.reason.kind}`]
++      if (event.type !== 'user/message' || event.data.source.kind !== 'plugin'
++        || event.data.source.plugin !== '@deepseek-ai/dsh-max-token-continuation') return []
++      return [event.data.content.map(block => block.type === 'text' ? block.text : '').join('')]
++    })).toMatchInlineSnapshot(`
++      [
++        "turn/end:max-tokens",
++        "<system-reminder>
++      上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。
++      </system-reminder>",
++        "turn/end:max-tokens",
++        "<system-reminder>
++      上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。
++      </system-reminder>",
++        "turn/end:completed",
++      ]
++    `)
++  } finally {
++    await handle.dispose()
++    disposeAdapter()
++  }
++}, 120_000)
+diff --git a/docs/config-catalog.i18n.yaml b/docs/config-catalog.i18n.yaml
+index d9fa142..91fd4e0 100644
+--- a/docs/config-catalog.i18n.yaml
++++ b/docs/config-catalog.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/config-catalog.md
+-config-catalog.md: 867ddd5ad8351a5cd25af92727466960c55c649a
+-config-catalog.zh.md: 66fe15ee31018f3df95e62e69fe539cdd7570add
++config-catalog.md: d173232a40397b7229c8d312aa6977fa2ffd64e6
++config-catalog.zh.md: feea86073ab4c0e97889a9f379d0c53d84e45405
+diff --git a/docs/config-catalog.md b/docs/config-catalog.md
+index 867ddd5..d173232 100644
+--- a/docs/config-catalog.md
++++ b/docs/config-catalog.md
+@@ -3240,6 +3240,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
+ - `@deepseek-ai/dsh-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
+ - `@deepseek-ai/dsh-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
+ - `@deepseek-ai/dsh-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
++- `@deepseek-ai/dsh-max-token-continuation` — requires `agents` ([`packages/guard/max-token-continuation/src/index.ts`](../packages/guard/max-token-continuation/src/index.ts))
+ - `@deepseek-ai/dsh-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
+ - `@deepseek-ai/dsh-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))
+ - `@deepseek-ai/dsh-session-checkpoint-policy` — requires `llm` · `sessionPersistence` · `sessions` · `tools` ([`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts))
+diff --git a/docs/config-catalog.zh.md b/docs/config-catalog.zh.md
+index 66fe15e..feea860 100644
+--- a/docs/config-catalog.zh.md
++++ b/docs/config-catalog.zh.md
+@@ -3242,6 +3242,7 @@ export interface Config {
+ - `@deepseek-ai/dsh-host-plugin-inventory` — 需要 `loader`（[`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts)）
+ - `@deepseek-ai/dsh-llm`（[`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts)）
+ - `@deepseek-ai/dsh-lsp`（[`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts)）
++- `@deepseek-ai/dsh-max-token-continuation` — 需要 `agents`（[`packages/guard/max-token-continuation/src/index.ts`](../packages/guard/max-token-continuation/src/index.ts)）
+ - `@deepseek-ai/dsh-schedule` — 需要 `agents` · `sessions` · `tools` · `sessionPersistence`（[`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts)）
+ - `@deepseek-ai/dsh-session`（[`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts)）
+ - `@deepseek-ai/dsh-session-checkpoint-policy` — 需要 `llm` · `sessionPersistence` · `sessions` · `tools`（[`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts)）
+diff --git a/docs/event-producer-consumer.i18n.yaml b/docs/event-producer-consumer.i18n.yaml
+index 5fdbf36..64c68a7 100644
+--- a/docs/event-producer-consumer.i18n.yaml
++++ b/docs/event-producer-consumer.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/event-producer-consumer.md
+-event-producer-consumer.md: d75d64b58b041c117bf2eaa1612c1b4683378a00
+-event-producer-consumer.zh.md: adfc11782e179077b17199fc4ea6e8f52b3c465b
++event-producer-consumer.md: b85ff66de81ab381f3459616e50e7bafb5e37416
++event-producer-consumer.zh.md: 729ffbc124e9eb1cc612658563718497974e6e58
+diff --git a/docs/event-producer-consumer.md b/docs/event-producer-consumer.md
+index d75d64b..b85ff66 100644
+--- a/docs/event-producer-consumer.md
++++ b/docs/event-producer-consumer.md
+@@ -19,7 +19,7 @@ This matrix shows which packages dispatch each harness-owned event and which pac
+ | `agent/request` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:244`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent`](../packages/core/agent) |
+ | `agent/request-error` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:260`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`compaction-basic`](../packages/compaction/compaction-basic), [`llm-retry`](../packages/llm/llm-retry) |
+ | `agent/session-start` | `emit` | [`packages/core/agent/src/runtime-types.ts:217`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emitAgentEvent`) | `agent-team`, [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) |
+-| `agent/status` | `emit` | [`packages/core/agent/src/runtime-types.ts:178`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`agent`](../packages/core/agent), `agent-team`, `apiproxy`, [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`schedule`](../packages/schedule/schedule), `server` |
++| `agent/status` | `emit` | [`packages/core/agent/src/runtime-types.ts:178`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`agent`](../packages/core/agent), `agent-team`, `apiproxy`, [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`max-token-continuation`](../packages/guard/max-token-continuation), [`schedule`](../packages/schedule/schedule), `server` |
+ | `agent/turn-stopping` | `serial` | [`packages/core/agent/src/runtime-types.ts:278`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`serial`) | [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) |
+ | `approval/request` | `waterfall` | [`packages/interaction/user-approval/src/index.ts:30`](../packages/interaction/user-approval/src/index.ts) | [`user-approval`](../packages/interaction/user-approval) (`waterfall`) | [`acp`](../packages/acp/acp), `apiproxy` |
+ | `commands/change` | `emit` | [`packages/interaction/commands/src/types.ts:80`](../packages/interaction/commands/src/types.ts) | [`commands`](../packages/interaction/commands) (`events.dispatch`) | `apiproxy` |
+@@ -40,7 +40,7 @@ This matrix shows which packages dispatch each harness-owned event and which pac
+ | `session-telemetry/record` | `waterfall` | [`packages/session/session-telemetry/src/index.ts:43`](../packages/session/session-telemetry/src/index.ts) | [`session-telemetry`](../packages/session/session-telemetry) (`waterfall`) | - |
+ | `session/created` | `emit` | [`packages/core/session/src/index.ts:54`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | `apiproxy`, [`compaction`](../packages/compaction/compaction), [`goal`](../packages/goal/goal), [`hook-protocol`](../packages/hooks/hook-protocol), [`llm-retry`](../packages/llm/llm-retry), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`schedule`](../packages/schedule/schedule), `server`, [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-telemetry`](../packages/session/session-telemetry), [`time-context`](../packages/context/time-context), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
+ | `session/disposed` | `emit` | [`packages/core/session/src/index.ts:64`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`agent-loop`](../packages/core/agent-loop), `agent-team`, `apiproxy`, [`session-persistence`](../packages/session/session-persistence), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-telemetry`](../packages/session/session-telemetry), [`session-title`](../packages/session/session-title) |
+-| `session/event` | `emit` | [`packages/core/session/src/index.ts:76`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`acp`](../packages/acp/acp), [`agent-instructions`](../packages/context/agent-instructions), [`agent-loop`](../packages/core/agent-loop), [`agent-presets`](../packages/preset/agent-presets), `agent-team`, `apiproxy`, [`compaction`](../packages/compaction/compaction), [`compaction-basic`](../packages/compaction/compaction-basic), [`file-reference-local`](../packages/context/file-reference-local), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`loader-smoke`](../packages/test-support/loader-smoke), `server`, [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-telemetry`](../packages/session/session-telemetry), [`session-telemetry-otel`](../packages/session/session-telemetry-otel), [`session-title`](../packages/session/session-title), [`token-meter`](../packages/llm/token-meter), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
++| `session/event` | `emit` | [`packages/core/session/src/index.ts:76`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`acp`](../packages/acp/acp), [`agent-instructions`](../packages/context/agent-instructions), [`agent-loop`](../packages/core/agent-loop), [`agent-presets`](../packages/preset/agent-presets), `agent-team`, `apiproxy`, [`compaction`](../packages/compaction/compaction), [`compaction-basic`](../packages/compaction/compaction-basic), [`file-reference-local`](../packages/context/file-reference-local), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`loader-smoke`](../packages/test-support/loader-smoke), [`max-token-continuation`](../packages/guard/max-token-continuation), `server`, [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-telemetry`](../packages/session/session-telemetry), [`session-telemetry-otel`](../packages/session/session-telemetry-otel), [`session-title`](../packages/session/session-title), [`token-meter`](../packages/llm/token-meter), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
+ | `session/flush` | `parallel` | [`packages/core/session/src/index.ts:85`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`session-persistence`](../packages/session/session-persistence), [`session-telemetry`](../packages/session/session-telemetry) |
+ | `settings/document-updated` | `emit` | [`packages/settings/settings/src/types.ts:48`](../packages/settings/settings/src/types.ts) | [`settings`](../packages/settings/settings) (`events.dispatch`) | `apiproxy` |
+ | `settings/updated` | `emit` | [`packages/settings/settings/src/types.ts:35`](../packages/settings/settings/src/types.ts) | [`settings`](../packages/settings/settings) (`events.dispatch`) | [`settings`](../packages/settings/settings) |
+@@ -68,7 +68,7 @@ This matrix shows which packages dispatch each harness-owned event and which pac
+ 
+ | Event string | Dispatchers | Listeners |
+ | --- | --- | --- |
+-| `internal/dispatch` | - | `agent-team`, [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction), [`fs`](../packages/fs/fs), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`llm-retry`](../packages/llm/llm-retry), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`schedule`](../packages/schedule/schedule), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`subagent`](../packages/subagent/subagent), [`terminal-bash`](../packages/terminal/terminal-bash), [`time-context`](../packages/context/time-context), [`tool-todo`](../packages/todo/tool-todo), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval), [`workflow`](../packages/workflow/workflow) |
++| `internal/dispatch` | - | `agent-team`, [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction), [`fs`](../packages/fs/fs), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`llm-retry`](../packages/llm/llm-retry), [`max-token-continuation`](../packages/guard/max-token-continuation), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`schedule`](../packages/schedule/schedule), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`subagent`](../packages/subagent/subagent), [`terminal-bash`](../packages/terminal/terminal-bash), [`time-context`](../packages/context/time-context), [`tool-todo`](../packages/todo/tool-todo), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval), [`workflow`](../packages/workflow/workflow) |
+ | `internal/plugin` | - | `loader`, [`lsp-stdio`](../packages/lsp/lsp-stdio), `webserver` |
+ | `internal/service` | - | [`agent-presets`](../packages/preset/agent-presets), `gateway` |
+ | `internal/status` | - | [`agent`](../packages/core/agent) |
+diff --git a/docs/event-producer-consumer.zh.md b/docs/event-producer-consumer.zh.md
+index adfc117..729ffbc 100644
+--- a/docs/event-producer-consumer.zh.md
++++ b/docs/event-producer-consumer.zh.md
+@@ -21,7 +21,7 @@
+ | `agent/request` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:244`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent`](../packages/core/agent) |
+ | `agent/request-error` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:260`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`compaction-basic`](../packages/compaction/compaction-basic), [`llm-retry`](../packages/llm/llm-retry) |
+ | `agent/session-start` | `emit` | [`packages/core/agent/src/runtime-types.ts:217`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emitAgentEvent`) | `agent-team`, [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) |
+-| `agent/status` | `emit` | [`packages/core/agent/src/runtime-types.ts:178`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`agent`](../packages/core/agent), `agent-team`, `apiproxy`, [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`schedule`](../packages/schedule/schedule), `server` |
++| `agent/status` | `emit` | [`packages/core/agent/src/runtime-types.ts:178`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`agent`](../packages/core/agent), `agent-team`, `apiproxy`, [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`max-token-continuation`](../packages/guard/max-token-continuation), [`schedule`](../packages/schedule/schedule), `server` |
+ | `agent/turn-stopping` | `serial` | [`packages/core/agent/src/runtime-types.ts:278`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`serial`) | [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) |
+ | `approval/request` | `waterfall` | [`packages/interaction/user-approval/src/index.ts:30`](../packages/interaction/user-approval/src/index.ts) | [`user-approval`](../packages/interaction/user-approval) (`waterfall`) | [`acp`](../packages/acp/acp), `apiproxy` |
+ | `commands/change` | `emit` | [`packages/interaction/commands/src/types.ts:80`](../packages/interaction/commands/src/types.ts) | [`commands`](../packages/interaction/commands) (`events.dispatch`) | `apiproxy` |
+@@ -42,7 +42,7 @@
+ | `session-telemetry/record` | `waterfall` | [`packages/session/session-telemetry/src/index.ts:43`](../packages/session/session-telemetry/src/index.ts) | [`session-telemetry`](../packages/session/session-telemetry) (`waterfall`) | - |
+ | `session/created` | `emit` | [`packages/core/session/src/index.ts:54`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | `apiproxy`, [`compaction`](../packages/compaction/compaction), [`goal`](../packages/goal/goal), [`hook-protocol`](../packages/hooks/hook-protocol), [`llm-retry`](../packages/llm/llm-retry), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`schedule`](../packages/schedule/schedule), `server`, [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-telemetry`](../packages/session/session-telemetry), [`time-context`](../packages/context/time-context), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
+ | `session/disposed` | `emit` | [`packages/core/session/src/index.ts:64`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`agent-loop`](../packages/core/agent-loop), `agent-team`, `apiproxy`, [`session-persistence`](../packages/session/session-persistence), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-telemetry`](../packages/session/session-telemetry), [`session-title`](../packages/session/session-title) |
+-| `session/event` | `emit` | [`packages/core/session/src/index.ts:76`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`acp`](../packages/acp/acp), [`agent-instructions`](../packages/context/agent-instructions), [`agent-loop`](../packages/core/agent-loop), [`agent-presets`](../packages/preset/agent-presets), `agent-team`, `apiproxy`, [`compaction`](../packages/compaction/compaction), [`compaction-basic`](../packages/compaction/compaction-basic), [`file-reference-local`](../packages/context/file-reference-local), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`loader-smoke`](../packages/test-support/loader-smoke), `server`, [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-telemetry`](../packages/session/session-telemetry), [`session-telemetry-otel`](../packages/session/session-telemetry-otel), [`session-title`](../packages/session/session-title), [`token-meter`](../packages/llm/token-meter), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
++| `session/event` | `emit` | [`packages/core/session/src/index.ts:76`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`acp`](../packages/acp/acp), [`agent-instructions`](../packages/context/agent-instructions), [`agent-loop`](../packages/core/agent-loop), [`agent-presets`](../packages/preset/agent-presets), `agent-team`, `apiproxy`, [`compaction`](../packages/compaction/compaction), [`compaction-basic`](../packages/compaction/compaction-basic), [`file-reference-local`](../packages/context/file-reference-local), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`loader-smoke`](../packages/test-support/loader-smoke), [`max-token-continuation`](../packages/guard/max-token-continuation), `server`, [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`session-projection`](../packages/session/session-projection), [`session-projection-cache`](../packages/session/session-projection-cache), [`session-telemetry`](../packages/session/session-telemetry), [`session-telemetry-otel`](../packages/session/session-telemetry-otel), [`session-title`](../packages/session/session-title), [`token-meter`](../packages/llm/token-meter), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
+ | `session/flush` | `parallel` | [`packages/core/session/src/index.ts:85`](../packages/core/session/src/index.ts) | [`session`](../packages/core/session) (`events.dispatch`) | [`session-persistence`](../packages/session/session-persistence), [`session-telemetry`](../packages/session/session-telemetry) |
+ | `settings/document-updated` | `emit` | [`packages/settings/settings/src/types.ts:48`](../packages/settings/settings/src/types.ts) | [`settings`](../packages/settings/settings) (`events.dispatch`) | `apiproxy` |
+ | `settings/updated` | `emit` | [`packages/settings/settings/src/types.ts:35`](../packages/settings/settings/src/types.ts) | [`settings`](../packages/settings/settings) (`events.dispatch`) | [`settings`](../packages/settings/settings) |
+@@ -70,7 +70,7 @@
+ 
+ | 事件字符串 | 派发方 | 监听方 |
+ | --- | --- | --- |
+-| `internal/dispatch` | - | `agent-team`, [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction), [`fs`](../packages/fs/fs), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`llm-retry`](../packages/llm/llm-retry), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`schedule`](../packages/schedule/schedule), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`subagent`](../packages/subagent/subagent), [`terminal-bash`](../packages/terminal/terminal-bash), [`time-context`](../packages/context/time-context), [`tool-todo`](../packages/todo/tool-todo), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval), [`workflow`](../packages/workflow/workflow) |
++| `internal/dispatch` | - | `agent-team`, [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction), [`fs`](../packages/fs/fs), [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hook-protocol`](../packages/hooks/hook-protocol), [`llm-retry`](../packages/llm/llm-retry), [`max-token-continuation`](../packages/guard/max-token-continuation), [`permission-presets`](../packages/interaction/permission-presets), [`plan-mode`](../packages/plan/plan-mode), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`schedule`](../packages/schedule/schedule), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`subagent`](../packages/subagent/subagent), [`terminal-bash`](../packages/terminal/terminal-bash), [`time-context`](../packages/context/time-context), [`tool-todo`](../packages/todo/tool-todo), [`tool-workflow`](../packages/workflow/tool-workflow), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval), [`workflow`](../packages/workflow/workflow) |
+ | `internal/plugin` | - | `loader`, [`lsp-stdio`](../packages/lsp/lsp-stdio), `webserver` |
+ | `internal/service` | - | [`agent-presets`](../packages/preset/agent-presets), `gateway` |
+ | `internal/status` | - | [`agent`](../packages/core/agent) |
+diff --git a/docs/module-graph.i18n.yaml b/docs/module-graph.i18n.yaml
+index 47f66d0..429e875 100644
+--- a/docs/module-graph.i18n.yaml
++++ b/docs/module-graph.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/module-graph.md
+-module-graph.md: f8eff01aeedb83f6824a605faf86aeec2b0385ab
+-module-graph.zh.md: 372deaba770e468327b570fc9d1e022799e5cf69
++module-graph.md: b02bd21b95acc114de0c8465ad3dad29c582acff
++module-graph.zh.md: 292cc500018eac8a141ae30b39b003511a63e538
+diff --git a/docs/module-graph.md b/docs/module-graph.md
+index f8eff01..b02bd21 100644
+--- a/docs/module-graph.md
++++ b/docs/module-graph.md
+@@ -207,6 +207,7 @@ flowchart TD
+     pkg_message_feedback["message-feedback"]
+   end
+   subgraph group_guard["packages/guard"]
++    pkg_max_token_continuation["max-token-continuation"]
+     pkg_repeat_tool_reminder["repeat-tool-reminder"]
+     pkg_tool_call_timeout_policy["tool-call-timeout-policy"]
+   end
+@@ -528,6 +529,10 @@ flowchart TD
+   pkg_message_feedback --> pkg_session_persistence
+   pkg_message_feedback --> pkg_storage_domain
+   pkg_message_feedback --> pkg_typert_protocol
++  pkg_max_token_continuation --> pkg_agent
++  pkg_max_token_continuation --> pkg_invariants
++  pkg_max_token_continuation --> pkg_llm
++  pkg_max_token_continuation --> pkg_session
+   pkg_commands --> pkg_agent
+   pkg_commands --> pkg_attachment
+   pkg_commands --> pkg_brand
+@@ -1530,6 +1535,7 @@ flowchart TD
+ | [`file-reference`](../packages/context/file-reference) | `context` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`typert-protocol`](../packages/typert/protocol) |
+ | [`time-context`](../packages/context/time-context) | `context` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`session`](../packages/core/session) |
+ | [`message-feedback`](../packages/feedback/message-feedback) | `feedback` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`storage-domain`](../packages/storage/storage-domain), [`typert-protocol`](../packages/typert/protocol) |
++| [`max-token-continuation`](../packages/guard/max-token-continuation) | `guard` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
+ | [`commands`](../packages/interaction/commands) | `interaction` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`typert-protocol`](../packages/typert/protocol) |
+ | [`user-approval`](../packages/interaction/user-approval) | `interaction` | [`agent`](../packages/core/agent), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt) |
+ | [`user-questions`](../packages/interaction/user-questions) | `interaction` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
+diff --git a/docs/module-graph.zh.md b/docs/module-graph.zh.md
+index 372deab..292cc50 100644
+--- a/docs/module-graph.zh.md
++++ b/docs/module-graph.zh.md
+@@ -209,6 +209,7 @@ flowchart TD
+     pkg_message_feedback["message-feedback"]
+   end
+   subgraph group_guard["packages/guard"]
++    pkg_max_token_continuation["max-token-continuation"]
+     pkg_repeat_tool_reminder["repeat-tool-reminder"]
+     pkg_tool_call_timeout_policy["tool-call-timeout-policy"]
+   end
+@@ -530,6 +531,10 @@ flowchart TD
+   pkg_message_feedback --> pkg_session_persistence
+   pkg_message_feedback --> pkg_storage_domain
+   pkg_message_feedback --> pkg_typert_protocol
++  pkg_max_token_continuation --> pkg_agent
++  pkg_max_token_continuation --> pkg_invariants
++  pkg_max_token_continuation --> pkg_llm
++  pkg_max_token_continuation --> pkg_session
+   pkg_commands --> pkg_agent
+   pkg_commands --> pkg_attachment
+   pkg_commands --> pkg_brand
+@@ -1532,6 +1537,7 @@ flowchart TD
+ | [`file-reference`](../packages/context/file-reference) | `context` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`typert-protocol`](../packages/typert/protocol) |
+ | [`time-context`](../packages/context/time-context) | `context` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`session`](../packages/core/session) |
+ | [`message-feedback`](../packages/feedback/message-feedback) | `feedback` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`storage-domain`](../packages/storage/storage-domain), [`typert-protocol`](../packages/typert/protocol) |
++| [`max-token-continuation`](../packages/guard/max-token-continuation) | `guard` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
+ | [`commands`](../packages/interaction/commands) | `interaction` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`typert-protocol`](../packages/typert/protocol) |
+ | [`user-approval`](../packages/interaction/user-approval) | `interaction` | [`agent`](../packages/core/agent), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt) |
+ | [`user-questions`](../packages/interaction/user-questions) | `interaction` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm) |
+diff --git a/packages/bundle/base/cordis.patch.yml b/packages/bundle/base/cordis.patch.yml
+index e9567d9..f76a5d2 100644
+--- a/packages/bundle/base/cordis.patch.yml
++++ b/packages/bundle/base/cordis.patch.yml
+@@ -386,6 +386,12 @@
+       config:
+         maxOutputChars: 16000
+ 
++    # Continue the same task in ordinary turns whenever one model response
++    # reaches its output-token ceiling. Human input and cancellation retain
++    # their normal takeover paths; there is deliberately no continuation cap.
++    - id: max-token-continuation
++      name: '@deepseek-ai/dsh-max-token-continuation'
++
+     # Consecutive-repeat reminders on the tool chain.
+     - id: repeat-tool-reminder
+       name: '@deepseek-ai/dsh-repeat-tool-reminder'
+diff --git a/packages/bundle/base/package.json b/packages/bundle/base/package.json
+index ce984dd..3270eb0 100644
+--- a/packages/bundle/base/package.json
++++ b/packages/bundle/base/package.json
+@@ -64,6 +64,7 @@
+     "@deepseek-ai/dsh-llm-deepseek": "workspace:^",
+     "@deepseek-ai/dsh-llm-pi-ai": "workspace:^",
+     "@deepseek-ai/dsh-llm-retry": "workspace:^",
++    "@deepseek-ai/dsh-max-token-continuation": "workspace:^",
+     "@deepseek-ai/dsh-permission-presets": "workspace:^",
+     "@deepseek-ai/dsh-plan-mode": "workspace:^",
+     "@deepseek-ai/dsh-pwsh-sandbox": "workspace:^",
+diff --git a/packages/client/ui-conversation/src/client/locales.ts b/packages/client/ui-conversation/src/client/locales.ts
+index f4e7a7c..e9f45a5 100644
+--- a/packages/client/ui-conversation/src/client/locales.ts
++++ b/packages/client/ui-conversation/src/client/locales.ts
+@@ -130,7 +130,7 @@ export const zh = {
+   'message.retry.failure': '失败原因：',
+   'message.turnError': '本轮运行失败',
+   'message.maxTokens': '已达到输出 token 上限',
+-  'message.maxTokens.hint': '回答被截断，已有输出保留在对话中。发送“继续”可让模型接着输出。',
++  'message.maxTokens.hint': '回答被截断，已有输出保留在对话中。',
+   'message.ranFor': '用时 {duration}',
+   'message.ttft': '首 token {seconds}秒',
+   'message.tokensPerSecond': '{tps} tok/s',
+@@ -307,7 +307,7 @@ export const en = {
+   'message.retry.failure': 'Failure reason: ',
+   'message.turnError': 'This turn failed',
+   'message.maxTokens': 'Output token limit reached',
+-  'message.maxTokens.hint': 'The reply was cut off; earlier output is preserved in the conversation. Send "continue" to let the model resume.',
++  'message.maxTokens.hint': 'The reply was cut off; earlier output is preserved in the conversation.',
+   'message.ranFor': 'Ran for {duration}',
+   'message.ttft': 'TTFT {seconds}s',
+   'message.tokensPerSecond': '{tps} tok/s',
+diff --git a/packages/client/ui-conversation/tests/chat-view.client.spec.tsx b/packages/client/ui-conversation/tests/chat-view.client.spec.tsx
+index b81dff8..d602c3d 100644
+--- a/packages/client/ui-conversation/tests/chat-view.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/chat-view.client.spec.tsx
+@@ -595,7 +595,7 @@ describe('ChatView', () => {
+     const view = render(<h.ChatView {...h.props} />)
+     const statuses = view.getAllByRole('status')
+     expect(statuses.map(status => status.textContent)).toEqual([
+-      '已达到输出 token 上限回答被截断，已有输出保留在对话中。发送“继续”可让模型接着输出。',
++      '已达到输出 token 上限回答被截断，已有输出保留在对话中。',
+     ])
+     expect(view.queryByText('本轮运行失败')).toBeNull()
+   })
+diff --git a/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts b/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
+index 98ae8bd..a716126 100644
+--- a/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
++++ b/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
+@@ -1774,7 +1774,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
+       },
+     ],
+     ownerProps: [
+-      '/** Standard owner currency supplied to every atomic Tool view. */\nexport interface ToolCallOwnerProps {\n  /** Tool call identity, stable across running and settled forms. */\n  callId: string\n  /** Wire Tool name and keyed dispatch value. */\n  toolName: string\n  /** Frozen running call or settled result node. */\n  block: ToolCallBlock\n  /** Session workspace root for relative summaries. */\n  cwd?: string | undefined\n  /** Host account home; POSIX home-rooted summaries display as `~`. */\n  home?: string | undefined\n  /** Open a Tool argument path through the Host. */\n  openFile: (path: string) => void\n  /** Inspect this call in the trajectory view when available. */\n  inspect?: (() => void) | undefined\n}',
++      '/** Standard owner currency supplied to every atomic Tool view. */\nexport interface ToolCallOwnerProps {\n  /** Tool call identity, stable across running and settled forms. */\n  callId: string\n  /** Wire Tool name and keyed dispatch value. */\n  toolName: string\n  /** Frozen running call or settled result node. */\n  block: ToolCallBlock\n  /** Perceptible UI activity state; may remain running briefly after a fast result. */\n  activityState?: \'running\' | \'settled\' | undefined\n  /** Session workspace root for relative summaries. */\n  cwd?: string | undefined\n  /** Host account home; POSIX home-rooted summaries display as `~`. */\n  home?: string | undefined\n  /** Open a Tool argument path through the Host. */\n  openFile: (path: string) => void\n  /** Inspect this call in the trajectory view when available. */\n  inspect?: (() => void) | undefined\n}',
+     ],
+     ownerPropsReferences: [
+       'Wire',
+diff --git a/packages/guard/README.i18n.yaml b/packages/guard/README.i18n.yaml
+index b438626..c69461d 100644
+--- a/packages/guard/README.i18n.yaml
++++ b/packages/guard/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/guard/README.md
+-README.md: ce5c16dbfbae5c55430f4e8d8bb48ab50989b7ad
+-README.zh.md: 7fc032bf7aa8b14a89376ae6d3a57ac45447ea60
++README.md: c8634a75d055e83aea76d17ac74d7d525f850edb
++README.zh.md: 1daab8d50254af3bc5f27835e7b5c65819701125
+diff --git a/packages/guard/README.md b/packages/guard/README.md
+index ce5c16d..c8634a7 100644
+--- a/packages/guard/README.md
++++ b/packages/guard/README.md
+@@ -6,6 +6,7 @@ Behavioral guard plugins watch the agent loop for unproductive patterns and enfo
+ 
+ | Package | Role | ctx key |
+ |---|---|---|
++| [`max-token-continuation/`](max-token-continuation/README.md) | Unlimited next-turn continuation after output-token truncation | listens on session and agent events |
+ | [`repeat-tool-reminder/`](repeat-tool-reminder/README.md) | Advisory reminders for repeated tool calls | listens on tool and agent events |
+ | [`timeout-policy/`](timeout-policy/README.md) | Arms per-call tool deadlines as deployment policy | registers a `tools/execute` listener |
+ 
+diff --git a/packages/guard/README.zh.md b/packages/guard/README.zh.md
+index 7fc032b..1daab8d 100644
+--- a/packages/guard/README.zh.md
++++ b/packages/guard/README.zh.md
+@@ -6,6 +6,7 @@
+ 
+ | 包 | 职责 | ctx key |
+ |---|---|---|
++| [`max-token-continuation/`](max-token-continuation/README.md) | 输出 token 截断后的无限下一轮续跑 | 监听会话与 agent 事件 |
+ | [`repeat-tool-reminder/`](repeat-tool-reminder/README.md) | 针对重复工具调用的建议性提醒 | 监听工具和 agent 事件 |
+ | [`timeout-policy/`](timeout-policy/README.md) | 以部署策略形式设置单次工具调用截止时间 | 注册 `tools/execute` 监听器 |
+ 
+diff --git a/packages/guard/max-token-continuation/README.i18n.yaml b/packages/guard/max-token-continuation/README.i18n.yaml
+new file mode 100644
+index 0000000..d45e761
+--- /dev/null
++++ b/packages/guard/max-token-continuation/README.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write packages/guard/max-token-continuation/README.md
++README.md: 5213a8e90dba83f2b0b48709e36305ab6cbcbd64
++README.zh.md: 78485c96e12fb825eed1947f1e3096ae9ec0d1b8
+diff --git a/packages/guard/max-token-continuation/README.md b/packages/guard/max-token-continuation/README.md
+new file mode 100644
+index 0000000..5213a8e
+--- /dev/null
++++ b/packages/guard/max-token-continuation/README.md
+@@ -0,0 +1,42 @@
++# @deepseek-ai/dsh-max-token-continuation
++
++English | [中文](README.zh.md)
++
++This host-plane guard resumes the same agent task when a conversation request ends at its output-token limit. It listens for a durable `turn/end` with reason `max-tokens`, queues one plugin-sourced next-turn message through `agent.followup()`, and repeats on every later max-token ending without a round cap. A normal completion, request error, cancellation, disposal, or competing next-turn message ends this automatic chain. The decision is recorded in the [max-token continuation Agent Note](../../../.agents/notes/implemented/feature/2026-08-20-max-token-continuation.md).
++
++## Continuation semantics
++
++The plugin never parses assistant reasoning or visible text and never reconstructs or executes a truncated tool call. The LLM assembler and agent loop retain safe text and reasoning while dropping unfinished tool-call blocks before `turn/end`; this guard reacts only to that durable ending and starts an ordinary new turn.
++
++The max-token event records continuation intent without writing during session publication. When the agent reaches idle, already queued ordinary next-turn work takes precedence and the guard adds nothing; otherwise it queues the reminder and starts the next turn. Input submitted after that request starts follows the normal steering, queueing, and cancellation rules.
++
++The shipped base composition mounts one instance globally. The plugin has no config: unlimited continuation is the product default, while cancellation and human takeover remain the runtime controls.
++
++## Model Experience
++
++### Max-token continuation message
++
++#### What the model sees
++
++The next request retains the truncated assistant output and appends the following plugin-sourced user-role message. The system prompt and request header are unchanged.
++
++##### Continuation reminder
++
++```markdown
++<system-reminder>
++上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。
++</system-reminder>
++```
++
++#### Token effect
++
++Each max-token ending adds one retained reminder and another conversation request. Repeated max-token endings have no package-level round cap; ordinary context compaction still applies before later requests.
++
++#### KV Cache effect
++
++Append-only. The existing system prompt, tool schemas, and message prefix remain byte-identical; each reminder and retained partial response extend the request tail.
++
++## Known Limitations and Deferred Work
++
++- **A claimed continuation is already running work** — a human follow-up submitted after the reminder enters its turn does not retroactively replace that request; steering or cancellation provides immediate takeover.
++- **Unlimited continuation can consume unbounded requests** — a model that repeatedly reaches its output-token ceiling continues until another terminal condition or operator action occurs; a fixed retry cap is deliberately not imposed.
+diff --git a/packages/guard/max-token-continuation/README.zh.md b/packages/guard/max-token-continuation/README.zh.md
+new file mode 100644
+index 0000000..78485c9
+--- /dev/null
++++ b/packages/guard/max-token-continuation/README.zh.md
+@@ -0,0 +1,42 @@
++# @deepseek-ai/dsh-max-token-continuation
++
++[English](README.md) | 中文
++
++这个 host 侧 guard 会在对话请求达到输出 token 上限时恢复同一个 agent（智能体）任务。它监听结束原因为 `max-tokens` 的持久化 `turn/end`，通过 `agent.followup()` 排入一条来源于插件的下一轮消息，并在之后每次达到输出上限时继续运行，不设置轮数上限。正常完成、请求错误、取消、dispose（资源释放）或竞争的下一轮消息都会结束这条自动链。决策记录见 [max-token continuation Agent Note](../../../.agents/notes/implemented/feature/2026-08-20-max-token-continuation.md)。
++
++## 续跑语义
++
++插件绝不解析 assistant 的推理或可见文本，也不会重建或执行被截断的工具调用。LLM（大语言模型）assembler 与 agent loop（智能体循环）会在 `turn/end` 前保留安全的文本和推理，同时丢弃未完成的工具调用块；这个 guard 只响应持久化的结束事件，并启动一个普通的新轮次。
++
++max-token 事件只记录续跑意图，不会在会话发布期间写入。agent 到达 idle 时，已排队的普通下一轮工作优先，guard 不会添加任何内容；否则它会排入 reminder 并启动下一轮。该请求开始后提交的输入遵循正常的 steering（中途引导）、排队和取消规则。
++
++随附的基础 composition 在全局挂载一个实例。插件没有配置项：无限续跑是产品默认行为，取消和人类接管仍是运行时控制方式。
++
++## 模型体验
++
++### max-token 续跑消息
++
++#### 模型看到的内容
++
++下一次请求保留被截断的 assistant 输出，并追加以下来源于插件的 user-role 消息。系统提示词和请求 header 保持不变。
++
++##### 续跑 reminder
++
++```markdown
++<system-reminder>
++上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。
++</system-reminder>
++```
++
++#### Token 影响
++
++每次达到 max-token 上限都会增加一条保留的 reminder 和一次对话请求。重复达到上限时没有包级轮数限制；后续请求前仍会应用普通的上下文压缩（context compaction）。
++
++#### KV Cache 影响
++
++仅追加。现有系统提示词、工具 schema 和消息前缀保持逐字节一致；每条 reminder 和保留的部分输出只扩展请求尾部。
++
++## 已知限制与暂缓事项
++
++- **已领取的续跑属于正在运行的工作**：人类 follow-up 在 reminder 进入其轮次后提交，不会追溯替换该请求；steering 或取消可用于立即接管。
++- **无限续跑可能消耗无上限的请求**：持续达到输出 token 上限的模型会一直运行，直到出现其他终止条件或操作方介入；系统刻意不施加固定重试上限。
+diff --git a/packages/guard/max-token-continuation/package.json b/packages/guard/max-token-continuation/package.json
+new file mode 100644
+index 0000000..363e9a1
+--- /dev/null
++++ b/packages/guard/max-token-continuation/package.json
+@@ -0,0 +1,50 @@
++{
++  "name": "@deepseek-ai/dsh-max-token-continuation",
++  "description": "Host guard that continues an agent after an output-token-limit turn",
++  "version": "0.1.0-rc.8",
++  "publishConfig": {
++    "access": "public"
++  },
++  "repository": {
++    "type": "git",
++    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
++    "directory": "packages/guard/max-token-continuation"
++  },
++  "type": "module",
++  "main": "lib/index.js",
++  "types": "lib/types/index.d.ts",
++  "exports": {
++    ".": {
++      "types": "./lib/types/index.d.ts",
++      "default": "./lib/index.js"
++    },
++    "./invariant": {
++      "types": "./lib/types/invariant.d.ts",
++      "default": "./lib/invariant.js"
++    },
++    "./src/*": "./src/*",
++    "./package.json": "./package.json"
++  },
++  "files": [
++    "lib/index.js",
++    "lib/invariant.js",
++    "lib/types/**/*.d.ts"
++  ],
++  "license": "MIT",
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-agent": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^",
++    "@deepseek-ai/dsh-llm": "workspace:^",
++    "@deepseek-ai/dsh-session": "workspace:^"
++  },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-agent": "workspace:^",
++    "@deepseek-ai/dsh-agent-loop": "workspace:^",
++    "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^",
++    "@deepseek-ai/dsh-llm": "workspace:^",
++    "@deepseek-ai/dsh-session": "workspace:^"
++  }
++}
+diff --git a/packages/guard/max-token-continuation/src/index.ts b/packages/guard/max-token-continuation/src/index.ts
+new file mode 100644
+index 0000000..8e63d92
+--- /dev/null
++++ b/packages/guard/max-token-continuation/src/index.ts
+@@ -0,0 +1,56 @@
++/**
++ * Automatic next-turn continuation after a conversation request reaches its
++ * output-token ceiling.
++ *
++ * @module @deepseek-ai/dsh-max-token-continuation
++ */
++
++import type { Context } from '@deepseek-ai/cordis'
++import type { Agent } from '@deepseek-ai/dsh-agent'
++import { createUserMessage } from '@deepseek-ai/dsh-llm'
++import type { UserMessage } from '@deepseek-ai/dsh-llm'
++import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
++
++export const name = 'max-token-continuation'
++export const inject = ['agents']
++
++/** Source identity for every continuation message owned by this plugin. */
++export const MAX_TOKEN_CONTINUATION_SOURCE = '@deepseek-ai/dsh-max-token-continuation'
++
++/** Exact model-visible reminder retained after a max-token turn. */
++export const MAX_TOKEN_CONTINUATION_REMINDER = `<system-reminder>
++上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。
++</system-reminder>`
++
++/**
++ * Create the durable next-turn message used for automatic continuation.
++ *
++ * @returns The exact plugin-owned system reminder as a durable user message.
++ */
++export function createMaxTokenContinuationReminder(): UserMessage {
++  return createUserMessage({
++    content: [{ type: 'text', text: MAX_TOKEN_CONTINUATION_REMINDER }],
++    source: { kind: 'plugin', plugin: MAX_TOKEN_CONTINUATION_SOURCE },
++  })
++}
++
++/** Install unlimited automatic continuation with pending-human takeover. */
++export function apply(ctx: Context): void {
++  const needed = new WeakSet<Agent>()
++
++  ctx.on('session/event', (session: Session, event: SessionEvent) => {
++    if (event.type !== 'turn/end' || event.data.reason.kind !== 'max-tokens') return
++    const agent = ctx.agents.get(session.id)
++    if (agent === undefined || agent.session !== session) return
++    // Session observers run inside append publication, where another durable
++    // inbox append would be rejected as reentrant. The idle transition is the
++    // first lifecycle point after publication closes.
++    needed.add(agent)
++  }, { global: true })
++
++  ctx.on('agent/status', ({ agent, status }) => {
++    if (status !== 'idle' || !needed.delete(agent)) return
++    if (ctx.agents.get(agent.id) !== agent || agent.inbox.nextTurn.length > 0) return
++    agent.followup(createMaxTokenContinuationReminder())
++  }, { global: true })
++}
+diff --git a/packages/guard/max-token-continuation/src/invariant.ts b/packages/guard/max-token-continuation/src/invariant.ts
+new file mode 100644
+index 0000000..3c5e7df
+--- /dev/null
++++ b/packages/guard/max-token-continuation/src/invariant.ts
+@@ -0,0 +1,61 @@
++/** Package-owned continuation-message invariants. @module @deepseek-ai/dsh-max-token-continuation/invariant */
++
++import { isDeepStrictEqual } from 'node:util'
++import type { Context } from '@deepseek-ai/cordis'
++import type { InvariantFailure, InvariantInstaller } from '@deepseek-ai/dsh-invariants'
++import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
++import {
++  MAX_TOKEN_CONTINUATION_REMINDER,
++  MAX_TOKEN_CONTINUATION_SOURCE,
++} from './index.ts'
++
++const PACKAGE_NAME = '@deepseek-ai/dsh-max-token-continuation'
++
++/** Cordis companion plugin name. */
++export const name = 'max-token-continuation-invariant'
++/** Service required before the companion can reserve package ownership. */
++export const inject = ['invariants']
++
++/** Validate one package-owned reminder against its preceding turn. */
++function validateEvent(
++  prior: readonly SessionEvent[],
++  event: SessionEvent,
++  fail: InvariantFailure,
++): void {
++  if (event.type !== 'user/message') return
++  const source = event.data.source
++  if (source.kind !== 'plugin' || source.plugin !== MAX_TOKEN_CONTINUATION_SOURCE) return
++  if (!isDeepStrictEqual(event.data.content, [{ type: 'text', text: MAX_TOKEN_CONTINUATION_REMINDER }])) {
++    fail('continuation message does not match the package-owned reminder')
++  }
++  const turnEnd = prior.findLast(candidate => candidate.type === 'turn/end')
++  if (turnEnd?.data.reason.kind !== 'max-tokens') {
++    fail('continuation message is not preceded by a max-tokens turn')
++  }
++}
++
++/** Check existing sessions and every candidate event before Session publishes it. */
++const install: InvariantInstaller = Object.assign((ctx: Context, fail: InvariantFailure) => {
++  for (const session of ctx.sessions.list()) {
++    const prior: SessionEvent[] = []
++    for (const event of session.events) {
++      validateEvent(prior, event, fail)
++      prior.push(event)
++    }
++  }
++  /* jscpd:ignore-start -- package companions share dispatch and registration plumbing */
++  ctx.on('internal/dispatch', (_mode, eventName, args) => {
++    if (eventName !== 'session/event') return
++    const [session, event] = args as [Session, SessionEvent]
++    validateEvent(session.events, event, fail)
++  }, { global: true })
++}, { inject: ['sessions'] })
++
++/**
++ * Register the max-token-continuation invariant companion.
++ * @param ctx - Cordis context carrying the invariant service.
++ * @returns the installed registration's disposer after setup succeeds.
++ */
++export const apply = (ctx: Context): Promise<() => void> =>
++  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
++/* jscpd:ignore-end */
+diff --git a/packages/guard/max-token-continuation/tests/max-token-continuation.spec.ts b/packages/guard/max-token-continuation/tests/max-token-continuation.spec.ts
+new file mode 100644
+index 0000000..68090cc
+--- /dev/null
++++ b/packages/guard/max-token-continuation/tests/max-token-continuation.spec.ts
+@@ -0,0 +1,132 @@
++import { describe, expect, it } from 'vitest'
++import { Context } from '@deepseek-ai/cordis'
++import type { Agent } from '@deepseek-ai/dsh-agent'
++import AgentLoop from '@deepseek-ai/dsh-agent-loop'
++import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
++import { createUserMessage } from '@deepseek-ai/dsh-llm'
++import type { SessionEvent } from '@deepseek-ai/dsh-session'
++import { SessionId } from '@deepseek-ai/dsh-session'
++import * as MaxTokenContinuation from '@deepseek-ai/dsh-max-token-continuation'
++import {
++  MAX_TOKEN_CONTINUATION_REMINDER,
++  MAX_TOKEN_CONTINUATION_SOURCE,
++} from '@deepseek-ai/dsh-max-token-continuation'
++import {
++  maxTokensResponse,
++  MockAdapter,
++  textResponse,
++} from '../../../core/agent-loop/tests/mock-adapter.ts'
++
++/** Boot the real agent loop and the host continuation plugin. */
++async function harness(): Promise<{ ctx: Context; plugin: { dispose(): Promise<void> } }> {
++  const ctx = new Context()
++  await mountAgentLoopTestDependencies(ctx)
++  const plugin = await ctx.plugin(MaxTokenContinuation)
++  await ctx.plugin(AgentLoop, { agents: [] })
++  return { ctx, plugin }
++}
++
++/** Package-owned messages that reached durable model history. */
++function continuationMessages(agent: Agent): SessionEvent<'user/message'>[] {
++  return agent.session.events.filter((event): event is SessionEvent<'user/message'> =>
++    event.type === 'user/message'
++    && event.data.source.kind === 'plugin'
++    && event.data.source.plugin === MAX_TOKEN_CONTINUATION_SOURCE)
++}
++
++/** Start one human turn and wait for the complete replacement-work interval. */
++async function run(agent: Agent): Promise<void> {
++  agent.followup(createUserMessage({
++    content: [{ type: 'text', text: 'start' }],
++    source: { kind: 'user' },
++  }))
++  await agent.whenIdle()
++}
++
++describe('max-token continuation', () => {
++  it('continues without a round cap until a request completes normally', async () => {
++    const { ctx } = await harness()
++    const adapter = new MockAdapter([
++      maxTokensResponse('part one'),
++      maxTokensResponse('part two'),
++      maxTokensResponse('part three'),
++      textResponse('done'),
++    ])
++    ctx.llm.registerAdapter(['mock'], adapter)
++    const agent = ctx.agentLoop.create(SessionId('unlimited'), { provider: 'mock', model: 'mock' })
++
++    await run(agent)
++
++    expect(adapter.requests).toHaveLength(4)
++    expect(agent.session.events
++      .filter((event): event is SessionEvent<'turn/end'> => event.type === 'turn/end')
++      .map(event => event.data.reason.kind))
++      .toEqual(['max-tokens', 'max-tokens', 'max-tokens', 'completed'])
++    expect(continuationMessages(agent).map(event => event.data.content)).toEqual([
++      [{ type: 'text', text: MAX_TOKEN_CONTINUATION_REMINDER }],
++      [{ type: 'text', text: MAX_TOKEN_CONTINUATION_REMINDER }],
++      [{ type: 'text', text: MAX_TOKEN_CONTINUATION_REMINDER }],
++    ])
++  })
++
++  it('lets already queued human work own the next turn', async () => {
++    const { ctx } = await harness()
++    const adapter = new MockAdapter([
++      () => {
++        agent.followup(createUserMessage({
++          content: [{ type: 'text', text: 'take over' }],
++          source: { kind: 'user' },
++        }))
++        return maxTokensResponse('partial')
++      },
++      textResponse('human follow-up done'),
++    ])
++    ctx.llm.registerAdapter(['mock'], adapter)
++    const agent = ctx.agentLoop.create(SessionId('queued-human'), { provider: 'mock', model: 'mock' })
++
++    await run(agent)
++
++    expect(adapter.requests).toHaveLength(2)
++    expect(continuationMessages(agent)).toEqual([])
++    expect(agent.session.events
++      .filter((event): event is SessionEvent<'user/message'> => event.type === 'user/message')
++      .map(event => event.data.source.kind))
++      .toEqual(['user', 'user'])
++  })
++
++  it('stops automatic continuation when the next request fails', async () => {
++    const { ctx } = await harness()
++    const adapter = new MockAdapter([
++      maxTokensResponse('partial'),
++      () => { throw new Error('provider failed') },
++    ])
++    ctx.llm.registerAdapter(['mock'], adapter)
++    const agent = ctx.agentLoop.create(SessionId('request-failure'), { provider: 'mock', model: 'mock' })
++
++    await run(agent)
++
++    expect(adapter.requests).toHaveLength(2)
++    expect(continuationMessages(agent)).toHaveLength(1)
++    expect(agent.session.events
++      .filter((event): event is SessionEvent<'turn/end'> => event.type === 'turn/end')
++      .map(event => event.data.reason.kind))
++      .toEqual(['max-tokens', 'error'])
++  })
++
++  it('removes its continuation behavior when the plugin fiber is disposed', async () => {
++    const { ctx, plugin } = await harness()
++    await plugin.dispose()
++    const adapter = new MockAdapter([maxTokensResponse('partial')])
++    ctx.llm.registerAdapter(['mock'], adapter)
++    const agent = ctx.agentLoop.create(SessionId('disposed-plugin'), { provider: 'mock', model: 'mock' })
++
++    await run(agent)
++
++    expect(adapter.requests).toHaveLength(1)
++    expect(continuationMessages(agent)).toEqual([])
++    expect(agent.session.events
++      .filter((event): event is SessionEvent<'turn/end'> => event.type === 'turn/end')
++      .map(event => event.data.reason.kind))
++      .toEqual(['max-tokens'])
++  })
++})
+diff --git a/packages/guard/max-token-continuation/tsconfig.json b/packages/guard/max-token-continuation/tsconfig.json
+new file mode 100644
+index 0000000..e02dc24
+--- /dev/null
++++ b/packages/guard/max-token-continuation/tsconfig.json
+@@ -0,0 +1,30 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types"
++  },
++  "include": [
++    "src"
++  ],
++  "references": [
++    {
++      "path": "../../../vendor/cosmokit"
++    },
++    {
++      "path": "../../../vendor/cordis"
++    },
++    {
++      "path": "../../core/agent"
++    },
++    {
++      "path": "../../llm/llm"
++    },
++    {
++      "path": "../../core/session"
++    },
++    {
++      "path": "../../runtime-diagnostics/invariants"
++    }
++  ]
++}
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 47c6f5f..1921ec0 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -1076,6 +1076,9 @@ importers:
+       '@deepseek-ai/dsh-llm-retry':
+         specifier: workspace:^
+         version: link:../../llm/llm-retry
++      '@deepseek-ai/dsh-max-token-continuation':
++        specifier: workspace:^
++        version: link:../../guard/max-token-continuation
+       '@deepseek-ai/dsh-permission-presets':
+         specifier: workspace:^
+         version: link:../../interaction/permission-presets
+@@ -1482,7 +1485,7 @@ importers:
+         version: 15.0.0
+       open:
+         specifier: ^11.0.0
+-        version: 11.0.0
++        version: 11.0.1
+     devDependencies:
+       '@deepseek-ai/cordis':
+         specifier: workspace:^
+@@ -4782,6 +4785,30 @@ importers:
+         specifier: workspace:^
+         version: link:../../core/tools
+ 
++  packages/guard/max-token-continuation:
++    devDependencies:
++      '@deepseek-ai/cordis':
++        specifier: workspace:^
++        version: link:../../../vendor/cordis
++      '@deepseek-ai/dsh-agent':
++        specifier: workspace:^
++        version: link:../../core/agent
++      '@deepseek-ai/dsh-agent-loop':
++        specifier: workspace:^
++        version: link:../../core/agent-loop
++      '@deepseek-ai/dsh-agent-loop-testkit':
++        specifier: workspace:^
++        version: link:../../test-support/agent-loop-testkit
++      '@deepseek-ai/dsh-invariants':
++        specifier: workspace:^
++        version: link:../../runtime-diagnostics/invariants
++      '@deepseek-ai/dsh-llm':
++        specifier: workspace:^
++        version: link:../../llm/llm
++      '@deepseek-ai/dsh-session':
++        specifier: workspace:^
++        version: link:../../core/session
++
+   packages/guard/repeat-tool-reminder:
+     dependencies:
+       '@deepseek-ai/schemastery':
+@@ -13609,8 +13636,8 @@ packages:
+   oniguruma-to-es@4.3.6:
+     resolution: {integrity: sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==}
+ 
+-  open@11.0.0:
+-    resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
++  open@11.0.1:
++    resolution: {integrity: sha512-NzwMUB6C1D0+Kd+9iMS/H4k+Ck3cTX6Ckyfr/gAGlmvSE1LUQZnEZvWBi4PYmMwH/S5SMeTXnE+9uAz8uF+pWw==}
+     engines: {node: '>=20'}
+ 
+   openai@6.26.0:
+@@ -13768,6 +13795,10 @@ packages:
+     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
+     engines: {node: '>=20'}
+ 
++  powershell-utils@0.2.0:
++    resolution: {integrity: sha512-ZlsFlG7MtSFCoc5xreOvBAozCJ6Pf06opgJjh9ONEv418xpZSAzNjstD36C6+JwOnfSqOW/9uDkqKjezTdxZhw==}
++    engines: {node: '>=20'}
++
+   preact@10.29.7:
+     resolution: {integrity: sha512-DCHYrK/B10yUD3ZjLfhZ3WIE/9Vf9VFUODcRE2dRomTYDpJk6z6L9wecSfhfE6M9ZTHUdyQkoC46arIDhEV84Q==}
+     peerDependencies:
+@@ -14614,8 +14645,8 @@ packages:
+       utf-8-validate:
+         optional: true
+ 
+-  wsl-utils@0.3.1:
+-    resolution: {integrity: sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg==}
++  wsl-utils@1.0.0:
++    resolution: {integrity: sha512-Hl0ZOAs672vg+06kfujwRhoS6/jehvULrlFkuF2dRu6pHgA8U06h3xqNIqNNU1LTXPcedxByAR4GS6pwQK0mgA==}
+     engines: {node: '>=20'}
+ 
+   xml-name-validator@5.0.0:
+@@ -19074,14 +19105,14 @@ snapshots:
+       regex: 6.1.0
+       regex-recursion: 6.0.2
+ 
+-  open@11.0.0:
++  open@11.0.1:
+     dependencies:
+       default-browser: 5.5.0
+       define-lazy-prop: 3.0.0
+       is-in-ssh: 1.0.0
+       is-inside-container: 1.0.0
+-      powershell-utils: 0.1.0
+-      wsl-utils: 0.3.1
++      powershell-utils: 0.2.0
++      wsl-utils: 1.0.0
+ 
+   openai@6.26.0(ws@8.21.0)(zod@4.4.3):
+     optionalDependencies:
+@@ -19268,6 +19299,8 @@ snapshots:
+ 
+   powershell-utils@0.1.0: {}
+ 
++  powershell-utils@0.2.0: {}
++
+   preact@10.29.7: {}
+ 
+   prelude-ls@1.2.1: {}
+@@ -20232,7 +20265,7 @@ snapshots:
+ 
+   ws@8.21.0: {}
+ 
+-  wsl-utils@0.3.1:
++  wsl-utils@1.0.0:
+     dependencies:
+       is-wsl: 3.1.1
+       powershell-utils: 0.1.0
+diff --git a/tsconfig.host.json b/tsconfig.host.json
+index 601c74c..86ebd7e 100644
+--- a/tsconfig.host.json
++++ b/tsconfig.host.json
+@@ -285,6 +285,7 @@
+     { "path": "./packages/plan/plan-mode" },
+     { "path": "./packages/preset/agent-presets" },
+     { "path": "./packages/preset/persona" },
++    { "path": "./packages/guard/max-token-continuation" },
+     { "path": "./packages/guard/repeat-tool-reminder" },
+     { "path": "./packages/extensions/cordis-host-runner" },
+     { "path": "./packages/extensions/tool-cordis" },
+-- 
+2.51.2.windows.1
+
