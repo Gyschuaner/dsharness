@@ -74,7 +74,8 @@ DSH-003 已把上游源码接入方式改为可复现构建：
   工具调用即时进度反馈、BUG-449804CF 工具耗时与行内状态布局修复，以及
   BUG-5F3BF25D 快速工具运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015
   Code 子工具计划提前展示、DSH-016 Think 独立计时和工具活动状态布局，以及
-  DSH-018 输出 token 上限自动持续续跑，以及 DSH-019 的 0.1.1 兼容调整；
+  DSH-018 输出 token 上限自动持续续跑、DSH-019 的 0.1.1 兼容调整、
+  BUG-C393119A 静态门禁修复，以及默认关闭的 DSH-005 视觉桥；
 - `dev/install-dsh-source.ps1` 在空目录拉取源码、应用补丁、执行 frozen install、
   完整构建并注册 `dsh`；
 - `dev/verify-dsh-source.ps1` 独立校验工具链、源码 tree、补丁、CLI 版本和 Web

@@ -76,6 +76,28 @@ if ((Test-Path -LiteralPath $QwenCompositionPath -PathType Leaf) -and (Test-Path
     Check ($QwenMetadata -match '(?m)^name:\s*Qwen 原生模式\s*$') 'qwen-native 显示名称'
 }
 
+$VisionBridgeSourcePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/index.ts'
+$VisionBridgeBundlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/lib/index.js'
+$BaseCordisPatchPath = Join-Path $SourceDirectory 'packages/bundle/base/cordis.patch.yml'
+Check (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) 'DSH-005 vision-bridge 源码存在'
+Check (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) 'DSH-005 vision-bridge 构建产物存在'
+if (Test-Path -LiteralPath $BaseCordisPatchPath -PathType Leaf) {
+    $BaseCordisPatch = Get-Content -LiteralPath $BaseCordisPatchPath -Raw -Encoding UTF8
+    Check ($BaseCordisPatch -match '(?s)id:\s*vision-bridge.*?disabled:\s*true.*?model:\s*Qwen3\.6-35B-A3B') 'vision-bridge 在 base bundle 中默认关闭'
+} else {
+    Check $false 'Base Cordis 配置存在'
+}
+
+$VisionGatewayOverlayPath = Join-Path $RepoRoot 'dev/vision-bridge.dp-gateway.patch.yml'
+if (Test-Path -LiteralPath $VisionGatewayOverlayPath -PathType Leaf) {
+    $VisionGatewayOverlay = Get-Content -LiteralPath $VisionGatewayOverlayPath -Raw -Encoding UTF8
+    Check ($VisionGatewayOverlay -match "baseURL:\s*'https://ai\.chuansgu\.top/v1'") '视觉桥固定通过 DP Gateway'
+    Check ($VisionGatewayOverlay -match '(?m)^\s*apiKeyEnv:\s*DPGATEWAY_API_KEY\s*$') '视觉桥使用 DPGATEWAY_API_KEY 凭据引用'
+    Check ($VisionGatewayOverlay -match '(?m)^\s*model:\s*Qwen3\.6-35B-A3B\s*$') '视觉桥目标模型为 Qwen3.6-35B-A3B'
+} else {
+    Check $false 'DP Gateway profile 覆盖存在'
+}
+
 $WebAppPatchPath = Join-Path $SourceDirectory 'packages/bundle/web-app/cordis.patch.yml'
 if (Test-Path -LiteralPath $WebAppPatchPath -PathType Leaf) {
     $WebAppPatch = Get-Content -LiteralPath $WebAppPatchPath -Raw -Encoding UTF8

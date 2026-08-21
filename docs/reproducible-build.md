@@ -18,8 +18,9 @@
   进度反馈补丁、BUG-449804CF 工具耗时与行内状态布局修复、BUG-5F3BF25D 快速工具
   运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
   DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
-  以及 DSH-019 的 0.1.1 兼容调整和各自的 SHA-256；
-- 应用补丁后的 Git tree `166fe87aab17ec96848909d136d03dc57744966d`。
+  DSH-019 的 0.1.1 兼容调整、BUG-C393119A 静态门禁修复，以及 DSH-005 可选视觉桥
+  和各自的 SHA-256；
+- 应用补丁后的 Git tree `a812b84b74d8ed3abafd12bafc8654efa49ab55c`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -188,3 +189,19 @@ lint、workspace constraints、227 份包不变式及 Host/Client/Web 完整构�
 快照。迁移后的 26 个相关测试文件共 756 条用例、TypeScript 类型检查、全仓 lint、
 1009 组中英配对以及 Host/Client/Web 完整构建均通过。最终 tree 锁定为
 `166fe87aab17ec96848909d136d03dc57744966d`。
+
+2026-08-22 新增第十五、十六个补丁。BUG-C393119A 把
+`dsh-max-token-continuation` 包版本对齐到 `0.1.1-rc.2`，并把仅限包内使用的
+malformed-tool-call reminder 常量取消导出，使 workspace constraints 与 knip 恢复
+通过。DSH-005 新增默认关闭的 `@deepseek-ai/dsh-vision-bridge`：纯文本主模型只接收
+持久 reminder 与结构化 `vision_inspect` 结果，图片通过当前会话授权后交给视觉子模型。
+部署覆盖固定走 `https://ai.chuansgu.top/v1`、凭据引用 `DPGATEWAY_API_KEY` 和模型
+`Qwen3.6-35B-A3B`，不允许直连模型机。
+
+视觉桥、Host 图片准入与 ACP 的 3 个测试文件共 24 条用例通过。随后从空目录拉取官方
+基线、顺序回放全部 16 个补丁、frozen install 936 个依赖并完成 Host/Client/Web 全构建，
+精确命中锁定 tree。静态门禁 35/37 通过；剩余两项均为文档站环境问题：Windows 无符号链接权限导致安全
+fixture 在 `symlinkSync` 报 EPERM，VitePress MPA 的原始 Markdown twin 与已生成
+`index.md` 发生基线碰撞。DP Gateway 当前 `/v1/models` 尚未暴露目标模型，因此真实
+视觉集成与 SIT 保持阻塞，不启用 profile，也不改动 3080。最终 tree 锁定为
+`a812b84b74d8ed3abafd12bafc8654efa49ab55c`。

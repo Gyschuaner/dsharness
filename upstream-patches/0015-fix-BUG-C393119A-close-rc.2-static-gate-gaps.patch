@@ -1,0 +1,36 @@
+From 1b91dd1f48b7f3d52e675408549d6064614d95e7 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 00:51:08 +0800
+Subject: [PATCH 15/16] fix(BUG-C393119A): close rc.2 static gate gaps
+
+---
+ packages/core/agent-loop/src/malformed-tool-call.ts | 2 +-
+ packages/guard/max-token-continuation/package.json  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/packages/core/agent-loop/src/malformed-tool-call.ts b/packages/core/agent-loop/src/malformed-tool-call.ts
+index 79539a2..98ea326 100644
+--- a/packages/core/agent-loop/src/malformed-tool-call.ts
++++ b/packages/core/agent-loop/src/malformed-tool-call.ts
+@@ -4,7 +4,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
+ import type { UserMessage } from '@deepseek-ai/dsh-llm'
+ 
+ /** Guidance retained immediately after a model wrote a would-be tool call in reasoning. */
+-export const MALFORMED_TOOL_CALL_RETRY_REMINDER = `<system-reminder>
++const MALFORMED_TOOL_CALL_RETRY_REMINDER = `<system-reminder>
+ The immediately preceding assistant attempt was invalid, but it has been retained in the conversation.
+ No tool was executed for that attempt. Retry the same task now.
+ When a tool is needed, invoke it only through the native tool-call channel. Do not write tool-call XML, JSON, tags, or arguments in reasoning or visible text, and do not merely describe the call.
+diff --git a/packages/guard/max-token-continuation/package.json b/packages/guard/max-token-continuation/package.json
+index 363e9a1..826396e 100644
+--- a/packages/guard/max-token-continuation/package.json
++++ b/packages/guard/max-token-continuation/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@deepseek-ai/dsh-max-token-continuation",
+   "description": "Host guard that continues an agent after an output-token-limit turn",
+-  "version": "0.1.0-rc.8",
++  "version": "0.1.1-rc.2",
+   "publishConfig": {
+     "access": "public"
+   },

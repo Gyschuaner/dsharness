@@ -32,6 +32,7 @@ dsharness/
 │   └── setup-plugin-junction.ps1  # 把 ~/.dsh/plugins/<name> 指向本仓库的 junction
 └── docs/
     ├── dev-setup.md          # 本地 DSH 开发链路说明
+    ├── DSH-005-vision-bridge.md # 视觉桥与 DP Gateway 部署覆盖
     ├── reproducible-build.md # 新电脑可复现构建与更新方法
     └── installed-plugins.md  # web profile 已安装插件台账（版本/通道/回退，DSH-007）
 ```
@@ -54,6 +55,10 @@ Git 还原相同构建。`dsharness` 现在同时管理两类内容：仓库内�
 - 新电脑可从空目录完成 frozen install、完整构建和 `dsh` 命令注册。
 
 当前还包含 `image-context-guard` 短期保护插件：它只裁剪发往模型的临时请求副本，保证一次请求不超过 9 张图片，不删除会话历史或附件。长期多模态上下文重构登记在 DP `DSH-005`。
+
+DSH-005 的视觉桥作为上游源码补丁交付，并保持默认关闭。纯文本主模型需要视觉辅助时，
+按 [`docs/DSH-005-vision-bridge.md`](docs/DSH-005-vision-bridge.md) 使用 DP Gateway
+覆盖；DSH 不直连视觉模型机。
 
 ## 快速开始（构建 DSH）
 
@@ -92,8 +97,8 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 与行内状态布局修复、BUG-5F3BF25D 的快速工具运行态可感知性修复、亚秒耗时的毫秒
 精度展示修复、DSH-015 的 Code 子工具计划提前展示，以及 DSH-016 的 Think 独立计时
 和工具活动状态布局，再叠加 DSH-018 的输出 token 上限自动持续续跑，以及 DSH-019
-针对 0.1.1 新结构的兼容调整。最终源码 tree 为
-`166fe87aab17ec96848909d136d03dc57744966d`。
+针对 0.1.1 新结构的兼容调整、BUG-C393119A 静态门禁修复和 DSH-005 可选视觉桥。
+最终源码 tree 为 `a812b84b74d8ed3abafd12bafc8654efa49ab55c`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。

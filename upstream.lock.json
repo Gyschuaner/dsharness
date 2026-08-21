@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
   "baseTree": "53915efe4e2126cc7779b73dfc8a3bcec5318c44",
-  "resultTree": "166fe87aab17ec96848909d136d03dc57744966d",
+  "resultTree": "a812b84b74d8ed3abafd12bafc8654efa49ab55c",
   "dshVersion": "0.1.1-rc.2",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -64,6 +64,14 @@
     {
       "path": "upstream-patches/0014-fix-DSH-019-align-local-patches-with-0.1.1-rc.2.patch",
       "sha256": "A1FCC70A867CA22A67F248A5D35AE86035EDBBB750E1F297CCBE39CE7EC9E1E7"
+    },
+    {
+      "path": "upstream-patches/0015-fix-BUG-C393119A-close-rc.2-static-gate-gaps.patch",
+      "sha256": "E8CCAF845F07F1168F9A16B7CCD43EC7504CA764F358E2588924E32D0BAEA0C4"
+    },
+    {
+      "path": "upstream-patches/0016-feat-DSH-005-add-opt-in-vision-sub-agent-bridge.patch",
+      "sha256": "B9E155D0E6138B1F92861A1304E669A96A40656B70C6A95315BD428C6950E5D1"
     }
   ]
 }
