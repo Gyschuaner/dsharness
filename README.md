@@ -91,8 +91,10 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 摘要预算补丁、DSH-014 的工具调用即时进度反馈补丁，以及 BUG-449804CF 的工具耗时
 与行内状态布局修复、BUG-5F3BF25D 的快速工具运行态可感知性修复、亚秒耗时的毫秒
 精度展示修复、DSH-015 的 Code 子工具计划提前展示，以及 DSH-016 的 Think 独立计时
-和工具活动状态布局。最终源码 tree 为
-`9fd6590c3056bc9b07ce575bf23f82b20419a9a5`。
+和工具活动状态布局；随后追加 DSH-015 的流式源码识别与连续感知计时修复：模型不再
+声明 `plannedTools`，前端在 `code` 参数流中首次识别直接 `tools.name(...)` 调用时
+立即展示子工具并开始计时，真实 dispatch 到达后沿用同一计时起点。最终源码 tree 为
+`69bf0808f09113d68f678bd82f5061cb7802b797`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。

@@ -17,8 +17,9 @@
   重试流 JSDoc 补丁、DSH-011 Compact 32K 摘要预算补丁、DSH-014 工具调用即时
   进度反馈补丁、BUG-449804CF 工具耗时与行内状态布局修复、BUG-5F3BF25D 快速工具
   运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
-  DSH-016 Think 独立计时和工具活动状态布局及各自的 SHA-256；
-- 应用补丁后的 Git tree `9fd6590c3056bc9b07ce575bf23f82b20419a9a5`。
+  DSH-016 Think 独立计时和工具活动状态布局，以及 DSH-015 流式源码识别与连续感知
+  计时修复及各自的 SHA-256；
+- 应用补丁后的 Git tree `69bf0808f09113d68f678bd82f5061cb7802b797`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -168,3 +169,16 @@ install，Host/Client/Web 完整构建通过。Agent loop、重试、pi-ai、Com
 Agent Note 格式及工具目录门禁通过。三组 Playwright Web 回放未完成：RC8 对应的
 Chromium 尚未下载，Skill fixture 另受 Windows 路径反斜杠未转义影响；本机 3080
 切换后使用应用内真实浏览器补充运行时冒烟。
+
+2026-08-21 为 DSH-015 增加第十二个上游补丁，修正 Code 子工具只显示真实 dispatch
+毫秒耗时的问题。`run_code` 的新模型 schema 恢复为仅要求 `code` 与 `description`，
+旧记录中的可选 `plannedTools` 只保留执行兼容，不再驱动界面。前端从流式 `code`
+参数中首次识别直接 `tools.name(...)` 或静态括号访问时立即展示子工具、启动 `ing`
+和感知计时；真实 dispatch 按序复用该行，计时持续到真实结果，底层事件时间和统计
+口径保持不变。
+
+相关 8 个测试文件共 199 条用例通过，Client TypeScript 类型检查和 staged lint
+通过；Node `24.11.1` 下 Host/Client/Web 隔离完整构建成功，并从独立目录启动 3081，
+与原 3080 同时返回 HTTP 200。按人工验收安排，PTC Code 实际界面验证留在 3081
+由用户完成，未把本次构建覆盖到 3080。最终 tree 锁定为
+`69bf0808f09113d68f678bd82f5061cb7802b797`。
