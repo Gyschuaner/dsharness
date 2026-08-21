@@ -1,0 +1,70 @@
+From 3d9cbbed772662a582a7c1486d66217a42518b5e Mon Sep 17 00:00:00 2001
+From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
+Date: Thu, 20 Aug 2026 16:35:23 +0800
+Subject: [PATCH 10/14] fix(ui): show subsecond tool duration in milliseconds
+ (BUG-449804CF)
+
+---
+ .../src/client/tool/components/ToolActivityChrome.tsx       | 2 +-
+ packages/client/ui-tool/tests/tool-activity.client.spec.tsx | 6 +++---
+ .../client/ui-tool/tests/tool-call-tree.client.spec.tsx     | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
+index cccd8bd8c3..ec240636a9 100644
+--- a/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
++++ b/packages/client/ui-tool/src/client/tool/components/ToolActivityChrome.tsx
+@@ -30,7 +30,7 @@ export function useToolActivityPresentationState(
+ 
+ function formatElapsed(milliseconds: number): string {
+   const elapsed = Math.max(0, milliseconds)
+-  if (elapsed > 0 && elapsed < 1_000) return '<1s'
++  if (elapsed < 1_000) return `${Math.floor(elapsed)}ms`
+   const seconds = Math.floor(elapsed / 1_000)
+   if (seconds < 60) return `${seconds}s`
+   const minutes = Math.floor(seconds / 60)
+diff --git a/packages/client/ui-tool/tests/tool-activity.client.spec.tsx b/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
+index 016ec77e8d..0e32faca50 100644
+--- a/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
+@@ -88,7 +88,7 @@ describe('streamed Tool activity', () => {
+ 
+   it('keeps a completed subsecond call meaningful instead of rounding it to zero', () => {
+     const view = render(<ToolActivityChrome startedTime={9_500} finishedTime={9_850} state="settled" />)
+-    expect(view.getByText('<1s')).toBeTruthy()
++    expect(view.getByText('350ms')).toBeTruthy()
+     expect(view.queryByText('0s')).toBeNull()
+   })
+ 
+@@ -96,13 +96,13 @@ describe('streamed Tool activity', () => {
+     const view = render(<TimedActivityChrome startedTime={9_800} finishedTime={9_810} />)
+     expect(view.container.querySelector('[data-tool-activity-state="running"]')).not.toBeNull()
+     expect(view.getByText('ing')).toBeTruthy()
+-    expect(view.getByText('<1s')).toBeTruthy()
++    expect(view.getByText('10ms')).toBeTruthy()
+ 
+     act(() => { vi.advanceTimersByTime(399) })
+     expect(view.container.querySelector('[data-tool-activity-state="running"]')).not.toBeNull()
+     act(() => { vi.advanceTimersByTime(1) })
+     expect(view.container.querySelector('[data-tool-activity-state="settled"]')).not.toBeNull()
+     expect(view.getByText('Done')).toBeTruthy()
+-    expect(view.getByText('<1s')).toBeTruthy()
++    expect(view.getByText('10ms')).toBeTruthy()
+   })
+ })
+diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+index 8e3f9db7eb..63f23e105f 100644
+--- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+@@ -87,7 +87,7 @@ describe('ToolCallTree', () => {
+     expect(view.container.querySelector('[data-chat-call-id="parent:code:1"]')?.hasAttribute('data-selected')).toBe(false)
+     expect(view.container.querySelector('[data-chat-call-id="parent:code:1:code:1"]')?.getAttribute('data-selected')).toBe('true')
+     expect(nests).toHaveLength(2)
+-    expect(view.getByText('<1s')).toBeTruthy()
++    expect(view.getByText('250ms')).toBeTruthy()
+   })
+ 
+   it('abbreviates a POSIX home path in the generic tool summary', () => {
+-- 
+2.51.2.windows.1
+

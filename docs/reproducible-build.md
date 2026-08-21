@@ -10,7 +10,7 @@
 
 `upstream.lock.json` 是构建事实来源，当前锁定内容包括：
 
-- DeepSeek Harness 官方基线 `141eb6f`，版本 `0.1.0-rc.8`；
+- DeepSeek Harness 官方标签 `dsh-v0.1.1-rc.2`，提交 `b150a55`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
 - `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
   Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用持久历史恢复与
@@ -18,8 +18,8 @@
   进度反馈补丁、BUG-449804CF 工具耗时与行内状态布局修复、BUG-5F3BF25D 快速工具
   运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
   DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
-  以及各自的 SHA-256；
-- 应用补丁后的 Git tree `ae9a489ce67185e057510f54709a127d60a89f83`。
+  以及 DSH-019 的 0.1.1 兼容调整和各自的 SHA-256；
+- 应用补丁后的 Git tree `166fe87aab17ec96848909d136d03dc57744966d`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -181,3 +181,10 @@ lint、workspace constraints、227 份包不变式及 Host/Client/Web 完整构�
 27/28 通过，唯一失败仍是当前 Windows 会话无符号链接创建权限，临时目录 symlink
 安全测试在 `symlinkSync` 处报 EPERM。最终 tree 锁定为
 `ae9a489ce67185e057510f54709a127d60a89f83`；验证过程使用隔离源码和端口，不修改 3080。
+
+2026-08-21 为 DSH-019 将官方基线升级到 `dsh-v0.1.1-rc.2` 提交 `b150a55`。
+现有 13 个本地补丁完整重放到新基线，并新增第十四个兼容补丁：同步 Qwen 原生 preset
+与新版标准 preset 的非 persona 内容、修正中文文档配对链接并刷新 advanced toolchain
+快照。迁移后的 26 个相关测试文件共 756 条用例、TypeScript 类型检查、全仓 lint、
+1009 组中英配对以及 Host/Client/Web 完整构建均通过。最终 tree 锁定为
+`166fe87aab17ec96848909d136d03dc57744966d`。

@@ -9,7 +9,7 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
 
 行为：
   1. 停掉 3080 端口监听进程 + 命令行里带 dsh web 的 node 进程（含 npx 包装层），等端口释放
-  2. 新开一个 PowerShell 窗口运行 dsh web（日志可见，Ctrl+C 可停）
+  2. 在隐藏窗口运行 dsh web，标准输出和错误写入系统临时目录
   3. 轮询等待 HTTP 恢复（最多 60 秒），再调 /api/skill-manager 验证新 host 已加载
      （本次功能需要 apiVersion >= 5；重启前运行中的进程是 4）
 
@@ -35,7 +35,7 @@ if ($conn) { $portPids = @($conn | ForEach-Object OwningProcess | Sort-Object -U
 $webPids = @()
 Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object {
 	$_ -and $_.CommandLine -and
-	(($_.CommandLine -match 'bin\.js web') -or ($_.CommandLine -match '@deepseek-ai[/\\]dsh web'))
+	(($_.CommandLine -match 'bin\.js(?:\s+web|\s+--profile\s+web)') -or ($_.CommandLine -match '@deepseek-ai[/\\]dsh web'))
 } | ForEach-Object { $webPids += $_.ProcessId }
 
 $all = @($portPids + $webPids) | Where-Object { $_ } | Sort-Object -Unique
@@ -70,8 +70,11 @@ if ($NoLaunch) {
 	Write-Step "跳过启动（-NoLaunch），请自行运行：dsh web --host $HostAddr --port $Port"
 	exit 0
 }
-Write-Step "启动 dsh web（新开窗口，日志可见）"
-Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoExit', '-NoProfile', '-Command', "dsh web --host $HostAddr --port $Port") | Out-Null
+$LogStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$StdoutLog = Join-Path ([IO.Path]::GetTempPath()) "dsh-web-$Port-$LogStamp.out.log"
+$StderrLog = Join-Path ([IO.Path]::GetTempPath()) "dsh-web-$Port-$LogStamp.err.log"
+Write-Step "在隐藏窗口启动 dsh web（日志：$StdoutLog；$StderrLog）"
+Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList @('-NoProfile', '-Command', "dsh web --no-open --host $HostAddr --port $Port") -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog | Out-Null
 
 # ── 3) 等待恢复 + 验证 ──────────────────────────────────────────────────────
 Write-Step "等待 http://${HostAddr}:${Port} 恢复（最多 60 秒）…"
@@ -85,7 +88,7 @@ while ((Get-Date) -lt $deadline) {
 	Start-Sleep -Milliseconds 500
 }
 if (-not $up) {
-	Write-Host "等待服务超时，请看新窗口里的日志" -ForegroundColor Red
+	Write-Host "等待服务超时，请查看日志：$StdoutLog；$StderrLog" -ForegroundColor Red
 	exit 1
 }
 Write-Step "服务已起来"

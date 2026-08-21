@@ -1,7 +1,8 @@
-From 48c0685e76c2bf11a3b8b5d93e96d9ec26f7b8d3 Mon Sep 17 00:00:00 2001
+From 6bde7071fb991f031f8d9fcb1c64268c46d82b00 Mon Sep 17 00:00:00 2001
 From: chuansgu <506946815@qq.com>
 Date: Tue, 18 Aug 2026 23:14:48 +0800
-Subject: [PATCH] fix(BUG-B0EE8D2D): recover malformed reasoning tool calls
+Subject: [PATCH 03/14] fix(BUG-B0EE8D2D): recover malformed reasoning tool
+ calls
 
 ---
  packages/core/agent-loop/README.i18n.yaml     |   4 +-
@@ -27,7 +28,7 @@ Subject: [PATCH] fix(BUG-B0EE8D2D): recover malformed reasoning tool calls
  create mode 100644 packages/core/agent-loop/src/malformed-tool-call.ts
 
 diff --git a/packages/core/agent-loop/README.i18n.yaml b/packages/core/agent-loop/README.i18n.yaml
-index a7ad572..aec0f8e 100644
+index 2a5445de6b..30a2ca2ebd 100644
 --- a/packages/core/agent-loop/README.i18n.yaml
 +++ b/packages/core/agent-loop/README.i18n.yaml
 @@ -2,5 +2,5 @@
@@ -35,11 +36,11 @@ index a7ad572..aec0f8e 100644
  # after editing either side, bring the other along and re-record with:
  #   pnpm run verify-translation-pairing --write packages/core/agent-loop/README.md
 -README.md: 907bbe75fd687388be044916f4c4509e1c552177
--README.zh.md: 29b06c907bb1a72c5056d29130fe85f479f2f19a
+-README.zh.md: 76a73155a3d9f811931cf0f86c227e6ab3dc1c32
 +README.md: c9fd1d15a806874f85da604c3db90c10aa8c78d1
-+README.zh.md: c0c8cd957f77e5fe6c62f8cd2c2f38d6a077ef50
++README.zh.md: d8e2a34e97871e531a2c7c2da7ba47ae8e8c3cf9
 diff --git a/packages/core/agent-loop/README.md b/packages/core/agent-loop/README.md
-index 907bbe7..c9fd1d1 100644
+index 907bbe75fd..c9fd1d15a8 100644
 --- a/packages/core/agent-loop/README.md
 +++ b/packages/core/agent-loop/README.md
 @@ -63,12 +63,14 @@ Every inbox mutation publishes one normalized `agent/inbox/spliced` event before
@@ -77,19 +78,19 @@ index 907bbe7..c9fd1d1 100644
  ### Retained message history
  
 diff --git a/packages/core/agent-loop/README.zh.md b/packages/core/agent-loop/README.zh.md
-index 29b06c9..c0c8cd9 100644
+index 76a73155a3..d8e2a34e97 100644
 --- a/packages/core/agent-loop/README.zh.md
 +++ b/packages/core/agent-loop/README.zh.md
 @@ -63,12 +63,14 @@ interface Config {
  
- 驱动器在其整个生命周期内拥有一个 agent，并在 `ctx.agents.withInitiator(agent, ...)` 内运行。包私有的编排入口点会恢复确切的 Agent，一次性派生 `agent.session`，并让操作局部的辅助函数捕获它，而不是通过浅层接口继续传递具体驱动器或每次操作的 `Session`。如果显式 `Session` 正是辅助函数的实际接口，该辅助函数会保留它；创建、持久化加载、未发布 setup、服务、worker、进程、持久化和 wire 协议则继续保留各自的显式身份。[agent 服务](../agent/README.md#initiating-agent-scope)规定传播、teardown 和分离工作规则。
+ 驱动器在其整个生命周期内拥有一个 agent，并在 `ctx.agents.withInitiator(agent, ...)` 内运行。包私有的编排入口点会恢复确切的 Agent，一次性派生 `agent.session`，并让操作局部的辅助函数捕获它，而不是通过浅层接口继续传递具体驱动器或每次操作的 `Session`。如果显式 `Session` 正是辅助函数的实际接口，该辅助函数会保留它；创建、持久化加载、未发布 setup、服务、worker、进程、持久化和 wire 协议则继续保留各自的显式身份。[agent 服务](../agent/README.zh.md#initiating-agent-scope)规定传播、teardown 和分离工作规则。
  
--每次提供方调用成功结束时，都会恰好追加一个 `assistant/message` 完成锚点，包括无内容调用和以 `max-tokens` 结束的调用。该锚点原样记录组装后的内容，在 `sourceEventSeqs` 中列出确切的分片 seq（流没有分片时为 `[]`），并在用量可用时包含用量；空内容不会进入派生消息历史。轮次取消打断流式输出时，如果非空文本或推理内容已送达用户，循环也会追加一个带 `interrupted: true` 的锚点。该锚点引用对应的分片 seq，并把已渲染的前缀放入派生消息历史，使下一次请求包含用户看到的内容。未分派的工具调用会被省略，空流或只包含工具调用的流不会生成锚点；提供方故障也不提交 assistant 内容（[决策](../../../.agents/notes/implemented/architecture/2026-08-10-cancelled-stream-prefix-finalize.md)）。
-+每次提供方调用成功结束时，都会恰好追加一个 `assistant/message` 完成锚点，包括无内容调用和以 `max-tokens` 结束的调用；唯一例外是只含 reasoning 且带有工具调用标记、已进入纠错恢复的 stop。该锚点原样记录组装后的内容，在 `sourceEventSeqs` 中列出确切的分片 seq（流没有分片时为 `[]`），并在用量可用时包含用量；空内容不会进入派生消息历史。轮次取消打断流式输出时，如果非空文本或推理内容已送达用户，循环也会追加一个带 `interrupted: true` 的锚点。该锚点引用对应的分片 seq，并把已渲染的前缀放入派生消息历史，使下一次请求包含用户看到的内容。未分派的工具调用会被省略，空流或只包含工具调用的流不会生成锚点；提供方故障也不提交 assistant 内容（[决策](../../../.agents/notes/implemented/architecture/2026-08-10-cancelled-stream-prefix-finalize.md)）。
+-每次提供方调用成功结束时，都会恰好追加一个 `assistant/message` 完成锚点，包括无内容调用和以 `max-tokens` 结束的调用。该锚点原样记录组装后的内容，在 `sourceEventSeqs` 中列出确切的分片 seq（流没有分片时为 `[]`），并在用量可用时包含用量；空内容不会进入派生消息历史。轮次取消打断流式输出时，如果非空文本或推理内容已送达用户，循环也会追加一个带 `interrupted: true` 的锚点。该锚点引用对应的分片 seq，并把已渲染的前缀放入派生消息历史，使下一次请求包含用户看到的内容。未分派的工具调用会被省略，空流或只包含工具调用的流不会生成锚点；提供方故障也不提交 assistant 内容（[决策](../../../.agents/notes/implemented/architecture/2026-08-10-cancelled-stream-prefix-finalize.zh.md)）。
++每次提供方调用成功结束时，都会恰好追加一个 `assistant/message` 完成锚点，包括无内容调用和以 `max-tokens` 结束的调用；唯一例外是只含 reasoning 且带有工具调用标记、已进入纠错恢复的 stop。该锚点原样记录组装后的内容，在 `sourceEventSeqs` 中列出确切的分片 seq（流没有分片时为 `[]`），并在用量可用时包含用量；空内容不会进入派生消息历史。轮次取消打断流式输出时，如果非空文本或推理内容已送达用户，循环也会追加一个带 `interrupted: true` 的锚点。该锚点引用对应的分片 seq，并把已渲染的前缀放入派生消息历史，使下一次请求包含用户看到的内容。未分派的工具调用会被省略，空流或只包含工具调用的流不会生成锚点；提供方故障也不提交 assistant 内容（[决策](../../../.agents/notes/implemented/architecture/2026-08-10-cancelled-stream-prefix-finalize.zh.md)）。
  
  在 `agent/request` 返回提供方／模型调用配置后，循环会调用 `ctx.llm.prepareCall()`，在活跃轮次信号的控制下校验由适配器负责的字段，并填入配置的推理（reasoning）强度和输出 token 默认值。准备完成的调用会在这次异步解析、`request/header` 日志记录和最终分派期间保留同一项确切的适配器注册，因此 HMR（热模块替换）不会把某个适配器的能力解析结果与另一适配器的请求混用。请求 header 会记录生效配置以及哪些字段来自适配器。下一次 waterfall（瀑布式事件）前，循环会从提议中移除这些带标记字段，使当前精确路由重新填入自身默认值；未带标记的显式设置会跨步骤和路由变化保留。没有已注册适配器的路由会保留原定配置，使 `llm/stream` 监听器可以接管并短路该请求；最终分派仍会以 `NO_ADAPTER` 拒绝未得到处理的路由。新循环实例在恢复时会遵循同一套适配器默认值标记规则。
  
- 插件失败会结束当前轮次，而不是结束循环。最终适配器选择、分发与迭代失败会以终止错误或中止结束的形式由 `ctx.llm` 传来，并进入 `agent/request-error`；middleware、结果处理、工具及其他扩展失败仍会抛出并直接关闭轮次。恢复逻辑会接收请求坐标、不可变的提供方事实、准备完成的适配器注册所捕获的不可变重试策略以及轮次信号；middleware 接管未准备路由时，该策略缺失。处理失败的监听器返回 `{ kind: 'retry' }`；未被处理的失败是终态。AgentLoop 为当前准入操作或轮次拥有一个取消信号。有效的 `cancel(cause)` 在未设置 `keepInbox` 时清除待处理工作，并以协作方式中止该信号；空闲取消是空操作。abort 触发后、活动收敛到空闲前到达的唤醒输入会被锁存（`wakeRequested`），并在 driver 自身的收敛边界重放，无需再发一条唤醒 send 即可执行；`disposed` 取消从不锁存，而 agent 已处于空闲时发送的唤醒总是打开自己的 turn 边界（即使消息已被清除，状态也会显示瞬态 `idle → running → idle` 对）。持久 `turn/end` 为 `user` 和 `parent` 记录 `aborted`，dispose 则记录 `disposed`；未分发的模型工具调用会收到合成的 `tool/call` 与 `ABORTED_BEFORE_DISPATCH` 结果对。取消原因只影响报告方式，不影响如何处理在取消后完成终结的结果上下文。dispose 会等待忽略信号的工作完成，然后才从注册表移除。[显式取消决策](../../../.agents/notes/implemented/architecture/2026-07-16-explicit-turn-cancellation.md)与[取消收敛窗口唤醒锁存](../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md)规定生命周期与竞态约定。
+ 插件失败会结束当前轮次，而不是结束循环。最终适配器选择、分发与迭代失败会以终止错误或中止结束的形式由 `ctx.llm` 传来，并进入 `agent/request-error`；middleware、结果处理、工具及其他扩展失败仍会抛出并直接关闭轮次。恢复逻辑会接收请求坐标、不可变的提供方事实、准备完成的适配器注册所捕获的不可变重试策略以及轮次信号；middleware 接管未准备路由时，该策略缺失。处理失败的监听器返回 `{ kind: 'retry' }`；未被处理的失败是终态。AgentLoop 为当前准入操作或轮次拥有一个取消信号。有效的 `cancel(cause)` 在未设置 `keepInbox` 时清除待处理工作，并以协作方式中止该信号；空闲取消是空操作。abort 触发后、活动收敛到空闲前到达的唤醒输入会被锁存（`wakeRequested`），并在 driver 自身的收敛边界重放，无需再发一条唤醒 send 即可执行；`disposed` 取消从不锁存，而 agent 已处于空闲时发送的唤醒总是打开自己的 turn 边界（即使消息已被清除，状态也会显示瞬态 `idle → running → idle` 对）。持久 `turn/end` 为 `user` 和 `parent` 记录 `aborted`，dispose 则记录 `disposed`；未分发的模型工具调用会收到合成的 `tool/call` 与 `ABORTED_BEFORE_DISPATCH` 结果对。取消原因只影响报告方式，不影响如何处理在取消后完成终结的结果上下文。dispose 会等待忽略信号的工作完成，然后才从注册表移除。[显式取消决策](../../../.agents/notes/implemented/architecture/2026-07-16-explicit-turn-cancellation.zh.md)与[取消收敛窗口唤醒锁存](../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.zh.md)规定生命周期与竞态约定。
  
 +如果普通 `stop` 的唯一非空输出是私有 reasoning，且其中包含 Qwen 风格工具调用标记，则它会成为 `MALFORMED_TOOL_CALL`，绝不会被当作可执行调用。首次缺陷进入 `agent/request-error`；恢复被接受后，只为该次重试追加临时 `<system-reminder>`，要求需要工具时使用原生结构化通道，不需要工具时可以继续思考或给出最终回答。循环会把该 reminder 作为一条仅用于本次请求的 user-role 尾消息，追加在完全不变的持久消息前缀之后；系统提示词与请求 header 保持不变。它不写入历史，也不会进入后续步骤，请求重建校验只放行这个由包自身生成的精确尾缀。若再次只返回 reasoning，则立即失败，不再提供恢复机会。只要存在可见文本或原生输出块，引用示例就保持惰性，并走正常完成路径。
 +
@@ -115,7 +116,7 @@ index 29b06c9..c0c8cd9 100644
  ### 保留的消息历史
  
 diff --git a/packages/core/agent-loop/src/agent.ts b/packages/core/agent-loop/src/agent.ts
-index 3ef1ec7..317b47f 100644
+index 3ef1ec7aa4..317b47f2ee 100644
 --- a/packages/core/agent-loop/src/agent.ts
 +++ b/packages/core/agent-loop/src/agent.ts
 @@ -16,10 +16,11 @@ import type {
@@ -230,7 +231,7 @@ index 3ef1ec7..317b47f 100644
            provider: request.provider,
            model: request.model,
 diff --git a/packages/core/agent-loop/src/invariant.ts b/packages/core/agent-loop/src/invariant.ts
-index 80fdfba..3b3db64 100644
+index 80fdfba8f9..3b3db64ee2 100644
 --- a/packages/core/agent-loop/src/invariant.ts
 +++ b/packages/core/agent-loop/src/invariant.ts
 @@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
@@ -253,7 +254,7 @@ index 80fdfba..3b3db64 100644
  
 diff --git a/packages/core/agent-loop/src/malformed-tool-call.ts b/packages/core/agent-loop/src/malformed-tool-call.ts
 new file mode 100644
-index 0000000..fb0d000
+index 0000000000..fb0d000925
 --- /dev/null
 +++ b/packages/core/agent-loop/src/malformed-tool-call.ts
 @@ -0,0 +1,45 @@
@@ -303,7 +304,7 @@ index 0000000..fb0d000
 +    }])
 +}
 diff --git a/packages/core/agent-loop/tests/invariant.spec.ts b/packages/core/agent-loop/tests/invariant.spec.ts
-index 503100f..775fdfa 100644
+index 503100f22c..775fdfa509 100644
 --- a/packages/core/agent-loop/tests/invariant.spec.ts
 +++ b/packages/core/agent-loop/tests/invariant.spec.ts
 @@ -4,6 +4,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -338,7 +339,7 @@ index 503100f..775fdfa 100644
      const { ctx, session, boundary } = await requestSetup()
      const divergent = [...boundary, { role: 'user', content: [{ type: 'text', text: 'phantom' }] }]
 diff --git a/packages/core/agent-loop/tests/loop.spec.ts b/packages/core/agent-loop/tests/loop.spec.ts
-index 2105b86..87c45e7 100644
+index 2105b86f42..87c45e7ea5 100644
 --- a/packages/core/agent-loop/tests/loop.spec.ts
 +++ b/packages/core/agent-loop/tests/loop.spec.ts
 @@ -7,7 +7,7 @@ import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
@@ -494,7 +495,7 @@ index 2105b86..87c45e7 100644
      const adapter = new MockAdapter([textResponse('ok')])
      // The persona is a TEMPLATE: {{model}} is the loop-registered variable
 diff --git a/packages/core/agent-loop/tests/mock-adapter.ts b/packages/core/agent-loop/tests/mock-adapter.ts
-index c5341fb..78a263e 100644
+index c5341fb7ed..78a263e592 100644
 --- a/packages/core/agent-loop/tests/mock-adapter.ts
 +++ b/packages/core/agent-loop/tests/mock-adapter.ts
 @@ -12,6 +12,27 @@ export function textResponse(text: string): StreamChunk[] {
@@ -526,7 +527,7 @@ index c5341fb..78a263e 100644
   * Like {@link textResponse} but the stream ends with a `max-tokens` finish —
   * the model was cut off at the output-token ceiling (DeepSeek's `length`).
 diff --git a/packages/llm/llm-retry/README.i18n.yaml b/packages/llm/llm-retry/README.i18n.yaml
-index 2c468f9..42f2e74 100644
+index 2c468f9bc1..42f2e7477d 100644
 --- a/packages/llm/llm-retry/README.i18n.yaml
 +++ b/packages/llm/llm-retry/README.i18n.yaml
 @@ -2,5 +2,5 @@
@@ -538,7 +539,7 @@ index 2c468f9..42f2e74 100644
 +README.md: fb48f12fb9448f28f64f4715ccc4b90b96a522a6
 +README.zh.md: b210f946b0c870d15baa0e25edce6fda84e5bd0a
 diff --git a/packages/llm/llm-retry/README.md b/packages/llm/llm-retry/README.md
-index 1dd5300..fb48f12 100644
+index 1dd530051e..fb48f12fb9 100644
 --- a/packages/llm/llm-retry/README.md
 +++ b/packages/llm/llm-retry/README.md
 @@ -4,7 +4,7 @@ English | [中文](README.zh.md)
@@ -551,7 +552,7 @@ index 1dd5300..fb48f12 100644
  Both modes use bounded exponential backoff with symmetric jitter. A valid `providerRetryAfterMs` at or below `maxDelayMs` replaces local backoff without jitter. An over-cap provider delay makes normal mode delegate, while always mode uses its configured local backoff so it cannot terminate on that instruction.
  
 diff --git a/packages/llm/llm-retry/README.zh.md b/packages/llm/llm-retry/README.zh.md
-index 52badf6..b210f94 100644
+index 52badf6a6e..b210f946b0 100644
 --- a/packages/llm/llm-retry/README.zh.md
 +++ b/packages/llm/llm-retry/README.zh.md
 @@ -4,7 +4,7 @@
@@ -564,7 +565,7 @@ index 52badf6..b210f94 100644
  两种 mode 都使用带对称 jitter 的有界指数退避。有效 `providerRetryAfterMs` 不超过 `maxDelayMs` 时会替换本地退避，并且不加 jitter。超出上限的提供方延迟会使 normal mode 继续委托；always mode 则改用已配置的本地退避，避免该指令终止重试。
  
 diff --git a/packages/llm/llm-retry/tests/retry.spec.ts b/packages/llm/llm-retry/tests/retry.spec.ts
-index c2643a6..6077d9f 100644
+index c2643a6d45..6077d9f529 100644
 --- a/packages/llm/llm-retry/tests/retry.spec.ts
 +++ b/packages/llm/llm-retry/tests/retry.spec.ts
 @@ -79,6 +79,17 @@ function textResponse(text: string): StreamChunk[] {
@@ -640,22 +641,22 @@ index c2643a6..6077d9f 100644
      vi.useFakeTimers()
      const adapter = new ScriptedAdapter([
 diff --git a/packages/llm/llm/README.i18n.yaml b/packages/llm/llm/README.i18n.yaml
-index 0700b14..7118fc1 100644
+index 08820bbfd9..3b7978d8a9 100644
 --- a/packages/llm/llm/README.i18n.yaml
 +++ b/packages/llm/llm/README.i18n.yaml
 @@ -2,5 +2,5 @@
  # side as of the last confirmed-consistent state. Both languages carry equal authority;
  # after editing either side, bring the other along and re-record with:
  #   pnpm run verify-translation-pairing --write packages/llm/llm/README.md
--README.md: e6b3c4924ad4e7cf115abdbfb38d22d0f524e377
--README.zh.md: 51f034af632c19ca91c1d2f91a7c9c22714870e0
-+README.md: 18766d01a3817ca6377a83dea5a308e40042a4a3
-+README.zh.md: b1583c49a2d852aed5fbc229c2a145a1eec22d5c
+-README.md: 59c5303bdae8d6391f3bb1595a527d677e2378bc
+-README.zh.md: 313fc23590de2119bf07dd5c4c4fafe9daa94c56
++README.md: ed151edfcf6cc3cdde1f0873f57445d17b6070ff
++README.zh.md: bdec60a86f12df34184e299b7e128c91002795d2
 diff --git a/packages/llm/llm/README.md b/packages/llm/llm/README.md
-index e6b3c49..18766d0 100644
+index 59c5303bda..ed151edfcf 100644
 --- a/packages/llm/llm/README.md
 +++ b/packages/llm/llm/README.md
-@@ -81,6 +81,7 @@ Every adapter that puts a credential in an HTTP header judges it the same way be
+@@ -83,6 +83,7 @@ Every adapter that puts a credential in an HTTP header judges it the same way be
  - `CONTEXT_WINDOW_EXCEEDED_CODE` — the provider-neutral code both DeepSeek adapters use when a request exceeds the model context window, regardless of thrown-HTTP versus in-band finish delivery. `isContextWindowExceededError(detail)` is their shared conservative classifier for OpenAI-compatible provider detail.
  - `QUOTA_EXCEEDED_CODE` — the non-transient provider-neutral code for exhausted account quota, balance, credits, budget, or usage limits. `isQuotaExceededError(detail)` keeps those failures distinct from request-rate limits.
  - `EMPTY_RESPONSE_CODE` — the provider-neutral code both adapters use for a degenerate provider completion: a terminal `stop` that carried no content blocks at all. Classified as an error finish (not a successful empty message) because the attempt produced nothing durable; `dsh-llm-retry` retries it by default.
@@ -664,10 +665,10 @@ index e6b3c49..18766d0 100644
  
  ### Real adapters
 diff --git a/packages/llm/llm/README.zh.md b/packages/llm/llm/README.zh.md
-index 51f034a..b1583c4 100644
+index 313fc23590..bdec60a86f 100644
 --- a/packages/llm/llm/README.zh.md
 +++ b/packages/llm/llm/README.zh.md
-@@ -81,6 +81,7 @@
+@@ -85,6 +85,7 @@
  - `CONTEXT_WINDOW_EXCEEDED_CODE`：当请求超过模型上下文窗口时，无论通过 HTTP 异常抛出还是带内 finish 交付，两个 DeepSeek 适配器都使用的提供方无关 code。`isContextWindowExceededError(detail)` 是它们针对 OpenAI 兼容提供方详细信息的共享保守分类器。
  - `QUOTA_EXCEEDED_CODE`：帐户配额、余额、点数、预算或用量限制耗尽时使用的非暂时性提供方无关 code。`isQuotaExceededError(detail)` 使这些失败与请求速率限制保持区分。
  - `EMPTY_RESPONSE_CODE`：两个适配器都使用的提供方无关 code，用于表示退化的提供方生成结果：一个未携带任何内容块的终止 `stop`。它会被分类为错误 finish（而非成功空消息），因为尝试未产生持久内容；`dsh-llm-retry` 默认重试它。
@@ -676,7 +677,7 @@ index 51f034a..b1583c4 100644
  
  ### 真实适配器
 diff --git a/packages/llm/llm/src/error.ts b/packages/llm/llm/src/error.ts
-index 4b3e25c..f76ae37 100644
+index 4b3e25c75f..f76ae3715c 100644
 --- a/packages/llm/llm/src/error.ts
 +++ b/packages/llm/llm/src/error.ts
 @@ -38,6 +38,15 @@ export const QUOTA_EXCEEDED_CODE = 'QUOTA'
@@ -696,7 +697,7 @@ index 4b3e25c..f76ae37 100644
   * Canonical provider-neutral code for a credential that was supplied but
   * cannot be used — malformed rather than absent. Distinct from
 diff --git a/packages/llm/llm/src/retry-policy.ts b/packages/llm/llm/src/retry-policy.ts
-index f6e6175..ae9ccf6 100644
+index f6e6175cb9..ae9ccf6c2f 100644
 --- a/packages/llm/llm/src/retry-policy.ts
 +++ b/packages/llm/llm/src/retry-policy.ts
 @@ -9,7 +9,7 @@
@@ -717,7 +718,7 @@ index f6e6175..ae9ccf6 100644
    'SERVER',
    'TIMEOUT',
 diff --git a/packages/llm/llm/tests/retry-policy.spec.ts b/packages/llm/llm/tests/retry-policy.spec.ts
-index cc7ebb8..1cfa3c4 100644
+index cc7ebb8fa7..1cfa3c4c6d 100644
 --- a/packages/llm/llm/tests/retry-policy.spec.ts
 +++ b/packages/llm/llm/tests/retry-policy.spec.ts
 @@ -13,7 +13,7 @@ describe('provider retry policy', () => {

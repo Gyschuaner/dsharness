@@ -2,64 +2,68 @@
   "schemaVersion": 1,
   "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
   "baseBranch": "master",
-  "baseCommit": "141eb6fef83422698aef7a981029e843e8161534",
-  "baseTree": "24a3336d5c32b32ca7e01a84a08c757bd788c624",
-  "resultTree": "ae9a489ce67185e057510f54709a127d60a89f83",
-  "dshVersion": "0.1.0-rc.8",
+  "baseCommit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+  "baseTree": "53915efe4e2126cc7779b73dfc8a3bcec5318c44",
+  "resultTree": "166fe87aab17ec96848909d136d03dc57744966d",
+  "dshVersion": "0.1.1-rc.2",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
   "patches": [
     {
       "path": "upstream-patches/0001-fix-DSH-009-refresh-idle-on-raw-stream-activity.patch",
-      "sha256": "35D4BCA8F1E991B6A5FCC335F1BD6B17C41CAD6ECA2CF01D10B93B1B28A6231B"
+      "sha256": "C5BEF0D0392E31FD06ECB742F0441EDFF2B5301DC54A9656483436CAA977618A"
     },
     {
       "path": "upstream-patches/0002-feat-DSH-012-ship-Qwen-native-agent-preset.patch",
-      "sha256": "0E9FB582F984E86DF1EB31D404A917287CEA79405ECB32898B9EFAA452E17ED1"
+      "sha256": "A60EAA56A59C7C5EE04EA503F340E3EED6DA9451C160FBDFAE8F6E7B6C6D477C"
     },
     {
       "path": "upstream-patches/0003-fix-BUG-B0EE8D2D-recover-malformed-reasoning-tool-ca.patch",
-      "sha256": "3B657DD5EF94C4E365C5CEFD46C9ED5AC9AC07B626CB552050F38BA9D8984145"
+      "sha256": "DFA7DD8FA08D48473A14C5415D5FE5783E56C21153B4352706DDD12B3286AC57"
     },
     {
-      "path": "upstream-patches/0003b-fix-BUG-B0EE8D2D-retain-malformed-retry-history.patch",
-      "sha256": "24C350C15BF59720B3C6E0C23DFD4DA614F8DC79E5BE311868E6EDB26AFCE5E5"
+      "path": "upstream-patches/0004-fix-BUG-B0EE8D2D-retain-malformed-retry-history.patch",
+      "sha256": "EB9CA77CBCB6A5BFB277ADE778E02E3FB7837D0643504ED576849BB428B1159B"
     },
     {
-      "path": "upstream-patches/0004-docs-BUG-B0EE8D2D-document-retry-stream-token-cap.patch",
-      "sha256": "D8FCBB1D734D00AE98941E84DAC17A025DA53D5337ADABA05A117AAB50E00D78"
+      "path": "upstream-patches/0005-docs-BUG-B0EE8D2D-document-retry-stream-token-cap.patch",
+      "sha256": "4C9553E33F4DDEEADD550F29E4EBB6C412FB6D4E20A111F390EE286A737784FB"
     },
     {
-      "path": "upstream-patches/0005-feat-DSH-011-raise-compact-summary-budget-to-32K.patch",
-      "sha256": "B8A933B474F14E44A0F128F215928EB495FE55FCF3AEA74B284321771E913CBF"
+      "path": "upstream-patches/0006-feat-DSH-011-raise-compact-summary-budget-to-32K.patch",
+      "sha256": "65A18C989B32F45F5FA44DF3CEB45D3ACBCC2219A428CFFE91FD499E672165C1"
     },
     {
-      "path": "upstream-patches/0006-feat-DSH-014-show-streamed-tool-activity.patch",
-      "sha256": "2C0B92E3F645D728E41ACA805C8C86666505EE2817493DF3366B0DF321727049"
+      "path": "upstream-patches/0007-feat-ui-show-streamed-tool-activity-immediately-DSH-.patch",
+      "sha256": "28F5BC8601E621F349DDA56054F23DBC5E1E6F81782B510C73D8BE1A92438935"
     },
     {
-      "path": "upstream-patches/0007-fix-BUG-449804CF-tool-duration-layout.patch",
-      "sha256": "29AAFC127189F17A4F896410ADB4277735653CE5677A3219870140E353784D34"
+      "path": "upstream-patches/0008-fix-ui-keep-tool-duration-meaningful-and-inline-BUG-.patch",
+      "sha256": "6F4747A4C3BFB79FD9169F683FF4127264FE98FE12C494529D118867EAD66E9D"
     },
     {
-      "path": "upstream-patches/0008-fix-BUG-5F3BF25D-preserve-fast-tool-running-feedback.patch",
-      "sha256": "B059B7AC51D4B020FD17B264E82E34F81D267EA49103EEDD3D1E5AF49E20AFAF"
+      "path": "upstream-patches/0009-fix-ui-preserve-fast-tool-running-feedback-BUG-5F3BF.patch",
+      "sha256": "983E9BB69C5B3C12089ECFB6D75B79069BD4BBFBC0D44921F05C4F813E83E55B"
     },
     {
-      "path": "upstream-patches/0009-fix-BUG-449804CF-show-subsecond-duration-in-ms.patch",
-      "sha256": "5120FCC73A3460B5409A8D848C760F4D78237873811A407BDF0F66A3C5273BA2"
+      "path": "upstream-patches/0010-fix-ui-show-subsecond-tool-duration-in-milliseconds-.patch",
+      "sha256": "C66F6EFEC428F41FFD1E162161C8F8D0BEF3C76EFE1BFFF9CE57B6260C961398"
     },
     {
-      "path": "upstream-patches/0010-feat-ui-preview-planned-Code-subtools-DSH-015.patch",
-      "sha256": "DC8AF9F683CA7CFBE829376895EBCF54A977CEB43928EF5C16ADC18DD90575FC"
+      "path": "upstream-patches/0011-feat-ui-preview-planned-Code-subtools-DSH-015.patch",
+      "sha256": "C41689D55068D2A9E4BE4D9229DA5C94479EA9EC5019F307C4F8698331AD340F"
     },
     {
-      "path": "upstream-patches/0011-feat-DSH-016-align-Think-timing-and-tool-status.patch",
-      "sha256": "D2F05C362824AA7AABA5EA0090A94FF2C62E5F8935162EFCC9EE7DCD1A9A5E7E"
+      "path": "upstream-patches/0012-feat-ui-align-Think-timing-and-tool-activity-status-.patch",
+      "sha256": "2189A7B45932F5E0CCF96E46BE71FE01253BA71C4FDC46F8F26D655AD5A05864"
     },
     {
-      "path": "upstream-patches/0012-feat-DSH-018-continue-max-token-turns-automatically.patch",
-      "sha256": "851C9842265A4EF4125104335FA34AFF7B67F091A0D879A6A9744AC01BCF714C"
+      "path": "upstream-patches/0013-feat-DSH-018-continue-max-token-turns-automatically.patch",
+      "sha256": "E799CFA680DEB5CB8D45EAA46CD9B25F8321F986AF5ECD75B97AFC6908E26EA0"
+    },
+    {
+      "path": "upstream-patches/0014-fix-DSH-019-align-local-patches-with-0.1.1-rc.2.patch",
+      "sha256": "A1FCC70A867CA22A67F248A5D35AE86035EDBBB750E1F297CCBE39CE7EC9E1E7"
     }
   ]
 }

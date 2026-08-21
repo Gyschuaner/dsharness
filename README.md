@@ -85,14 +85,15 @@ cd dsharness
 
 ## 上游源码（deepseek-harness）
 
-当前锁定官方 `master` 提交 `141eb6f`（`0.1.0-rc.8`），随后依次应用 DSH-009 的
+当前锁定官方标签 `dsh-v0.1.1-rc.2` 提交 `b150a55`，随后依次应用 DSH-009 的
 流式活动保活补丁、DSH-012 的 Qwen 原生 Agent preset 补丁，以及
 BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compact 32K
 摘要预算补丁、DSH-014 的工具调用即时进度反馈补丁，以及 BUG-449804CF 的工具耗时
 与行内状态布局修复、BUG-5F3BF25D 的快速工具运行态可感知性修复、亚秒耗时的毫秒
 精度展示修复、DSH-015 的 Code 子工具计划提前展示，以及 DSH-016 的 Think 独立计时
-和工具活动状态布局，再叠加 DSH-018 的输出 token 上限自动持续续跑。最终源码 tree 为
-`ae9a489ce67185e057510f54709a127d60a89f83`。
+和工具活动状态布局，再叠加 DSH-018 的输出 token 上限自动持续续跑，以及 DSH-019
+针对 0.1.1 新结构的兼容调整。最终源码 tree 为
+`166fe87aab17ec96848909d136d03dc57744966d`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。

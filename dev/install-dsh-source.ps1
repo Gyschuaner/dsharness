@@ -128,7 +128,13 @@ if ($PnpmVersion -ne $Lock.pnpmVersion) {
 }
 
 Write-Step '安装锁定依赖'
-Invoke-Native 'corepack' @('pnpm', 'install', '--frozen-lockfile') $SourceDirectory
+$PreviousCi = $env:CI
+try {
+    $env:CI = 'true'
+    Invoke-Native 'corepack' @('pnpm', 'install', '--frozen-lockfile') $SourceDirectory
+} finally {
+    $env:CI = $PreviousCi
+}
 Write-Step '执行完整构建'
 Invoke-Native 'corepack' @('pnpm', 'run', 'build') $SourceDirectory
 

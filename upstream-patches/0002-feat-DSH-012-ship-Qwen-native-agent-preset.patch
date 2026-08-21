@@ -1,7 +1,7 @@
-From 0d99274ad51223e03cc67b2b94328094351dbf32 Mon Sep 17 00:00:00 2001
+From 030acca7102b07d16b0c72e5ccf8a7b16fa21eb3 Mon Sep 17 00:00:00 2001
 From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
 Date: Tue, 18 Aug 2026 17:22:33 +0800
-Subject: [PATCH] feat(DSH-012): ship Qwen native agent preset
+Subject: [PATCH 02/14] feat(DSH-012): ship Qwen native agent preset
 
 ---
  .../qwen-native/agent.cordis.yml              | 268 ++++++++++++++++++
@@ -22,7 +22,7 @@ Subject: [PATCH] feat(DSH-012): ship Qwen native agent preset
 
 diff --git a/apps/cli/config/agent-presets/qwen-native/agent.cordis.yml b/apps/cli/config/agent-presets/qwen-native/agent.cordis.yml
 new file mode 100644
-index 0000000..26111c3
+index 0000000000..26111c326b
 --- /dev/null
 +++ b/apps/cli/config/agent-presets/qwen-native/agent.cordis.yml
 @@ -0,0 +1,268 @@
@@ -296,7 +296,7 @@ index 0000000..26111c3
 +    searchTimeoutMs: 60000
 diff --git a/apps/cli/config/agent-presets/qwen-native/preset.yml b/apps/cli/config/agent-presets/qwen-native/preset.yml
 new file mode 100644
-index 0000000..50619b2
+index 0000000000..50619b2f21
 --- /dev/null
 +++ b/apps/cli/config/agent-presets/qwen-native/preset.yml
 @@ -0,0 +1,3 @@
@@ -305,7 +305,7 @@ index 0000000..50619b2
 +order: 2
 diff --git a/apps/cli/tests/qwen-native-preset.spec.ts b/apps/cli/tests/qwen-native-preset.spec.ts
 new file mode 100644
-index 0000000..00faa6a
+index 0000000000..00faa6a6ac
 --- /dev/null
 +++ b/apps/cli/tests/qwen-native-preset.spec.ts
 @@ -0,0 +1,53 @@
@@ -363,7 +363,7 @@ index 0000000..00faa6a
 +  })
 +})
 diff --git a/apps/cli/tests/web-agent-presets.e2e.ts b/apps/cli/tests/web-agent-presets.e2e.ts
-index 0e98af0..e238718 100644
+index 0e98af0477..e23871831f 100644
 --- a/apps/cli/tests/web-agent-presets.e2e.ts
 +++ b/apps/cli/tests/web-agent-presets.e2e.ts
 @@ -216,10 +216,10 @@ describe('the shipped Web composition', () => {
@@ -380,7 +380,7 @@ index 0e98af0..e238718 100644
      expect(ctx.agentPresets.defaultId).toBe('standard')
    })
 diff --git a/apps/cli/tests/windows-shell.spec.ts b/apps/cli/tests/windows-shell.spec.ts
-index ce37022..64225ca 100644
+index ce37022cdf..64225cae2d 100644
 --- a/apps/cli/tests/windows-shell.spec.ts
 +++ b/apps/cli/tests/windows-shell.spec.ts
 @@ -103,7 +103,7 @@ describe('the shipped shell composition (real bundle layers)', () => {
@@ -393,7 +393,7 @@ index ce37022..64225ca 100644
        readFileSync(join(presetRoot, preset, 'agent.cordis.yml'), 'utf8'),
        { schema: entryListSchema },
 diff --git a/apps/web/tests/snapshots/agent-preset-authoring/created.expected.md b/apps/web/tests/snapshots/agent-preset-authoring/created.expected.md
-index d82f48d..ab955b5 100644
+index d82f48d8c1..ab955b5454 100644
 --- a/apps/web/tests/snapshots/agent-preset-authoring/created.expected.md
 +++ b/apps/web/tests/snapshots/agent-preset-authoring/created.expected.md
 @@ -41,6 +41,16 @@
@@ -414,7 +414,7 @@ index d82f48d..ab955b5 100644
        - 'button "设为默认: 极简模式"':
          - text: 极简模式 内置 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agent。
 diff --git a/apps/web/tests/snapshots/agent-preset-authoring/damaged.expected.md b/apps/web/tests/snapshots/agent-preset-authoring/damaged.expected.md
-index 0869bd7..dfed58f 100644
+index 0869bd7f3f..dfed58f3ea 100644
 --- a/apps/web/tests/snapshots/agent-preset-authoring/damaged.expected.md
 +++ b/apps/web/tests/snapshots/agent-preset-authoring/damaged.expected.md
 @@ -41,6 +41,16 @@
@@ -435,7 +435,7 @@ index 0869bd7..dfed58f 100644
        - 'button "设为默认: 极简模式"':
          - text: 极简模式 内置 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agent。
 diff --git a/apps/web/tests/snapshots/agent-preset-authoring/section.expected.md b/apps/web/tests/snapshots/agent-preset-authoring/section.expected.md
-index c8d983c..035b59a 100644
+index c8d983cb34..035b59af43 100644
 --- a/apps/web/tests/snapshots/agent-preset-authoring/section.expected.md
 +++ b/apps/web/tests/snapshots/agent-preset-authoring/section.expected.md
 @@ -41,6 +41,16 @@
@@ -456,7 +456,7 @@ index c8d983c..035b59a 100644
        - 'button "设为默认: 极简模式"':
          - text: 极简模式 内置 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agent。
 diff --git a/apps/web/tests/snapshots/agent-preset-selection/menu.expected.md b/apps/web/tests/snapshots/agent-preset-selection/menu.expected.md
-index 9e3116d..c857cb7 100644
+index 9e3116d353..c857cb73f0 100644
 --- a/apps/web/tests/snapshots/agent-preset-selection/menu.expected.md
 +++ b/apps/web/tests/snapshots/agent-preset-selection/menu.expected.md
 @@ -3,5 +3,6 @@
@@ -467,7 +467,7 @@ index 9e3116d..c857cb7 100644
    - menuitem "Minimal mode Two-tool coding agent with persistent bash and str_replace_editor."
    - menuitem "Creator mode Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance."
 diff --git a/packages/client/ui-agent-preset/src/client/locales.ts b/packages/client/ui-agent-preset/src/client/locales.ts
-index de19803..b9ab092 100644
+index de19803a29..b9ab092c67 100644
 --- a/packages/client/ui-agent-preset/src/client/locales.ts
 +++ b/packages/client/ui-agent-preset/src/client/locales.ts
 @@ -5,6 +5,7 @@ export type AgentPresetSettingsKey =
@@ -506,7 +506,7 @@ index de19803..b9ab092 100644
    minimal: { name: 'presetMinimalName', description: 'presetMinimalDescription' },
    cordis: { name: 'presetCordisName', description: 'presetCordisDescription' },
 diff --git a/packages/client/ui-agent-preset/tests/locales.client.spec.ts b/packages/client/ui-agent-preset/tests/locales.client.spec.ts
-index 02623e7..70546db 100644
+index 02623e7d7b..70546db98a 100644
 --- a/packages/client/ui-agent-preset/tests/locales.client.spec.ts
 +++ b/packages/client/ui-agent-preset/tests/locales.client.spec.ts
 @@ -1,4 +1,4 @@
