@@ -3,12 +3,15 @@
 ## 结论
 
 在不使用 GPU/VRAM、不改变 DSH `vision_inspect` 协议和 DP Relay 路由的前提下，
-Qwen3.6-35B-A3B 的真实图片长输出已经从生产 Q8 基线 17.81 TPS 提升到 50.03 TPS
-中位数、50.14 TPS 均值。最佳候选是 ik_llama.cpp NUMA mirror fork、Q4_0、仅镜像
-权重、64 个 decode 线程、8K 上下文和关闭 continuous batching。
+accuracy-first 的 Q8_0 真实图片 1024-token 长输出从生产基线 17.81 TPS 提升到 41.18
+TPS 中位数。配置是 ik_llama.cpp NUMA mirror fork、仅镜像权重、44 个 decode 线程、
+8K 上下文、ubatch 64 和关闭 continuous batching。它比生产基线快约 131%，但没有达到
+DSH-021 后续提高到 45 TPS 的验收线。
 
-本次没有替换生产端口 `23343`。Q4_0 比优化后的 Q8 快约 27.1%，但量化精度更低；
-因此将它定义为性能候选，待补充小字 OCR、复杂图表和空间关系质量集后再决定是否上线。
+Q4_0 可达到 50.03 TPS 中位数、50.14 TPS 均值，但用户明确选择 Q8 的视觉精度，故仅保留
+为性能参考。重新导出的 Q8_0 内置官方一层 MTP 后，draft 接受率稳定在 83.15%，长输出却
+降到 33.49 TPS 中位数、33.45 TPS 均值；纯 CPU 上额外 MTP 层与双 token 验证成本大于
+接受收益，因此不启用 MTP。本次没有替换生产端口 `23343`。
 
 ## 固定环境与测试口径
 
@@ -20,7 +23,8 @@ Qwen3.6-35B-A3B 的真实图片长输出已经从生产 Q8 基线 17.81 TPS 提�
   640×488《纽约时报》登月头版 JPEG。
 - 温度 0、关闭 thinking、单并发、流式 OpenAI chat completions。短测输出 256 token；
   长测输出 1024 token；TPS 从首个可见 token 到流结束计算。
-- 最佳候选 RSS 40,563,500 KiB；进程没有打开 `/dev/nvidia*` 设备。
+- Q8 非 MTP 候选约占 73 GiB RSS；Q8+MTP 实测峰值 RSS 77,394,976 KiB。两者均未打开
+  `/dev/nvidia*` 设备。
 
 ## 开源方案筛选
 
@@ -31,7 +35,7 @@ Qwen3.6-35B-A3B 的真实图片长输出已经从生产 Q8 基线 17.81 TPS 提�
 | [NUMA mirror fork](https://github.com/mikechambers84/ik_llama.cpp/tree/numa-mirror) | 最佳 | 每个 CPU 插槽持有本地权重副本，并使用分层 barrier，显著减少跨插槽访存。 |
 | [KTransformers AMX](https://github.com/kvcache-ai/ktransformers/blob/main/doc/en/AMX.md) | 不采用 | AMX 更利于矩阵-矩阵的 prefill；decode 仍主要走 AVX-512。其 [Qwen3.5 路径](https://github.com/kvcache-ai/ktransformers/blob/main/doc/en/Qwen3.5.md) 是 CPU/GPU 混合，和“不占 VRAM”冲突。 |
 | 外部 0.8B draft speculative | 不可用 | multimodal target 需要等价图片 embedding；当前 server 明确拒绝无视觉 embedding 的 draft。 |
-| target 自带 MTP | 不可用 | 当前 GGUF 不包含完整 MTP head，server 在启动时拒绝。 |
+| target 自带 MTP | 实测后淘汰 | 从官方 HF 权重重新导出同一 GGUF 内置的一层 MTP；接受率 83.15%，但 Q8 长输出从 41.18 降至 33.49 TPS。 |
 
 ## 结果
 
@@ -45,11 +49,46 @@ Qwen3.6-35B-A3B 的真实图片长输出已经从生产 Q8 基线 17.81 TPS 提�
 | ik NUMA mirror Q4_K_M | 权重与 KV 双节点镜像，64 threads | 44.73 | 0.20 s | 约 45 GiB |
 | ik Q4_0 最佳候选 | 仅权重镜像，64 threads，8K ctx，ubatch 64，no-CB | 49.54 | 0.15 s | 38.68 GiB |
 
-Q8 可以使用，而且经过 NUMA mirror 后从 17.81 提升到 39.38 TPS；但双份 Q8 权重更吃
-内存带宽，仍比 Q4_K_M 慢 12.0%，比 Q4_0 短测慢 20.5%。如果质量优先，Q8 是最稳妥
-回退；如果目标是 50 TPS，则需要 Q4_0。
+Q8 可以使用，而且经过 NUMA mirror 与长输出参数细调后从 17.81 提升到 41.18 TPS；
+如果质量优先，它是当前推荐路径。Q4_0 的 50 TPS 只说明硬件仍有低比特性能空间，不能
+作为 Q8 精度验收的替代品。
 
-### 最佳候选的真实图片长输出
+### Q8_0 非 MTP 长输出基线
+
+| 轮次 | TTFT | 输出 token | 端到端流式 TPS |
+| ---: | ---: | ---: | ---: |
+| 1（冷图片） | 2.344 s | 1024 | 40.64 |
+| 2 | 0.413 s | 1024 | 41.18 |
+| 3 | 0.162 s | 1024 | 41.17 |
+| 4 | 0.175 s | 1024 | 41.46 |
+| 5 | 0.170 s | 1024 | 41.43 |
+
+中位 41.18 TPS，均值 41.18 TPS。五轮均正确识别 `The New York Times`、
+`MONDAY, JULY 21, 1969` 和 `MEN WALK ON MOON`。
+
+### Q8_0 内置一层 MTP
+
+新 GGUF 由官方 BF16/HF 权重直接转换为 Q8_0，共 753 个 tensor、37,802,149,568 bytes，
+元数据包含 `qwen35moe.nextn_predict_layers=1`。服务使用
+`--spec-type mtp:n_max=1,p_min=0.0`，并在启动时执行 `--validate-quants` 和
+`--check-tensors`。文件 SHA-256 为
+`e9e45e0f9d4ae0274875cb9438bc9f46fd0ccf76f30c14c92e72bbe072014d4e`。
+
+| 轮次 | TTFT | 输出 token | 端到端流式 TPS | draft 接受率 |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.436 s | 1024 | 33.49 | 83.15% |
+| 2 | 0.282 s | 1024 | 33.53 | 83.15% |
+| 3 | 0.156 s | 1024 | 33.20 | 83.15% |
+| 4 | 0.162 s | 1024 | 33.74 | 83.15% |
+| 5 | 0.149 s | 1024 | 33.30 | 83.15% |
+
+中位 33.49 TPS，均值 33.45 TPS，比同量化非 MTP 基线慢 18.7%。32–56 decode threads
+细扫的最佳值为 36 线程、256-token 35.13 TPS，排除了“44 线程仅适合普通 decode”的
+干扰。服务端累计生成 4,582 个 draft token、接受 3,820 个，证明 MTP 一直生效，并非
+静默回退。密集 UI、`Think 2s ... vision_inspect` 小字行以及 `Look 48s ... 53s` 重复耗时
+三项 OCR 冒烟均通过，说明失败点是性能而不是质量。
+
+### Q4_0 性能参考的真实图片长输出
 
 | 轮次 | TTFT | 输出 token | 端到端流式 TPS |
 | ---: | ---: | ---: | ---: |
@@ -80,6 +119,10 @@ Q8 可以使用，而且经过 NUMA mirror 后从 17.81 提升到 39.38 TPS；�
 7. `/proc/sys/kernel/numa_balancing=1`，当前账号不能无密码 sudo。NUMA fork 明确警告该
    设置可能影响性能；若以后允许主机级调优，关闭自动 NUMA balancing 后值得重测，
    但本报告没有把未执行的收益计入结果。
+8. Q8_K_R8、transparent huge pages、QKV/专家合并、远端 KV cache 和异步调度均未把 Q8
+   拉到 45 TPS；最佳长输出仍约 41 TPS。
+9. MTP 的接受率不是问题。纯 CPU 每一步还要运行一层 MTP MoE，并由 target 对两个 token
+   做验证；这部分成本使 83% 接受率仍成为 18.7% 的净负收益。MTP 不进入推荐启动参数。
 
 ## 推荐配置与切换边界
 
@@ -87,8 +130,8 @@ Q8 可以使用，而且经过 NUMA mirror 后从 17.81 提升到 39.38 TPS；�
 无显式授权使用 `23343`。关键参数：
 
 ```text
-Q4_0 + BF16 mmproj
-threads=64, threads-batch=96, threads-mtmd=96
+Q8_0 + BF16 mmproj，不启用 MTP
+threads=44, threads-batch=96, threads-mtmd=96
 ctx=8192, batch=512, ubatch=64, parallel=1
 numa-mirror=weights, runtime-repack, no-cont-batching
 ngl=0, no-mmproj-offload, CUDA_VISIBLE_DEVICES=""
@@ -96,8 +139,8 @@ ngl=0, no-mmproj-offload, CUDA_VISIBLE_DEVICES=""
 
 上线前仍需：
 
-1. 建立至少 30 张图片的质量集，覆盖小字 OCR、表格、流程图、图表、密集 UI、空间关系、
-   中文与英文混排；以当前 Q8 为基准做盲测。
+1. 用户已接受 Q8 非 MTP 的稳定 41 TPS 方案作为最终候选；后续若继续追速，应优先评估
+   可控的主机级 NUMA balancing/内存策略或新的 CPU kernel，不再继续调 MTP 接受阈值。
 2. 评估 8K 上下文是否覆盖视觉子代理的最长完整 prompt；超长请求应明确报错或路由到
    Q8 32K 回退，而不是静默截断。
 3. 在隔离端口通过 DP Relay 和 DSH `vision_inspect` 做完整回归，再由用户明确授权替换

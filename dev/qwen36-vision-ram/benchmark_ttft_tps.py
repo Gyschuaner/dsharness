@@ -32,6 +32,8 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         "temperature": 0,
         "chat_template_kwargs": {"enable_thinking": False},
     }
+    if args.threads is not None:
+        payload["n_threads"] = args.threads
     headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
     api_key = os.getenv("BENCHMARK_API_KEY", "").strip()
     if api_key:
@@ -45,6 +47,7 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
     started = time.perf_counter()
     first_token_at: float | None = None
     usage: dict[str, Any] = {}
+    timings: dict[str, Any] = {}
     text_fragments: list[str] = []
     with urllib.request.urlopen(request, timeout=args.timeout) as response:
         for raw_line in response:
@@ -60,6 +63,8 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
                 continue
             if isinstance(event.get("usage"), dict):
                 usage = event["usage"]
+            if isinstance(event.get("timings"), dict):
+                timings = event["timings"]
             choices = event.get("choices") or []
             if not choices:
                 continue
@@ -76,6 +81,8 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
     measured_tps = None
     if decode_seconds and decode_seconds > 0 and completion_tokens > 1:
         measured_tps = (completion_tokens - 1) / decode_seconds
+    draft_n = int(timings.get("draft_n") or 0)
+    draft_n_accepted = int(timings.get("draft_n_accepted") or 0)
     return {
         "ok": first_token_at is not None,
         "ttft_seconds": ttft,
@@ -84,6 +91,11 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         "completion_tokens": completion_tokens,
         "prompt_tokens": int(usage.get("prompt_tokens") or 0),
         "measured_tps": measured_tps,
+        "requested_threads": args.threads,
+        "server_timings": timings,
+        "draft_acceptance_rate": (
+            draft_n_accepted / draft_n if draft_n > 0 else None
+        ),
         "output_preview": "".join(text_fragments)[:240],
     }
 
@@ -96,19 +108,36 @@ def main() -> None:
     parser.add_argument("--image", type=Path)
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--rounds", type=int, default=2)
+    parser.add_argument(
+        "--threads",
+        type=int,
+        help="Optional per-request decode thread override for compatible servers",
+    )
     parser.add_argument("--timeout", type=float, default=900)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     rows = [run_once(args) for _ in range(args.rounds)]
     ttfts = [row["ttft_seconds"] for row in rows if row["ttft_seconds"] is not None]
     speeds = [row["measured_tps"] for row in rows if row["measured_tps"] is not None]
+    acceptance_rates = [
+        row["draft_acceptance_rate"]
+        for row in rows
+        if row["draft_acceptance_rate"] is not None
+    ]
     result = {
         "base_url": args.base_url,
         "model": args.model,
         "kind": "image" if args.image else "text",
         "rounds": rows,
         "ttft_median_seconds": statistics.median(ttfts) if ttfts else None,
+        "tps_mean": statistics.mean(speeds) if speeds else None,
         "tps_median": statistics.median(speeds) if speeds else None,
+        "draft_acceptance_rate_mean": (
+            statistics.mean(acceptance_rates) if acceptance_rates else None
+        ),
+        "draft_acceptance_rate_median": (
+            statistics.median(acceptance_rates) if acceptance_rates else None
+        ),
     }
     rendered = json.dumps(result, ensure_ascii=False, indent=2)
     print(rendered)

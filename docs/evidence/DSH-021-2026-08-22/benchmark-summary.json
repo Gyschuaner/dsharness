@@ -14,6 +14,8 @@
     "ik_llama_q4_k_m_runtime_repack": 30.0427,
     "ik_llama_numa_mirror_q8_0": 39.3752,
     "ik_llama_numa_mirror_q4_k_m": 44.7306,
+    "ik_llama_numa_weight_mirror_q8_0_1024_tokens": 41.1803,
+    "ik_llama_numa_weight_mirror_q8_0_mtp_1024_tokens": 33.4895,
     "ik_llama_numa_weight_mirror_q4_0_256_tokens": 49.5379,
     "ik_llama_numa_weight_mirror_q4_0_1024_tokens": 50.0280
   },
@@ -35,10 +37,30 @@
     "visual_smoke": "passed: New York Times, 1969-07-21 and MEN WALK ON MOON recognized"
   },
   "q8_comparison": {
-    "optimized_q8_tps_median": 39.3752,
+    "optimized_q8_tps_mean": 41.1771,
+    "optimized_q8_tps_median": 41.1803,
     "optimized_q4_0_tps_median": 50.0280,
-    "q4_0_speedup_percent": 27.1,
-    "decision": "Keep Q8 production service until Q4_0 quality acceptance; Q4_0 is the performance candidate."
+    "q4_0_speedup_percent": 21.5,
+    "decision": "Use Q8_0 as the accuracy-first candidate; keep Q4_0 only as a performance reference. The user accepted the stable 41 TPS result instead of the earlier 45 TPS target."
+  },
+  "q8_mtp_experiment": {
+    "model_file": "/data1/gys/dsh021/models/Qwen3.6-35B-A3B-Q8_0-MTP.gguf",
+    "model_size_bytes": 37802149568,
+    "sha256": "e9e45e0f9d4ae0274875cb9438bc9f46fd0ccf76f30c14c92e72bbe072014d4e",
+    "tensor_count": 753,
+    "mtp_layers": 1,
+    "threads": 36,
+    "tps_rounds": [33.4895, 33.5343, 33.1989, 33.7442, 33.3018],
+    "tps_mean": 33.4537,
+    "tps_median": 33.4895,
+    "draft_tokens_generated": 4582,
+    "draft_tokens_accepted": 3820,
+    "draft_acceptance_rate": 0.8315,
+    "non_mtp_q8_slowdown_percent": 18.7,
+    "rss_kib": 77394976,
+    "nvidia_device_open": false,
+    "visual_smoke": "passed: newspaper facts, dense UI, Think row and duplicate Look timings",
+    "decision": "Reject MTP for this pure-CPU Q8 deployment because extra MTP and verification compute outweigh accepted drafts."
   },
   "safety": {
     "production_ports_modified": false,

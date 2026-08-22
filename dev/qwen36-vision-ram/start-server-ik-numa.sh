@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# DSH-021 candidate launcher. It defaults to an isolated port and must not
-# replace the managed Q8 service until its lower-precision quality is accepted.
+# DSH-021 Q8 accuracy-first candidate launcher. It defaults to an isolated
+# port and must not replace the managed service without explicit authorization.
 BIN="${IK_LLAMA_SERVER_BIN:-/data1/gys/dsh021/ik-numa-mirror/build-gcc12/bin/llama-server}"
-MODEL="${MODEL:-/data1/gys/dsh021/models/Qwen3.6-35B-A3B-Q4_0.gguf}"
-MMPROJ="${MMPROJ:-/dev/shm/gys/dsh021-q4/mmproj-BF16.gguf}"
+MODEL="${MODEL:-/dev/shm/gys/qwen36-q8/Qwen3.6-35B-A3B-Q8_0.gguf}"
+MMPROJ="${MMPROJ:-/dev/shm/gys/qwen36-q8/mmproj-BF16.gguf}"
 ALIAS="${MODEL_ALIAS:-Qwen3.6-35B-A3B}"
 PORT="${PORT:-23355}"
 CONTEXT_SIZE="${CONTEXT_SIZE:-8192}"
-THREADS="${THREADS:-64}"
+THREADS="${THREADS:-44}"
 THREADS_BATCH="${THREADS_BATCH:-96}"
 THREADS_MTMD="${THREADS_MTMD:-96}"
 BATCH_SIZE="${BATCH_SIZE:-512}"

@@ -29,13 +29,13 @@ line or in benchmark output.
 
 ## DSH-021 CPU/NUMA acceleration candidate
 
-The production launcher above intentionally remains on the accepted Q8
-configuration. DSH-021 adds a separately reviewable ik_llama.cpp candidate in
-`start-server-ik-numa.sh`; its defaults are the best measured settings on the
-dual-socket Xeon 8474C host:
+The production launcher above intentionally remains unchanged. DSH-021 adds a
+separately reviewable ik_llama.cpp candidate in `start-server-ik-numa.sh`; its
+defaults are the accuracy-first Q8 settings measured on the dual-socket Xeon
+8474C host:
 
-- Q4_0 target weights plus BF16 multimodal projector;
-- 64 decode threads, 96 prompt/image threads;
+- Q8_0 target weights plus BF16 multimodal projector;
+- 44 decode threads, 96 prompt/image threads;
 - per-node weight mirroring, without KV mirroring;
 - 8K context, batch 512, ubatch 64, one slot;
 - runtime row repacking and continuous batching disabled.
@@ -56,7 +56,9 @@ python3 ./benchmark_ttft_tps.py \
   --rounds 5
 ```
 
-Measured results and the Q8/Q4 comparison are recorded in
-`docs/DSH-021-vision-ram-tps.md`. Q4_0 is a speed candidate rather than an
-automatic production replacement: small-text OCR and visual reasoning quality
-must be accepted before changing the Relay upstream.
+Measured results and the Q8/Q4/MTP comparison are recorded in
+`docs/DSH-021-vision-ram-tps.md`. Q4_0 remains a speed-only reference. An
+embedded one-layer MTP head reached more than 83% draft acceptance but reduced
+Q8 long-output throughput, so the launcher deliberately keeps speculative
+decoding disabled. Changing the Relay upstream still requires explicit release
+authorization.
