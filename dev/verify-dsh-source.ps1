@@ -79,6 +79,9 @@ if ((Test-Path -LiteralPath $QwenCompositionPath -PathType Leaf) -and (Test-Path
 $VisionBridgeSourcePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/index.ts'
 $VisionBridgeBundlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/lib/index.js'
 $VisionBridgeRowPath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.tsx'
+$VisionBridgeRowStylePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.module.css'
+$VisionBridgeThrottlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts'
+$ToolCallTreeStylePath = Join-Path $SourceDirectory 'packages/client/ui-tool/src/client/tool/ToolCallTree.module.css'
 $ToolEventTypesPath = Join-Path $SourceDirectory 'packages/core/tools/src/types.ts'
 $KnownEventTypesPath = Join-Path $SourceDirectory 'packages/core/session/src/known-event-types.ts'
 $BaseCordisPatchPath = Join-Path $SourceDirectory 'packages/bundle/base/cordis.patch.yml'
@@ -91,9 +94,21 @@ if (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) {
 if (Test-Path -LiteralPath $VisionBridgeRowPath -PathType Leaf) {
     $VisionBridgeRow = Get-Content -LiteralPath $VisionBridgeRowPath -Raw -Encoding UTF8
     Check ($VisionBridgeRow -match 'title="Look"' -and $VisionBridgeRow -match 'progressText' -and $VisionBridgeRow -match '>ing<') 'DSH-020 Look ing 行消费视觉流式进度'
+    Check ($VisionBridgeRow -match 'latestLine\(model\.summary\)' -and $VisionBridgeRow -match 'data-follow-end' -and $VisionBridgeRow -match 'useThrottledVisualUpdate') 'BUG-374ECAE5 Looking 行跟随最新视觉文字'
+    Check ($VisionBridgeRow -match 'function visualProgress' -and $VisionBridgeRow -match 'structuredObject\(text\)\?\.observations' -and $VisionBridgeRow -match 'return visualSummary\(text\)') 'BUG-40D0E1BE Looking 在 summary 后继续投影 observations'
 } else {
     Check $false 'DSH-020 vision-inspect 客户端呈现存在'
 }
+if ((Test-Path -LiteralPath $VisionBridgeRowStylePath -PathType Leaf) -and (Test-Path -LiteralPath $ToolCallTreeStylePath -PathType Leaf)) {
+    $VisionBridgeRowStyle = Get-Content -LiteralPath $VisionBridgeRowStylePath -Raw -Encoding UTF8
+    $ToolCallTreeStyle = Get-Content -LiteralPath $ToolCallTreeStylePath -Raw -Encoding UTF8
+    Check ($VisionBridgeRowStyle -match '(?s)\.root\s*\{.*?width:\s*100%;.*?min-width:\s*0;' -and $VisionBridgeRowStyle -match '(?s)\.summary\[data-follow-end\].*?text-overflow:\s*clip') 'BUG-374ECAE5 Looking 摘要具有独立裁剪窗口'
+    Check ($VisionBridgeRowStyle -notmatch 'dsh-vision-row-sweep' -and $ToolCallTreeStyle -match 'dsh-tool-row-sweep') 'BUG-374ECAE5 视觉运行态仅复用 Tool 单层扫光'
+    Check ($ToolCallTreeStyle -match "data-tool-activity-placement='inline'" -and $ToolCallTreeStyle -match '(?s)data-tool-activity-placement.*?data-tool-activity-state.*?display:\s*none') 'BUG-BA3AD2DC 内联 Look 计时抑制外层重复时长'
+} else {
+    Check $false 'BUG-374ECAE5 视觉与 Tool 行样式存在'
+}
+Check (Test-Path -LiteralPath $VisionBridgeThrottlePath -PathType Leaf) 'BUG-374ECAE5 视觉节流更新实现存在'
 if ((Test-Path -LiteralPath $ToolEventTypesPath -PathType Leaf) -and (Test-Path -LiteralPath $KnownEventTypesPath -PathType Leaf)) {
     $ToolEventTypes = Get-Content -LiteralPath $ToolEventTypesPath -Raw -Encoding UTF8
     $KnownEventTypes = Get-Content -LiteralPath $KnownEventTypesPath -Raw -Encoding UTF8

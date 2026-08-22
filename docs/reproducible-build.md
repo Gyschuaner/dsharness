@@ -19,9 +19,9 @@
   运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
   DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
   DSH-019 的 0.1.1 兼容调整、BUG-C393119A 静态门禁修复，以及 DSH-005 可选视觉桥
-  及其发布门禁、`vision_inspect` 专属视觉工具呈现、流式视觉输出与持久交接补丁，
-  并包含各自的 SHA-256；
-- 应用补丁后的 Git tree `9689ee52fd6994f51674c73ba2a7a6580f481ef0`。
+  及其发布门禁、`vision_inspect` 专属视觉工具呈现、流式视觉输出与持久交接、单层
+  扫光、流式尾部跟随、observation 持续投影与重复计时抑制补丁，并包含各自的 SHA-256；
+- 应用补丁后的 Git tree `20b75d22dce990c0db43de5ea9ea03b7132e2e6e`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -222,3 +222,20 @@ Think 行保持一致，并保留完整 IN/OUT disclosure 和 Inspect 入口。H
 3080 浏览器以 100 ms 间隔实测，工具行首次出现后到完成的最小行数保持不变；页面
 刷新前后 5 条视觉记录及最后一条摘要逐字一致。最终 tree 更新为
 `9689ee52fd6994f51674c73ba2a7a6580f481ef0`。
+
+同日新增第二十个补丁，修复 BUG-374ECAE5。视觉工具行删除插件自身的重复扫光，只保留
+`ToolCallTree` 原生的一层 `dsh-tool-row-sweep`；运行态摘要复用 Think 的三帧节流策略，
+并补齐 `width: 100%` / `min-width: 0` 约束，使摘要元素自身形成真实裁剪窗口，每次
+视觉增量后横向跟随最新文字尾部，完成后恢复首行摘要。5 个相关测试文件 57 条用例、
+Client/Web 构建通过；3080 实际浏览器采样中，摘要溢出后的 `scrollLeft` 随增量从
+`0` 增至 `218`、`539`，扫描动画始终只有一个，刷新后完成记录仍在且控制台无错误。
+最终 tree 更新为 `f048dc7e3b36499b6ab3564771b857967ffa1a2a`。
+
+同日新增第二十一个补丁，修复 BUG-40D0E1BE 并完成 BUG-BA3AD2DC。Looking 的运行态
+投影在结构化 `summary` 结束后继续读取 `observations`，始终显示正在生成的最新一条
+observation；正式 `tool/result` 到达后仍收拢回首行 summary。拥有 Think 形态内联计时
+的 keyed 工具视图会通过通用 `data-tool-activity-placement="inline"` 约定隐藏外层重复
+Tool 时长。5 个相关测试文件 59 条用例、lint、Client/Web 构建通过；3080 实际调用在
+47 秒时显示 observation，完成结果含 9 条 observations，1:05 完成后恢复 summary，
+刷新后第 10 条 Look 记录仍在。外层 `1:10 Done` 保留在 DOM，但计算样式为 `display: none`。
+最终 tree 更新为 `20b75d22dce990c0db43de5ea9ea03b7132e2e6e`。

@@ -1,0 +1,351 @@
+From 04fe823cd249b625ed5b725e3b8a82de00b7c3f0 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 15:44:51 +0800
+Subject: [PATCH] fix(BUG-374ECAE5): follow the vision stream tail
+
+Reuse the ToolCallTree sweep and share Think's throttled end-follow behavior.
+
+diff --git a/packages/vision/vision-bridge/README.i18n.yaml b/packages/vision/vision-bridge/README.i18n.yaml
+index ecb6989..5219a7a 100644
+--- a/packages/vision/vision-bridge/README.i18n.yaml
++++ b/packages/vision/vision-bridge/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/vision/vision-bridge/README.md
+-README.md: 8e8e5d4ab6730e37dd97599218dc39a46cd6a71f
+-README.zh.md: 229ba48f1e2ea53db218da554a4211238e02bf6d
++README.md: 185cf7d91e206d6d56b9c414521901971b222482
++README.zh.md: 0500feb714580c413ae99159369762ac440bb312
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+index 8e8e5d4..185cf7d 100644
+--- a/packages/vision/vision-bridge/README.md
++++ b/packages/vision/vision-bridge/README.md
+@@ -26,7 +26,7 @@ Enable the existing base-bundle row in a later composition patch and restate its
+ 
+ Loading the row is the enablement decision. It supplies the optional `imageInputBridge` admission capability, registers `vision_inspect`, and installs the durable reminder hook. There is no model preset or global prompt mutation.
+ 
+-The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a compact eye icon and `Look` title instead of the generic Tool call label. The running row deliberately reads `Look ing <elapsed>` with a small visual gap between the title and activity suffix; the settled row reads `Look <duration>`. The OpenAI-compatible request uses SSE and appends each visual-model text fragment as a replayable `tool/progress` event keyed by the durable call id. As soon as the structured `summary` begins, that visual observation replaces the delegated prompt after the separator. The final structured value still lands once in the paired `tool/result`, and the disclosure retains the exact durable input and output. Progress is log-only and never enters model history, so it does not duplicate the result or change the request prefix. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
++The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a compact eye icon and `Look` title instead of the generic Tool call label. The running row deliberately reads `Look ing <elapsed>` with a small visual gap between the title and activity suffix; the settled row reads `Look <duration>`. The row defines no private sweep and receives the one native in-flight sweep owned by the surrounding Tool call seat. The OpenAI-compatible request uses SSE and appends each visual-model text fragment as a replayable `tool/progress` event keyed by the durable call id. As soon as the structured `summary` begins, that visual observation replaces the delegated prompt after the separator; while streaming, the one-line viewport follows the latest line and its newest text, then returns to the summary's first line when settled. The final structured value still lands once in the paired `tool/result`, and the disclosure retains the exact durable input and output. Progress is log-only and never enters model history, so it does not duplicate the result or change the request prefix. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
+ 
+ ## Durable history and KV cache
+ 
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+index 229ba48..0500feb 100644
+--- a/packages/vision/vision-bridge/README.zh.md
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -26,7 +26,7 @@
+ 
+ 是否加载该配置行就是功能开关。插件会提供可选的 `imageInputBridge` 准入能力、注册 `vision_inspect`，并安装持久 reminder hook；不会修改模型 preset，也不会增加全局 system prompt。
+ 
+-该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用简洁的眼睛图标与 `Look` 标题，不再显示通用 Tool call 标识；运行态有意显示为 `Look ing <耗时>`，在标题与活动后缀之间保留一小段视觉间距，完成态显示 `Look <耗时>`。OpenAI 兼容请求使用 SSE，并把视觉模型的每段文本按持久 call id 追加成可回放的 `tool/progress` 事件；结构化 `summary` 一开始生成，就会在分隔点后替换委托问题，实时展示视觉观察。最终结构化值仍只通过配对的 `tool/result` 落地一次，disclosure 保留完整持久输入与输出。progress 只是日志事件，不进入模型历史，因此不会重复结果或改变请求前缀。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
++该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用简洁的眼睛图标与 `Look` 标题，不再显示通用 Tool call 标识；运行态有意显示为 `Look ing <耗时>`，在标题与活动后缀之间保留一小段视觉间距，完成态显示 `Look <耗时>`。视觉行本身不再定义私有扫光，只接收外层工具调用容器统一提供的一层原生运行态扫光。OpenAI 兼容请求使用 SSE，并把视觉模型的每段文本按持久 call id 追加成可回放的 `tool/progress` 事件；结构化 `summary` 一开始生成，就会在分隔点后替换委托问题，流式期间单行视口跟随最新一行及其最新文字，完成后回到摘要第一行。最终结构化值仍只通过配对的 `tool/result` 落地一次，disclosure 保留完整持久输入与输出。progress 只是日志事件，不进入模型历史，因此不会重复结果或改变请求前缀。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
+ 
+ ## 持久历史与 KV cache
+ 
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+index e4056c4..9c67116 100644
+--- a/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+@@ -3,6 +3,8 @@
+ .root {
+   display: flex;
+   flex-direction: column;
++  width: 100%;
++  min-width: 0;
+ }
+ 
+ /* This keyed row renders the activity counter beside Look, so the generic Tool counter is redundant. */
+@@ -10,32 +12,6 @@
+   display: none;
+ }
+ 
+-.row {
+-  position: relative;
+-  overflow: hidden;
+-}
+-
+-.root[data-state='running'] .row::after {
+-  content: '';
+-  position: absolute;
+-  inset-block: 0;
+-  left: 0;
+-  width: 300px;
+-  background: linear-gradient(
+-    90deg,
+-    transparent 0%,
+-    color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 55%,
+-    transparent 100%
+-  );
+-  animation: dsh-vision-row-sweep 2.6s ease-out infinite;
+-  pointer-events: none;
+-}
+-
+-@keyframes dsh-vision-row-sweep {
+-  0% { left: -300px; }
+-  90%, 100% { left: 100%; }
+-}
+-
+ .leading {
+   flex-shrink: 0;
+ }
+@@ -85,6 +61,10 @@
+   white-space: nowrap;
+ }
+ 
++.summary[data-follow-end] {
++  text-overflow: clip;
++}
++
+ .errorSummary {
+   color: var(--dsw-alias-state-error-primary);
+ }
+@@ -179,10 +159,6 @@
+ }
+ 
+ @media (prefers-reduced-motion: reduce) {
+-  .root[data-state='running'] .row::after {
+-    animation: none;
+-  }
+-
+   .inspectButton {
+     transition: none;
+   }
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+index 521650e..e9d6a4f 100644
+--- a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+@@ -1,10 +1,11 @@
+ /** Dedicated `vision_inspect` presentation: visual identity plus replay-stable evidence disclosure. */
+-import { useState, type ReactNode } from 'react'
++import { useEffect, useRef, useState, type ReactNode } from 'react'
+ import {
+   DisclosureRow, ElapsedTime, IconInspectOutline12, StateDot,
+ } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
+ import { VisionInspectIcon } from './VisionInspectIcon.tsx'
++import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
+ import css from './VisionInspectRow.module.css'
+ 
+ type VisionState = 'running' | 'ok' | 'error' | 'stopped'
+@@ -50,14 +51,14 @@ function visualSummary(text: string): string {
+     const parsed = JSON.parse(trimmed) as unknown
+     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+       const summary = (parsed as Record<string, unknown>).summary
+-      if (typeof summary === 'string') return firstLine(summary.trim())
++      if (typeof summary === 'string') return summary.trim()
+     }
+   } catch {
+     // A streaming JSON prefix is expected until the final fragment arrives.
+   }
+   const match = /"summary"\s*:\s*"/.exec(trimmed)
+-  if (match !== null) return firstLine(partialJsonString(trimmed, match.index + match[0].length).trim())
+-  return trimmed.startsWith('{') ? '' : firstLine(trimmed.trim())
++  if (match !== null) return partialJsonString(trimmed, match.index + match[0].length).trim()
++  return trimmed.startsWith('{') ? '' : trimmed.trim()
+ }
+ 
+ function firstLine(text: string): string {
+@@ -65,6 +66,12 @@ function firstLine(text: string): string {
+   return newline === -1 ? text : text.slice(0, newline)
+ }
+ 
++function latestLine(text: string): string {
++  const visible = text.trimEnd()
++  const newline = visible.lastIndexOf('\n')
++  return newline === -1 ? visible : visible.slice(newline + 1)
++}
++
+ function resultText(block: ToolCallViewProps['block']): string | null {
+   if (!('kind' in block)) return null
+   const parts = block.content.map(item => item.type === 'text' ? item.text : JSON.stringify(item, null, 2))
+@@ -128,6 +135,7 @@ function accessibleState(state: VisionState): string | null {
+ export function VisionInspectRow({ block, activityState, inspect }: ToolCallViewProps) {
+   const model = visionModel(block)
+   const [expanded, setExpanded] = useState(false)
++  const summaryRef = useRef<HTMLSpanElement>(null)
+   const startedTime = 'kind' in block ? block.callTime : block.time
+   const finishedTime = 'kind' in block ? block.time : undefined
+   const presentingRunning = activityState === undefined
+@@ -136,6 +144,15 @@ export function VisionInspectRow({ block, activityState, inspect }: ToolCallView
+   const expandable = model.output !== null || model.argsRaw !== ''
+   const open = expanded && expandable
+   const status = accessibleState(model.state)
++  const summary = presentingRunning ? latestLine(model.summary) : firstLine(model.summary)
++  const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
++    const element = summaryRef.current
++    if (element === null) return
++    element.scrollLeft = presentingRunning ? element.scrollWidth - element.clientWidth : 0
++  })
++  useEffect(() => {
++    scheduleSummaryScroll()
++  }, [presentingRunning, scheduleSummaryScroll, summary])
+   return (
+     <div
+       className={css.root}
+@@ -171,8 +188,13 @@ export function VisionInspectRow({ block, activityState, inspect }: ToolCallView
+         collapsedContent={(
+           <>
+             <span className={css.separator} aria-hidden />
+-            <span className={model.state === 'error' ? `${css.summary} ${css.errorSummary}` : css.summary}>
+-              {model.summary}
++            <span
++              ref={summaryRef}
++              className={model.state === 'error' ? `${css.summary} ${css.errorSummary}` : css.summary}
++              data-follow-end={presentingRunning || undefined}
++              data-vision-summary
++            >
++              {summary}
+             </span>
+           </>
+         )}
+diff --git a/packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts b/packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts
+new file mode 100644
+index 0000000..0f0b075
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts
+@@ -0,0 +1,32 @@
++/** Frame-throttled scheduling for the visual stream's non-essential DOM alignment. */
++import { useCallback, useLayoutEffect, useRef } from 'react'
++
++const INTERVAL_FRAMES = 3
++
++/** Coalesce streamed summary scrolling and apply only the latest alignment. */
++export function useThrottledVisualUpdate(update: () => void): () => void {
++  const updateRef = useRef(update)
++  updateRef.current = update
++  const pendingFrameRef = useRef<number | null>(null)
++
++  useLayoutEffect(() => () => {
++    if (pendingFrameRef.current === null) return
++    cancelAnimationFrame(pendingFrameRef.current)
++    pendingFrameRef.current = null
++  }, [])
++
++  return useCallback(() => {
++    if (pendingFrameRef.current !== null) return
++    let remainingFrames = INTERVAL_FRAMES
++    const advance = (): void => {
++      remainingFrames -= 1
++      if (remainingFrames > 0) {
++        pendingFrameRef.current = requestAnimationFrame(advance)
++        return
++      }
++      pendingFrameRef.current = null
++      updateRef.current()
++    }
++    pendingFrameRef.current = requestAnimationFrame(advance)
++  }, [])
++}
+diff --git a/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+index 61aa2f0..e25d142 100644
+--- a/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
++++ b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+@@ -3,7 +3,9 @@
+ // replay-stable disclosure, lifecycle semantics, and keyed-slot ownership.
+ 
+ import { Context } from '@deepseek-ai/cordis'
+-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
++import { readFileSync } from 'node:fs'
++import { resolve } from 'node:path'
++import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+ import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
+@@ -12,8 +14,12 @@ import { VisionInspectRow } from '../src/client/VisionInspectRow.tsx'
+ 
+ type RowProps = Parameters<typeof VisionInspectRow>[0]
+ 
++const visionCss = readFileSync(resolve('packages/vision/vision-bridge/src/client/VisionInspectRow.module.css'), 'utf8')
++const toolTreeCss = readFileSync(resolve('packages/client/ui-tool/src/client/tool/ToolCallTree.module.css'), 'utf8')
++
+ afterEach(() => {
+   cleanup()
++  vi.unstubAllGlobals()
+   vi.useRealTimers()
+ })
+ 
+@@ -49,6 +55,14 @@ function props(block: RowProps['block'], activityState?: RowProps['activityState
+ }
+ 
+ describe('VisionInspectRow', () => {
++  it('reuses the single outer ToolCallTree sweep instead of defining another animation', () => {
++    expect(toolTreeCss).toContain(".callHead[data-state='running']::after")
++    expect(toolTreeCss).toContain('animation: dsh-tool-row-sweep 2.6s ease-out infinite')
++    expect(visionCss).not.toContain('dsh-vision-row-sweep')
++    expect(visionCss).not.toContain(".root[data-state='running'] .row::after")
++    expect(visionCss).toMatch(/\.root\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s)
++  })
++
+   it('replaces generic Tool call copy with the compact eye and Look identity', () => {
+     vi.useFakeTimers()
+     vi.setSystemTime(9_300)
+@@ -85,6 +99,52 @@ describe('VisionInspectRow', () => {
+     expect(view.container.querySelector('[data-look-activity]')).not.toBeNull()
+   })
+ 
++  it('follows the newest streamed visual text and restores the final summary start', () => {
++    let nextFrame = 1
++    let frames = new Map<number, FrameRequestCallback>()
++    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
++      const id = nextFrame++
++      frames.set(id, callback)
++      return id
++    })
++    vi.stubGlobal('cancelAnimationFrame', (id: number) => { frames.delete(id) })
++    const flushFrames = (count: number): void => {
++      for (let index = 0; index < count; index += 1) {
++        const callbacks = [...frames.values()]
++        frames = new Map()
++        for (const callback of callbacks) callback(index)
++      }
++    }
++
++    const view = render(<VisionInspectRow {...props({
++      ...running(),
++      progressText: '{"summary":"Initial visual observation\\nNewest visual tokens',
++    }, 'running')} />)
++    const summary = view.container.querySelector<HTMLElement>('[data-vision-summary]')
++    expect(summary?.textContent).toBe('Newest visual tokens')
++    expect(summary?.getAttribute('data-follow-end')).toBe('true')
++    Object.defineProperties(summary, {
++      scrollWidth: { configurable: true, value: 320 },
++      clientWidth: { configurable: true, value: 100 },
++    })
++
++    view.rerender(<VisionInspectRow {...props({
++      ...running(),
++      progressText: '{"summary":"Initial visual observation\\nNewest visual tokens keep arriving',
++    }, 'running')} />)
++    act(() => { flushFrames(3) })
++    expect(summary?.textContent).toBe('Newest visual tokens keep arriving')
++    expect(summary?.scrollLeft).toBe(220)
++
++    view.rerender(<VisionInspectRow {...props(settled({
++      content: [{ type: 'text', text: '{"summary":"Final summary starts here\\nAdditional detail"}' }],
++    }), 'settled')} />)
++    act(() => { flushFrames(3) })
++    expect(summary?.textContent).toBe('Final summary starts here')
++    expect(summary?.scrollLeft).toBe(0)
++    expect(summary?.hasAttribute('data-follow-end')).toBe(false)
++  })
++
+   it('discloses exact durable input/output and preserves Inspect', () => {
+     const inspect = vi.fn()
+     render(<VisionInspectRow {...props(settled())} inspect={inspect} />)
+diff --git a/packages/vision/vision-bridge/tsconfig.client.json b/packages/vision/vision-bridge/tsconfig.client.json
+index 84eff0c..1bb8ffc 100644
+--- a/packages/vision/vision-bridge/tsconfig.client.json
++++ b/packages/vision/vision-bridge/tsconfig.client.json
+@@ -10,6 +10,7 @@
+     "src/client/index.ts",
+     "src/client/VisionInspectIcon.tsx",
+     "src/client/VisionInspectRow.tsx",
++    "src/client/use-throttled-visual-update.ts",
+     "src/tool-name.ts"
+   ],
+   "references": [
+-- 
+2.51.2.windows.1
+
+

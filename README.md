@@ -100,8 +100,10 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 针对 0.1.1 新结构的兼容调整、BUG-C393119A 静态门禁修复和 DSH-005 可选视觉桥。
 视觉桥的后续补丁补齐发布门禁，并为 `vision_inspect` 增加专属眼睛图标、`Look ing`
 标题、Think 同款运行计时，以及可回放但不进入模型消息的流式视觉进度；正式
-`tool/call` 与 `tool/result` 在运行态交接和页面刷新后保持同一条持久记录。最终源码
-tree 为 `9689ee52fd6994f51674c73ba2a7a6580f481ef0`。
+`tool/call` 与 `tool/result` 在运行态交接和页面刷新后保持同一条持久记录。第 20 个
+补丁让 Looking 行只复用 Tool 外层的一层扫光，并像 Think 一样在流式期间持续跟随最新
+文字尾部；第 21 个补丁让 summary 结束后继续投影最新 observation，并在 Look 已拥有
+内联计时时隐藏外层重复时长。最终源码 tree 为 `20b75d22dce990c0db43de5ea9ea03b7132e2e6e`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。

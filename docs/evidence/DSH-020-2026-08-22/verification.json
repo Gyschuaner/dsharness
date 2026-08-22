@@ -32,10 +32,59 @@
       "packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts"
     ]
   },
+  "bug374ECAE5": {
+    "capturedAt": "2026-08-22T16:07:00+08:00",
+    "singleSweep": {
+      "count": 1,
+      "animationName": "dsh-tool-row-sweep",
+      "pluginOwnedSweepPresent": false
+    },
+    "tailFollowing": {
+      "viewportWidthPx": 589,
+      "samples": [
+        { "textSuffix": "这是一张名为", "scrollLeft": 0 },
+        { "textSuffix": "中间为会话列表", "scrollLeft": 218 },
+        { "textSuffix": "AI 正在执行视觉", "scrollLeft": 539 }
+      ],
+      "completedScrollLeft": 0,
+      "followMarkerAfterCompletion": false
+    },
+    "reloadPersistence": {
+      "visionRowCount": 8,
+      "latestState": "ok",
+      "latestTextRetained": true,
+      "newBrowserErrors": 0
+    }
+  },
+  "bug40D0E1BE": {
+    "capturedAt": "2026-08-22T16:33:34+08:00",
+    "streamProjection": {
+      "baselineVisionRowCount": 9,
+      "runningState": "running",
+      "runningElapsed": "47s",
+      "runningObservation": "第一张图片中间面板当前选中项为“这是 DSH-005 生产验收。...”",
+      "finalState": "ok",
+      "finalElapsed": "1:05",
+      "finalObservationCount": 9,
+      "settledToSummary": true
+    },
+    "duplicateActivity": {
+      "inlineElapsed": "1:05",
+      "outerActivityText": "1:10Done",
+      "outerComputedDisplay": "none",
+      "visibleOuterTimerCount": 0
+    },
+    "reloadPersistence": {
+      "visionRowCount": 10,
+      "latestState": "ok",
+      "summaryRetained": true,
+      "outerComputedDisplay": "none"
+    }
+  },
   "reproducibleBuild": {
     "officialBase": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
-    "patchCount": 19,
-    "sourceTree": "9689ee52fd6994f51674c73ba2a7a6580f481ef0",
+    "patchCount": 21,
+    "sourceTree": "20b75d22dce990c0db43de5ea9ea03b7132e2e6e",
     "frozenInstall": "passed",
     "hostBuild": "passed",
     "clientBuild": "passed",

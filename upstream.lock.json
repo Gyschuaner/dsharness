@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
   "baseTree": "53915efe4e2126cc7779b73dfc8a3bcec5318c44",
-  "resultTree": "9689ee52fd6994f51674c73ba2a7a6580f481ef0",
+  "resultTree": "20b75d22dce990c0db43de5ea9ea03b7132e2e6e",
   "dshVersion": "0.1.1-rc.2",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -84,6 +84,14 @@
     {
       "path": "upstream-patches/0019-feat-DSH-020-stream-and-persist-vision-progress.patch",
       "sha256": "098F8E803D5574F748B6644BD963FAC99B3E2B1E2B1BE78AE505346E6A755116"
+    },
+    {
+      "path": "upstream-patches/0020-fix-BUG-374ECAE5-follow-the-vision-stream-tail.patch",
+      "sha256": "8E563A8867A10B7EAFD87B79ECEA2708EF5A61279D23CEF83F1578958887F384"
+    },
+    {
+      "path": "upstream-patches/0021-fix-BUG-40D0E1BE-stream-vision-observations.patch",
+      "sha256": "40ED98C5D7E7E1F2F07741C826DA87DC2EEB223D51B62DDB6B1CF838FB800556"
     }
   ]
 }
