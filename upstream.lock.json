@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
   "baseTree": "53915efe4e2126cc7779b73dfc8a3bcec5318c44",
-  "resultTree": "3c61807f54affd0667e4b6fcf7d170ef20d087bf",
+  "resultTree": "d760562c3d46576a8683b8fc5dec19ee828108a1",
   "dshVersion": "0.1.1-rc.2",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -96,6 +96,10 @@
     {
       "path": "upstream-patches/0022-feat-DSH-022-restore-native-image-policy.patch",
       "sha256": "197E70B47998311CBAADB4B6060D66B6FE31EFE5C56A75B6FEDED9048F8F6125"
+    },
+    {
+      "path": "upstream-patches/0023-feat-DSH-023-inspect-local-image-paths.patch",
+      "sha256": "5F87004E5B0AA27491E250308A28CFE8511C591E3EFFB65404047F732EC53523"
     }
   ]
 }

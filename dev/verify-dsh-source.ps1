@@ -90,6 +90,16 @@ Check (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) 'DSH-005 v
 if (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) {
     $VisionBridgeSource = Get-Content -LiteralPath $VisionBridgeSourcePath -Raw -Encoding UTF8
     Check ($VisionBridgeSource -match 'stream:\s*true' -and $VisionBridgeSource -match 'exec\.reportProgress\(delta\)') 'DSH-020 视觉层使用 SSE 并上报流式进度'
+    Check ($VisionBridgeSource.Contains('Inspect conversation attachments or local image files with the configured vision model.') -and
+        $VisionBridgeSource.Contains('Image file paths to import into this conversation and inspect.') -and
+        $VisionBridgeSource -match "'vision/image-import'" -and
+        $VisionBridgeSource -match 'importPathImages') 'DSH-023 vision_inspect 支持本会话附件与本地路径'
+}
+if (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) {
+    $VisionBridgeBundle = Get-Content -LiteralPath $VisionBridgeBundlePath -Raw -Encoding UTF8
+    Check ($VisionBridgeBundle.Contains('Inspect conversation attachments or local image files with the configured vision model.') -and
+        $VisionBridgeBundle.Contains('Image file paths to import into this conversation and inspect.') -and
+        $VisionBridgeBundle -match 'vision/image-import') 'DSH-023 构建产物包含路径导入逻辑'
 }
 if (Test-Path -LiteralPath $VisionBridgeRowPath -PathType Leaf) {
     $VisionBridgeRow = Get-Content -LiteralPath $VisionBridgeRowPath -Raw -Encoding UTF8
@@ -113,6 +123,7 @@ if ((Test-Path -LiteralPath $ToolEventTypesPath -PathType Leaf) -and (Test-Path 
     $ToolEventTypes = Get-Content -LiteralPath $ToolEventTypesPath -Raw -Encoding UTF8
     $KnownEventTypes = Get-Content -LiteralPath $KnownEventTypesPath -Raw -Encoding UTF8
     Check ($ToolEventTypes -match "'tool/progress':\s*ToolProgressEventData" -and $ToolEventTypes -match 'deriveMessages\(\).*ignores it' -and $KnownEventTypes -match "'tool/progress'") 'DSH-020 tool/progress 可回放且不进入模型消息'
+    Check ($KnownEventTypes -match "'vision/image-import'") 'DSH-023 vision/image-import 已登记为持久化事件'
 } else {
     Check $false 'DSH-020 tool/progress 事件定义存在'
 }

@@ -43,6 +43,12 @@ DSH 不直连模型机，也不在会话、工具结果、日志或 Git 中保�
 DSH-022 起不再加载 `image-context-guard`。视觉桥的默认 20 图边界与 0.1.1 原生
 `attachment-local` 单条消息数量一致；它只限制一次工具调用，不删除会话附件。
 
+DSH-023 起，`vision_inspect` 可接收本会话 `attachmentIds`、本地图片 `paths`，或两者
+混用。本地路径不会绕过原生附件服务：工具会在当前会话工作目录中解析相对路径，校验
+PNG/JPEG/WebP/GIF、文件类型与部署限额，内容寻址保存后再调用视觉层。成功导入的附件
+引用以模型不可见的 `vision/image-import` 事件留在当前会话，后续可按返回的附件 ID
+回看；其他会话仍不可访问。
+
 ## 启用前健康检查
 
 1. 以受管凭据请求 `GET https://ai.chuansgu.top/v1/models`。
