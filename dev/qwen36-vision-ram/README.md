@@ -29,10 +29,9 @@ line or in benchmark output.
 
 ## DSH-021 CPU/NUMA acceleration candidate
 
-The production launcher above intentionally remains unchanged. DSH-021 adds a
-separately reviewable ik_llama.cpp candidate in `start-server-ik-numa.sh`; its
-defaults are the accuracy-first Q8 settings measured on the dual-socket Xeon
-8474C host:
+DSH-021 selects the separately reviewable ik_llama.cpp path in
+`start-server-ik-numa.sh`; its defaults are the accuracy-first Q8 settings
+measured on the dual-socket Xeon 8474C host:
 
 - Q8_0 target weights plus BF16 multimodal projector;
 - 44 decode threads, 96 prompt/image threads;
@@ -62,3 +61,10 @@ embedded one-layer MTP head reached more than 83% draft acceptance but reduced
 Q8 long-output throughput, so the launcher deliberately keeps speculative
 decoding disabled. Changing the Relay upstream still requires explicit release
 authorization.
+
+For the managed production service, use `launch-server-ik-numa.sh`, then
+install `ensure-server-ik-numa.sh` with `install-autostart-ik-numa.sh`. The
+launcher never replaces an occupied port, and the ensure script verifies that
+the listener is the selected ik NUMA binary before treating it as healthy.
+The production cutover therefore records and explicitly stops the old service
+before launching this variant; unrelated cron jobs are preserved.
