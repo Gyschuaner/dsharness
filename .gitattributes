@@ -1,1 +1,2 @@
 upstream-patches/*.patch binary
+*.sh text eol=lf
