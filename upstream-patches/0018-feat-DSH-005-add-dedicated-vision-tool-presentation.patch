@@ -1,0 +1,1079 @@
+From 21359bea97746e0d1522713fe4b921e635b29e99 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 13:05:34 +0800
+Subject: [PATCH] feat(DSH-005): add dedicated vision tool presentation
+
+---
+ ...ext-model-vision-subagent-bridge.i18n.yaml |   4 +-
+ ...08-22-text-model-vision-subagent-bridge.md |   4 +-
+ ...22-text-model-vision-subagent-bridge.zh.md |   4 +-
+ docs/module-graph.i18n.yaml                   |   4 +-
+ docs/module-graph.md                          |  20 +-
+ docs/module-graph.zh.md                       |  20 +-
+ .../src/client/slot-catalog.ts                |   1 +
+ .../vision/vision-bridge/README.i18n.yaml     |   4 +-
+ packages/vision/vision-bridge/README.md       |   2 +
+ packages/vision/vision-bridge/README.zh.md    |   2 +
+ packages/vision/vision-bridge/package.json    |  31 +++-
+ .../src/client/VisionInspectIcon.tsx          |  32 ++++
+ .../src/client/VisionInspectRow.module.css    | 175 ++++++++++++++++++
+ .../src/client/VisionInspectRow.tsx           | 141 ++++++++++++++
+ .../vision/vision-bridge/src/client/index.ts  |  15 ++
+ .../vision/vision-bridge/src/css-modules.d.ts |   4 +
+ packages/vision/vision-bridge/src/index.ts    |   5 +-
+ .../vision/vision-bridge/src/tool-name.ts     |   2 +
+ .../tests/vision-inspect-row.client.spec.tsx  | 148 +++++++++++++++
+ .../vision/vision-bridge/tsconfig.client.json |  23 +++
+ .../vision/vision-bridge/tsconfig.host.json   |  22 +++
+ packages/vision/vision-bridge/tsconfig.json   |  17 +-
+ .../vision/vision-bridge/tsdown.config.ts     |   7 +
+ pnpm-lock.yaml                                |  27 +++
+ tsconfig.client.json                          |   2 +
+ tsconfig.host.json                            |   2 +-
+ 26 files changed, 672 insertions(+), 46 deletions(-)
+ create mode 100644 packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+ create mode 100644 packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+ create mode 100644 packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+ create mode 100644 packages/vision/vision-bridge/src/client/index.ts
+ create mode 100644 packages/vision/vision-bridge/src/css-modules.d.ts
+ create mode 100644 packages/vision/vision-bridge/src/tool-name.ts
+ create mode 100644 packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+ create mode 100644 packages/vision/vision-bridge/tsconfig.client.json
+ create mode 100644 packages/vision/vision-bridge/tsconfig.host.json
+ create mode 100644 packages/vision/vision-bridge/tsdown.config.ts
+
+diff --git a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml
+index 6241f45..53807b0 100644
+--- a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml
++++ b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
+-2026-08-22-text-model-vision-subagent-bridge.md: 4a792e94730311fe6f51ba33764b9b627df18112
+-2026-08-22-text-model-vision-subagent-bridge.zh.md: 170ace30c6c8b851cc2c9d346656095121692a07
++2026-08-22-text-model-vision-subagent-bridge.md: 941a7a8785021b9cd744af37191a1cb0b7aa2c15
++2026-08-22-text-model-vision-subagent-bridge.zh.md: 6146f816067fc180bddcbc731f0bedf2fd605c9a
+diff --git a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
+index 4a792e9..941a7a8 100644
+--- a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
++++ b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
+@@ -16,6 +16,8 @@ When the agent loop claims a new human message containing images, the plugin app
+ 
+ The plugin registers `vision_inspect` only while it is loaded. The main model supplies current-conversation attachment ids and one self-contained visual task. The tool authorizes the complete id batch against the calling agent's full session event log before reading any bytes. It then sends the prompt and authorized images to the configured visual model and returns only `attachmentIds`, `summary`, `observations`, and `limitations`. Provider identity, endpoint, credential, timing, and untrusted extra response fields do not enter the tool result.
+ 
++The same opt-in package contributes a keyed browser presentation for `vision_inspect`. Its 14-pixel viewfinder-eye glyph and `Vision` title replace the generic Tool call identity, while the running suffix, elapsed-time component, and sweep motion use the same activity language as the Think row. The frozen call and result remain available in the disclosure. Unloading the package releases both the Host tool and the browser slot, so disabled and native-multimodal compositions expose neither surface.
++
+ Gateway routing and credentials remain deployment concerns. The endpoint comes from operator composition or the inherited process/user environment; a workspace `.env` cannot redirect it. The credential is resolved per call from the configured credential reference unless an explicitly embedded host credential is supplied. Transport failures use stable errors that do not include the endpoint, key, or remote response body.
+ 
+ ## Alternatives considered
+@@ -30,7 +32,7 @@ Gateway routing and credentials remain deployment concerns. The endpoint comes f
+ 
+ ## Verification
+ 
+-The package test owns every statement, branch, and function in the bridge implementation. It covers durable one-time reminders, text-only replay, current-session and cross-session authorization, request construction, literal/credential/environment key resolution, structured and malformed visual responses, limits, duplicate ids, cancellation, HTTP and JSON failures, redacted results, configuration rejection, contribution disposal, and reject/enter pre-step chaining. ACP content and API-proxy tests cover the shared image admission and model capability paths. A deployment test must also list the configured visual model through the gateway and complete one real image inspection before the overlay is promoted.
++The package test owns every statement, branch, line, and function in the bridge implementation. It covers durable one-time reminders, text-only replay, current-session and cross-session authorization, request construction, literal/credential/environment key resolution, structured and malformed visual responses, limits, duplicate ids, cancellation, HTTP and JSON failures, redacted results, configuration rejection, contribution disposal, reject/enter pre-step chaining, keyed browser registration and teardown, visual lifecycle states, and the shared elapsed-time presentation. ACP content and API-proxy tests cover the shared image admission and model capability paths. A deployment test must also list the configured visual model through the gateway, complete one real image inspection, and capture its running and settled visual rows before the overlay is promoted.
+ 
+ ## Consequences
+ 
+diff --git a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md
+index 170ace3..6146f81 100644
+--- a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md
++++ b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md
+@@ -16,6 +16,8 @@ Status: implemented
+ 
+ 插件仅在加载期间注册 `vision_inspect`。主模型提供当前对话的 attachment id 和一个自包含视觉任务。工具在读取任何字节前，先依据调用 agent 的完整会话事件日志对整批 id 授权；随后把 prompt 和已授权图片发送给配置的视觉模型，并且只返回 `attachmentIds`、`summary`、`observations` 和 `limitations`。提供商身份、endpoint、credential、耗时以及远端响应中的不受信任额外字段不会进入工具结果。
+ 
++同一个可选包还为 `vision_inspect` 提供 keyed 浏览器呈现。14 像素的取景框眼睛图标和 `Vision` 标题替换通用 Tool call 标识；运行后缀、elapsed-time 组件和扫光动效则沿用 Think 行的活动语言。冻结的调用与结果仍可在 disclosure 中查看。卸载该包会同时释放 Host 工具和浏览器 slot，因此禁用配置和原生多模态配置都不会暴露这两个表面。
++
+ 网关路由和凭据属于部署配置。endpoint 来自运维 composition 或继承的进程/用户环境，工作区 `.env` 不能重定向它。除非宿主显式内嵌凭据，否则每次调用都通过配置的 credential reference 解析密钥。传输失败使用稳定错误，不包含 endpoint、密钥或远端响应正文。
+ 
+ ## Alternatives considered
+@@ -30,7 +32,7 @@ Status: implemented
+ 
+ ## Verification
+ 
+-包测试覆盖视觉桥实现的每条语句、分支和函数，包括持久单次 reminder、纯文本重放、当前会话与跨会话授权、请求构造、字面量/credential/环境密钥解析、结构化与异常视觉响应、数量限制、重复 id、取消、HTTP 与 JSON 失败、结果脱敏、配置拒绝、贡献卸载以及 reject/enter pre-step 链。ACP 内容与 API proxy 测试覆盖共享图片准入和模型能力路径。部署测试还必须先通过网关列出目标视觉模型，并完成一次真实图片检查，才能提升覆盖配置。
++包测试覆盖视觉桥实现的每条语句、分支、代码行和函数，包括持久单次 reminder、纯文本重放、当前会话与跨会话授权、请求构造、字面量/credential/环境密钥解析、结构化与异常视觉响应、数量限制、重复 id、取消、HTTP 与 JSON 失败、结果脱敏、配置拒绝、贡献卸载、reject/enter pre-step 链、keyed 浏览器注册与卸载、视觉生命周期状态和共享 elapsed-time 呈现。ACP 内容与 API proxy 测试覆盖共享图片准入和模型能力路径。部署测试还必须先通过网关列出目标视觉模型，完成一次真实图片检查，并保留运行中与完成态视觉行截图，才能提升覆盖配置。
+ 
+ ## Consequences
+ 
+diff --git a/docs/module-graph.i18n.yaml b/docs/module-graph.i18n.yaml
+index 4afee84..96af9aa 100644
+--- a/docs/module-graph.i18n.yaml
++++ b/docs/module-graph.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/module-graph.md
+-module-graph.md: af9b09ee22bf942bc99f14de4edb13d174554ca5
+-module-graph.zh.md: c3635f76d96fde479510b5b0c32d28fccdd1cc1c
++module-graph.md: a280b63e926bba83577ec079ed354bacf3ca372e
++module-graph.zh.md: efcf43237cec77bca5a34ec1a30ca36df271d65b
+diff --git a/docs/module-graph.md b/docs/module-graph.md
+index af9b09e..a280b63 100644
+--- a/docs/module-graph.md
++++ b/docs/module-graph.md
+@@ -982,14 +982,6 @@ flowchart TD
+   pkg_llm_replay --> pkg_invariants
+   pkg_llm_replay --> pkg_llm
+   pkg_llm_replay --> pkg_session
+-  pkg_vision_bridge --> pkg_agent
+-  pkg_vision_bridge --> pkg_attachment
+-  pkg_vision_bridge --> pkg_credentials
+-  pkg_vision_bridge --> pkg_invariants
+-  pkg_vision_bridge --> pkg_launch_environment
+-  pkg_vision_bridge --> pkg_llm
+-  pkg_vision_bridge --> pkg_session
+-  pkg_vision_bridge --> pkg_tools
+   pkg_tool_workflow --> pkg_agent
+   pkg_tool_workflow --> pkg_invariants
+   pkg_tool_workflow --> pkg_llm
+@@ -1468,6 +1460,16 @@ flowchart TD
+   pkg_client_ui_cordis --> pkg_client_ui_tool
+   pkg_client_ui_cordis --> pkg_cordis_client_runner
+   pkg_client_ui_cordis --> pkg_invariants
++  pkg_vision_bridge --> pkg_agent
++  pkg_vision_bridge --> pkg_attachment
++  pkg_vision_bridge --> pkg_client_runtime
++  pkg_vision_bridge --> pkg_client_ui_tool
++  pkg_vision_bridge --> pkg_credentials
++  pkg_vision_bridge --> pkg_invariants
++  pkg_vision_bridge --> pkg_launch_environment
++  pkg_vision_bridge --> pkg_llm
++  pkg_vision_bridge --> pkg_session
++  pkg_vision_bridge --> pkg_tools
+   pkg_host_directory_picker_auto --> pkg_client_ui_directory_picker_browse
+   pkg_host_directory_picker_auto --> pkg_client_ui_directory_picker_native
+   pkg_host_directory_picker_auto --> pkg_host_directory_picker_browse
+@@ -1636,7 +1638,6 @@ flowchart TD
+ | [`tool-terminal`](../packages/terminal/tool-terminal) | `terminal` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`output-retention`](../packages/util/output-retention), [`system-prompt`](../packages/core/system-prompt), [`terminal`](../packages/terminal/terminal), [`tools`](../packages/core/tools) |
+ | [`agent-loop-testkit`](../packages/test-support/agent-loop-testkit) | `test-support` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
+ | [`llm-replay`](../packages/test-support/llm-replay) | `test-support` | [`compaction`](../packages/compaction/compaction), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
+-| [`vision-bridge`](../packages/vision/vision-bridge) | `vision` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
+ | [`tool-workflow`](../packages/workflow/tool-workflow) | `workflow` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`workflow`](../packages/workflow/workflow) |
+ | [`subagent-acp`](../packages/subagent/subagent-acp) | `subagent` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+ | [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | `subagent` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+@@ -1706,4 +1707,5 @@ flowchart TD
+ | [`client-ui-permission-presets`](../packages/client/ui-permission-presets) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-commands`](../packages/client/ui-commands), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-settings`](../packages/client/ui-settings), [`invariants`](../packages/runtime-diagnostics/invariants), [`permission-presets`](../packages/interaction/permission-presets) |
+ | [`client-ui-skill`](../packages/client/ui-skill) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-tool`](../packages/client/ui-tool), [`invariants`](../packages/runtime-diagnostics/invariants) |
+ | [`client-ui-cordis`](../packages/extensions/ui-cordis) | `extensions` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`client-ui-tool`](../packages/client/ui-tool), [`cordis-client-runner`](../packages/extensions/cordis-client-runner), [`invariants`](../packages/runtime-diagnostics/invariants) |
++| [`vision-bridge`](../packages/vision/vision-bridge) | `vision` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`client-runtime`](../packages/client/runtime), [`client-ui-tool`](../packages/client/ui-tool), [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
+ | [`host-directory-picker-auto`](../packages/host/directory-picker-auto) | `host` | [`client-ui-directory-picker-browse`](../packages/client/ui-directory-picker-browse), [`client-ui-directory-picker-native`](../packages/client/ui-directory-picker-native), [`host-directory-picker-browse`](../packages/host/directory-picker-browse), [`host-directory-picker-native`](../packages/host/directory-picker-native), [`host-webserver`](../packages/host/webserver), [`invariants`](../packages/runtime-diagnostics/invariants) |
+diff --git a/docs/module-graph.zh.md b/docs/module-graph.zh.md
+index c3635f7..efcf432 100644
+--- a/docs/module-graph.zh.md
++++ b/docs/module-graph.zh.md
+@@ -984,14 +984,6 @@ flowchart TD
+   pkg_llm_replay --> pkg_invariants
+   pkg_llm_replay --> pkg_llm
+   pkg_llm_replay --> pkg_session
+-  pkg_vision_bridge --> pkg_agent
+-  pkg_vision_bridge --> pkg_attachment
+-  pkg_vision_bridge --> pkg_credentials
+-  pkg_vision_bridge --> pkg_invariants
+-  pkg_vision_bridge --> pkg_launch_environment
+-  pkg_vision_bridge --> pkg_llm
+-  pkg_vision_bridge --> pkg_session
+-  pkg_vision_bridge --> pkg_tools
+   pkg_tool_workflow --> pkg_agent
+   pkg_tool_workflow --> pkg_invariants
+   pkg_tool_workflow --> pkg_llm
+@@ -1470,6 +1462,16 @@ flowchart TD
+   pkg_client_ui_cordis --> pkg_client_ui_tool
+   pkg_client_ui_cordis --> pkg_cordis_client_runner
+   pkg_client_ui_cordis --> pkg_invariants
++  pkg_vision_bridge --> pkg_agent
++  pkg_vision_bridge --> pkg_attachment
++  pkg_vision_bridge --> pkg_client_runtime
++  pkg_vision_bridge --> pkg_client_ui_tool
++  pkg_vision_bridge --> pkg_credentials
++  pkg_vision_bridge --> pkg_invariants
++  pkg_vision_bridge --> pkg_launch_environment
++  pkg_vision_bridge --> pkg_llm
++  pkg_vision_bridge --> pkg_session
++  pkg_vision_bridge --> pkg_tools
+   pkg_host_directory_picker_auto --> pkg_client_ui_directory_picker_browse
+   pkg_host_directory_picker_auto --> pkg_client_ui_directory_picker_native
+   pkg_host_directory_picker_auto --> pkg_host_directory_picker_browse
+@@ -1638,7 +1640,6 @@ flowchart TD
+ | [`tool-terminal`](../packages/terminal/tool-terminal) | `terminal` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`output-retention`](../packages/util/output-retention), [`system-prompt`](../packages/core/system-prompt), [`terminal`](../packages/terminal/terminal), [`tools`](../packages/core/tools) |
+ | [`agent-loop-testkit`](../packages/test-support/agent-loop-testkit) | `test-support` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
+ | [`llm-replay`](../packages/test-support/llm-replay) | `test-support` | [`compaction`](../packages/compaction/compaction), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
+-| [`vision-bridge`](../packages/vision/vision-bridge) | `vision` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
+ | [`tool-workflow`](../packages/workflow/tool-workflow) | `workflow` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`workflow`](../packages/workflow/workflow) |
+ | [`subagent-acp`](../packages/subagent/subagent-acp) | `subagent` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+ | [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | `subagent` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+@@ -1708,4 +1709,5 @@ flowchart TD
+ | [`client-ui-permission-presets`](../packages/client/ui-permission-presets) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-commands`](../packages/client/ui-commands), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-settings`](../packages/client/ui-settings), [`invariants`](../packages/runtime-diagnostics/invariants), [`permission-presets`](../packages/interaction/permission-presets) |
+ | [`client-ui-skill`](../packages/client/ui-skill) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-tool`](../packages/client/ui-tool), [`invariants`](../packages/runtime-diagnostics/invariants) |
+ | [`client-ui-cordis`](../packages/extensions/ui-cordis) | `extensions` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`client-ui-tool`](../packages/client/ui-tool), [`cordis-client-runner`](../packages/extensions/cordis-client-runner), [`invariants`](../packages/runtime-diagnostics/invariants) |
++| [`vision-bridge`](../packages/vision/vision-bridge) | `vision` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`client-runtime`](../packages/client/runtime), [`client-ui-tool`](../packages/client/ui-tool), [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
+ | [`host-directory-picker-auto`](../packages/host/directory-picker-auto) | `host` | [`client-ui-directory-picker-browse`](../packages/client/ui-directory-picker-browse), [`client-ui-directory-picker-native`](../packages/client/ui-directory-picker-native), [`host-directory-picker-browse`](../packages/host/directory-picker-browse), [`host-directory-picker-native`](../packages/host/directory-picker-native), [`host-webserver`](../packages/host/webserver), [`invariants`](../packages/runtime-diagnostics/invariants) |
+diff --git a/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts b/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
+index 52a77c8..a88153f 100644
+--- a/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
++++ b/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts
+@@ -1840,6 +1840,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
+       'client-ui-cordis CordisRunRow key \'cordis_run\'',
+       'client-ui-cordis CordisActionRow key \'cordis_stop\'',
+       'client-ui-cordis CordisActionRow key \'cordis_undefine\'',
++      'vision-bridge VisionInspectRow',
+     ],
+     replaceRisk: 'shadows-shipped-ui',
+     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'tool.call.toolview\', () => ctx.slots.register(\n      { name: \'tool.call.toolview\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+diff --git a/packages/vision/vision-bridge/README.i18n.yaml b/packages/vision/vision-bridge/README.i18n.yaml
+index 0ac7c9a..22912fc 100644
+--- a/packages/vision/vision-bridge/README.i18n.yaml
++++ b/packages/vision/vision-bridge/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/vision/vision-bridge/README.md
+-README.md: 4cdddad2c38bd5dd0f175cbab53d3a1047308e0a
+-README.zh.md: 1884c3e0c99ace82b5f4e59b4a8ae40826fb64c2
++README.md: 48279f07b530b034de48937bcc6b167aa2bd6800
++README.zh.md: ba2722d2daf90126dd8d938890ccf1ac295a5e1b
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+index 4cdddad..48279f0 100644
+--- a/packages/vision/vision-bridge/README.md
++++ b/packages/vision/vision-bridge/README.md
+@@ -26,6 +26,8 @@ Enable the existing base-bundle row in a later composition patch and restate its
+ 
+ Loading the row is the enablement decision. It supplies the optional `imageInputBridge` admission capability, registers `vision_inspect`, and installs the durable reminder hook. There is no model preset or global prompt mutation.
+ 
++The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a viewfinder-eye icon and `Vision` title instead of the generic Tool call label. Its running `ing` suffix, elapsed-time counter, and sweep motion follow the Think row, while the disclosure retains the exact durable input and output. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
++
+ ## Durable history and KV cache
+ 
+ The reminder is generated only while a newly claimed human message contains image blocks. It is inserted immediately after that message and appended by the ordinary agent loop as another durable `user/message`. Later turns replay that exact event; the plugin does not remove, regenerate, move, or re-inject old reminders. Thus the prior conversation remains an append-only request prefix and can reuse the same KV-cache entries as ordinary text history.
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+index 1884c3e..ba2722d 100644
+--- a/packages/vision/vision-bridge/README.zh.md
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -26,6 +26,8 @@
+ 
+ 是否加载该配置行就是功能开关。插件会提供可选的 `imageInputBridge` 准入能力、注册 `vision_inspect`，并安装持久 reminder hook；不会修改模型 preset，也不会增加全局 system prompt。
+ 
++该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用取景框眼睛图标与 `Vision` 标题，不再显示通用 Tool call 标识；运行中的 `ing` 后缀、计时器和扫光动效与 Think 行一致，同时 disclosure 仍保留完整持久输入与输出。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
++
+ ## 持久历史与 KV cache
+ 
+ 只有新领取的人类消息中确实存在图片块时，插件才生成 reminder。它紧跟原用户消息，并由普通 agent loop 作为另一条持久化 `user/message` 追加。后续轮次只重放这条既有事件；插件不会删除、重新生成、移动或再次注入旧 reminder。因而既有对话仍是仅追加的请求前缀，可以像普通文本历史一样复用 KV cache。
+diff --git a/packages/vision/vision-bridge/package.json b/packages/vision/vision-bridge/package.json
+index 754d1f2..34df074 100644
+--- a/packages/vision/vision-bridge/package.json
++++ b/packages/vision/vision-bridge/package.json
+@@ -14,10 +14,24 @@
+   "exports": {
+     ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
+     "./invariant": { "types": "./lib/types/invariant.d.ts", "default": "./lib/invariant.js" },
++    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" },
+     "./src/*": "./src/*",
+     "./package.json": "./package.json"
+   },
+-  "files": ["lib/index.js", "lib/invariant.js", "lib/types/**/*.d.ts"],
++  "dsh": {
++    "client": {
++      "inject": [
++        "@deepseek-ai/dsh-client-runtime",
++        "@deepseek-ai/dsh-client-ui-tool"
++      ],
++      "platform": "web"
++    }
++  },
++  "scripts": {
++    "bundle": "tsdown",
++    "watch": "tsdown --watch"
++  },
++  "files": ["lib/index.js", "lib/invariant.js", "lib/client.js", "lib/types/**/*.d.ts"],
+   "license": "MIT",
+   "dependencies": { "@deepseek-ai/schemastery": "workspace:^" },
+   "peerDependencies": {
+@@ -29,7 +43,9 @@
+     "@deepseek-ai/dsh-launch-environment": "workspace:^",
+     "@deepseek-ai/dsh-llm": "workspace:^",
+     "@deepseek-ai/dsh-session": "workspace:^",
+-    "@deepseek-ai/dsh-tools": "workspace:^"
++    "@deepseek-ai/dsh-tools": "workspace:^",
++    "@deepseek-ai/dsh-client-runtime": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-tool": "workspace:^"
+   },
+   "devDependencies": {
+     "@deepseek-ai/cordis": "workspace:^",
+@@ -42,6 +58,15 @@
+     "@deepseek-ai/dsh-launch-environment": "workspace:^",
+     "@deepseek-ai/dsh-llm": "workspace:^",
+     "@deepseek-ai/dsh-session": "workspace:^",
+-    "@deepseek-ai/dsh-tools": "workspace:^"
++    "@deepseek-ai/dsh-tools": "workspace:^",
++    "@deepseek-ai/dsh-client-runtime": "workspace:^",
++    "@deepseek-ai/dsh-client-test-runtime": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-tool": "workspace:^",
++    "@testing-library/react": "^16.1.0",
++    "@types/react": "~18.3.1",
++    "react": "^18.2.0",
++    "react-dom": "^18.2.0"
+   }
+ }
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx b/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+new file mode 100644
+index 0000000..a052600
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+@@ -0,0 +1,32 @@
++/** Viewfinder-eye glyph for the visual sub-agent Tool row. */
++export function VisionInspectIcon({ size = 14, className }: {
++  readonly size?: number
++  readonly className?: string | undefined
++}) {
++  return (
++    <svg
++      width={size}
++      height={size}
++      className={className}
++      viewBox="0 0 14 14"
++      fill="none"
++      xmlns="http://www.w3.org/2000/svg"
++      aria-hidden
++      data-icon="vision-inspect"
++    >
++      <path
++        d="M4.25 1.75H2.75a1 1 0 0 0-1 1v1.5m8-2.5h1.5a1 1 0 0 1 1 1v1.5m-8 8H2.75a1 1 0 0 1-1-1v-1.5m8 2.5h1.5a1 1 0 0 0 1-1v-1.5"
++        stroke="currentColor"
++        strokeWidth="1.15"
++        strokeLinecap="round"
++      />
++      <path
++        d="M2.8 7s1.5-2.15 4.2-2.15S11.2 7 11.2 7 9.7 9.15 7 9.15 2.8 7 2.8 7Z"
++        stroke="currentColor"
++        strokeWidth="1.15"
++        strokeLinejoin="round"
++      />
++      <circle cx="7" cy="7" r="0.9" fill="currentColor" />
++    </svg>
++  )
++}
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+new file mode 100644
+index 0000000..2acd97f
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+@@ -0,0 +1,175 @@
++/* Dedicated visual Tool row. Geometry and activity motion intentionally match Think. */
++
++.root {
++  display: flex;
++  flex-direction: column;
++}
++
++.row {
++  position: relative;
++  overflow: hidden;
++}
++
++.root[data-state='running'] .row::after {
++  content: '';
++  position: absolute;
++  inset-block: 0;
++  left: 0;
++  width: 300px;
++  background: linear-gradient(
++    90deg,
++    transparent 0%,
++    color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 55%,
++    transparent 100%
++  );
++  animation: dsh-vision-row-sweep 2.6s ease-out infinite;
++  pointer-events: none;
++}
++
++@keyframes dsh-vision-row-sweep {
++  0% { left: -300px; }
++  90%, 100% { left: 100%; }
++}
++
++.leading {
++  flex-shrink: 0;
++}
++
++.chevron {
++  color: var(--dsw-alias-label-secondary);
++}
++
++.title {
++  font-weight: 400;
++}
++
++.runningStatus {
++  flex: none;
++  margin-left: 5px;
++  color: var(--dsw-alias-label-caption);
++  font-size: 14px;
++  line-height: 24px;
++}
++
++.separator {
++  flex: none;
++  width: 2px;
++  height: 2px;
++  margin: 0 8px;
++  border-radius: 1px;
++  background: var(--dsw-alias-label-caption);
++}
++
++.summary {
++  min-width: 0;
++  overflow: hidden;
++  flex: 1 1 auto;
++  color: var(--dsw-alias-label-tertiary);
++  font-size: 14px;
++  line-height: 24px;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.errorSummary {
++  color: var(--dsw-alias-state-error-primary);
++}
++
++.bodyWrap {
++  display: flex;
++  flex-direction: column;
++}
++
++.ioCard {
++  display: flex;
++  flex-direction: column;
++  max-height: 260px;
++  margin: 4px 0 4px 4px;
++  overflow: hidden;
++  border: 1px solid var(--dsw-alias-border-l1);
++  border-radius: 12px;
++  background: var(--dsw-alias-markdown-code-block);
++  font: var(--dsw-font-markdown-code-block-small);
++}
++
++.ioSection {
++  display: grid;
++  grid-template-columns: max-content minmax(0, 1fr);
++  column-gap: 14px;
++  align-items: baseline;
++  min-height: 0;
++  padding: 10px 12px;
++  overflow: auto;
++}
++
++.ioLabel {
++  color: var(--dsw-alias-label-caption);
++  font-size: 10px;
++  font-weight: 500;
++  letter-spacing: 0.04em;
++}
++
++.ioText {
++  min-width: 0;
++  margin: 0;
++  color: var(--dsw-alias-label-secondary);
++  font: inherit;
++  overflow-wrap: anywhere;
++  white-space: pre-wrap;
++}
++
++.ioText[data-error] {
++  color: var(--dsw-alias-state-error-primary);
++}
++
++.ioDivider {
++  height: 1px;
++  background: var(--dsw-alias-border-l2);
++}
++
++.inspectButton {
++  display: inline-flex;
++  align-self: flex-start;
++  align-items: center;
++  gap: 4px;
++  margin: 4px 0 2px 4px;
++  padding: 2px 8px;
++  border: 1px solid var(--dsw-alias-border-l2);
++  border-radius: 999px;
++  background: var(--dsw-alias-bg-base);
++  color: var(--dsw-alias-label-secondary);
++  font-size: 11px;
++  line-height: 16px;
++  cursor: pointer;
++  opacity: 0;
++  transition: opacity 100ms ease;
++}
++
++.root:hover .inspectButton,
++.inspectButton:focus-visible {
++  opacity: 1;
++}
++
++.inspectButton:hover {
++  background: var(--dsw-alias-interactive-bg-hover-solid);
++  color: var(--dsw-alias-label-primary);
++}
++
++.visuallyHidden {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  overflow: hidden;
++  clip: rect(0 0 0 0);
++  white-space: nowrap;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .root[data-state='running'] .row::after {
++    animation: none;
++  }
++
++  .inspectButton {
++    transition: none;
++  }
++}
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+new file mode 100644
+index 0000000..da89b5f
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+@@ -0,0 +1,141 @@
++/** Dedicated `vision_inspect` presentation: visual identity plus replay-stable evidence disclosure. */
++import { useState, type ReactNode } from 'react'
++import {
++  DisclosureRow, IconInspectOutline12, StateDot,
++} from '@deepseek-ai/dsh-client-ui-primitives'
++import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
++import { VisionInspectIcon } from './VisionInspectIcon.tsx'
++import css from './VisionInspectRow.module.css'
++
++type VisionState = 'running' | 'ok' | 'error' | 'stopped'
++
++interface VisionModel {
++  readonly argsRaw: string
++  readonly output: string | null
++  readonly summary: string
++  readonly state: VisionState
++}
++
++function firstLine(text: string): string {
++  const newline = text.indexOf('\n')
++  return newline === -1 ? text : text.slice(0, newline)
++}
++
++function resultText(block: ToolCallViewProps['block']): string | null {
++  if (!('kind' in block)) return null
++  const parts = block.content.map(item => item.type === 'text' ? item.text : JSON.stringify(item, null, 2))
++  if (parts.length === 0 && block.error !== undefined) parts.push(`${block.error.name}: ${block.error.code}`)
++  return parts.join('\n') || null
++}
++
++function promptSummary(argsRaw: string, callId: string): string {
++  try {
++    const parsed = JSON.parse(argsRaw) as unknown
++    if (typeof parsed === 'object' && parsed !== null) {
++      const prompt = (parsed as Record<string, unknown>).prompt
++      if (typeof prompt === 'string' && prompt.trim() !== '') return firstLine(prompt.trim())
++    }
++  } catch {
++    // Streaming arguments may be an incomplete JSON prefix.
++  }
++  return argsRaw === '' ? callId : firstLine(argsRaw)
++}
++
++function visionModel(block: ToolCallViewProps['block']): VisionModel {
++  const settled = 'kind' in block
++  const argsRaw = (settled ? block.call?.argsRaw : block.argsRaw) ?? ''
++  const output = resultText(block)
++  const state: VisionState = !settled
++    ? 'running'
++    : block.error?.code === 'interrupted'
++      ? 'stopped'
++      : block.isError ? 'error' : 'ok'
++  return {
++    argsRaw,
++    output,
++    summary: state === 'error' && output !== null ? firstLine(output) : promptSummary(argsRaw, block.callId),
++    state,
++  }
++}
++
++function leadingFor(state: VisionState): ReactNode {
++  switch (state) {
++    case 'error': return <StateDot state="error" />
++    case 'stopped': return <StateDot state="warning" />
++    default: return <VisionInspectIcon />
++  }
++}
++
++function accessibleState(state: VisionState): string | null {
++  switch (state) {
++    case 'running': return 'Vision inspection running'
++    case 'error': return 'Vision inspection failed'
++    case 'stopped': return 'Vision inspection stopped'
++    default: return null
++  }
++}
++
++/** Render a visual inspection with a domain icon and Think-shaped activity title. */
++export function VisionInspectRow({ block, activityState, inspect }: ToolCallViewProps) {
++  const model = visionModel(block)
++  const [expanded, setExpanded] = useState(false)
++  const presentingRunning = activityState === undefined
++    ? model.state === 'running'
++    : activityState === 'running'
++  const expandable = model.output !== null || model.argsRaw !== ''
++  const open = expanded && expandable
++  const status = accessibleState(model.state)
++  return (
++    <div className={css.root} data-tool="vision_inspect" data-state={model.state}>
++      {status !== null && <span className={css.visuallyHidden}>{status}</span>}
++      <DisclosureRow
++        rowClassName={css.row}
++        leadingClassName={css.leading}
++        titleClassName={css.title}
++        chevronClassName={css.chevron}
++        icon={leadingFor(model.state)}
++        title="Vision"
++        titleSuffix={presentingRunning ? (
++          <span className={css.runningStatus} data-tool-running-status aria-hidden>ing</span>
++        ) : undefined}
++        open={open}
++        expandable={expandable}
++        expandOnRowClick
++        keepContentWhenOpen
++        onToggle={() => { setExpanded(value => !value) }}
++        collapsedContent={(
++          <>
++            <span className={css.separator} aria-hidden />
++            <span className={model.state === 'error' ? `${css.summary} ${css.errorSummary}` : css.summary}>
++              {model.summary}
++            </span>
++          </>
++        )}
++      >
++        <div className={css.bodyWrap}>
++          <div className={css.ioCard}>
++            {model.argsRaw !== '' && (
++              <section className={css.ioSection}>
++                <span className={css.ioLabel}>IN</span>
++                <pre className={css.ioText}>{model.argsRaw}</pre>
++              </section>
++            )}
++            {model.argsRaw !== '' && model.output !== null && <span className={css.ioDivider} aria-hidden />}
++            {model.output !== null && (
++              <section className={css.ioSection}>
++                <span className={css.ioLabel}>OUT</span>
++                <pre className={css.ioText} data-error={model.state === 'error' || undefined}>{model.output}</pre>
++              </section>
++            )}
++          </div>
++          {inspect !== undefined && (
++            <button type="button" className={css.inspectButton} onClick={inspect}>
++              <IconInspectOutline12 />
++              Inspect
++            </button>
++          )}
++        </div>
++      </DisclosureRow>
++    </div>
++  )
++}
+diff --git a/packages/vision/vision-bridge/src/client/index.ts b/packages/vision/vision-bridge/src/client/index.ts
+new file mode 100644
+index 0000000..5853269
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/index.ts
+@@ -0,0 +1,15 @@
++/** Browser half: opt-in keyed presentation for the Host-owned visual Tool. */
++import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
++import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
++import { VISION_INSPECT_TOOL_NAME } from '../tool-name.ts'
++import { VisionInspectRow } from './VisionInspectRow.tsx'
++
++export const inject = ['slots']
++
++/** Register the visual Tool row; the plugin fiber owns teardown and HMR disposal. */
++export function apply(ctx: ClientContext): void {
++  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
++    { name: 'tool.call.toolview', key: VISION_INSPECT_TOOL_NAME },
++    VisionInspectRow,
++  ))
++}
+diff --git a/packages/vision/vision-bridge/src/css-modules.d.ts b/packages/vision/vision-bridge/src/css-modules.d.ts
+new file mode 100644
+index 0000000..8811db1
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/css-modules.d.ts
+@@ -0,0 +1,4 @@
++declare module '*.module.css' {
++  const classes: Record<string, string>
++  export default classes
++}
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+index 2c19366..8251f58 100644
+--- a/packages/vision/vision-bridge/src/index.ts
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -18,6 +18,9 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
+ import { defineTool } from '@deepseek-ai/dsh-tools'
+ import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
+ import type {} from '@deepseek-ai/dsh-agent'
++import { VISION_INSPECT_TOOL_NAME } from './tool-name.ts'
++
++export { VISION_INSPECT_TOOL_NAME } from './tool-name.ts'
+ 
+ /** Cordis plugin name used in durable reminder provenance. */
+ export const name = 'vision-bridge'
+@@ -25,8 +28,6 @@ export const name = 'vision-bridge'
+ /** Services required for durable image resolution and tool registration. */
+ export const inject = ['attachments', 'tools']
+ 
+-/** Stable model-facing tool name. */
+-export const VISION_INSPECT_TOOL_NAME = 'vision_inspect'
+ /** Default environment reference for the vision gateway credential. */
+ export const DEFAULT_VISION_API_KEY_ENV = 'QWEN_VISION_API_KEY'
+ /** Default environment variable carrying the OpenAI-compatible endpoint base. */
+diff --git a/packages/vision/vision-bridge/src/tool-name.ts b/packages/vision/vision-bridge/src/tool-name.ts
+new file mode 100644
+index 0000000..a86825b
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/tool-name.ts
+@@ -0,0 +1,2 @@
++/** Stable wire name shared by the Host tool and its optional browser presentation. */
++export const VISION_INSPECT_TOOL_NAME = 'vision_inspect'
+diff --git a/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+new file mode 100644
+index 0000000..640bc3c
+--- /dev/null
++++ b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+@@ -0,0 +1,148 @@
++// @vitest-environment jsdom
++// Dedicated visual Tool presentation: identity, Think-shaped activity,
++// replay-stable disclosure, lifecycle semantics, and keyed-slot ownership.
++
++import { Context } from '@deepseek-ai/cordis'
++import { cleanup, fireEvent, render, screen } from '@testing-library/react'
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
++import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
++import { ToolActivityChrome } from '@deepseek-ai/dsh-client-ui-tool/src/client/tool/components/ToolActivityChrome.tsx'
++import { apply, inject } from '../src/client/index.ts'
++import { VisionInspectRow } from '../src/client/VisionInspectRow.tsx'
++
++type RowProps = Parameters<typeof VisionInspectRow>[0]
++
++afterEach(() => {
++  cleanup()
++  vi.useRealTimers()
++})
++
++function running(argsRaw = '{"attachmentIds":["sha256:a"],"prompt":"Read the flowchart labels"}'): RunningToolCall {
++  return {
++    callId: 'call-vision', name: 'vision_inspect', argsRaw,
++    turn: 1, step: 1, time: 8_000, callView: null, subCalls: [],
++  }
++}
++
++function settled(over: Partial<ToolResultNode> = {}): ToolResultNode {
++  return {
++    kind: 'tool-result', seq: 3, time: 10_000, callId: 'call-vision',
++    call: {
++      name: 'vision_inspect',
++      argsRaw: '{"attachmentIds":["sha256:a"],"prompt":"Read the flowchart labels"}',
++    },
++    callTime: 8_000,
++    content: [{ type: 'text', text: '{"summary":"The node says request enters"}' }],
++    isError: false, callView: null, resultView: null, subCalls: [],
++    ...over,
++  }
++}
++
++function props(block: RowProps['block'], activityState?: RowProps['activityState']): RowProps {
++  return {
++    callId: block.callId,
++    toolName: 'vision_inspect',
++    block,
++    activityState,
++    openFile: vi.fn(),
++  } as unknown as RowProps
++}
++
++describe('VisionInspectRow', () => {
++  it('replaces generic Tool call copy with the viewfinder-eye Vision identity', () => {
++    const view = render(<VisionInspectRow {...props(running())} />)
++    expect(view.container.textContent).toContain('Visioning')
++    expect(view.container.textContent).toContain('Read the flowchart labels')
++    expect(view.container.textContent).not.toContain('Tool call')
++    const icon = view.container.querySelector('[data-icon="vision-inspect"]')
++    expect(icon?.getAttribute('viewBox')).toBe('0 0 14 14')
++    expect(icon?.querySelector('circle')).not.toBeNull()
++  })
++
++  it('composes the same ElapsedTime countdown used by Think', () => {
++    vi.useFakeTimers()
++    vi.setSystemTime(9_300)
++    const view = render(
++      <div>
++        <VisionInspectRow {...props(running(), 'running')} />
++        <ToolActivityChrome startedTime={8_000} state="running" />
++      </div>,
++    )
++    expect(view.container.textContent).toContain('Visioning')
++    expect(view.container.textContent).toContain('1s')
++    expect(view.container.querySelector('[data-tool-timer]')).not.toBeNull()
++  })
++
++  it('discloses exact durable input/output and preserves Inspect', () => {
++    const inspect = vi.fn()
++    render(<VisionInspectRow {...props(settled())} inspect={inspect} />)
++    const row = screen.getByRole('button', { name: /VisionRead the flowchart labels/ })
++    expect(row.getAttribute('aria-expanded')).toBe('false')
++    fireEvent.click(row)
++    expect(row.getAttribute('aria-expanded')).toBe('true')
++    expect(screen.getByText('IN')).toBeTruthy()
++    expect(screen.getByText('OUT')).toBeTruthy()
++    expect(screen.getByText(/sha256:a/)).toBeTruthy()
++    expect(screen.getByText(/request enters/)).toBeTruthy()
++    fireEvent.click(screen.getByRole('button', { name: 'Inspect' }))
++    expect(inspect).toHaveBeenCalledTimes(1)
++  })
++
++  it('uses durable error and interrupted lifecycle semantics', () => {
++    const failed = render(<VisionInspectRow {...props(settled({
++      content: [{ type: 'text', text: 'VisionError: gateway unavailable\nRetry later.' }],
++      isError: true,
++      error: { name: 'VisionError', code: 'gateway' },
++    }))} />)
++    expect(failed.container.querySelector('[data-state="error"]')).not.toBeNull()
++    expect(failed.container.textContent).toContain('Vision inspection failed')
++    expect(screen.getByRole('button').textContent).not.toContain('Retry later')
++    cleanup()
++
++    const stopped = render(<VisionInspectRow {...props(settled({
++      content: [],
++      error: { name: 'InterruptedError', code: 'interrupted' },
++    }))} />)
++    expect(stopped.container.querySelector('[data-state="stopped"]')).not.toBeNull()
++    expect(stopped.container.textContent).toContain('Vision inspection stopped')
++  })
++
++  it('falls back safely for streamed or missing arguments', () => {
++    const partial = render(<VisionInspectRow {...props(running('{"prompt":"Inspect\n'))} />)
++    expect(partial.container.textContent).toContain('{"prompt":"Inspect')
++    cleanup()
++    const missing = render(<VisionInspectRow {...props(settled({ call: null, content: [] }))} />)
++    expect(missing.container.textContent).toContain('call-vision')
++    cleanup()
++    const emptyPrompt = render(<VisionInspectRow {...props(running('{"prompt":""}'))} />)
++    expect(emptyPrompt.container.textContent).toContain('{"prompt":""}')
++    cleanup()
++    const nonStringPrompt = render(<VisionInspectRow {...props(running('{"prompt":7}'))} />)
++    expect(nonStringPrompt.container.textContent).toContain('{"prompt":7}')
++    cleanup()
++    const structured = render(<VisionInspectRow {...props(settled({
++      content: [{ type: 'reasoning', text: 'visual trace' }],
++    }))} />)
++    fireEvent.click(screen.getByRole('button'))
++    expect(structured.container.textContent).toContain('"type": "reasoning"')
++  })
++})
++
++describe('browser plugin', () => {
++  it('owns only the vision_inspect keyed seat and releases it on disposal', async () => {
++    const ctx = new Context()
++    const slots = new SlotRegistry(ctx)
++    slots.register({
++      name: 'root',
++      children: { 'tool.call.toolview': { kind: 'keyed', scope: 'session' } },
++    } as never, () => null)
++    const fiber = ctx.plugin({ inject: [...inject], apply })
++    await fiber.await()
++    const entry = slots.entries('tool.call.toolview')[0]
++    expect(entry?.options).toMatchObject({ key: 'vision_inspect' })
++    expect(entry?.component).toBe(VisionInspectRow)
++    await fiber.dispose()
++    expect(slots.entries('tool.call.toolview')).toHaveLength(0)
++  })
++})
+diff --git a/packages/vision/vision-bridge/tsconfig.client.json b/packages/vision/vision-bridge/tsconfig.client.json
+new file mode 100644
+index 0000000..84eff0c
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsconfig.client.json
+@@ -0,0 +1,23 @@
++{
++  "extends": "../../../tsconfig.base.client.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types",
++    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
++  },
++  "files": [
++    "src/css-modules.d.ts",
++    "src/client/index.ts",
++    "src/client/VisionInspectIcon.tsx",
++    "src/client/VisionInspectRow.tsx",
++    "src/tool-name.ts"
++  ],
++  "references": [
++    { "path": "../../../vendor/cordis" },
++    { "path": "../../client/runtime" },
++    { "path": "../../client/ui-primitives" },
++    { "path": "../../client/ui-slots" },
++    { "path": "../../client/ui-tool" },
++    { "path": "../../runtime-diagnostics/invariants" }
++  ]
++}
+diff --git a/packages/vision/vision-bridge/tsconfig.host.json b/packages/vision/vision-bridge/tsconfig.host.json
+new file mode 100644
+index 0000000..b725e90
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsconfig.host.json
+@@ -0,0 +1,22 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types",
++    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
++  },
++  "files": ["src/index.ts", "src/invariant.ts", "src/tool-name.ts"],
++  "references": [
++    { "path": "../../../vendor/cosmokit" },
++    { "path": "../../../vendor/cordis" },
++    { "path": "../../../vendor/schemastery" },
++    { "path": "../../attachment/attachment" },
++    { "path": "../../credentials/credentials" },
++    { "path": "../../util/launch-environment" },
++    { "path": "../../llm/llm" },
++    { "path": "../../core/session" },
++    { "path": "../../core/agent" },
++    { "path": "../../core/tools" },
++    { "path": "../../runtime-diagnostics/invariants" }
++  ]
++}
+diff --git a/packages/vision/vision-bridge/tsconfig.json b/packages/vision/vision-bridge/tsconfig.json
+index eb57e4a..2a0b0e3 100644
+--- a/packages/vision/vision-bridge/tsconfig.json
++++ b/packages/vision/vision-bridge/tsconfig.json
+@@ -1,18 +1,7 @@
+ {
+-  "extends": "../../../tsconfig.base.json",
+-  "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
+-  "include": ["src"],
++  "files": [],
+   "references": [
+-    { "path": "../../../vendor/cosmokit" },
+-    { "path": "../../../vendor/cordis" },
+-    { "path": "../../../vendor/schemastery" },
+-    { "path": "../../attachment/attachment" },
+-    { "path": "../../credentials/credentials" },
+-    { "path": "../../util/launch-environment" },
+-    { "path": "../../llm/llm" },
+-    { "path": "../../core/session" },
+-    { "path": "../../core/agent" },
+-    { "path": "../../core/tools" },
+-    { "path": "../../runtime-diagnostics/invariants" }
++    { "path": "./tsconfig.host.json" },
++    { "path": "./tsconfig.client.json" }
+   ]
+ }
+diff --git a/packages/vision/vision-bridge/tsdown.config.ts b/packages/vision/vision-bridge/tsdown.config.ts
+new file mode 100644
+index 0000000..2f6c970
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsdown.config.ts
+@@ -0,0 +1,7 @@
++import { clientBundle } from '../../client/tsdown.client.ts'
++
++export default clientBundle(
++  '@deepseek-ai/dsh-vision-bridge',
++  ['lib/types/index.js', 'lib/types/invariant.js'],
++  { hostPhase: true },
++)
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 474f8dd..54d2fa4 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -8385,6 +8385,21 @@ importers:
+       '@deepseek-ai/dsh-attachment':
+         specifier: workspace:^
+         version: link:../../attachment/attachment
++      '@deepseek-ai/dsh-client-runtime':
++        specifier: workspace:^
++        version: link:../../client/runtime
++      '@deepseek-ai/dsh-client-test-runtime':
++        specifier: workspace:^
++        version: link:../../test-support/client-runtime
++      '@deepseek-ai/dsh-client-ui-primitives':
++        specifier: workspace:^
++        version: link:../../client/ui-primitives
++      '@deepseek-ai/dsh-client-ui-slots':
++        specifier: workspace:^
++        version: link:../../client/ui-slots
++      '@deepseek-ai/dsh-client-ui-tool':
++        specifier: workspace:^
++        version: link:../../client/ui-tool
+       '@deepseek-ai/dsh-credentials':
+         specifier: workspace:^
+         version: link:../../credentials/credentials
+@@ -8403,6 +8418,18 @@ importers:
+       '@deepseek-ai/dsh-tools':
+         specifier: workspace:^
+         version: link:../../core/tools
++      '@testing-library/react':
++        specifier: ^16.1.0
++        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
++      '@types/react':
++        specifier: ~18.3.1
++        version: 18.3.31
++      react:
++        specifier: ^18.2.0
++        version: 18.3.1
++      react-dom:
++        specifier: ^18.2.0
++        version: 18.3.1(react@18.3.1)
+ 
+   packages/web/tool-web:
+     dependencies:
+diff --git a/tsconfig.client.json b/tsconfig.client.json
+index b5874b6..1a3a3f3 100644
+--- a/tsconfig.client.json
++++ b/tsconfig.client.json
+@@ -25,6 +25,7 @@
+     "packages/*/*/tests/**/*.client.ts",
+     // Client package outside packages/client with a local CSS module face.
+     "packages/extensions/ui-cordis/src/css-modules.d.ts",
++    "packages/vision/vision-bridge/src/css-modules.d.ts",
+     "packages/client/tsdown.client.ts",
+     "scripts/client-build-environment.ts",
+     "scripts/*.client.spec.ts",
+@@ -67,6 +68,7 @@
+     { "path": "./packages/client/ui-brand-official" },
+     { "path": "./packages/client/ui-conversation" },
+     { "path": "./packages/client/ui-tool" },
++    { "path": "./packages/vision/vision-bridge/tsconfig.client.json" },
+     { "path": "./packages/client/ui-deliverables" },
+     { "path": "./packages/client/ui-workflow-run" },
+     { "path": "./packages/client/ui-workspace" },
+diff --git a/tsconfig.host.json b/tsconfig.host.json
+index 19630d6..8109161 100644
+--- a/tsconfig.host.json
++++ b/tsconfig.host.json
+@@ -289,7 +289,7 @@
+     { "path": "./packages/preset/persona" },
+     { "path": "./packages/guard/max-token-continuation" },
+     { "path": "./packages/guard/repeat-tool-reminder" },
+-    { "path": "./packages/vision/vision-bridge" },
++    { "path": "./packages/vision/vision-bridge/tsconfig.host.json" },
+     { "path": "./packages/extensions/cordis-host-runner" },
+     { "path": "./packages/extensions/tool-cordis" },
+     { "path": "./packages/hooks/hook-protocol" },
+-- 
+2.51.2.windows.1
+

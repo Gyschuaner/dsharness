@@ -19,8 +19,8 @@
   运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
   DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
   DSH-019 的 0.1.1 兼容调整、BUG-C393119A 静态门禁修复，以及 DSH-005 可选视觉桥
-  和各自的 SHA-256；
-- 应用补丁后的 Git tree `479d568bd1c79c32e67dff5707cc536f13a271c3`。
+  及其发布门禁和 `vision_inspect` 专属视觉工具呈现，并包含各自的 SHA-256；
+- 应用补丁后的 Git tree `2f2d1e7033499d5e2d7b7e2d66450b69df117741`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -205,3 +205,10 @@ fixture 在 `symlinkSync` 报 EPERM，VitePress MPA 的原始 Markdown twin 与�
 `index.md` 发生基线碰撞。DP Gateway 当前 `/v1/models` 尚未暴露目标模型，因此真实
 视觉集成与 SIT 保持阻塞，不启用 profile，也不改动 3080。最终 tree 锁定为
 `479d568bd1c79c32e67dff5707cc536f13a271c3`。
+
+同日新增第十八个补丁，为 `vision_inspect` 提供与插件同启同停的浏览器 half：专属
+取景框眼睛图标和 `Vision` 标题替换通用 Tool call，运行后缀、计时器及扫光动效与
+Think 行保持一致，并保留完整 IN/OUT disclosure 和 Inspect 入口。Host/Client 类型检查、
+全仓 lint、Host/Client/Web 完整构建、37 条视觉桥聚焦用例和 100% 语句/分支/函数/行
+覆盖均通过。最终 tree 更新为
+`2f2d1e7033499d5e2d7b7e2d66450b69df117741`。
