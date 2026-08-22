@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
   "baseTree": "53915efe4e2126cc7779b73dfc8a3bcec5318c44",
-  "resultTree": "a812b84b74d8ed3abafd12bafc8654efa49ab55c",
+  "resultTree": "479d568bd1c79c32e67dff5707cc536f13a271c3",
   "dshVersion": "0.1.1-rc.2",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -72,6 +72,10 @@
     {
       "path": "upstream-patches/0016-feat-DSH-005-add-opt-in-vision-sub-agent-bridge.patch",
       "sha256": "B9E155D0E6138B1F92861A1304E669A96A40656B70C6A95315BD428C6950E5D1"
+    },
+    {
+      "path": "upstream-patches/0017-test-DSH-005-close-vision-bridge-release-gates.patch",
+      "sha256": "810199EF0F414A796EBAFAB692EA4169669D58B766DA7B32667BE870114B0EAD"
     }
   ]
 }

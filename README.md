@@ -98,7 +98,7 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 精度展示修复、DSH-015 的 Code 子工具计划提前展示，以及 DSH-016 的 Think 独立计时
 和工具活动状态布局，再叠加 DSH-018 的输出 token 上限自动持续续跑，以及 DSH-019
 针对 0.1.1 新结构的兼容调整、BUG-C393119A 静态门禁修复和 DSH-005 可选视觉桥。
-最终源码 tree 为 `a812b84b74d8ed3abafd12bafc8654efa49ab55c`。
+最终源码 tree 为 `479d568bd1c79c32e67dff5707cc536f13a271c3`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。

@@ -20,7 +20,7 @@
   DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
   DSH-019 的 0.1.1 兼容调整、BUG-C393119A 静态门禁修复，以及 DSH-005 可选视觉桥
   和各自的 SHA-256；
-- 应用补丁后的 Git tree `a812b84b74d8ed3abafd12bafc8654efa49ab55c`。
+- 应用补丁后的 Git tree `479d568bd1c79c32e67dff5707cc536f13a271c3`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -204,4 +204,4 @@ malformed-tool-call reminder 常量取消导出，使 workspace constraints 与 
 fixture 在 `symlinkSync` 报 EPERM，VitePress MPA 的原始 Markdown twin 与已生成
 `index.md` 发生基线碰撞。DP Gateway 当前 `/v1/models` 尚未暴露目标模型，因此真实
 视觉集成与 SIT 保持阻塞，不启用 profile，也不改动 3080。最终 tree 锁定为
-`a812b84b74d8ed3abafd12bafc8654efa49ab55c`。
+`479d568bd1c79c32e67dff5707cc536f13a271c3`。
