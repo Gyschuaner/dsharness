@@ -4,6 +4,7 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
 
 用法：
   .\restart-dsh-web.ps1             重启并等待服务恢复，最后验证 skill-manager apiVersion
+  .\restart-dsh-web.ps1 -EnableVisionBridge  通过 DP Gateway 启用 vision_inspect
   .\restart-dsh-web.ps1 -NoLaunch   只停不启动（想自己手动起时用）
   .\restart-dsh-web.ps1 -Port 3080  端口可改（默认 3080）
 
@@ -21,6 +22,7 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
 param(
 	[int]$Port = 3080,
 	[string]$HostAddr = '127.0.0.1',
+	[switch]$EnableVisionBridge,
 	[switch]$NoLaunch
 )
 
@@ -35,7 +37,7 @@ if ($conn) { $portPids = @($conn | ForEach-Object OwningProcess | Sort-Object -U
 $webPids = @()
 Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object {
 	$_ -and $_.CommandLine -and
-	(($_.CommandLine -match 'bin\.js(?:\s+web|\s+--profile\s+web)') -or ($_.CommandLine -match '@deepseek-ai[/\\]dsh web'))
+	(($_.CommandLine -match 'bin\.js(?:\s+web|.*?\s+--patch\s+.*?\s+web|\s+--profile\s+web)') -or ($_.CommandLine -match '@deepseek-ai[/\\]dsh web'))
 } | ForEach-Object { $webPids += $_.ProcessId }
 
 $all = @($portPids + $webPids) | Where-Object { $_ } | Sort-Object -Unique
@@ -73,8 +75,17 @@ if ($NoLaunch) {
 $LogStamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $StdoutLog = Join-Path ([IO.Path]::GetTempPath()) "dsh-web-$Port-$LogStamp.out.log"
 $StderrLog = Join-Path ([IO.Path]::GetTempPath()) "dsh-web-$Port-$LogStamp.err.log"
+$VisionPatchPath = Join-Path $PSScriptRoot 'dev\vision-bridge.dp-gateway.patch.yml'
+$DshCommand = "dsh web --no-open --host $HostAddr --port $Port"
+if ($EnableVisionBridge) {
+	if (-not (Test-Path -LiteralPath $VisionPatchPath -PathType Leaf)) {
+		throw "视觉桥覆盖不存在：$VisionPatchPath"
+	}
+	$DshCommand = "dsh --patch `"$VisionPatchPath`" web --no-open --host $HostAddr --port $Port"
+	Write-Step "启用 vision-bridge（覆盖：$VisionPatchPath）"
+}
 Write-Step "在隐藏窗口启动 dsh web（日志：$StdoutLog；$StderrLog）"
-Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList @('-NoProfile', '-Command', "dsh web --no-open --host $HostAddr --port $Port") -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog | Out-Null
+Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList @('-NoProfile', '-Command', $DshCommand) -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog | Out-Null
 
 # ── 3) 等待恢复 + 验证 ──────────────────────────────────────────────────────
 Write-Step "等待 http://${HostAddr}:${Port} 恢复（最多 60 秒）…"
