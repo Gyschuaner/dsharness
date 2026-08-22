@@ -246,3 +246,11 @@ Tool 时长。5 个相关测试文件 59 条用例、lint、Client/Web 构建通
 `image-context-guard`，也不再对整次模型请求做 9 图裁剪。`vision_inspect` 的默认值与
 base bundle 配置同步提高到 20，并新增默认值回归。最终 tree 更新为
 `3c61807f54affd0667e4b6fcf7d170ef20d087bf`。
+
+同日新增第二十三个补丁，完成 DSH-023。`vision_inspect` 保留本会话 `attachmentIds`
+输入，并新增可混用的 `paths`：后端先使用会话工作目录解析路径，批量完成文件类型、
+图片格式和附件限额校验，再通过原生 attachment 服务保存内容寻址图片。新增的
+`vision/image-import` 事件只持久化规范化附件引用，不携带图片字节，也不进入主模型
+消息面；后续调用可直接复用返回的附件 ID。插件定向测试 36 条、持久化生成测试 25 条、
+TypeScript、lint、插件 bundle 与官方完整构建均通过。最终 tree 更新为
+`d760562c3d46576a8683b8fc5dec19ee828108a1`。

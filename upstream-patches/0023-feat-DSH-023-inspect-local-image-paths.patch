@@ -1,0 +1,658 @@
+From 7c13b68b668504664b71eb84cea26217c6d9b001 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 23:29:53 +0800
+Subject: [PATCH] feat(DSH-023): inspect local image paths
+
+---
+ docs/persistence-catalog.md                   |  13 ++
+ .../core/session/src/known-event-types.ts     |   1 +
+ packages/vision/vision-bridge/README.md       |  13 +-
+ packages/vision/vision-bridge/README.zh.md    |  13 +-
+ packages/vision/vision-bridge/package.json    |   2 +
+ packages/vision/vision-bridge/src/index.ts    | 167 ++++++++++++++++--
+ .../vision/vision-bridge/src/invariant.ts     |   5 +-
+ .../vision-bridge/tests/vision-bridge.spec.ts | 142 ++++++++++++++-
+ .../vision/vision-bridge/tsconfig.host.json   |   1 +
+ pnpm-lock.yaml                                |  21 ++-
+ 10 files changed, 342 insertions(+), 36 deletions(-)
+
+diff --git a/docs/persistence-catalog.md b/docs/persistence-catalog.md
+index 9999737..8c97c9d 100644
+--- a/docs/persistence-catalog.md
++++ b/docs/persistence-catalog.md
+@@ -1009,6 +1009,19 @@ Source: [`packages/core/session/src/types.ts:243`](../packages/core/session/src/
+ 
+ Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/types.ts)
+ 
++### `vision/*`
++
++<a id="visionimage-import--log-only"></a>
++
++#### `vision/image-import` — log-only
++
++```ts persistence-catalog
++/** Local images admitted by `vision_inspect`; log-only and absent from model history. */
++'vision/image-import': VisionImageImportEventData
++```
++
++Source: [`packages/vision/vision-bridge/src/index.ts:114`](../packages/vision/vision-bridge/src/index.ts)
++
+ ### `web/*`
+ 
+ <a id="webdeepseek-search-llm-request--log-only"></a>
+diff --git a/packages/core/session/src/known-event-types.ts b/packages/core/session/src/known-event-types.ts
+index abaab97..cca99ca 100644
+--- a/packages/core/session/src/known-event-types.ts
++++ b/packages/core/session/src/known-event-types.ts
+@@ -65,5 +65,6 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
+   'turn/end',
+   'turn/start',
+   'user/message',
++  'vision/image-import',
+   'web/deepseek-search-llm-request',
+ ])
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+index 40381d9..e3e7c3f 100644
+--- a/packages/vision/vision-bridge/README.md
++++ b/packages/vision/vision-bridge/README.md
+@@ -36,7 +36,9 @@ Compaction may replace an old visible range with a summary according to the depl
+ 
+ ## Session isolation and gateway contract
+ 
+-Before reading bytes, `vision_inspect` resolves every requested id from uploaded image blocks in the calling agent's own session event stream. An unknown or cross-session id rejects the complete batch before any attachment read or gateway request. Duplicate ids and over-limit batches also fail before dispatch.
++`vision_inspect` accepts current-session `attachmentIds`, local image `paths`, or both. Before reading bytes, it resolves every requested id from uploaded image blocks or prior `vision/image-import` records in the calling agent's own session event stream. An unknown or cross-session id rejects the complete batch before any attachment or filesystem read and before any gateway request.
++
++Local paths resolve relative to the session workspace through the mounted `ctx.fs` backend; absolute paths use the same backend rules. The bridge accepts PNG/JPEG/WebP/GIF regular files, admits the complete path batch through the native attachment service, and appends only the resulting normalized references as one log-only `vision/image-import` event. It never stores source paths or image bytes in the session log. The combined references are content-id deduplicated and bounded by `maxImagesPerCall`, so later calls in this session may use the returned attachment ids without rereading the source files.
+ 
+ The gateway receives one OpenAI-compatible chat-completions request containing the main model's complete delegated prompt plus data URLs for the authorized images. Model-visible results contain only `attachmentIds`, `summary`, `observations` (`text`, optional `region`, optional `confidence`), and `limitations`; endpoint, credential, remote model, timing, and internal error bodies are excluded.
+ 
+@@ -70,11 +72,16 @@ Append-only: the new user message and notice extend the reusable request prefix.
+ 
+ #### What the model sees
+ 
+-The model sees the `vision_inspect` tool with `attachmentIds` and a complete delegated `prompt`; its description says to reuse recent tool results unless a new visual question, region, comparison, or missing observation requires another call.
++The model sees the `vision_inspect` tool with optional `attachmentIds`, optional `paths`, and a required complete delegated `prompt`. At least one image source is required. The concise descriptions are:
++
++- Tool: `Inspect conversation attachments or local image files with the configured vision model.`
++- `attachmentIds`: `Current-conversation attachment IDs to inspect.`
++- `paths`: `Image file paths to import into this conversation and inspect.`
++- `prompt`: `The complete visual question or inspection task.`
+ 
+ #### Token effect
+ 
+-The stable tool definition is present whenever the plugin is loaded. Each successful call adds one structured textual tool result; image bytes and data URLs exist only in the separate vision-gateway request.
++The stable tool definition is present whenever the plugin is loaded. A path call additionally adds one model-invisible import record containing normalized attachment references. Each successful call adds one structured textual tool result; source paths, image bytes, and data URLs never enter model history and the latter exist only in the separate vision-gateway request.
+ 
+ #### KV Cache effect
+ 
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+index df60a48..b728545 100644
+--- a/packages/vision/vision-bridge/README.zh.md
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -36,7 +36,9 @@
+ 
+ ## 对话隔离与网关契约
+ 
+-读取任何图片字节前，`vision_inspect` 会先从调用 agent 自己的 session event stream 中解析全部请求 id。未知 id 或其他对话中的 id 会让整批请求在 attachment 读取和网关调用之前失败；重复 id 和超过上限的批次同样会在派发前失败。
++`vision_inspect` 可以接收当前会话的 `attachmentIds`、本地图片 `paths`，也可以混用。读取任何图片字节前，它会先从调用 agent 自己的 session event stream 中解析全部请求 id，来源包括用户上传的图片块和先前的 `vision/image-import` 记录。未知 id 或其他对话中的 id 会让整批请求在 attachment、文件系统读取和网关调用之前失败。
++
++本地相对路径通过挂载的 `ctx.fs` 后端按 session workspace 解析，绝对路径也遵循同一后端规则。插件只接受 PNG/JPEG/WebP/GIF 普通文件，整批图片通过原生 attachment 服务准入，并且只把规范化后的引用作为一条仅日志的 `vision/image-import` 事件追加到会话；源路径与图片字节都不会写入 session log。合并后的引用按内容 id 去重并受 `maxImagesPerCall` 限制，之后同一会话可以直接使用工具返回的 attachment id，不必重新读取源文件。
+ 
+ 网关收到一条 OpenAI 兼容 chat-completions 请求，其中包含主模型给出的完整委托 prompt，以及已授权图片的 data URL。主模型可见结果只包含 `attachmentIds`、`summary`、`observations`（`text`、可选 `region`、可选 `confidence`）和 `limitations`；endpoint、credential、远端 model、耗时和内部错误正文都不会进入结果。
+ 
+@@ -70,11 +72,16 @@
+ 
+ #### What the model sees
+ 
+-模型会看到 `vision_inspect` 工具，参数为 `attachmentIds` 和完整委托 `prompt`。工具描述要求：最近的 tool result 已经足够时直接使用；只有新的视觉问题、其他区域、图片比较或证据缺失时才再次调用。
++模型会看到 `vision_inspect` 工具：`attachmentIds` 与 `paths` 均为可选图片来源，`prompt` 为必填的完整视觉任务，且至少要给出一种图片来源。精简后的定义为：
++
++- 工具：`Inspect conversation attachments or local image files with the configured vision model.`
++- `attachmentIds`：`Current-conversation attachment IDs to inspect.`
++- `paths`：`Image file paths to import into this conversation and inspect.`
++- `prompt`：`The complete visual question or inspection task.`
+ 
+ #### Token effect
+ 
+-插件加载期间，稳定工具定义始终存在。每次成功调用只增加一条结构化文本工具结果；图片字节和 data URL 只存在于独立的视觉网关请求中。
++插件加载期间，稳定工具定义始终存在。路径调用会额外增加一条仅含规范化附件引用、对模型不可见的导入记录。每次成功调用只增加一条结构化文本工具结果；源路径、图片字节和 data URL 都不会进入模型历史，后两者只存在于独立的视觉网关请求中。
+ 
+ #### KV Cache effect
+ 
+diff --git a/packages/vision/vision-bridge/package.json b/packages/vision/vision-bridge/package.json
+index 34df074..910505f 100644
+--- a/packages/vision/vision-bridge/package.json
++++ b/packages/vision/vision-bridge/package.json
+@@ -39,6 +39,7 @@
+     "@deepseek-ai/dsh-agent": "workspace:^",
+     "@deepseek-ai/dsh-attachment": "workspace:^",
+     "@deepseek-ai/dsh-credentials": "workspace:^",
++    "@deepseek-ai/dsh-fs": "workspace:^",
+     "@deepseek-ai/dsh-invariants": "workspace:^",
+     "@deepseek-ai/dsh-launch-environment": "workspace:^",
+     "@deepseek-ai/dsh-llm": "workspace:^",
+@@ -54,6 +55,7 @@
+     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
+     "@deepseek-ai/dsh-attachment": "workspace:^",
+     "@deepseek-ai/dsh-credentials": "workspace:^",
++    "@deepseek-ai/dsh-fs": "workspace:^",
+     "@deepseek-ai/dsh-invariants": "workspace:^",
+     "@deepseek-ai/dsh-launch-environment": "workspace:^",
+     "@deepseek-ai/dsh-llm": "workspace:^",
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+index 63e238e..2f1ea27 100644
+--- a/packages/vision/vision-bridge/src/index.ts
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -7,10 +7,18 @@
+  * @module @deepseek-ai/dsh-vision-bridge
+  */
+ 
++import { basename, extname } from 'node:path'
+ import type { Context } from '@deepseek-ai/cordis'
+ import z from '@deepseek-ai/schemastery'
+-import type { ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
++import type {
++  ImageAttachmentRef,
++  ImageMediaType,
++  SaveImageAttachment,
++  StoredImageAttachment,
++} from '@deepseek-ai/dsh-attachment'
+ import { credentialRef } from '@deepseek-ai/dsh-credentials'
++import { FsError } from '@deepseek-ai/dsh-fs'
++import type { FsInfo, FsTarget } from '@deepseek-ai/dsh-fs'
+ import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
+ import { createUserMessage } from '@deepseek-ai/dsh-llm'
+ import type { UserMessage } from '@deepseek-ai/dsh-llm'
+@@ -95,6 +103,18 @@ export interface VisionInspectResult {
+   readonly limitations: string[]
+ }
+ 
++/** Model-invisible durable record of local files imported for this session. */
++export interface VisionImageImportEventData {
++  readonly attachments: ImageAttachmentRef[]
++}
++
++declare module '@deepseek-ai/dsh-session/types' {
++  interface SessionEventMap {
++    /** Local images admitted by `vision_inspect`; log-only and absent from model history. */
++    'vision/image-import': VisionImageImportEventData
++  }
++}
++
+ type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+ 
+ /** Escape untrusted attachment metadata embedded in the XML-shaped reminder. */
+@@ -152,19 +172,108 @@ export function addImageReminders(messages: readonly UserMessage[]): UserMessage
+   return expanded
+ }
+ 
+-/** Find an uploaded image reference in the complete current-session event log. */
++/** Find an uploaded or locally imported image reference in the complete current-session event log. */
+ function findSessionImage(events: readonly SessionEvent[], attachmentId: string): ImageAttachmentRef | undefined {
+   for (const event of events) {
+-    if (event.type !== 'user/message') continue
+-    for (const block of event.data.content) {
+-      if (block.type === 'image' && String(block.attachment.attachmentId) === attachmentId) {
+-        return block.attachment
++    if (event.type === 'user/message') {
++      for (const block of event.data.content) {
++        if (block.type === 'image' && String(block.attachment.attachmentId) === attachmentId) {
++          return block.attachment
++        }
+       }
++      continue
++    }
++    if (event.type === 'vision/image-import') {
++      const ref = event.data.attachments.find(item => String(item.attachmentId) === attachmentId)
++      if (ref !== undefined) return ref
+     }
+   }
+   return undefined
+ }
+ 
++const IMAGE_MEDIA_TYPES: Readonly<Record<string, ImageMediaType>> = {
++  '.png': 'image/png',
++  '.jpg': 'image/jpeg',
++  '.jpeg': 'image/jpeg',
++  '.webp': 'image/webp',
++  '.gif': 'image/gif',
++}
++
++interface ResolvedPathImage {
++  readonly target: FsTarget
++  readonly info: FsInfo
++  readonly mediaType: ImageMediaType
++}
++
++/** Resolve and admit local image paths through the mounted filesystem and attachment services. */
++async function importPathImages(
++  ctx: Context,
++  paths: readonly string[],
++  exec: ToolRunContext,
++): Promise<ImageAttachmentRef[]> {
++  if (paths.length === 0) return []
++  const fs = ctx.get('fs')
++  if (fs === undefined) throw new Error('vision_inspect cannot import local paths: no filesystem service is mounted')
++  const candidates: Array<{ requestedPath: string; mediaType: ImageMediaType }> = []
++  for (const rawPath of paths) {
++    const requestedPath = rawPath.trim()
++    if (requestedPath.length === 0) throw new Error('vision_inspect paths must contain non-empty strings')
++    const mediaType = IMAGE_MEDIA_TYPES[extname(requestedPath).toLowerCase()]
++    if (mediaType === undefined) {
++      throw new Error(`cannot inspect "${requestedPath}": vision_inspect only accepts PNG/JPEG/WebP/GIF paths`)
++    }
++    if (!ctx.attachments.imageLimits.mediaTypes.includes(mediaType)) {
++      throw new Error(`cannot inspect "${requestedPath}": ${mediaType} images are not accepted by this deployment`)
++    }
++    candidates.push({ requestedPath, mediaType })
++  }
++
++  // Resolve and stat the whole batch before reading bytes. Canonical target ids
++  // dedupe aliases while preserving first-seen order and filename metadata.
++  const resolved: ResolvedPathImage[] = []
++  const targetKeys = new Set<string>()
++  const cwd = exec.agent?.session.header.cwd
++  for (const candidate of candidates) {
++    const target = await fs.resolve(candidate.requestedPath, {
++      ...cwd === undefined ? {} : { cwd },
++      signal: exec.signal,
++    })
++    const info = await fs.stat(target, exec.signal)
++    if (info === undefined) {
++      ctx.emit('fs/observed', target, { kind: 'absent' }, exec)
++      throw new FsError(`cannot inspect "${target.displayPath}": not found`, 'FS_NOT_FOUND')
++    }
++    if (info.type !== 'file') {
++      throw new FsError(`cannot inspect "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
++    }
++    const targetKey = String(target.targetKey)
++    if (targetKeys.has(targetKey)) continue
++    targetKeys.add(targetKey)
++    resolved.push({ target, info, mediaType: candidate.mediaType })
++  }
++  if (resolved.length > ctx.attachments.imageLimits.maxImagesPerMessage) {
++    throw new Error(`vision_inspect accepts at most ${String(ctx.attachments.imageLimits.maxImagesPerMessage)} local image paths per call`)
++  }
++
++  const byteCap = Math.min(
++    ctx.attachments.imageLimits.maxImageBytes,
++    ctx.attachments.imageLimits.maxMessageImageBytes,
++  )
++  const inputs: SaveImageAttachment[] = []
++  for (const item of resolved) {
++    inputs.push({
++      data: await fs.readBytes(item.target, exec.signal, byteCap),
++      mediaType: item.mediaType,
++      name: basename(item.target.displayPath),
++    })
++  }
++  const refs = [...await ctx.attachments.saveImages(inputs)]
++  for (const item of resolved) {
++    ctx.emit('fs/observed', item.target, { kind: 'present', version: item.info.version }, exec)
++  }
++  return refs
++}
++
+ /** Normalize an endpoint base without leaking it into model-visible errors. */
+ function chatCompletionsURL(baseURL: string): string {
+   const trimmed = baseURL.replace(/\/+$/, '')
+@@ -358,26 +467,42 @@ async function resolveApiKey(ctx: Context, options: VisionBridgeOptions): Promis
+ async function inspect(
+   ctx: Context,
+   options: VisionBridgeOptions,
+-  attachmentIds: readonly string[],
++  attachmentIds: readonly string[] | undefined,
++  paths: readonly string[] | undefined,
+   prompt: string,
+   exec: ToolRunContext,
+   fetchImpl: FetchLike,
+ ): Promise<VisionInspectResult> {
+   const agent = exec.agent
+   if (agent === undefined) throw new Error('vision_inspect requires an active agent session')
+-  if (attachmentIds.length === 0) throw new Error('vision_inspect requires at least one attachmentId')
+-  if (attachmentIds.length > options.maxImagesPerCall) {
++  const uniqueAttachmentIds = [...new Set(attachmentIds ?? [])]
++  const requestedPaths = paths ?? []
++  if (uniqueAttachmentIds.length === 0 && requestedPaths.length === 0) {
++    throw new Error('vision_inspect requires at least one attachmentId or path')
++  }
++  if (uniqueAttachmentIds.length > options.maxImagesPerCall) {
+     throw new Error(`vision_inspect accepts at most ${String(options.maxImagesPerCall)} images per call`)
+   }
+-  const unique = new Set(attachmentIds)
+-  if (unique.size !== attachmentIds.length) throw new Error('vision_inspect attachmentIds must be unique')
+ 
+-  // Authorize the entire batch before reading any bytes or contacting the gateway.
+-  const refs = attachmentIds.map((attachmentId) => {
++  // Authorize every referenced attachment before reading any file bytes or
++  // contacting the gateway. Imported refs are recorded in a log-only event.
++  const existingRefs = uniqueAttachmentIds.map((attachmentId) => {
+     const ref = findSessionImage(agent.session.events, attachmentId)
+     if (ref === undefined) throw new Error(`attachment "${attachmentId}" is not available in the current session`)
+     return ref
+   })
++  const importedRefs = await importPathImages(ctx, requestedPaths, exec)
++  const refsById = new Map(existingRefs.map(ref => [String(ref.attachmentId), ref]))
++  for (const ref of importedRefs) refsById.set(String(ref.attachmentId), refsById.get(String(ref.attachmentId)) ?? ref)
++  const refs = [...refsById.values()]
++  if (refs.length > options.maxImagesPerCall) {
++    throw new Error(`vision_inspect accepts at most ${String(options.maxImagesPerCall)} images per call`)
++  }
++  const newlyImported = importedRefs.filter(ref => findSessionImage(agent.session.events, String(ref.attachmentId)) === undefined)
++  if (newlyImported.length > 0) {
++    agent.session.append('vision/image-import', { attachments: newlyImported })
++  }
++  const resolvedAttachmentIds = refs.map(ref => String(ref.attachmentId))
+   const stored: StoredImageAttachment[] = []
+   for (const ref of refs) stored.push(await ctx.attachments.readImage(ref, exec.signal))
+   const apiKey = await resolveApiKey(ctx, options)
+@@ -426,7 +551,7 @@ async function inspect(
+   const text = await readResponseText(response, (delta) => {
+     exec.reportProgress(delta)
+   })
+-  return parseVisionResult(text, attachmentIds)
++  return parseVisionResult(text, resolvedAttachmentIds)
+ }
+ 
+ /**
+@@ -443,18 +568,22 @@ export function createVisionInspectTool(
+ ): ToolDefinition {
+   return defineTool({
+     name: VISION_INSPECT_TOOL_NAME,
+-    description: 'Inspect one or more images previously uploaded in the current conversation by delegating a complete visual task to the configured vision sub-agent. Pass only attachment_id values from this conversation and write a self-contained prompt that includes the user question, the exact visual evidence needed, regions to inspect, comparisons, and desired answer detail. Results already returned by this tool remain in recent tool results; call it again only when a new question, another region, a comparison, or missing evidence requires another visual observation.',
++    description: 'Inspect conversation attachments or local image files with the configured vision model.',
+     parameters: {
+       attachmentIds: {
+         type: 'array',
+         items: { type: 'string' },
+-        required: true,
+-        description: 'Unique attachment_id values from durable reminders in the current conversation.',
++        description: 'Current-conversation attachment IDs to inspect.',
++      },
++      paths: {
++        type: 'array',
++        items: { type: 'string' },
++        description: 'Image file paths to import into this conversation and inspect.',
+       },
+       prompt: {
+         type: 'string',
+         required: true,
+-        description: 'Complete visual sub-agent task, including the user request and what must be inspected or compared.',
++        description: 'The complete visual question or inspection task.',
+       },
+     },
+     output: {
+@@ -484,7 +613,7 @@ export function createVisionInspectTool(
+     },
+     timeoutMs: options.timeoutMs,
+     isConcurrencySafe: () => true,
+-    execute: (args, exec) => inspect(ctx, options, args.attachmentIds, args.prompt, exec, fetchImpl),
++    execute: (args, exec) => inspect(ctx, options, args.attachmentIds, args.paths, args.prompt, exec, fetchImpl),
+   })
+ }
+ 
+diff --git a/packages/vision/vision-bridge/src/invariant.ts b/packages/vision/vision-bridge/src/invariant.ts
+index 9b3d8d8..32ab05b 100644
+--- a/packages/vision/vision-bridge/src/invariant.ts
++++ b/packages/vision/vision-bridge/src/invariant.ts
+@@ -11,9 +11,10 @@ export const name = 'vision-bridge-invariant'
+ /** Service required before the companion can reserve package ownership. */
+ export const inject = ['invariants']
+ 
+-/** Runtime behavior is covered at the admission, durable-event, and tool boundaries. */
++/** Runtime behavior is covered at the path admission, durable-event, and tool boundaries. */
+ const install: InvariantInstaller = () => {
+-  // No runtime invariant: the package owns no durable event or mutable service state.
++  // No relational runtime invariant: imported refs are attachment-service output
++  // and the log-only event does not participate in turn or model-surface state.
+ }
+ 
+ /** Register this package's invariant companion. */
+diff --git a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+index 7b341a0..de12679 100644
+--- a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
++++ b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+@@ -255,8 +255,9 @@ describe('vision_inspect', () => {
+       },
+     })
+     const reportProgress = vi.fn<(delta: string) => void>()
++    const signal = new AbortController().signal
+     const exec = {
+-      signal: new AbortController().signal,
++      signal,
+       agent: { session: { events: [eventWithImage()] } },
+       reportProgress,
+     } as never
+@@ -350,14 +351,147 @@ describe('vision_inspect', () => {
+       agent: undefined,
+     } as never)).rejects.toThrow(/active agent session/)
+     await expect(tool.execute({ attachmentIds: [], prompt: 'x' }, execution([]))).rejects.toThrow(/at least one/)
+-    await expect(tool.execute({ attachmentIds: [ID, ID], prompt: 'x' }, execution([eventWithImage()])))
+-      .rejects.toThrow(/must be unique/)
+-    await expect(tool.execute({ attachmentIds: [ID, ID, ID, ID], prompt: 'x' }, execution([eventWithImage()])))
++    await expect(tool.execute({ attachmentIds: [
++      ID,
++      `sha256:${'2'.repeat(64)}`,
++      `sha256:${'3'.repeat(64)}`,
++      `sha256:${'4'.repeat(64)}`,
++    ], prompt: 'x' }, execution([eventWithImage()])))
+       .rejects.toThrow(/at most 3/)
+     expect(readImage).not.toHaveBeenCalled()
+     expect(fetchImpl).not.toHaveBeenCalled()
+   })
+ 
++  it('imports local paths once, persists their refs, and reuses them by attachment id', async () => {
++    const importedId = `sha256:${'2'.repeat(64)}`
++    const importedRef: ImageAttachmentRef = {
++      ...REF,
++      attachmentId: AttachmentId(importedId),
++      name: 'local.png',
++    }
++    const target = { targetKey: 'file:local', displayPath: 'D:/workspace/local.png' }
++    const info = { type: 'file', version: 'v1' }
++    const resolve = vi.fn().mockResolvedValue(target)
++    const stat = vi.fn().mockResolvedValue(info)
++    const readBytes = vi.fn().mockResolvedValue(Uint8Array.of(2))
++    const saveImages = vi.fn().mockResolvedValue([importedRef])
++    const readImage = vi.fn(async (ref: ImageAttachmentRef) => ({ ref, data: Uint8Array.of(2) }))
++    const emit = vi.fn()
++    const fs = { resolve, stat, readBytes }
++    const ctx = {
++      attachments: {
++        imageLimits: {
++          maxImageBytes: 4,
++          maxImagesPerMessage: 20,
++          maxMessageImageBytes: 4,
++          maxImagePixels: 4,
++          maxImageDimension: 2000,
++          mediaTypes: ['image/png'],
++        },
++        saveImages,
++        readImage,
++      },
++      get: (key: string) => key === 'fs' ? fs : undefined,
++      emit,
++    } as unknown as Context
++    const events: SessionEvent[] = [eventWithImage()]
++    const session = {
++      header: { cwd: 'D:/workspace' },
++      get events() { return events },
++      append(type: string, data: unknown) {
++        const event = { type, seq: events.length, time: 1, data } as SessionEvent
++        events.push(event)
++        return event
++      },
++    }
++    const signal = new AbortController().signal
++    const exec = {
++      signal,
++      agent: { session },
++      reportProgress: vi.fn(),
++    } as never
++    const fetchImpl = vi.fn(async () => jsonResponse({
++      choices: [{ message: { content: '{"summary":"local","observations":[],"limitations":[]}' } }],
++    }))
++    const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, fetchImpl)
++
++    await expect(tool.execute({ paths: ['local.png'], prompt: 'inspect local' }, exec)).resolves.toEqual({
++      attachmentIds: [importedId],
++      summary: 'local',
++      observations: [],
++      limitations: [],
++    })
++    expect(resolve).toHaveBeenCalledWith('local.png', { cwd: 'D:/workspace', signal })
++    expect(saveImages).toHaveBeenCalledWith([{ data: Uint8Array.of(2), mediaType: 'image/png', name: 'local.png' }])
++    expect(events.filter(event => event.type === 'vision/image-import')).toEqual([expect.objectContaining({
++      type: 'vision/image-import',
++      data: { attachments: [importedRef] },
++    })])
++    expect(emit).toHaveBeenCalledWith('fs/observed', target, { kind: 'present', version: 'v1' }, exec)
++
++    await expect(tool.execute({ attachmentIds: [importedId, importedId], prompt: 'inspect again' }, exec))
++      .resolves.toMatchObject({ attachmentIds: [importedId], summary: 'local' })
++    expect(saveImages).toHaveBeenCalledOnce()
++    expect(events.filter(event => event.type === 'vision/image-import')).toHaveLength(1)
++    expect(fetchImpl).toHaveBeenCalledTimes(2)
++
++    await expect(tool.execute({ attachmentIds: [ID], paths: ['local.png'], prompt: 'compare both' }, exec))
++      .resolves.toMatchObject({ attachmentIds: [ID, importedId], summary: 'local' })
++    expect(saveImages).toHaveBeenCalledTimes(2)
++    expect(events.filter(event => event.type === 'vision/image-import')).toHaveLength(1)
++    expect(fetchImpl).toHaveBeenCalledTimes(3)
++  })
++
++  it('rejects invalid local paths before attachment writes or gateway calls', async () => {
++    const saveImages = vi.fn()
++    const readImage = vi.fn()
++    const fetchImpl = vi.fn()
++    const fs = {
++      resolve: vi.fn().mockResolvedValue({ targetKey: 'missing', displayPath: 'D:/workspace/missing.png' }),
++      stat: vi.fn().mockResolvedValue(undefined),
++      readBytes: vi.fn(),
++    }
++    const ctx = {
++      attachments: {
++        imageLimits: {
++          maxImageBytes: 4,
++          maxImagesPerMessage: 20,
++          maxMessageImageBytes: 4,
++          mediaTypes: ['image/png'],
++        },
++        saveImages,
++        readImage,
++      },
++      get: (key: string) => key === 'fs' ? fs : undefined,
++      emit: vi.fn(),
++    } as unknown as Context
++    const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, fetchImpl)
++    const exec = {
++      signal: new AbortController().signal,
++      agent: { session: { header: { cwd: 'D:/workspace' }, events: [], append: vi.fn() } },
++    } as never
++
++    await expect(tool.execute({ paths: ['notes.txt'], prompt: 'x' }, exec)).rejects.toThrow(/only accepts/)
++    await expect(tool.execute({ paths: ['missing.png'], prompt: 'x' }, exec)).rejects.toThrow(/not found/)
++    expect(fs.readBytes).not.toHaveBeenCalled()
++    expect(saveImages).not.toHaveBeenCalled()
++    expect(readImage).not.toHaveBeenCalled()
++    expect(fetchImpl).not.toHaveBeenCalled()
++  })
++
++  it('uses concise native-style tool descriptions', () => {
++    const tool = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn())
++    expect(tool.description).toBe('Inspect conversation attachments or local image files with the configured vision model.')
++    expect(tool.parameters).toMatchObject({
++      properties: {
++        attachmentIds: { description: 'Current-conversation attachment IDs to inspect.' },
++        paths: { description: 'Image file paths to import into this conversation and inspect.' },
++        prompt: { description: 'The complete visual question or inspection task.' },
++      },
++      required: ['prompt'],
++    })
++  })
++
+   it('uses an exact chat-completions endpoint and credential service key', async () => {
+     const resolve = vi.fn().mockResolvedValue({ value: 'credential-key', source: 'memory' })
+     const ctx = new Context()
+diff --git a/packages/vision/vision-bridge/tsconfig.host.json b/packages/vision/vision-bridge/tsconfig.host.json
+index b725e90..f994189 100644
+--- a/packages/vision/vision-bridge/tsconfig.host.json
++++ b/packages/vision/vision-bridge/tsconfig.host.json
+@@ -12,6 +12,7 @@
+     { "path": "../../../vendor/schemastery" },
+     { "path": "../../attachment/attachment" },
+     { "path": "../../credentials/credentials" },
++    { "path": "../../fs/fs" },
+     { "path": "../../util/launch-environment" },
+     { "path": "../../llm/llm" },
+     { "path": "../../core/session" },
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 54d2fa4..ce5f361 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -8403,6 +8403,9 @@ importers:
+       '@deepseek-ai/dsh-credentials':
+         specifier: workspace:^
+         version: link:../../credentials/credentials
++      '@deepseek-ai/dsh-fs':
++        specifier: workspace:^
++        version: link:../../fs/fs
+       '@deepseek-ai/dsh-invariants':
+         specifier: workspace:^
+         version: link:../../runtime-diagnostics/invariants
+@@ -12302,6 +12305,10 @@ packages:
+     resolution: {integrity: sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==}
+     engines: {node: '>=18'}
+ 
++  content-type@2.1.0:
++    resolution: {integrity: sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==}
++    engines: {node: '>=18'}
++
+   convert-source-map@2.0.0:
+     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+ 
+@@ -13635,9 +13642,9 @@ packages:
+   natural-compare@1.4.0:
+     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
+ 
+-  negotiator@1.0.0:
+-    resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
+-    engines: {node: '>= 0.6'}
++  negotiator@1.1.0:
++    resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
++    engines: {node: '>=18'}
+ 
+   node-addon-api@7.1.1:
+     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
+@@ -17266,7 +17273,7 @@ snapshots:
+   accepts@2.0.0:
+     dependencies:
+       mime-types: 3.0.2
+-      negotiator: 1.0.0
++      negotiator: 1.1.0
+ 
+   acorn-jsx@5.3.2(acorn@8.17.0):
+     dependencies:
+@@ -17469,6 +17476,8 @@ snapshots:
+ 
+   content-type@2.0.0: {}
+ 
++  content-type@2.1.0: {}
++
+   convert-source-map@2.0.0: {}
+ 
+   cookie-signature@1.2.2: {}
+@@ -19111,7 +19120,9 @@ snapshots:
+ 
+   natural-compare@1.4.0: {}
+ 
+-  negotiator@1.0.0: {}
++  negotiator@1.1.0:
++    dependencies:
++      content-type: 2.1.0
+ 
+   node-addon-api@7.1.1: {}
+ 
+-- 
+2.51.2.windows.1
+
