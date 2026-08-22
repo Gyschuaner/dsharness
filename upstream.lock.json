@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
   "baseTree": "53915efe4e2126cc7779b73dfc8a3bcec5318c44",
-  "resultTree": "20b75d22dce990c0db43de5ea9ea03b7132e2e6e",
+  "resultTree": "3c61807f54affd0667e4b6fcf7d170ef20d087bf",
   "dshVersion": "0.1.1-rc.2",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -92,6 +92,10 @@
     {
       "path": "upstream-patches/0021-fix-BUG-40D0E1BE-stream-vision-observations.patch",
       "sha256": "40ED98C5D7E7E1F2F07741C826DA87DC2EEB223D51B62DDB6B1CF838FB800556"
+    },
+    {
+      "path": "upstream-patches/0022-feat-DSH-022-restore-native-image-policy.patch",
+      "sha256": "197E70B47998311CBAADB4B6060D66B6FE31EFE5C56A75B6FEDED9048F8F6125"
     }
   ]
 }

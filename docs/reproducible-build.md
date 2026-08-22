@@ -20,8 +20,9 @@
   DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
   DSH-019 的 0.1.1 兼容调整、BUG-C393119A 静态门禁修复，以及 DSH-005 可选视觉桥
   及其发布门禁、`vision_inspect` 专属视觉工具呈现、流式视觉输出与持久交接、单层
-  扫光、流式尾部跟随、observation 持续投影与重复计时抑制补丁，并包含各自的 SHA-256；
-- 应用补丁后的 Git tree `20b75d22dce990c0db43de5ea9ea03b7132e2e6e`。
+  扫光、流式尾部跟随、observation 持续投影与重复计时抑制补丁，以及 DSH-022 原生
+  图片策略恢复补丁，并包含各自的 SHA-256；
+- 应用补丁后的 Git tree `3c61807f54affd0667e4b6fcf7d170ef20d087bf`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
@@ -239,3 +240,9 @@ Tool 时长。5 个相关测试文件 59 条用例、lint、Client/Web 构建通
 47 秒时显示 observation，完成结果含 9 条 observations，1:05 完成后恢复 summary，
 刷新后第 10 条 Look 记录仍在。外层 `1:10 Done` 保留在 DOM，但计算样式为 `display: none`。
 最终 tree 更新为 `20b75d22dce990c0db43de5ea9ea03b7132e2e6e`。
+
+同日新增第二十二个补丁，完成 DSH-022。0.1.1 原生附件服务已经在单条消息边界提供
+20 张、单图 20 MiB、合计 200 MiB 的准入与持久化，因此生产 profile 不再加载
+`image-context-guard`，也不再对整次模型请求做 9 图裁剪。`vision_inspect` 的默认值与
+base bundle 配置同步提高到 20，并新增默认值回归。最终 tree 更新为
+`3c61807f54affd0667e4b6fcf7d170ef20d087bf`。

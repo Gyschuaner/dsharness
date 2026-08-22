@@ -1,6 +1,6 @@
 # 本地 DSH 开发链路说明
 
-> 适用：在本机开发 DSH Web GUI 的**插件**（如 skill-manager、image-context-guard）。
+> 适用：在本机开发 DSH Web GUI 的**插件**（如 skill-manager）。
 > 目标：让"仓库内开发"与"运行时加载"是同一份文件，保留 Git 历史，不破坏正在运行的 Web GUI。
 
 ## 1. 运行时的加载链
@@ -86,11 +86,13 @@ DSH-003 已把上游源码接入方式改为可复现构建：
 完整方法见 [`reproducible-build.md`](reproducible-build.md)。本仓库插件继续通过
 junction 接入运行时；是否安装和启用某个插件属于每台电脑的新运行配置。
 
-## 6. 图片上下文短期保护
+## 6. 原生图片策略
 
-`plugins/image-context-guard` 对应 DP `DSH-004` / `BUG-3E5CFD04`。它通过 `llm/stream` host 插件在模型适配器调用前生成安全副本，按“最新消息优先、消息内保持原顺序”保留最多 9 张图片。持久化会话、附件引用和前端历史不被改写。
-
-该插件是本地短期保护，不替代 DP `DSH-005` 中的长期方案（附件存储、视觉摘要、工具截图消费后退出上下文、按附件 ID 重注入）。接入步骤和 profile 配置见 `plugins/image-context-guard/README.md`。
+DSH-022 已取消 DSH-004 的 9 图临时裁剪，`plugins/image-context-guard` 不再安装或加载。
+图片由 0.1.1 原生附件服务准入和持久化：单条消息默认最多 20 张、单图 20 MiB、合计
+200 MiB。纯文本主模型启用视觉桥时，`vision_inspect` 同样默认最多读取当前会话内
+20 张唯一图片；未知或跨会话引用仍在读取字节前整批拒绝。完整迁移和回退边界见
+[`DSH-022-native-image-policy.md`](DSH-022-native-image-policy.md)。
 
 ## 7. 相关路径速查
 

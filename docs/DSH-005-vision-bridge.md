@@ -33,12 +33,15 @@ DSH 不直连模型机，也不在会话、工具结果、日志或 Git 中保�
     apiKeyEnv: DPGATEWAY_API_KEY
     model: Qwen3.6-35B-A3B
     timeoutMs: 900000
-    maxImagesPerCall: 9
+    maxImagesPerCall: 20
     maxOutputTokens: 4096
 ```
 
 该条目只用于纯文本主模型进程。使用原生多模态模型时不要加载视觉桥，继续走 DSH
 原生图片通道。
+
+DSH-022 起不再加载 `image-context-guard`。视觉桥的默认 20 图边界与 0.1.1 原生
+`attachment-local` 单条消息数量一致；它只限制一次工具调用，不删除会话附件。
 
 ## 启用前健康检查
 

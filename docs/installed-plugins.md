@@ -12,7 +12,7 @@
   `upstream.lock.json` 锁定；`~/.dsh/profiles/web` 继续作为独立运行配置维护。
 - **macOS（gys MacBook，2026-08-17）**：`@deepseek-ai/dsh` 0.1.0-rc.6
   （npm 预构建包，npx 缓存启动 `npm exec @deepseek-ai/dsh@latest web`），
-  Node v22.15.0，pnpm 11.19.0。同为裸环境起步（零插件），上表 3 个插件
+  Node v22.15.0，pnpm 11.19.0。同为裸环境起步（零插件），相关插件
   均已于 2026-08-17 安装（见变更日志与宿主差异）。
 
 ## 插件清单
@@ -20,7 +20,6 @@
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
 | dsh-skill-manager | 0.1.0（build 10） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003 | 本地持续开发；`~/.dsh/plugins/skill-manager` 为指向本仓库的 junction |
-| dsh-image-context-guard | 0.1.0 | 本仓库（提交 aa85d62，已合并 main） | `link:` 指向 `~/.dsh/plugin-cache/image-context-guard-aa85d62` | cordis.patch.yml insert（手动，DSH-004 注释段） | DSH-004 / BUG-3E5CFD04 | 模型请求图片上限 9 张；cache 目录名 = 源提交短哈希 |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
@@ -31,11 +30,11 @@
 
 ## 宿主差异（2026-08-17）
 
-- **Windows**：上表前 3 个插件均已安装；skill-manager 为 junction 指向本仓库
+- **Windows**：skill-manager 与 better-sidebar 已安装；skill-manager 为 junction 指向本仓库
   checkout（拉到 main 后即 DSH-006 build 11 扩展页）。better-sidebar-smooth
   未安装（该胶囊动画撕裂在 Windows 宿主同样存在，需要时按 macOS 同法接入）。
-- **macOS**：上表 4 个插件全部安装。skill-manager / image-context-guard /
-  better-sidebar-smooth 为 link 通道，`~/.dsh/plugins/<name>` 符号链接 →
+- **macOS**：历史上安装过 image-context-guard；同步 DSH-022 后应移除该依赖和挂载。
+  skill-manager / better-sidebar-smooth 为 link 通道，`~/.dsh/plugins/<name>` 符号链接 →
   本仓库 `plugins/<name>`（macOS 下的 junction 等价物，
   `dev/setup-plugin-junction.ps1` 仅 Windows 可用，手工 `ln -sfn` 建链）；
   better-sidebar 0.12.3 走 npm 官方通道（与 Windows 同版本）。
@@ -47,7 +46,7 @@
   - 回退：`dsh plugin --profile web remove <name>`，若 `dsh.profile.bundles` 有残留
     手工删除该条目，重启生效。
   - 版本事实以 profile `package.json` 的依赖声明 + npm 包内容为准；本表登记上游提交便于追溯。
-- **本仓库 link 插件**（skill-manager / image-context-guard）：按 DSH-003 流程
+- **本仓库 link 插件**（skill-manager）：按 DSH-003 流程
   （junction + 逐文件哈希校验），见 `dev/setup-plugin-junction.ps1` 与 README「快速开始」。
 - **node-pty 前置**：pnpm 默认拦截构建脚本，需白名单放行（DSH-007 添加，
   better-sidebar 终端所需）：pnpm 10 用 `onlyBuiltDependencies: [node-pty]`，
@@ -60,12 +59,16 @@
   0.12.2）。显式 `add <name>@<版本>` 可绕过，pnpm 自动把该版本写入
   `minimumReleaseAgeExclude`。
 - **双挂载检查**：`~/.dsh/profiles/web/cordis.patch.yml` 中不得出现与 npm 通道插件
-  重复的手工 insert 行（better-sidebar 无手工行；skill-manager / image-context-guard
-  为 link 通道，手工行是唯一挂载点）。
+  重复的手工 insert 行（better-sidebar 无手工行；skill-manager 为 link 通道，
+  手工行是唯一挂载点）。
 - **重启边界**：host 半变化（新插件、bundle 变更、host 代码更新）需重启 dsh web
   （`.\restart-dsh-web.ps1`，会话持久化在磁盘、可恢复）；client 半变化硬刷新浏览器即可。
 
 ## 变更日志
+
+- **2026-08-22（DSH-022）**：Windows 生产 profile 移除 `dsh-image-context-guard`
+  依赖和 `cordis.patch.yml` 挂载，恢复 0.1.1 原生图片准入；视觉桥单次调用上限同步为
+  20 张。旧插件源码仅保留历史回溯，不再属于已安装插件。
 
 - **2026-08-17（macOS 宿主装 better-sidebar-smooth，BUG-1E130940）**：
   本地 CSS 补丁插件修复 better-sidebar 0.12.3 侧面板开合时 Session log

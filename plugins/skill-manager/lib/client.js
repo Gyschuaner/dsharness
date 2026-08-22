@@ -2265,7 +2265,7 @@
 									: h(ExtPlaceholder, {
 										key: 'plugin',
 										title: '插件管理（建设中）',
-										body: '展示已安装到 web profile 的 DSH 插件（如 skill-manager、image-context-guard）：名称、版本、来源与启用状态。',
+										body: '展示已安装到 web profile 的 DSH 插件（如 skill-manager）：名称、版本、来源与启用状态。',
 										planned: '已安装插件列表、启用/停用（从组合树摘除/挂回）、安装来源与版本信息。'
 									})
 						)

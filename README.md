@@ -21,7 +21,7 @@ dsharness/
 │       │   ├── index.js      #  host 半：注册 /api/skill-manager JSON 路由
 │       │   └── client.js     #  client 半：settings.section 页面
 │       └── README.md         #  插件功能 / 安装 / 技术说明
-│   └── image-context-guard/  # 模型请求图片上限保护（最多 9 张）
+│   └── image-context-guard/  # 已退役的 DSH-004 临时保护源码，仅供历史回溯
 │       ├── package.json
 │       ├── lib/index.js      # host 半：llm/stream 请求边界裁剪
 │       ├── test/             # Node.js 自动化测试
@@ -54,7 +54,9 @@ Git 还原相同构建。`dsharness` 现在同时管理两类内容：仓库内�
 - 官方源码基线、Node/pnpm 版本、本地补丁和最终源码 tree 有明确校验值；
 - 新电脑可从空目录完成 frozen install、完整构建和 `dsh` 命令注册。
 
-当前还包含 `image-context-guard` 短期保护插件：它只裁剪发往模型的临时请求副本，保证一次请求不超过 9 张图片，不删除会话历史或附件。长期多模态上下文重构登记在 DP `DSH-005`。
+`image-context-guard` 已由 DSH-022 退役，不再安装或加载。0.1.1 原生附件服务负责图片
+准入、持久存储和模型投影：默认单条消息最多 20 张、单图最多 20 MiB、单条消息合计
+最多 200 MiB；仓库保留旧插件源码只用于历史回溯，不应重新接入 profile。
 
 DSH-005 的视觉桥作为上游源码补丁交付，并保持默认关闭。纯文本主模型需要视觉辅助时，
 按 [`docs/DSH-005-vision-bridge.md`](docs/DSH-005-vision-bridge.md) 使用 DP Gateway
@@ -103,7 +105,9 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 `tool/call` 与 `tool/result` 在运行态交接和页面刷新后保持同一条持久记录。第 20 个
 补丁让 Looking 行只复用 Tool 外层的一层扫光，并像 Think 一样在流式期间持续跟随最新
 文字尾部；第 21 个补丁让 summary 结束后继续投影最新 observation，并在 Look 已拥有
-内联计时时隐藏外层重复时长。最终源码 tree 为 `20b75d22dce990c0db43de5ea9ea03b7132e2e6e`。
+内联计时时隐藏外层重复时长；第 22 个补丁退役 9 图裁剪，并把视觉桥默认调用上限与
+0.1.1 原生单消息上限统一为 20。最终源码 tree 为
+`3c61807f54affd0667e4b6fcf7d170ef20d087bf`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。

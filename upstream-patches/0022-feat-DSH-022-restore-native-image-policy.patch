@@ -1,0 +1,78 @@
+From 25a0c0547283b103a2fe93f64ed3de175180742a Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 21:40:35 +0800
+Subject: [PATCH] feat(DSH-022): restore native image policy
+
+
+diff --git a/packages/bundle/base/cordis.patch.yml b/packages/bundle/base/cordis.patch.yml
+index 73b4006..8afe606 100644
+--- a/packages/bundle/base/cordis.patch.yml
++++ b/packages/bundle/base/cordis.patch.yml
+@@ -117,7 +117,7 @@
+         apiKeyEnv: QWEN_VISION_API_KEY
+         model: Qwen3.6-35B-A3B
+         timeoutMs: 120000
+-        maxImagesPerCall: 9
++        maxImagesPerCall: 20
+         maxOutputTokens: 4096
+ 
+     # Full-text session search is opt-in. `openAt: never` keeps
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+index 9f5ab00..40381d9 100644
+--- a/packages/vision/vision-bridge/README.md
++++ b/packages/vision/vision-bridge/README.md
+@@ -18,7 +18,7 @@ Enable the existing base-bundle row in a later composition patch and restate its
+     apiKeyEnv: QWEN_VISION_API_KEY
+     model: Qwen3.6-35B-A3B
+     timeoutMs: 120000
+-    maxImagesPerCall: 9
++    maxImagesPerCall: 20
+     maxOutputTokens: 4096
+ ```
+ 
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+index 329bed2..df60a48 100644
+--- a/packages/vision/vision-bridge/README.zh.md
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -18,7 +18,7 @@
+     apiKeyEnv: QWEN_VISION_API_KEY
+     model: Qwen3.6-35B-A3B
+     timeoutMs: 120000
+-    maxImagesPerCall: 9
++    maxImagesPerCall: 20
+     maxOutputTokens: 4096
+ ```
+ 
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+index ce35ba5..63e238e 100644
+--- a/packages/vision/vision-bridge/src/index.ts
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -36,8 +36,8 @@ export const DEFAULT_VISION_BASE_URL_ENV = 'DSH_VISION_BASE_URL'
+ export const DEFAULT_VISION_MODEL = 'Qwen3.6-35B-A3B'
+ /** Default cooperative call timeout. */
+ export const DEFAULT_VISION_TIMEOUT_MS = 120_000
+-/** Default image-count bound for one visual inspection. */
+-export const DEFAULT_VISION_MAX_IMAGES = 9
++/** Default image-count bound for one visual inspection, aligned with 0.1.1 attachment admission. */
++export const DEFAULT_VISION_MAX_IMAGES = 20
+ /** Default generated-token bound for one visual inspection. */
+ export const DEFAULT_VISION_MAX_OUTPUT_TOKENS = 4096
+ 
+diff --git a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+index 1561905..7b341a0 100644
+--- a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
++++ b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+@@ -465,6 +465,10 @@ describe('plugin configuration and lifecycle', () => {
+     return ctx
+   }
+ 
++  it('uses the 0.1.1 native per-message image count by default', () => {
++    expect(VisionBridge.Config({}).maxImagesPerCall).toBe(20)
++  })
++
+   it('loads from an operator-owned environment route and unloads every contribution', async () => {
+     const ctx = await baseContext(createLaunchEnvironmentSnapshot([
+       { source: 'project-env', path: 'D:/workspace/.env', values: { DSH_VISION_BASE_URL: 'http://project.invalid' } },
+-- 
+2.51.2.windows.1
+
