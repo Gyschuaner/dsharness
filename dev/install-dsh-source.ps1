@@ -54,6 +54,28 @@ function Get-GitTree([string]$RepositoryPath) {
     return $tree
 }
 
+function Test-LinkTarget([string]$LinkPath, [string]$ExpectedDirectory) {
+    if (-not (Test-Path -LiteralPath $LinkPath)) {
+        return $false
+    }
+    $Link = Get-Item -LiteralPath $LinkPath -Force
+    foreach ($Target in @($Link.Target)) {
+        if ([string]::IsNullOrWhiteSpace($Target)) {
+            continue
+        }
+        $ResolvedTarget = if ([IO.Path]::IsPathRooted($Target)) {
+            [IO.Path]::GetFullPath($Target)
+        } else {
+            [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $LinkPath) $Target))
+        }
+        if ($ResolvedTarget.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) -eq
+            $ExpectedDirectory.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)) {
+            return $true
+        }
+    }
+    return $false
+}
+
 Require-Command 'git'
 Require-Command 'node'
 Require-Command 'corepack'
@@ -146,31 +168,26 @@ if (-not $SkipRegister) {
     }
 
     $GlobalPackagePath = Join-Path $NpmGlobalPrefix 'node_modules\@deepseek-ai\dsh'
-    $AlreadyLinked = $false
-    if (Test-Path -LiteralPath $GlobalPackagePath) {
-        $GlobalPackage = Get-Item -LiteralPath $GlobalPackagePath -Force
-        foreach ($Target in @($GlobalPackage.Target)) {
-            if ([string]::IsNullOrWhiteSpace($Target)) {
-                continue
-            }
-            $ResolvedTarget = if ([IO.Path]::IsPathRooted($Target)) {
-                [IO.Path]::GetFullPath($Target)
-            } else {
-                [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $GlobalPackagePath) $Target))
-            }
-            if ($ResolvedTarget.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) -eq
-                $CliDirectory.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)) {
-                $AlreadyLinked = $true
-                break
-            }
-        }
-    }
+    $AlreadyLinked = Test-LinkTarget $GlobalPackagePath $CliDirectory
 
     if ($AlreadyLinked) {
         Write-Step "全局 dsh 已指向 $CliDirectory，跳过重复注册"
     } else {
         Write-Step '注册全局 dsh 命令'
-        Invoke-Native 'npm' @('link') $CliDirectory
+        Push-Location $CliDirectory
+        try {
+            & npm link
+            $LinkExitCode = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        $LinkedAfterCommand = Test-LinkTarget $GlobalPackagePath $CliDirectory
+        if (-not $LinkedAfterCommand) {
+            throw "npm link 执行后全局 dsh 未指向 $CliDirectory，退出码 $LinkExitCode。"
+        }
+        if ($LinkExitCode -ne 0) {
+            Write-Step "npm link 返回 $LinkExitCode，但全局链接后置验证已通过；继续执行版本校验"
+        }
     }
     $DshVersion = (& dsh --version).Trim()
     if ($LASTEXITCODE -ne 0 -or $DshVersion -ne $Lock.dshVersion) {
