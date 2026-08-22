@@ -31,3 +31,16 @@ DSH 0.1.1 已提供图片批次准入、内容寻址存储、会话事件引用�
 
 如某个下游提供方重新出现更低的图片硬限制，应针对该路由修复或配置，不恢复全局 9 图
 裁剪；紧急回退只恢复旧 profile 依赖和挂载，不触碰现有会话或附件目录。
+
+## 生产发布结果（2026-08-22）
+
+- 22 个上游补丁从官方 `0.1.1-rc.2` 基线完整重放，最终源码树为
+  `3c61807f54affd0667e4b6fcf7d170ef20d087bf`，Host、Client、Web 全量构建成功；
+- `attachment-local` 原生默认值确认是每条消息 20 张、单图 20 MiB、合计 200 MiB；
+- `vision_inspect` 默认批次由 9 改为 20，41 项视觉桥与本地附件回归测试通过；
+- Web profile 已移除 `dsh-image-context-guard` 依赖和挂载，原 profile 备份位于
+  `C:\Users\chuansgu\.dsh\profiles\web\backup-DSH-022-20260822-220148`；
+- 3080 已使用新构建启动，dump-config 中不存在旧 guard，视觉桥配置为
+  `maxImagesPerCall: 20`；
+- 浏览器生产冒烟通过，既有会话、图片、`Look` 工具记录和结果仍可见，未迁移或删除附件；
+- 回退时只恢复 profile 备份并重新启动 3080，不回滚或清理会话数据。
