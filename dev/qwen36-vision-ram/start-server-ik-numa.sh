@@ -51,5 +51,4 @@ exec "$BIN" \
   --run-time-repack \
   --no-cont-batching \
   --metrics \
-  --slots \
   --jinja
