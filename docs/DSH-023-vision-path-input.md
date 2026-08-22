@@ -43,3 +43,19 @@ prompt: The complete visual question or inspection task.
   [`evidence/DSH-023-3082-look-persisted.png`](evidence/DSH-023-3082-look-persisted.png)。
 
 正式技术设计：<https://ycn7t34xe864.feishu.cn/docx/YxyvdRUpVo2Fazx1RBfcV47dn5b>。
+
+## 生产发布记录（2026-08-22）
+
+- dsharness `main` 合并提交：`7e753a2afb491fa863d332ceff3bcda477bdf0c4`，已推送远端。
+- 从官方 `0.1.1-rc.2` 基线回放 23 个补丁并重新执行 Host/Client/Web 完整构建；
+  最终源码 tree 为 `d760562c3d46576a8683b8fc5dec19ee828108a1`。
+- 全局 `dsh` 已从 DSH-022 源码目录切换到
+  `D:\Pythonproject\deepseek-harness-DSH-023-repro-20260822\apps\cli`；生产页面展示
+  本地构建提交 `32e6ae2`。
+- 3080 使用 `vision-bridge.dp-gateway.patch.yml` 重新启动；HTTP 200、skill-manager
+  apiVersion 6、锁定源码门禁和浏览器回归均通过，浏览器错误日志为空。
+- 历史会话、附件和 Look 工具记录未迁移或删除。生产证据：
+  [`evidence/DSH-023-3080-production.png`](evidence/DSH-023-3080-production.png)。
+- 回滚：把全局 `dsh` 重新链接到
+  `D:\Pythonproject\deepseek-harness-DSH-022-repro2-20260822\apps\cli`，再使用同一
+  `-EnableVisionBridge` 覆盖重启 3080；不触碰会话和附件数据。
