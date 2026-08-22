@@ -1,0 +1,46 @@
+{
+  "requirement": "DSH-020",
+  "bug": "BUG-46C2A7B5",
+  "url": "http://127.0.0.1:3080/",
+  "capturedAt": "2026-08-22T14:30:45+08:00",
+  "handoffSampling": {
+    "intervalMs": 100,
+    "baselineVisionRowCount": 3,
+    "firstNewRowAtMs": 1200,
+    "samples": 246,
+    "minimumRowCountAfterFirstAppearance": 4,
+    "rowCountReturnedToBaseline": false,
+    "completedState": "ok",
+    "completedText": "Look 49s · 流程图最顶部节点的文字识别"
+  },
+  "reloadPersistence": {
+    "rowCountBeforeReload": 5,
+    "rowCountAfterReload": 5,
+    "stateAfterReload": "ok",
+    "textIdenticalAfterReload": true,
+    "completedText": "Look 1:27 · 该流程图描述了处理包含或不包含新图片的请求时的分支逻辑，涉及原生多模态支持、vision bridge 注册、历史图细节处理、调用 Qwen 等步骤，最终走向取决于各判断结果。"
+  },
+  "contextContract": {
+    "progressEvent": "tool/progress",
+    "progressIsModelFacing": false,
+    "finalModelFacingEvents": [
+      "tool/call",
+      "tool/result"
+    ],
+    "verifiedBy": [
+      "packages/core/tools/tests/tools.spec.ts",
+      "packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts"
+    ]
+  },
+  "reproducibleBuild": {
+    "officialBase": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+    "patchCount": 19,
+    "sourceTree": "9689ee52fd6994f51674c73ba2a7a6580f481ef0",
+    "frozenInstall": "passed",
+    "hostBuild": "passed",
+    "clientBuild": "passed",
+    "webBuild": "passed",
+    "registered": false,
+    "webStarted": false
+  }
+}

@@ -78,9 +78,29 @@ if ((Test-Path -LiteralPath $QwenCompositionPath -PathType Leaf) -and (Test-Path
 
 $VisionBridgeSourcePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/index.ts'
 $VisionBridgeBundlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/lib/index.js'
+$VisionBridgeRowPath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.tsx'
+$ToolEventTypesPath = Join-Path $SourceDirectory 'packages/core/tools/src/types.ts'
+$KnownEventTypesPath = Join-Path $SourceDirectory 'packages/core/session/src/known-event-types.ts'
 $BaseCordisPatchPath = Join-Path $SourceDirectory 'packages/bundle/base/cordis.patch.yml'
 Check (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) 'DSH-005 vision-bridge 源码存在'
 Check (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) 'DSH-005 vision-bridge 构建产物存在'
+if (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) {
+    $VisionBridgeSource = Get-Content -LiteralPath $VisionBridgeSourcePath -Raw -Encoding UTF8
+    Check ($VisionBridgeSource -match 'stream:\s*true' -and $VisionBridgeSource -match 'exec\.reportProgress\(delta\)') 'DSH-020 视觉层使用 SSE 并上报流式进度'
+}
+if (Test-Path -LiteralPath $VisionBridgeRowPath -PathType Leaf) {
+    $VisionBridgeRow = Get-Content -LiteralPath $VisionBridgeRowPath -Raw -Encoding UTF8
+    Check ($VisionBridgeRow -match 'title="Look"' -and $VisionBridgeRow -match 'progressText' -and $VisionBridgeRow -match '>ing<') 'DSH-020 Look ing 行消费视觉流式进度'
+} else {
+    Check $false 'DSH-020 vision-inspect 客户端呈现存在'
+}
+if ((Test-Path -LiteralPath $ToolEventTypesPath -PathType Leaf) -and (Test-Path -LiteralPath $KnownEventTypesPath -PathType Leaf)) {
+    $ToolEventTypes = Get-Content -LiteralPath $ToolEventTypesPath -Raw -Encoding UTF8
+    $KnownEventTypes = Get-Content -LiteralPath $KnownEventTypesPath -Raw -Encoding UTF8
+    Check ($ToolEventTypes -match "'tool/progress':\s*ToolProgressEventData" -and $ToolEventTypes -match 'deriveMessages\(\).*ignores it' -and $KnownEventTypes -match "'tool/progress'") 'DSH-020 tool/progress 可回放且不进入模型消息'
+} else {
+    Check $false 'DSH-020 tool/progress 事件定义存在'
+}
 if (Test-Path -LiteralPath $BaseCordisPatchPath -PathType Leaf) {
     $BaseCordisPatch = Get-Content -LiteralPath $BaseCordisPatchPath -Raw -Encoding UTF8
     Check ($BaseCordisPatch -match '(?s)id:\s*vision-bridge.*?disabled:\s*true.*?model:\s*Qwen3\.6-35B-A3B') 'vision-bridge 在 base bundle 中默认关闭'
