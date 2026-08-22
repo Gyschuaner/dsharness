@@ -81,7 +81,7 @@ if ($EnableVisionBridge) {
 	if (-not (Test-Path -LiteralPath $VisionPatchPath -PathType Leaf)) {
 		throw "视觉桥覆盖不存在：$VisionPatchPath"
 	}
-	$DshCommand = "dsh --patch `"$VisionPatchPath`" web --no-open --host $HostAddr --port $Port"
+	$DshCommand = "dsh --profile web --patch `"$VisionPatchPath`" --no-open --host $HostAddr --port $Port"
 	Write-Step "启用 vision-bridge（覆盖：$VisionPatchPath）"
 }
 Write-Step "在隐藏窗口启动 dsh web（日志：$StdoutLog；$StderrLog）"
