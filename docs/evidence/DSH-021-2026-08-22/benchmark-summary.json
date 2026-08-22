@@ -1,0 +1,53 @@
+{
+  "requirement": "DSH-021",
+  "date": "2026-08-22",
+  "hardware": {
+    "cpu": "2 x Intel Xeon Platinum 8474C",
+    "physical_cores": 96,
+    "logical_cpus": 192,
+    "numa_nodes": 2,
+    "ram_gib": 503,
+    "gpu_layers": 0
+  },
+  "real_image_decode_tps_median": {
+    "production_llama_cpp_q8_0": 17.8148,
+    "ik_llama_q4_k_m_runtime_repack": 30.0427,
+    "ik_llama_numa_mirror_q8_0": 39.3752,
+    "ik_llama_numa_mirror_q4_k_m": 44.7306,
+    "ik_llama_numa_weight_mirror_q4_0_256_tokens": 49.5379,
+    "ik_llama_numa_weight_mirror_q4_0_1024_tokens": 50.0280
+  },
+  "best_candidate": {
+    "quantization": "Q4_0 with runtime row repacking",
+    "context_size": 8192,
+    "threads": 64,
+    "threads_batch": 96,
+    "threads_mtmd": 96,
+    "batch_size": 512,
+    "ubatch_size": 64,
+    "numa_mirror": "weights",
+    "continuous_batching": false,
+    "rss_kib": 40563500,
+    "ttft_median_seconds": 0.1833725274,
+    "tps_rounds": [49.8516, 49.9522, 50.0280, 50.3227, 50.5225],
+    "tps_mean": 50.1354,
+    "tps_median": 50.0280,
+    "visual_smoke": "passed: New York Times, 1969-07-21 and MEN WALK ON MOON recognized"
+  },
+  "q8_comparison": {
+    "optimized_q8_tps_median": 39.3752,
+    "optimized_q4_0_tps_median": 50.0280,
+    "q4_0_speedup_percent": 27.1,
+    "decision": "Keep Q8 production service until Q4_0 quality acceptance; Q4_0 is the performance candidate."
+  },
+  "safety": {
+    "production_ports_modified": false,
+    "experiment_ports_closed": [23350, 23351, 23352, 23353, 23354, 23355],
+    "production_health_after_test": {
+      "23341": "ok",
+      "23343": "ok"
+    },
+    "nvidia_device_open_by_best_candidate": false
+  },
+  "remote_raw_evidence_root": "/data1/gys/dsh021"
+}
