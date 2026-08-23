@@ -519,7 +519,7 @@ interface MarketDrawerProps {
 				var detail = props.detail;
 				var rows = (detail ? [
 					['作者', detail.author], ['语言', detail.language], ['许可证', detail.license],
-					['仓库', detail.stars == null && detail.forks == null ? null : (formatNumber(detail.stars) || '0') + ' Stars · ' + (formatNumber(detail.forks) || '0') + ' Forks'],
+					['仓库', (detail.stars === null || detail.stars === undefined) && (detail.forks === null || detail.forks === undefined) ? null : (formatNumber(detail.stars) || '0') + ' Stars · ' + (formatNumber(detail.forks) || '0') + ' Forks'],
 					['最后推送', formatDate(detail.lastPushedAt)]
 				] as Array<[string, string | null | undefined]> : []).filter(function (row): row is [string, string] { return typeof row[1] === 'string' && row[1] !== ''; });
 				return h('aside', { className: 'mm-drawer', role: 'dialog', 'aria-modal': false, 'aria-label': item.repository + ' 详情' },

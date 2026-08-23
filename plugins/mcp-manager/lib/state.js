@@ -207,7 +207,9 @@ export function normalizeServer(input, options = {}) {
     const timeout = input.toolCallTimeoutMs === undefined ? 60_000 : Number(input.toolCallTimeoutMs);
     if (!Number.isInteger(timeout) || timeout < 1_000 || timeout > 600_000)
         throw new ApiError(400, '工具超时必须是 1000–600000 毫秒的整数', 'CONFIG_INVALID');
-    const repository = input.repository == null ? null : cleanText(input.repository, '仓库', 200, true);
+    const repository = input.repository === null || input.repository === undefined
+        ? null
+        : cleanText(input.repository, '仓库', 200, true);
     if (repository !== null && !REPOSITORY_RE.test(repository))
         throw new ApiError(400, '仓库必须是 owner/repository', 'CONFIG_INVALID');
     const declaredRequiredEnv = cleanStringArray(input.requiredEnv, '必需环境变量', 64, 80);
@@ -222,7 +224,9 @@ export function normalizeServer(input, options = {}) {
         toolCallTimeoutMs: timeout,
         failOnStartupError: input.failOnStartupError === true,
         source: input.source === 'market' ? 'market' : 'manual',
-        marketId: input.marketId == null ? null : cleanText(input.marketId, '市场 ID', 200, true),
+        marketId: input.marketId === null || input.marketId === undefined
+            ? null
+            : cleanText(input.marketId, '市场 ID', 200, true),
         repository,
         iconUrl: safeOptionalIconUrl(input.iconUrl),
         revision: typeof input.revision === 'number' && Number.isInteger(input.revision) && input.revision >= 0 ? input.revision : 0,
