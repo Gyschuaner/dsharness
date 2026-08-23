@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 19
+ * build: 20
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -63,6 +63,9 @@
  * moves presets and infrequent batch actions into menus, shows only the first
  * description sentence in stable catalog rows, and defers source choices and
  * technical metadata inside the overlay drawer until explicitly requested.
+ * build 20: a single toggle updates its row and project count immediately,
+ * shows a quiet pending label while persistence finishes, and restores the
+ * exact previous row if the Host rejects or rolls back the mutation.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -252,6 +255,7 @@
 				'.sk-rowDesc{margin-top:2px;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 				'.sk-tag{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-secondary);padding:0 7px;font-size:11px;line-height:16px;display:inline-flex;align-items:center;gap:3px}',
 				'.sk-rowSide{flex:none;display:flex;align-items:center;gap:8px;margin-top:2px}',
+				'.sk-saving{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
 				'.sk-empty{margin:0;font-size:12px;color:var(--dsw-alias-label-quaternary);padding:24px 4px}',
 				'.sk-error{margin:0 0 8px;font-size:13px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
 				'.sk-bulkbar{flex:none;display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);box-shadow:0 -4px 18px rgba(0,0,0,.06)}',
@@ -1442,9 +1446,13 @@
 					if (proj === null || toggling[row.name] === true || viewBusy === true) return;
 					if (view && (view.configCorrupt === true || view.configFuture === true)) return;
 					var want = force === 'boolean' ? force : row.enabled !== true;
+					var before = row;
 					var gen = genRef.current;
 					setToggling(function (t) { var n = Object.assign({}, t); n[row.name] = true; return n; });
 					setViewError(null);
+					// Immediate visual feedback; the authoritative Host response replaces
+					// this row, while any failure restores the exact pre-click row.
+					patchRow(Object.assign({}, row, { enabled: want, modelInvocable: want }));
 					apiCallAt('setEnabled', { cwd: proj.cwd, name: row.name, enabled: want }, ctx).then(
 						function (value) {
 							if (!isCurrentProject(gen, proj.cwd)) { return; }
@@ -1464,6 +1472,7 @@
 						function (e) {
 							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setToggling(function (t) { var n = Object.assign({}, t); delete n[row.name]; return n; });
+							patchRow(before);
 							setViewError(String((e && e.message) || e));
 						}
 					);
@@ -1687,7 +1696,9 @@
 				function switchV1(row) {
 					var on = row.enabled === true;
 					var dim = project === null || toggling[row.name] === true;
-					var title = project === null
+					var title = toggling[row.name] === true
+						? '正在保存项目配置'
+						: project === null
 						? '请先选择项目'
 						: on
 							? '在本项目禁用（模型不再自动调用，仍可用 /' + row.name + ' 手动调用）'
@@ -1770,7 +1781,10 @@
 							row.description ? h('div', { className: 'sk-rowDesc' }, firstSentence(row.description)) : null
 							)
 						),
-						h('div', { className: 'sk-rowSide' }, !bulkMode ? switchV1(row) : null)
+						h('div', { className: 'sk-rowSide' },
+							!bulkMode && toggling[row.name] === true ? h('span', { className: 'sk-saving', role: 'status' }, '保存中') : null,
+							!bulkMode ? switchV1(row) : null
+						)
 					);
 				}
 				function drawerEl() {

@@ -11,7 +11,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 19 / DSH-008 V1）
+## 页面结构（build 20 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
@@ -69,6 +69,12 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     frontmatter 标志（字节保真，永不加 `user-invocable`）。
   - `copy`：未修改的受管副本——改副本标志并刷新登记的 `copyHash`。
   - `original`：用户/全局/内置来源——生成/删除 marker 验证的派生开关文件。
+- **单项启停快速路径（build 20）**：`catalog` 完成后按项目缓存身份快照；单项 `setEnabled`
+  只校验项目来源目录签名、目标 Skill 的来源配置与 `SKILL.md` mtime，再对目标身份执行一次
+  reconcile 和一次配置写入，不再为 68 个身份重复全量扫描/对账。项目原生 Skill、未修改的
+  受管副本和普通可调用来源均可走快速路径；目录、来源选择或目标文件发生变化时自动退回完整
+  reconcile。Client 点击后先在本地更新行底色、开关和计数并显示安静的「保存中」状态，失败时
+  精确恢复点击前行状态。
 - **启用必须等于会话可调用**：若项目启用的原始来源自身带有
   `disable-model-invocation`（例如旧全局默认关闭策略留下的用户 Skill），或来源只存在于
   另一个 Agent preset 的 bundled 根，reconcile 会生成去除禁用标志的 rank-100 受管项目副本。
@@ -220,17 +226,17 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
     `list` 幂等运行（旧版兼容）；配置文件用 tmp+rename 原子写入，目录副本使用受监控根外
     暂存、附属文件优先、`SKILL.md` 最后发布并整目录哈希复核。
-- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：51 用例覆盖
+- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：53 用例覆盖
   状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
   三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
   标签、预设 diff/应用、一键精简、旧版兼容与只读根 403；并覆盖并发写、
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
   多来源预设冲突，以及已全局关闭的用户 Skill / 其他 preset bundled Skill 在项目启用后
-  物化为真实可调用副本。
-- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：5 用例直接执行
+  物化为真实可调用副本；并验证单项快速路径、缓存失效安全回退、配置写入失败时文件与配置回滚。
+- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：6 用例直接执行
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖单页信息架构、可收起导航、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
-  丢弃过期 catalog、mutation、preset preview 响应和旧 Host 降级。
+  丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚和旧 Host 降级。
 - **热更新边界**（实测）：client bundle 由进程按请求从磁盘读取 —— 改 client 刷新页面即生效；
   host 代码没有模块级 HMR（组合树中 hmr 服务 `disabled: true`）—— 改 host 需要重启 `dsh web`
   （会话持久化在磁盘，重启后原会话可恢复，仅进行中的轮次会中断）。
@@ -243,7 +249,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   build 15 按 Product Design 方案 3 重构预设应用/保存弹窗，build 16 将详情标签区重构为
   同一设计语言的一体化编辑面板，build 17 移除默认列表的启用/未启用自动分组并以淡蓝底色标记
   保持原位的已启用行，build 18 移除重复资源库入口并加入可持久化的左导航收起态，build 19
-  将项目上下文压为单行、低频动作收进菜单、列表 description 收为第一句并按需展开来源与技术信息；主题只用
+  将项目上下文压为单行、低频动作收进菜单、列表 description 收为第一句并按需展开来源与技术信息，build 20
+  为单项启停加入乐观更新、安静保存态与失败回滚；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
   入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，

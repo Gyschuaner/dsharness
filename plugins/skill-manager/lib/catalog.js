@@ -836,8 +836,9 @@ function classifyIdentity(identity, projectConfig, projectRoot) {
  * @returns report { created: [path], removed: [path], rewritten: [path],
  *   conflicts: [{name, message}], failed: [{name, error}] }
  */
-export async function reconcileProject(projectRoot, projectConfig, identities, opts, logger, ledger) {
+export async function reconcileProject(projectRoot, projectConfig, identities, opts, logger, ledger, reconcileOptions) {
 	const report = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
+	const sweepOrphans = !reconcileOptions || reconcileOptions.sweepOrphans !== false;
 	const fail = (name, error) => {
 		report.failed.push({ name, error: error instanceof Error ? error.message : String(error) });
 	};
@@ -1020,7 +1021,7 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 
 	// Orphaned stubs: marker-verified switch files whose skill no longer
 	// exists anywhere.
-	try {
+	if (sweepOrphans) try {
 		const entries = await readdir(stubDir, { withFileTypes: true }).catch(() => []);
 		for (const entry of entries) {
 			if (!entry.isFile() || entry.name.startsWith('.') || !entry.name.toLowerCase().endsWith('.md')) continue;
@@ -1051,7 +1052,7 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 	// user-modified copies are kept and reported. A source-less registration
 	// is a default-materialized copy whose origin is the identity's current
 	// product-priority real source.
-	if (projectRoot !== null) {
+	if (projectRoot !== null && sweepOrphans) {
 		for (const [name, entry] of Object.entries(projectConfig.sources)) {
 			if (!entry || entry.generated !== true) continue;
 			const identity = identities.get(name);
