@@ -1,10 +1,10 @@
 /**
  * dsh-extension-manager — client half (browser bundle).
- * build: 1 (DSH-006)
+ * build: 2 (DSH-006 / DSH-027)
  *
  * Owns the frame-level 「扩展」 entry and full-page navigation. Business
  * plugins contribute sections through `extension.manager.section`; this
- * package ships only the MCP / Plugin roadmap placeholders.
+ * package ships only the MCP roadmap placeholder.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -112,10 +112,9 @@
 							id: id,
 							label: resolveLabel(options.label, id.toUpperCase()),
 							order: Number.isFinite(options.order) ? options.order : 0,
-							// MCP / Plugin are shell-owned roadmap placeholders. Slot options
-							// are intentionally narrowed by the runtime, so placeholder state
-							// is derived from their stable ids instead of custom metadata.
-							soon: id === 'mcp' || id === 'plugin'
+							// MCP remains the shell-owned roadmap placeholder. Plugin is now a
+							// real contribution from dsh-plugin-manager (DSH-027).
+							soon: id === 'mcp'
 						};
 					}).filter(function (row) { return row.id !== ''; }).sort(function (a, b) {
 						return a.order - b.order || a.id.localeCompare(b.id);
@@ -154,14 +153,6 @@
 					title: 'MCP 管理（建设中）',
 					body: 'MCP（Model Context Protocol）服务器把外部工具接入 DSH，模型会以原生工具形式调用它们。当前 MCP 服务器在 web profile 的 cordis 配置中以 dsh-mcp-client 插件行声明。',
 					planned: '服务器列表与连接状态、工具清单、新增/编辑/删除配置、保存后热加载（无需重启 dsh web）。'
-				});
-			}
-
-			function PluginPlaceholder() {
-				return h(ExtensionPlaceholder, {
-					title: '插件管理（建设中）',
-					body: '展示已安装到 web profile 的 DSH 插件：名称、版本、来源与启用状态。',
-					planned: '已安装插件列表、启用/停用（从组合树摘除/挂回）、安装来源与版本信息。'
 				});
 			}
 
@@ -263,7 +254,6 @@
 				});
 				slots.inject('extension.manager.section', function* () {
 					yield slots.register({ name: 'extension.manager.section', id: 'mcp', order: 20, label: function () { return 'MCP'; } }, McpPlaceholder);
-					yield slots.register({ name: 'extension.manager.section', id: 'plugin', order: 30, label: function () { return 'Plugin'; } }, PluginPlaceholder);
 				});
 			};
 			return module.exports;

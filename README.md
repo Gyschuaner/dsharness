@@ -21,6 +21,11 @@ dsharness/
 │       │   ├── index.js      #  host 半：注册 /api/skill-manager JSON 路由
 │       │   └── client.js     #  client 半：settings.section 页面
 │       └── README.md         #  插件功能 / 安装 / 技术说明
+│   ├── extension-manager/    # 通用“扩展”主页入口、全页壳与分区 Slot
+│   ├── plugin-manager/       # 本地插件管理 + GitHub 插件市场（DSH-027）
+│       ├── lib/index.js      # Host：/api/plugin-manager
+│       ├── lib/client.js     # Client：本地插件 / 插件市场双页
+│       └── test/             # Host 事务与 Client DOM 回归
 │   └── image-context-guard/  # 已退役的 DSH-004 临时保护源码，仅供历史回溯
 │       ├── package.json
 │       ├── lib/index.js      # host 半：llm/stream 请求边界裁剪

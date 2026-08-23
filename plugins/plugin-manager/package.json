@@ -1,7 +1,7 @@
 {
-  "name": "dsh-extension-manager",
+  "name": "dsh-plugin-manager",
   "version": "0.2.0",
-  "description": "DeepSeek Harness Extensions shell: sidebar entry, full-page navigation, and an extension section Slot.",
+  "description": "DeepSeek Harness local plugin manager and curated GitHub plugin marketplace.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

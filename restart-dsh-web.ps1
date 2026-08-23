@@ -11,7 +11,7 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
 行为：
   1. 停掉 3080 端口监听进程 + 命令行里带 dsh web 的 node 进程（含 npx 包装层），等端口释放
   2. 在隐藏窗口运行 dsh web，标准输出和错误写入系统临时目录
-  3. 轮询等待 HTTP 恢复（最多 60 秒），再调 /api/skill-manager 验证新 host 已加载
+  3. 轮询等待 HTTP 恢复（最多 60 秒），再调 Skill / Plugin Manager API 验证 host 已加载
      （本次功能需要 apiVersion >= 5；重启前运行中的进程是 4）
 
 注意：
@@ -114,5 +114,16 @@ try {
 	}
 } catch {
 	Write-Host "skill-manager API 验证失败（不影响 dsh web 本身）：$($_.Exception.Message)" -ForegroundColor Yellow
+}
+try {
+	$j = Invoke-RestMethod -Uri "http://${HostAddr}:${Port}/api/plugin-manager" -Method Post -ContentType 'application/json; charset=utf-8' -Body '{"op":"capabilities"}'
+	$api = $j.value.apiVersion
+	if ($api -ge 1) {
+		Write-Host "plugin-manager host：apiVersion $api ✓" -ForegroundColor Green
+	} else {
+		Write-Host "plugin-manager host：apiVersion $api —— 未加载到可用版本" -ForegroundColor Yellow
+	}
+} catch {
+	Write-Host "plugin-manager API 验证失败（请检查 profile 依赖与 Cordis 行）：$($_.Exception.Message)" -ForegroundColor Yellow
 }
 Write-Step "重启完成"
