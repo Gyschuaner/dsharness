@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 11
+ * build: 15
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -287,16 +287,51 @@
 				'.sk-advBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.sk-advBody{border-top:1px solid var(--dsw-alias-border-l2);padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
 				'.sk-advBody code{overflow-wrap:anywhere;font-size:11px}',
-				// diff preview
-				'.sk-modalDiff{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}',
-				'.sk-diffRow{display:flex;gap:8px;font-size:12.5px;align-items:baseline}',
-				'.sk-diffMark{flex:none;width:14px;font-weight:700}',
-				'.sk-diffAdd{color:var(--dsw-alias-brand-primary)}',
-				'.sk-diffDel{color:var(--dsw-alias-state-error-primary)}',
-				'.sk-diffName{overflow-wrap:anywhere;min-width:0}',
-				'.sk-diffMeta{font-size:11px;color:var(--dsw-alias-label-quaternary);white-space:nowrap}',
+				// preset / slim previews
+				'[role="dialog"]:has(.sk-presetApply){width:min(700px,calc(100vw - 40px));max-width:none}',
+				'[role="dialog"]:has(.sk-presetSave){width:min(580px,calc(100vw - 40px));max-width:none}',
+				'.sk-presetApply{width:min(640px,calc(100vw - 96px));display:flex;flex-direction:column;gap:14px}',
+				'.sk-presetMode{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:3px;background:var(--dsw-alias-fill-tsp-secondary)}',
+				'.sk-presetModeBtn{appearance:none;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:13px;line-height:1.35;min-height:38px;padding:8px 12px;text-align:center;white-space:nowrap}',
+				'.sk-presetModeBtn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}',
+				'.sk-presetModeBtnOn{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08)}',
+				'.sk-presetImpact{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 2px}',
+				'.sk-presetImpactMain{font-size:13.5px;font-weight:600;color:var(--dsw-alias-label-primary);line-height:1.45}',
+				'.sk-presetImpactMeta{font-size:11.5px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
+				'.sk-presetListTitle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}',
+				'.sk-modalDiff{display:flex;flex-direction:column;gap:12px;max-height:300px;overflow-y:auto;padding-right:5px;scrollbar-gutter:stable}',
+				'.sk-diffGroup{display:flex;flex-direction:column}',
+				'.sk-diffGroupHead{display:flex;align-items:center;gap:7px;padding:0 2px 7px;border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}',
+				'.sk-diffGroupCount{font-size:11px;font-weight:400;color:var(--dsw-alias-label-quaternary)}',
+				'.sk-diffRow{display:flex;gap:10px;font-size:12.5px;align-items:center;min-height:34px;padding:5px 2px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
+				'.sk-diffRow:last-child{border-bottom:0}',
+				'.sk-diffName{overflow-wrap:anywhere;min-width:0;flex:1}',
+				'.sk-diffMeta{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
+				'.sk-diffState{flex:none;border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);padding:2px 8px;font-size:10.5px;line-height:1.4;color:var(--dsw-alias-label-secondary)}',
+				'.sk-diffStateAdd{color:var(--dsw-alias-brand-primary)}',
+				'.sk-diffStateDel{color:var(--dsw-alias-state-error-primary)}',
+				'.sk-presetFooter{width:100%;min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:nowrap}',
+				'.sk-presetFooterLeft{display:flex;align-items:center;gap:12px;min-width:0}',
+				'.sk-presetTextBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;padding:6px 0;white-space:nowrap}',
+				'.sk-presetTextBtn:hover{color:var(--dsw-alias-label-primary)}',
+				'.sk-presetTextDanger:hover{color:var(--dsw-alias-state-error-primary)}',
+				'.sk-presetPrimary{min-width:96px!important;background:var(--dsw-alias-label-primary)!important;border-color:var(--dsw-alias-label-primary)!important;color:var(--dsw-alias-bg-base)!important}',
+				'.sk-presetPrimary:hover:not(:disabled){opacity:.88}',
+				'.sk-presetPrimary:disabled{background:var(--dsw-alias-fill-tsp-secondary)!important;border-color:var(--dsw-alias-border-l2)!important;color:var(--dsw-alias-label-quaternary)!important}',
+				'.sk-presetSave{width:min(500px,calc(100vw - 96px));display:flex;flex-direction:column;gap:16px}',
+				'.sk-presetField{display:flex;flex-direction:column;gap:7px}',
+				'.sk-presetFieldHead{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;font-weight:600;color:var(--dsw-alias-label-primary)}',
+				'.sk-presetCounter{font-size:11px;font-weight:400;color:var(--dsw-alias-label-quaternary);font-variant-numeric:tabular-nums}',
+				'.sk-presetInput,.sk-presetTextarea{box-sizing:border-box;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:1.5;padding:9px 11px}',
+				'.sk-presetInput{height:40px}',
+				'.sk-presetTextarea{min-height:96px;resize:vertical}',
+				'.sk-presetInput:focus,.sk-presetTextarea:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px;border-color:transparent}',
+				'.sk-presetSaveSummary{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l2);border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
+				'.sk-presetSaveSummary strong{font-weight:600;color:var(--dsw-alias-label-primary)}',
+				'.sk-presetSaveSummary span{font-size:11px;color:var(--dsw-alias-label-quaternary)}',
 				'@media(max-width:900px){.ext-nav{width:138px;padding:10px}.ext-main{padding:16px}.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-content{position:relative}.sk-drawer{position:absolute;z-index:20;inset:0 0 0 auto;width:min(420px,100%);max-width:none;box-shadow:-12px 0 32px rgba(0,0,0,.18)}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
 				'@media(max-width:680px){.ext-nav{display:none}.ext-main{padding:12px}.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}.sk-tabs{padding-left:0}}',
+				'@media(max-width:600px){[role="dialog"]:has(.sk-presetApply),[role="dialog"]:has(.sk-presetSave){width:calc(100vw - 24px)}.sk-presetApply,.sk-presetSave{width:auto}.sk-presetMode{grid-template-columns:1fr}.sk-presetImpact{align-items:flex-start;flex-direction:column;gap:3px}.sk-presetFooter{flex-wrap:wrap}.sk-presetFooterLeft{width:100%}}',
 				'@media(max-width:480px){.ext-top{padding:12px}.ext-topTitle{white-space:nowrap}.ext-topSub{display:none}.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}'
 			].join('');
 			document.head.appendChild(style);
@@ -1112,31 +1147,32 @@
 			/** Shared diff list (preset apply / 一键精简 preview). */
 			function DiffView(props) {
 				var diff = (props && props.diff) || {};
-				var rows = [];
-				(diff.toEnable || []).forEach(function (n) {
-					rows.push(h('div', { key: 'e' + n, className: 'sk-diffRow' },
-						h('span', { className: 'sk-diffMark sk-diffAdd' }, '＋'),
-						h('span', { className: 'sk-diffName' }, n),
-						h('span', { className: 'sk-diffMeta' }, '启用')));
-				});
-				(diff.toDisable || []).forEach(function (n) {
-					rows.push(h('div', { key: 'd' + n, className: 'sk-diffRow' },
-						h('span', { className: 'sk-diffMark sk-diffDel' }, '－'),
-						h('span', { className: 'sk-diffName' }, n),
-						h('span', { className: 'sk-diffMeta' }, '停用')));
-				});
-				(diff.sourceChanges || []).forEach(function (c) {
-					rows.push(h('div', { key: 's' + c.name, className: 'sk-diffRow' },
-						h('span', { className: 'sk-diffMark' }, '⇄'),
-						h('span', { className: 'sk-diffName' }, c.name),
-						h('span', { className: 'sk-diffMeta' }, '来源：' + (c.from || '默认') + ' → ' + (c.to || '默认'))));
-				});
-				if (rows.length === 0) {
-					rows.push(h('p', { key: 'none', className: 'sk-slimNote' }, '没有变化：当前配置已与该预设一致'));
+				var groups = [];
+				function group(title, key, values, renderRow) {
+					if (!Array.isArray(values) || values.length === 0) return;
+					groups.push(h('section', { key: key, className: 'sk-diffGroup', 'aria-label': title },
+						h('div', { className: 'sk-diffGroupHead' }, title, h('span', { className: 'sk-diffGroupCount' }, String(values.length))),
+						values.map(renderRow)));
 				}
-				rows.push(h('p', { key: 'final', className: 'sk-slimNote' },
+				group('将启用', 'enable', diff.toEnable || [], function (n) {
+					return h('div', { key: 'e' + n, className: 'sk-diffRow' },
+						h('span', { className: 'sk-diffName' }, n),
+						h('span', { className: 'sk-diffState sk-diffStateAdd' }, '启用'));
+				});
+				group('将停用', 'disable', diff.toDisable || [], function (n) {
+					return h('div', { key: 'd' + n, className: 'sk-diffRow' },
+						h('span', { className: 'sk-diffName' }, n),
+						h('span', { className: 'sk-diffState sk-diffStateDel' }, '停用'));
+				});
+				group('来源变更', 'source', diff.sourceChanges || [], function (c) {
+					return h('div', { key: 's' + c.name, className: 'sk-diffRow' },
+						h('span', { className: 'sk-diffName' }, c.name),
+						h('span', { className: 'sk-diffMeta' }, (c.from || '默认') + ' → ' + (c.to || '默认')));
+				});
+				if (groups.length === 0) groups.push(h('p', { key: 'none', className: 'sk-slimNote' }, '没有变化：当前配置已与该预设一致'));
+				if (!props || props.showFinal !== false) groups.push(h('p', { key: 'final', className: 'sk-slimNote' },
 					'应用后启用 ' + (diff.finalEnabled || []).length + ' 个 Skill；下一轮对话生效，无需重启'));
-				return h('div', { className: 'sk-modalDiff' }, rows);
+				return h('div', { className: 'sk-modalDiff' }, groups);
 			}
 			/**
 			 * The V1 body. Rendered only after the apiVersion 6 probe
@@ -2182,40 +2218,48 @@
 						onClose: function () { setPresetModal(null); },
 						title: presetModal ? '应用预设「' + presetModal.name + '」' : '应用预设',
 						closeLabel: '关闭',
-						description: '先预览变化，再选择替换或合并。预设只保存 Skill 身份与所选通用来源：不锁定版本、不携带项目特化内容。',
+						description: '预览当前项目将发生的变化，再选择替换或合并；版本与项目特化内容不会写入预设。',
 						footer: h(
-							React.Fragment,
-							null,
-							h('span', { className: 'sk-spacer' }),
+							'div',
+							{ className: 'sk-presetFooter' },
 							presetModal
 								? h(React.Fragment, null,
-									h(Button, { variant: 'outline', onClick: function () { setDefaultPreset(presetModal.name); } }, '设为默认精简预设'),
-									h(Button, { variant: 'outline', onClick: function () { deletePreset(presetModal.name); } }, '删除预设'),
+									h('div', { className: 'sk-presetFooterLeft' },
+										h('button', { type: 'button', className: 'sk-presetTextBtn', title: '设为默认精简预设', onClick: function () { setDefaultPreset(presetModal.name); } }, '设为默认'),
+										h('button', { type: 'button', className: 'sk-presetTextBtn sk-presetTextDanger', onClick: function () { deletePreset(presetModal.name); } }, '删除预设')),
+									h('span', { className: 'sk-spacer' }),
 									h(Button, { variant: 'outline', onClick: function () { setPresetModal(null); } }, '取消'),
-								h(Button, { disabled: presetBusy || viewBusy === true || (project !== null && presetModal.cwd !== project.cwd), onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
+									h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || viewBusy === true || (project !== null && presetModal.cwd !== project.cwd), onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
 								: null
 						)
 					},
 						presetModal
 							? h(
 								'div',
-								{ className: 'sk-modalDiff' },
+								{ className: 'sk-presetApply' },
 								h(
 									'div',
-									{ className: 'sk-filters' },
+									{ className: 'sk-presetMode', role: 'radiogroup', 'aria-label': '预设应用方式' },
 									[['replace', '替换当前配置'], ['merge', '合并到当前配置']].map(function (m) {
 										return h('button', {
 											type: 'button',
 											role: 'radio',
 											'aria-checked': presetModal.mode === m[0],
 											key: m[0],
-											className: 'sk-filterBtn' + (presetModal.mode === m[0] ? ' sk-filterBtnActive' : ''),
+											className: 'sk-presetModeBtn' + (presetModal.mode === m[0] ? ' sk-presetModeBtnOn' : ''),
 											onClick: function () { switchPresetMode(m[0]); }
 										}, m[1]);
 									})
 								),
+								h('div', { className: 'sk-presetImpact', role: 'status', 'aria-live': 'polite' },
+									h('span', { className: 'sk-presetImpactMain' },
+										'将启用 ' + (presetModal.diff.toEnable || []).length + ' 个 Skill，停用 ' + (presetModal.diff.toDisable || []).length + ' 个'),
+									h('span', { className: 'sk-presetImpactMeta' }, (presetModal.diff.sourceChanges || []).length + ' 项来源变更')),
 								presetModal.desc ? h('p', { className: 'sk-slimNote' }, presetModal.desc) : null,
-								h(DiffView, { diff: presetModal.diff })
+								h('div', { className: 'sk-presetListTitle' },
+									h('span', null, '全部变更'),
+									h('span', { className: 'sk-presetImpactMeta' }, '下一轮对话生效')),
+								h(DiffView, { diff: presetModal.diff, showFinal: false })
 							)
 							: null
 					),
@@ -2241,34 +2285,46 @@
 						onClose: function () { setSaveOpen(false); },
 						title: '保存为自定义预设',
 						closeLabel: '关闭',
-						description: '保存当前项目的启用集合与所选来源（跨项目可复用；不保存版本与项目特化内容）。',
+						description: '保存当前项目的启用 Skill 与所选来源，可在其他项目复用。',
 						footer: h(
-							React.Fragment,
-							null,
+							'div',
+							{ className: 'sk-presetFooter' },
+							h('span', { className: 'sk-spacer' }),
 							h(Button, { variant: 'outline', onClick: function () { setSaveOpen(false); } }, '取消'),
-							h(Button, { disabled: presetBusy || saveName.trim() === '', onClick: savePreset }, presetBusy ? '保存中…' : '保存')
+							h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || saveName.trim() === '', onClick: savePreset }, presetBusy ? '保存中…' : '保存')
 						)
 					},
 						h(
 							'div',
-							{ style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-							h('input', {
-								className: 'sk-tagInput',
-								style: { width: '100%', borderRadius: 8 },
-								placeholder: '预设名称（1–64 字符）',
-								value: saveName,
-								maxLength: 64,
-								onChange: function (event) { setSaveName(event.target.value); },
-								onKeyDown: function (event) { if (event.key === 'Enter' && saveName.trim() !== '') savePreset(); }
-							}),
-							h('input', {
-								className: 'sk-tagInput',
-								style: { width: '100%', borderRadius: 8 },
-								placeholder: '描述（可选）',
-								value: saveDesc,
-								maxLength: 200,
-								onChange: function (event) { setSaveDesc(event.target.value); }
-							}),
+							{ className: 'sk-presetSave' },
+							h('label', { className: 'sk-presetField' },
+								h('span', { className: 'sk-presetFieldHead' },
+									h('span', null, '预设名称'),
+									h('span', { className: 'sk-presetCounter' }, saveName.length + '/64')),
+								h('input', {
+									className: 'sk-presetInput',
+									placeholder: '例如：日常研发 · 精简',
+									value: saveName,
+									maxLength: 64,
+									onChange: function (event) { setSaveName(event.target.value); },
+									onKeyDown: function (event) { if (event.key === 'Enter' && saveName.trim() !== '') savePreset(); }
+								})),
+							h('label', { className: 'sk-presetField' },
+								h('span', { className: 'sk-presetFieldHead' },
+									h('span', null, '描述（可选）'),
+									h('span', { className: 'sk-presetCounter' }, saveDesc.length + '/200')),
+								h('textarea', {
+									className: 'sk-presetTextarea',
+									placeholder: '说明适用场景、来源或使用建议',
+									value: saveDesc,
+									maxLength: 200,
+									onChange: function (event) { setSaveDesc(event.target.value); }
+								})),
+							project !== null
+								? h('div', { className: 'sk-presetSaveSummary' },
+									h('strong', null, '将保存当前项目的 ' + enabledCount + ' 个已启用 Skill 与所选来源'),
+									h('span', null, '可跨项目复用 · 不保存版本与项目特化内容'))
+								: null,
 							project === null
 								? h('p', { className: 'sk-slimNote' }, '需要项目上下文：请先在顶部选择项目。')
 								: null

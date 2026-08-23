@@ -13,7 +13,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 14 / DSH-008 V1）
+## 页面结构（build 15 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
@@ -24,7 +24,9 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 - **SKILL 分区（V1）**：`项目管理 / 统一资源库` 两个子页签。
   - **项目管理**：顶部项目控制栏固定展示当前项目、完整路径、当前工作区标记、
     已启用/总数与「仅影响此项目」说明；历史选择不会覆盖当前会话工作区，切换菜单仍包含
-    最近使用的工作区与添加本地项目；推荐预设与保存预设保留为次级动作；
+    最近使用的工作区与添加本地项目；推荐预设与保存预设保留为次级动作；应用预设弹窗使用
+    「模式选择 → 影响摘要 → 分组变更列表 → 操作区」的固定层级，保存预设弹窗使用常驻字段标签、
+    字数计数、保存摘要和右对齐主操作，避免长列表与底部按钮挤压换行；
     工具栏为 搜索 / 带数量的全部·已启用·未启用 / 全部标签 / 批量管理 / 一键精简；
     默认行 = 图标 + 名称 + 项目特化/来源×N/未启用 徽标 + 完整描述 + 标签 + 启用开关；
     进入显式「批量管理」模式后才显示全选与行复选框，同时隐藏单项开关，避免两个控件都被理解为启停；
@@ -201,13 +203,13 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
     `list` 幂等运行（旧版兼容）；Windows 文件锁问题由 tmp+rename 原子写入规避。
-- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：48 用例覆盖
+- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：49 用例覆盖
   状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
   三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
   标签、预设 diff/应用、一键精简、旧版兼容与只读根 403；并覆盖并发写、
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
   多来源预设冲突。
-- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：3 用例直接执行
+- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：4 用例直接执行
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖双页面、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
   丢弃过期 catalog、mutation、preset preview 响应和旧 Host 降级。
@@ -220,7 +222,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   build 12 起 SKILL 分区为 V1 双子页 + 详情抽屉（`SkillCenterV1`），
   项目选择器复用 `ctx.get('sessions')` 当前工作区与 `ctx.get('workspaces')`
   （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时安全降级；
-  主题只用 `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
+  build 15 按 Product Design 方案 3 重构预设应用/保存弹窗；主题只用
+  `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
   入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，
   目标路径做包含性校验；内置根一律只读（save/delete 返回 403）；

@@ -298,9 +298,25 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	await h.click(h.button('应用推荐预设'));
 	await h.flush();
 	assert.ok(h.dom.window.document.querySelector('.test-modal'));
+	assert.ok(h.dom.window.document.querySelector('.sk-presetApply'), 'preset preview uses the compact apply layout');
+	assert.equal(h.dom.window.document.querySelector('.sk-presetMode').getAttribute('role'), 'radiogroup');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-presetMode [role="radio"]').length, 2);
+	assert.ok(h.dom.window.document.querySelector('.sk-presetImpactMain').textContent.includes('将启用 1 个 Skill'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-presetFooterLeft button')].map((item) => item.textContent), ['设为默认', '删除预设']);
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-diffGroup').length, 1);
 	await h.click([...h.dom.window.document.querySelectorAll('button')].find((item) => item.textContent.startsWith('应用（')));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'presets.apply' && call.cwd === '/project-a'));
+
+	await h.click(h.button('保存为预设'));
+	assert.ok(h.dom.window.document.querySelector('.sk-presetSave'), 'save preset uses the compact labeled form');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-presetFieldHead').length, 2);
+	assert.equal(h.dom.window.document.querySelector('.sk-presetInput').getAttribute('maxlength'), '64');
+	assert.equal(h.dom.window.document.querySelector('.sk-presetTextarea').getAttribute('maxlength'), '200');
+	assert.ok(h.dom.window.document.querySelector('.sk-presetSaveSummary').textContent.includes('个已启用 Skill'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-presetCounter')].map((item) => item.textContent), ['0/64', '0/200']);
+	await h.click(h.button('取消'));
+	assert.equal(h.dom.window.document.querySelector('.sk-presetSave'), null);
 });
 
 test('current workspace wins persisted project and visible rows support counted bulk selection', async (t) => {
