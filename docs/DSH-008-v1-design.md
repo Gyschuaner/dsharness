@@ -196,3 +196,12 @@ S9/S10 贯穿：DP 任务描述随进度更新；用例执行记录在验证证�
 - 测试用例 `3b60fd84-5dd2-4639-be11-3e9feb8aad3c` 已创建；加入/执行既有计划 `d53a9a04-0c07-4142-a01a-d866207d56d4` 均命中 DP 既有“用例号校验失败”，追踪号分别为 `4c27c19f-ed88-4d32-952e-d71f3b5abb52`、`4ec02870-419a-4c36-aea6-aa784b479061`。计划仍保留原 4 个用例与 0 条执行记录，未伪造 passed。
 - Git 功能提交 `e095c0a3e4ca87f6b21142705c08849bab2075bc` 已通过合并提交 `467e8fd57944eccdc7d0fed5b081b2a17e238ae0` 推送到 `main`。从 main 重启 3080 后，普通/受管副本 API 均保持 `fastPath:true`（8.9–26.1ms），内置浏览器启停及恢复通过，最终仍为 11/68。
 - DP 研发任务 `1462ccdf-0896-430b-a0ae-428d6955c8cd` 已 `done`，Bug `BUG-F0871ABC` 已回归关闭；需求 `DSH-008` 继续保持 `testing`。本次只更新代码主干和本地 3080，未部署生产。
+
+## 10. 2026-08-23 build 21：首次目录扫描加载态
+
+- 用户反馈首次进入 SKILL 页时，catalog 返回前只有左对齐的「正在扫描…」一行，缺少视觉锚点和过程感。
+- Client 新增独立 `SkillScanState`：复用官方 `IconSkillOutline16` 和现有蓝色主题令牌，居中展示呼吸光环、扫描光与两行状态文案；不改变 catalog 请求、项目切换或旧 Host 降级逻辑。
+- `prefers-reduced-motion: reduce` 下停止光环、浮动和扫描光动画，保留静态图标与状态文案；能力探测阶段也统一使用同一加载态。
+- Client DOM：7 pass / 0 fail；Host 回归保持 49 pass / 0 fail / 4 skip；`npm pack --dry-run`、语法检查和 `git diff --check` 通过。
+- 内置浏览器 3080 实测在 catalog 延迟期间看到居中扫描态，catalog 返回后正常回到 68 行列表；页面未新增 console error/warn，未写项目配置。
+- DP：研发任务 `d261bf63-a3f4-4a46-b776-93e963bbecb3`（`done`）；测试用例 `6977f0bc-86c8-4248-ab91-3e55b1843c9f` 已加入计划 `14df386a-eb6e-41dc-8970-3f82c7274f7c`；SIT 平台执行尚未回写。

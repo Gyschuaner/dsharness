@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 20
+ * build: 21
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -66,6 +66,9 @@
  * build 20: a single toggle updates its row and project count immediately,
  * shows a quiet pending label while persistence finishes, and restores the
  * exact previous row if the Host rejects or rolls back the mutation.
+ * build 21: the first catalog load gets a centered Skill scan state with a
+ * restrained pulse/sweep animation, descriptive status copy, and a
+ * prefers-reduced-motion static fallback.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -257,6 +260,18 @@
 				'.sk-rowSide{flex:none;display:flex;align-items:center;gap:8px;margin-top:2px}',
 				'.sk-saving{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
 				'.sk-empty{margin:0;font-size:12px;color:var(--dsw-alias-label-quaternary);padding:24px 4px}',
+				'.sk-scanState{flex:1;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:52px 24px;text-align:center}',
+				'.sk-scanVisual{position:relative;width:76px;height:76px;display:grid;place-items:center;color:var(--dsw-static-blue-500)}',
+				'.sk-scanHalo{position:absolute;inset:6px;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 25%,transparent);border-radius:50%;animation:sk-scanPulse 2.2s ease-in-out infinite}',
+				'.sk-scanIcon{position:relative;z-index:1;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 28%,var(--dsw-alias-border-l2));border-radius:12px;background:var(--dsw-alias-bg-layer-3);box-shadow:0 6px 18px color-mix(in srgb,var(--dsw-static-blue-500) 13%,transparent);animation:sk-scanFloat 2.2s ease-in-out infinite}',
+				'.sk-scanSweep{position:absolute;z-index:2;left:8px;right:8px;top:8px;height:2px;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-static-blue-500),transparent);box-shadow:0 0 8px color-mix(in srgb,var(--dsw-static-blue-500) 55%,transparent);animation:sk-scanSweep 1.8s ease-in-out infinite;pointer-events:none}',
+				'.sk-scanCopy{display:flex;flex-direction:column;gap:4px}',
+				'.sk-scanCopy strong{font-size:14px;font-weight:600;color:var(--dsw-alias-label-primary)}',
+				'.sk-scanCopy span{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-tertiary)}',
+				'@keyframes sk-scanPulse{0%,100%{transform:scale(.9);opacity:.5}50%{transform:scale(1.08);opacity:1}}',
+				'@keyframes sk-scanFloat{0%,100%{transform:translateY(1px)}50%{transform:translateY(-3px)}}',
+				'@keyframes sk-scanSweep{0%{transform:translateY(0);opacity:0}16%{opacity:.9}84%{opacity:.9}100%{transform:translateY(60px);opacity:0}}',
+				'@media (prefers-reduced-motion: reduce){.sk-scanHalo,.sk-scanIcon,.sk-scanSweep{animation:none}.sk-scanHalo{opacity:.8}.sk-scanSweep{transform:translateY(30px);opacity:.45}}',
 				'.sk-error{margin:0 0 8px;font-size:13px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
 				'.sk-bulkbar{flex:none;display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);box-shadow:0 -4px 18px rgba(0,0,0,.06)}',
 				'.sk-bulkbar strong{font-size:12.5px;white-space:nowrap}',
@@ -1230,6 +1245,24 @@
 				if (!props || props.showFinal !== false) groups.push(h('p', { key: 'final', className: 'sk-slimNote' },
 					'应用后启用 ' + (diff.finalEnabled || []).length + ' 个 Skill；下一轮对话生效，无需重启'));
 				return h('div', { className: 'sk-modalDiff' }, groups);
+			}
+			function SkillScanState(props) {
+				var title = (props && props.title) || '正在扫描 Skill';
+				var detail = (props && props.detail) || '整理项目配置与可用来源';
+				return h(
+					'div',
+					{ className: 'sk-scanState', role: 'status', 'aria-live': 'polite' },
+					h(
+						'div',
+						{ className: 'sk-scanVisual', 'aria-hidden': true },
+						h('span', { className: 'sk-scanHalo' }),
+						h('span', { className: 'sk-scanSweep' }),
+						h('span', { className: 'sk-scanIcon' }, h(P.IconSkillOutline16))
+					),
+					h('div', { className: 'sk-scanCopy' },
+						h('strong', null, title),
+						h('span', null, detail))
+				);
 			}
 			/**
 			 * The V1 body. Rendered only after the apiVersion 6 probe
@@ -2256,7 +2289,9 @@
 								'div',
 								{ className: 'sk-list' },
 								view === null && !viewError
-									? h('p', { className: 'sk-empty' }, viewBusy ? '正在扫描…' : '（空）')
+									? (viewBusy
+										? h(SkillScanState)
+										: h('p', { className: 'sk-empty' }, '（空）'))
 									: null,
 							visibleRows.length === 0 && view !== null
 								? h('div', { className: 'sk-empty' },
@@ -2445,7 +2480,10 @@
 					);
 				}, [attempt, ctx]);
 				if (probe === 'loading') {
-					return h('div', { className: 'sk-root' }, h('p', { className: 'sk-empty' }, '正在加载…'));
+					return h('div', { className: 'sk-root' }, h(SkillScanState, {
+						title: '正在准备 Skill',
+						detail: '连接管理中心，读取项目索引'
+					}));
 				}
 				if (probe === 'legacy') {
 					return h(

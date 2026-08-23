@@ -387,6 +387,36 @@ test('extension type navigation collapses to icons and persists across reopen', 
 	assert.equal(h.dom.window.localStorage.getItem('smgr.ext.navCollapsed'), '0');
 });
 
+test('Skill catalog loading uses the animated scan state with a reduced-motion fallback', async (t) => {
+	const catalog = deferred();
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return catalog.promise;
+		if (body.op === 'presets.list') return { presets: [] };
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.open();
+
+	const scanState = h.dom.window.document.querySelector('.sk-scanState');
+	assert.ok(scanState, 'catalog loading renders the dedicated scan state');
+	assert.equal(scanState.getAttribute('role'), 'status');
+	assert.equal(scanState.getAttribute('aria-live'), 'polite');
+	assert.equal(h.dom.window.document.querySelector('.sk-scanVisual').getAttribute('aria-hidden'), 'true');
+	assert.ok(h.dom.window.document.querySelector('.sk-scanIcon [data-icon="1"]'), 'scan state reuses the official Skill icon');
+	assert.equal(h.dom.window.document.querySelector('.sk-scanCopy strong').textContent, '正在扫描 Skill');
+	const pluginCss = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
+	assert.ok(pluginCss.includes('@keyframes sk-scanPulse'));
+	assert.ok(pluginCss.includes('@keyframes sk-scanSweep'));
+	assert.ok(pluginCss.includes('@media (prefers-reduced-motion: reduce)'));
+
+	catalog.resolve(view('/project-a', [row('alpha-skill', 'alpha')]));
+	await h.flush();
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelector('.sk-scanState'), null, 'scan state leaves when the catalog arrives');
+});
+
 test('current workspace wins; enabled rows stay in catalog order and bulk selection remains counted', async (t) => {
 	const calls = [];
 	let rows = [
