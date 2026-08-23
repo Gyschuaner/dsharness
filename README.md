@@ -108,7 +108,10 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 内联计时时隐藏外层重复时长；第 22 个补丁退役 9 图裁剪，并把视觉桥默认调用上限与
 0.1.1 原生单消息上限统一为 20；第 23 个补丁允许同一个 `vision_inspect` 同时接收
 本会话附件 ID 与本地图片路径，路径会先经原生附件服务准入并持久化为本会话附件。
-最终源码 tree 为 `d760562c3d46576a8683b8fc5dec19ee828108a1`。
+第 24 个补丁为上传图片生成只属于当前会话的稳定、带扩展名只读路径，并把路径写入
+同一条持久 `system-reminder`；视觉子模型与 `vision_inspect` 改为直接流式返回
+Markdown，不再强制 JSON、region 或 confidence。最终源码 tree 为
+`00939824bca71da4be792e11369cf6641f637b71`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。
