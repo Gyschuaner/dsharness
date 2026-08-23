@@ -460,6 +460,35 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3);
 });
 
+test('single toggle updates optimistically, shows a quiet pending state and rolls back on failure', async (t) => {
+	const mutation = deferred();
+	const initial = row('optimistic-skill', 'Optimistic toggle');
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return view('/project-a', [initial]);
+		if (body.op === 'presets.list') return { presets: [] };
+		if (body.op === 'setEnabled') return mutation.promise;
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.open();
+
+	await h.click(h.dom.window.document.querySelector('[aria-label="启用 optimistic-skill（仅当前项目）"]'));
+	assert.equal(h.dom.window.document.querySelector('[role="switch"]').getAttribute('aria-checked'), 'true');
+	assert.ok(h.dom.window.document.querySelector('.sk-row').classList.contains('sk-rowEnabled'));
+	assert.equal(h.dom.window.document.querySelector('.sk-saving').textContent, '保存中');
+	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('已启用 1 / 1'));
+
+	mutation.reject(new Error('target write failed'));
+	await h.flush();
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelector('[role="switch"]').getAttribute('aria-checked'), 'false');
+	assert.ok(!h.dom.window.document.querySelector('.sk-row').classList.contains('sk-rowEnabled'));
+	assert.equal(h.dom.window.document.querySelector('.sk-saving'), null);
+	assert.ok(h.dom.window.document.body.textContent.includes('target write failed'));
+});
+
 test('project switch drops stale catalog, mutation and preset-preview responses', async (t) => {
 	const staleCatalog = deferred();
 	const staleMutation = deferred();

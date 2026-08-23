@@ -350,6 +350,53 @@ async function buildProjectViewLocked(cwd, opts) {
 	return withConfigLock(projectLockKey(projectRoot), () => buildProjectView(cwd, opts));
 }
 
+/** Cheap invalidation key for a warmed per-project identity snapshot. */
+async function projectRootSignature(cwd, opts) {
+	const { roots } = await computeRoots(cwd, opts);
+	const facts = await Promise.all(roots.map(async (root) => {
+		const st = await stat(root.dir).catch(() => undefined);
+		return [root.id, st === undefined ? null : st.mtimeMs];
+	}));
+	return JSON.stringify(facts);
+}
+
+function sameTargetSourceConfig(left, right, skillName) {
+	const fingerprint = (entry) => JSON.stringify(entry === null || typeof entry !== 'object'
+		? entry
+		: Object.fromEntries(Object.entries(entry).sort(([a], [b]) => a.localeCompare(b))));
+	return fingerprint((left.sources && left.sources[skillName]) || null)
+		=== fingerprint((right.sources && right.sources[skillName]) || null);
+}
+
+/**
+ * The target-only path covers stable ordinary sources plus project-owned
+ * sources (native or managed copies). It still rejects source graphs whose
+ * metadata or selection changed since the warmed catalog snapshot.
+ */
+function canUseTargetToggle(identity, config, skillName) {
+	if (identity === undefined || identity.v1 === undefined) return false;
+	if (identity.v1.mechanism === 'copy' || identity.v1.mechanism === 'self') {
+		return identity.sources.some((source) => source.scope === 'project' && !source.broken && !source.shadow);
+	}
+	if (identity.v1.mechanism !== 'original') return false;
+	const selected = config.sources && config.sources[skillName] && typeof config.sources[skillName].source === 'string'
+		? config.sources[skillName].source
+		: identity.v1.defaultSourceKey;
+	const source = identity.sources.find((candidate) => candidate.key === selected && !candidate.broken && !candidate.generated && !candidate.shadow);
+	return source !== undefined && source.scope !== 'bundled' && source.modelInvocable === true;
+}
+
+async function cachedIdentityStillCurrent(snapshot, cwd, opts, identity) {
+	if (await projectRootSignature(cwd, opts) !== snapshot.rootSignature) return false;
+	const checks = await Promise.all(identity.sources
+		.filter((source) => !source.broken && !source.shadow)
+		.map(async (source) => {
+			const st = await stat(source.path).catch(() => undefined);
+			return st !== undefined && st.isFile() && Math.abs(st.mtimeMs - source.mtimeMs) < 1;
+		}));
+	return checks.every(Boolean);
+}
+
 /**
  * Mutate one project atomically: read view + config, apply the mutator,
  * persist the config, re-reconcile derived artifacts.
@@ -401,7 +448,7 @@ async function mutateProject(cwd, opts, fn) {
 			reportAll.conflicts.push(...after.report.conflicts);
 			reportAll.failed.push(...after.report.failed);
 			const viewAfter = after.view;
-			return { view: viewAfter, report: reportAll };
+			return { view: viewAfter, report: reportAll, config: after.config, identities: after.identities };
 		} catch (error) {
 			const rollbackFailures = await ledger.rollback();
 			rollbackFailures.forEach((f) => opts.logger?.warn?.(`skill-manager: 回滚副本失败：${f}`));
@@ -449,6 +496,84 @@ function configPayload(view, config) {
  */
 function makeHandler(deps) {
 	const opts = { agentPresets: deps.agentPresets, logger: deps.logger, home: deps.home, faults: deps.faults };
+	const projectSnapshots = new Map();
+	async function rememberProjectSnapshot(cwd, built) {
+		if (!built || !built.view || built.view.projectRoot === null || !built.identities || !built.config) return;
+		projectSnapshots.set(built.view.projectRoot, {
+			view: built.view,
+			config: built.config,
+			identities: built.identities,
+			rootSignature: await projectRootSignature(cwd, opts),
+		});
+	}
+	async function tryTargetToggle(cwd, skillName, enabled) {
+		const projectRoot = await findProjectRoot(cwd);
+		return withConfigLock(projectLockKey(projectRoot), async () => {
+			const snapshot = projectSnapshots.get(projectRoot);
+			if (snapshot === undefined) return { value: null, reason: 'snapshot-missing' };
+			const read = await readProjectConfig(projectRoot, opts);
+			if (read.corrupt === true) throw new ApiError(409, `项目配置已损坏（JSON 无法解析）：为避免覆盖无法读取的真相文件，本次未修改任何文件；请修复或删除 ${projectRoot}/.dsh/skill-manager.json 后重试`);
+			if (read.future === true) throw new ApiError(409, `项目配置 apiVersion 高于当前 host 支持的 ${PROJECT_API_VERSION}：为保护未来版本数据，本次未修改任何文件；升级 host 后重试`);
+			const identity = snapshot.identities.get(skillName);
+			if (!canUseTargetToggle(identity, read.config, skillName)) return { value: null, reason: 'target-ineligible' };
+			if (!sameTargetSourceConfig(snapshot.config, read.config, skillName)) return { value: null, reason: 'source-selection-changed' };
+			if (!(await cachedIdentityStillCurrent(snapshot, cwd, opts, identity))) return { value: null, reason: 'source-tree-changed' };
+			const currentRow = snapshot.view.identities.find((row) => row.name === skillName);
+			if (currentRow === undefined) return { value: null, reason: 'row-missing' };
+
+			const ledger = createLedger();
+			try {
+				const config = read.config;
+				const enabledSet = new Set(config.enabled);
+				if (enabled) enabledSet.add(skillName);
+				else enabledSet.delete(skillName);
+				config.enabled = [...enabledSet].sort((a, b) => a.localeCompare(b));
+				config.updatedAt = new Date().toISOString();
+				const report = await reconcileProject(
+					projectRoot,
+					config,
+					new Map([[skillName, identity]]),
+					opts,
+					opts.logger,
+					ledger,
+					{ sweepOrphans: false },
+				);
+				// A target failure aborts before the truth file is persisted, allowing
+				// the ledger to restore the exact pre-click state.
+				targetReport(skillName, report);
+				await writeProjectConfig(projectRoot, config, opts, read.raw);
+				const commitFailures = await ledger.commit();
+				commitFailures.forEach((failure) => report.failed.push({ name: '*', error: `副本备份清理失败：${failure}` }));
+
+				let rowSources = currentRow.sources;
+				if (identity.v1.mechanism === 'copy' || identity.v1.mechanism === 'self') {
+					const effective = identity.sources.find((source) => source.key === identity.v1.effectiveSourceKey && source.scope === 'project' && !source.broken && !source.shadow);
+					if (effective !== undefined) {
+						const effectiveStat = await stat(effective.path).catch(() => undefined);
+						effective.modelInvocable = enabled;
+						if (effectiveStat !== undefined) effective.mtimeMs = effectiveStat.mtimeMs;
+						rowSources = currentRow.sources.map((source) => source.key === effective.key
+							? Object.assign({}, source, { modelInvocable: enabled, mtimeMs: effective.mtimeMs })
+							: source);
+					}
+				}
+				const row = Object.assign({}, currentRow, { sources: rowSources, enabled, modelInvocable: enabled });
+				identity.v1.enabled = enabled;
+				identity.v1.modelInvocable = enabled;
+				snapshot.view = Object.assign({}, snapshot.view, {
+					identities: snapshot.view.identities.map((candidate) => candidate.name === skillName ? row : candidate),
+				});
+				snapshot.config = config;
+				snapshot.rootSignature = await projectRootSignature(cwd, opts);
+				return { value: { name: skillName, enabled, partial: report.failed.length > 0 || report.conflicts.length > 0, view: row, report, fastPath: true }, reason: null };
+			} catch (error) {
+				projectSnapshots.delete(projectRoot);
+				const rollbackFailures = await ledger.rollback();
+				rollbackFailures.forEach((failure) => opts.logger?.warn?.(`skill-manager: 快速开关回滚失败：${failure}`));
+				throw error;
+			}
+		});
+	}
 	const ops = {
 		async capabilities() {
 			return {
@@ -733,10 +858,12 @@ function makeHandler(deps) {
 		/** Merged identity catalog for one project context (runs reconcile). */
 		async catalog(body) {
 			const cwd = await assertCwd(body.cwd);
-			const { view } = await buildProjectViewLocked(cwd, opts);
+			const built = await buildProjectViewLocked(cwd, opts);
 			const { config: globalConfig } = await readGlobalConfig(opts);
 			const allTags = [...new Set(Object.values(globalConfig.tags || {}).flat())].sort((a, b) => a.localeCompare(b));
-			return Object.assign({}, view, { allTags });
+			const view = Object.assign({}, built.view, { allTags });
+			await rememberProjectSnapshot(cwd, Object.assign({}, built, { view }));
+			return view;
 		},
 		/** Project config + last reconcile report. */
 		async projectState(body) {
@@ -751,15 +878,19 @@ function makeHandler(deps) {
 			const skillName = typeof body.name === 'string' ? body.name : '';
 			if (!NAME_RE.test(skillName)) throw new ApiError(400, `skill 名不合法：${String(body.name)}`);
 			const enabled = body.enabled === true;
-			const { view, report } = await mutateProject(cwd, opts, async (ctx) => {
+			const fast = await tryTargetToggle(cwd, skillName, enabled);
+			if (fast.value !== null) return fast.value;
+			const built = await mutateProject(cwd, opts, async (ctx) => {
 				if (!ctx.identities.has(skillName)) throw new ApiError(404, `skill 不存在：${skillName}`);
 				const set = new Set(ctx.config.enabled);
 				if (enabled) set.add(skillName);
 				else set.delete(skillName);
 				ctx.config.enabled = [...set].sort((a, b) => a.localeCompare(b));
 			});
+			const { view, report } = built;
+			await rememberProjectSnapshot(cwd, built);
 			const partial = targetReport(skillName, report);
-			return { name: skillName, enabled, partial, view: summarizeIdentity(view, skillName), report };
+			return { name: skillName, enabled, partial, view: summarizeIdentity(view, skillName), report, fastPath: false, fastPathReason: fast.reason };
 		},
 		/** Bulk enable/disable for this project. */
 		async setMany(body) {

@@ -318,6 +318,7 @@ test('setEnabled: toggling a user skill creates/removes the stub and flips model
 
 	const on = await api('setEnabled', { cwd: env.cwd, name: 'user-skill', enabled: true });
 	assert.equal(on.status, 200);
+	assert.equal(on.value.fastPath, true, 'ordinary invocable sources use the target-only mutation path');
 	assert.equal(await hasStub(env.projDsh, 'user-skill'), false);
 	assert.equal(on.value.view.enabled, true);
 	const { value: v1 } = await api('catalog', { cwd: env.cwd });
@@ -328,9 +329,23 @@ test('setEnabled: toggling a user skill creates/removes the stub and flips model
 
 	const off = await api('setEnabled', { cwd: env.cwd, name: 'user-skill', enabled: false });
 	assert.equal(off.status, 200);
+	assert.equal(off.value.fastPath, true, 'the warmed snapshot stays usable for the reverse toggle');
 	assert.equal(await hasStub(env.projDsh, 'user-skill'), true);
 	const { value: v2 } = await api('catalog', { cwd: env.cwd });
 	assert.equal(identity(v2, 'user-skill').modelInvocable, false);
+});
+
+test('setEnabled: stale source metadata invalidates the target-only snapshot and falls back safely', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const sourcePath = await putSkill(env.userDsh, 'stale-fast', 'before change');
+	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	await writeFile(sourcePath, skillMd('stale-fast', 'after change with a different size'), 'utf8');
+	const result = await api('setEnabled', { cwd: env.cwd, name: 'stale-fast', enabled: true });
+	assert.equal(result.status, 200);
+	assert.equal(result.value.fastPath, false);
+	assert.equal(result.value.view.enabled, true);
 });
 
 test('catalog: enabled user skill with a globally disabled source materializes an invocable project copy', async (t) => {
@@ -357,7 +372,12 @@ test('catalog: enabled user skill with a globally disabled source materializes a
 
 	const off = await api('setEnabled', { cwd: env.cwd, name: 'policy-disabled', enabled: false });
 	assert.equal(off.status, 200);
+	assert.equal(off.value.fastPath, true, `an existing managed copy uses target-only hash and flag verification (${off.value.fastPathReason ?? 'no miss reason'})`);
 	assert.ok((await readFile(copyPath, 'utf8')).includes('disable-model-invocation: true'));
+	const on = await api('setEnabled', { cwd: env.cwd, name: 'policy-disabled', enabled: true });
+	assert.equal(on.status, 200);
+	assert.equal(on.value.fastPath, true);
+	assert.ok(!(await readFile(copyPath, 'utf8')).includes('disable-model-invocation: true'));
 	assert.equal(await readFile(originalPath, 'utf8'), originalRaw);
 });
 
@@ -384,6 +404,12 @@ test('catalog: enabled bundled skill materializes a project copy independent of 
 	const { config } = await readProjectConfig(env.projectRoot, env.opts);
 	assert.equal(config.sources['other-preset-skill'].generated, true);
 	assert.equal(config.sources['other-preset-skill'].source, undefined);
+	const off = await api('setEnabled', { cwd: env.cwd, name: 'other-preset-skill', enabled: false });
+	assert.equal(off.status, 200);
+	assert.equal(off.value.fastPath, true, `materialized bundled copies toggle without a full catalog rebuild (${off.value.fastPathReason ?? 'no miss reason'})`);
+	const on = await api('setEnabled', { cwd: env.cwd, name: 'other-preset-skill', enabled: true });
+	assert.equal(on.status, 200);
+	assert.equal(on.value.fastPath, true);
 });
 
 test('setEnabled: project skill toggles its own frontmatter flag byte-safely', async (t) => {
@@ -397,6 +423,7 @@ test('setEnabled: project skill toggles its own frontmatter flag byte-safely', a
 	assert.ok(disabledRaw.includes('disable-model-invocation: true'));
 
 	const { value } = await api('setEnabled', { cwd: env.cwd, name: 'proj-skill', enabled: true });
+	assert.equal(value.fastPath, true, 'project-native skills use the target-only frontmatter path');
 	assert.equal(value.view.enabled, true);
 	const enabledRaw = await readFile(join(env.projDsh, 'proj-skill', 'SKILL.md'), 'utf8');
 	assert.equal(enabledRaw, original); // flag removed, nothing else changed
@@ -1147,6 +1174,27 @@ test('config write failure rolls back a newly materialized source copy and stub 
 	assert.equal(config.sources['rollback-copy'], undefined);
 	assert.equal(await stat(join(env.projDsh, 'rollback-copy.md')).then(() => true, () => false), false);
 	assert.equal(await hasStub(env.projDsh, 'rollback-copy'), true);
+});
+
+test('target-only toggle rolls back its stub change when the config write fails', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.userDsh, 'fast-rollback', 'ordinary source');
+	let armed = false;
+	env.opts.faults = {
+		beforeProjectConfigWrite: async () => {
+			if (armed) throw new Error('injected fast config failure');
+		},
+	};
+	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	assert.equal(await hasStub(env.projDsh, 'fast-rollback'), true);
+	armed = true;
+	const result = await api('setEnabled', { cwd: env.cwd, name: 'fast-rollback', enabled: true });
+	assert.equal(result.status, 500);
+	const { config } = await readProjectConfig(env.projectRoot, env.opts);
+	assert.deepEqual(config.enabled, []);
+	assert.equal(await hasStub(env.projDsh, 'fast-rollback'), true, 'removed stub is restored by the ledger');
 });
 
 test('preset second-source conflict rolls back the first managed copy and project config', async (t) => {
