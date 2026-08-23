@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 11
+ * build: 18
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -41,14 +41,24 @@
  * so the tint read as plain gray — switch to the theme's real blue
  * scale (--dsw-static-blue-500), raise the tint to 10%, and redraw the
  * icon as an outlined box with a lid line.
- * build 12 (DSH-008): SKILL 管理中心 V1 — the SKILL tab now hosts two
- * sub-pages (项目管理 / 统一资源库) served by the host's apiVersion 6
+ * build 13 (DSH-008): project-management UI adds a persistent project
+ * context card, per-state counts/grouping, select-visible bulk actions,
+ * current-workspace-safe defaults, derived drawer/tag state, responsive
+ * drawer behavior, and accessible switch/radio/detail controls. The SKILL
+ * management view is served by the host's apiVersion 6
  * ops (catalog / setEnabled / setMany / setSource / setTags / presets.* /
  * slim.*): project selector over DSH workspaces, per-project enable
  * state, merged same-name identities with source selection, global tags,
  * presets with replace/merge preview, and 一键精简. When the running host
  * predates apiVersion 6 (unknown `catalog` op), the page degrades to the
  * legacy section above with a notice.
+ * build 17: the project list no longer regroups rows by enabled state.
+ * Catalog order and scroll context stay stable while a soft blue row tint,
+ * the switch, and the optional state filters communicate enabled status.
+ * build 18: the redundant unified-library sub-page is removed; merged source
+ * selection remains in the project Skill drawer. The drawer now overlays the
+ * list at every desktop width without reflowing it, and the SKILL / MCP /
+ * Plugin navigation can collapse to an icon rail with browser-local state.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -138,29 +148,50 @@
 				'.ext-close{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 9px;font-size:15px;line-height:1;margin-left:auto}',
 				'.ext-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.ext-body{flex:1;min-height:0;display:flex}',
-				'.ext-nav{flex:none;width:190px;border-right:1px solid var(--dsw-alias-border-l2);padding:12px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}',
-				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:10px;padding:9px 12px;text-align:left;font:inherit;display:flex;flex-direction:column;gap:2px;align-items:flex-start}',
+				'.ext-nav{box-sizing:border-box;flex:none;width:208px;border-right:1px solid var(--dsw-alias-border-l2);padding:12px 10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;transition:width .16s ease,padding .16s ease}',
+				'.ext-navCollapsed{width:64px;padding-left:8px;padding-right:8px}',
+				'.ext-navHead{display:flex;align-items:center;min-height:32px;padding:0 4px}',
+				'.ext-navTitle{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--dsw-alias-label-quaternary)}',
+				'.ext-navToggle{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex:none}',
+				'.ext-navToggle:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+				'.ext-navList{display:flex;flex-direction:column;gap:6px}',
+				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:10px;padding:9px 10px;text-align:left;font:inherit;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:9px;align-items:center;min-height:54px}',
 				'.ext-navBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.ext-navBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary)}',
 				'.ext-navBtnActive:hover{background:var(--dsw-alias-fill-tsp-secondary)}',
-				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}',
+				'.ext-navIcon{position:relative;grid-row:1 / span 2;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;color:currentColor}',
+				'.ext-navCopy{min-width:0;display:flex;flex-direction:column;gap:2px}',
+				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}',
 				'.ext-navDesc{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
 				'.ext-soon{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-tertiary);padding:0 6px;font-size:10px;font-weight:500;line-height:16px;white-space:nowrap}',
-				'.ext-main{flex:1;min-width:0;overflow-y:auto;padding:20px 24px}',
+				'.ext-navSoonDot{position:absolute;right:-1px;top:-1px;width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-label-quaternary);border:1px solid var(--dsw-alias-bg-base)}',
+				'.ext-navCollapsed .ext-navTitle,.ext-navCollapsed .ext-navCopy{display:none}',
+				'.ext-navCollapsed .ext-navHead{justify-content:center;padding:0}',
+				'.ext-navCollapsed .ext-navToggle{margin-left:0}',
+				'.ext-navCollapsed .ext-navBtn{display:flex;align-items:center;justify-content:center;width:46px;min-height:44px;padding:10px 0}',
+				'.ext-navCollapsed .ext-navIcon{width:20px;height:20px}',
+				'.ext-main{flex:1;min-width:0;min-height:0;overflow:hidden;padding:20px 24px}',
 				'.ext-placeholder{max-width:520px;display:flex;flex-direction:column;gap:10px;padding:48px 0}',
 				'.ext-phIcon{color:var(--dsw-alias-label-quaternary)}',
 				'.ext-placeholder h3{margin:0;font-size:16px;font-weight:600}',
 				'.ext-placeholder p{margin:0;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.7}',
 				'.ext-phSoon{color:var(--dsw-alias-label-quaternary);font-size:12px}',
-				// ── DSH-008 V1: SKILL 管理中心 (项目管理 / 统一资源库) ─────────
-				'.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:1080px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
-				'.sk-tabs{display:flex;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2);flex:none}',
-				'.sk-tab{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:13px;font-weight:500;padding:8px 10px 10px;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:6px}',
-				'.sk-tab:hover{color:var(--dsw-alias-label-primary)}',
-				'.sk-tabActive{color:var(--dsw-alias-label-primary);font-weight:600;border-bottom-color:var(--dsw-alias-brand-primary)}',
-				'.sk-content{display:flex;flex:1;min-height:0}',
+				// ── DSH-008 V1: per-project SKILL management ─────────────────
+				'.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%;max-width:1180px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
+				'.sk-content{position:relative;isolation:isolate;display:flex;flex:1;min-height:0}',
 				'.sk-listcol{flex:1;min-width:0;display:flex;flex-direction:column}',
-				'.sk-projectbar{display:flex;align-items:center;gap:10px;margin:14px 0 12px;flex-wrap:wrap;flex:none}',
+				'.sk-projectCard{display:flex;align-items:center;gap:18px;margin:14px 0 12px;padding:14px 16px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);flex:none}',
+				'.sk-projectIdentity{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}',
+				'.sk-projectIcon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;color:var(--dsw-alias-label-primary)}',
+				'.sk-projectMeta{display:flex;flex-direction:column;gap:3px;min-width:0}',
+				'.sk-projectTitleLine{display:flex;align-items:center;gap:7px;flex-wrap:wrap}',
+				'.sk-projectTitle{font-size:17px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+				'.sk-projectPath{font-size:11.5px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:520px}',
+				'.sk-currentBadge{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);padding:2px 7px;font-size:10px;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
+				'.sk-projectStats{display:flex;align-items:center;gap:12px;padding-left:18px;border-left:1px solid var(--dsw-alias-border-l2);flex:none}',
+				'.sk-statValue{font-size:18px;font-weight:650;line-height:1.15}',
+				'.sk-statHint{font-size:11px;color:var(--dsw-alias-label-tertiary);margin-top:3px}',
+				'.sk-projectActions{display:flex;align-items:center;gap:7px;flex:none}',
 				'.sk-projLabel{font-size:12px;color:var(--dsw-alias-label-tertiary);flex:none}',
 				'.sk-projBtn{appearance:none;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);cursor:pointer;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;max-width:340px}',
 				'.sk-projBtn:hover:not(:disabled){border-color:var(--dsw-alias-label-dimmed)}',
@@ -184,22 +215,31 @@
 				'.sk-search{width:100%;background:var(--dsw-alias-bg-module-platform);color:inherit;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px 10px 6px 30px;font:inherit;font-size:13px}',
 				'.sk-search:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
 				'.sk-filters{display:inline-flex;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;overflow:hidden;flex:none}',
-				'.sk-filterBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;padding:6px 10px;white-space:nowrap}',
+				'.sk-filterBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;padding:6px 10px;white-space:nowrap;display:flex;align-items:center;gap:5px}',
 				'.sk-filterBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.sk-filterBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary);font-weight:600}',
+				'.sk-filterCount{font-size:10px;color:var(--dsw-alias-label-quaternary);font-variant-numeric:tabular-nums}',
 				'.sk-spacer{flex:1}',
-				'.sk-bulk{display:inline-flex;gap:6px;align-items:center}',
+				'.sk-selectVisible{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap;cursor:pointer}',
+				'.sk-selectVisible input{margin:0}',
+				'.sk-batchHint{display:flex;align-items:center;gap:7px;margin:-2px 0 8px;padding:7px 10px;border:1px dashed var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-fill-tsp-secondary);font-size:12px;color:var(--dsw-alias-label-secondary)}',
 				'.sk-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:2px 0 6px}',
 				'.sk-row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-bottom:1px solid var(--dsw-alias-border-l2);cursor:pointer;flex:none}',
 				'.sk-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+				'.sk-rowEnabled{background:var(--dsw-alias-bg-layer-3);background:color-mix(in srgb,var(--dsw-static-blue-500) 8%,var(--dsw-alias-bg-module-platform))}',
+				'.sk-rowEnabled:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 12%,var(--dsw-alias-bg-module-platform))}',
 				'.sk-rowActive{background:var(--dsw-alias-interactive-bg-hover-solid)}',
-				'.sk-rowOff .sk-rowName,.sk-rowOff .sk-rowDesc,.sk-rowOff .sk-ic{opacity:.55}',
+				'.sk-rowEnabled.sk-rowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 14%,var(--dsw-alias-bg-module-platform))}',
+				'.sk-rowOff .sk-ic{opacity:.58}',
 				'.sk-check{appearance:none;width:15px;height:15px;flex:none;margin-top:3px;border:1.5px solid var(--dsw-alias-border-l2);border-radius:4px;background:var(--dsw-alias-bg-module-platform);cursor:pointer;position:relative;padding:0}',
 				'.sk-check:hover{border-color:var(--dsw-alias-label-dimmed)}',
+				'.sk-check:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
 				'.sk-checkOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
 				'.sk-checkOn:after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}',
 				'.sk-ic{flex:none;color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;justify-content:center}',
 				'.sk-row .sk-ic{margin-top:2px}',
+				'.sk-rowOpen{appearance:none;border:0;background:transparent;color:inherit;display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0;padding:0;text-align:left;font:inherit;cursor:pointer;border-radius:6px}',
+				'.sk-rowOpen:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px}',
 				'.sk-rowMain{flex:1;min-width:0}',
 				'.sk-rowTitle{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
 				'.sk-rowName{font-size:13px;font-weight:600;overflow-wrap:anywhere}',
@@ -214,12 +254,17 @@
 				'.sk-empty{margin:0;font-size:12px;color:var(--dsw-alias-label-quaternary);padding:24px 4px}',
 				'.sk-error{margin:0 0 8px;font-size:13px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
 				'.sk-footer{flex:none;display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);margin-top:10px;padding-top:8px;font-size:11px;color:var(--dsw-alias-label-quaternary);flex-wrap:wrap;overflow-wrap:anywhere}',
+				'.sk-bulkbar{flex:none;display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);box-shadow:0 -4px 18px rgba(0,0,0,.06)}',
+				'.sk-bulkbar strong{font-size:12.5px;white-space:nowrap}',
+				'.sk-bulkPrimary{appearance:none;border:1px solid var(--dsw-alias-brand-primary);border-radius:8px;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font:inherit;font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;white-space:nowrap}',
+				'.sk-bulkPrimary:disabled{opacity:.5;cursor:default}',
+				'.sk-emptyActions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}',
 				'.sk-banner{margin:0 0 12px;font-size:12px;color:var(--dsw-alias-label-tertiary);border:1px dashed var(--dsw-alias-border-l2);border-radius:8px;padding:8px 10px;line-height:1.55}',
 				'.sk-bannerErr{border-style:solid;border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}',
 				'.sk-bannerWarn{border-style:solid;border-color:var(--dsw-alias-state-warn-primary);color:var(--dsw-alias-label-secondary)}',
 				'.sk-slimNote{margin:0;font-size:11px;color:var(--dsw-alias-label-quaternary);line-height:1.55}',
 				// drawer
-				'.sk-drawer{flex:none;width:370px;max-width:46%;border-left:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);overflow-y:auto;display:flex;flex-direction:column}',
+				'.sk-drawer{position:absolute;z-index:20;inset:0 0 0 auto;width:min(400px,100%);max-width:none;border-left:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);box-shadow:-12px 0 32px rgba(0,0,0,.18);overflow-y:auto;display:flex;flex-direction:column}',
 				'.sk-drawerHead{display:flex;align-items:center;gap:9px;padding:14px 16px 10px;position:sticky;top:0;background:var(--dsw-alias-bg-base);z-index:2}',
 				'.sk-drawerHead .sk-ic{color:var(--dsw-alias-label-primary)}',
 				'.sk-drawerName{font-size:15px;font-weight:600;flex:1;min-width:0;overflow-wrap:anywhere}',
@@ -242,11 +287,27 @@
 				'.sk-radio{width:13px;height:13px;flex:none;margin-top:2px;border-radius:50%;border:1.5px solid var(--dsw-alias-border-l2);position:relative;background:var(--dsw-alias-bg-module-platform)}',
 				'.sk-radioOn{border-color:var(--dsw-alias-brand-primary)}',
 				'.sk-radioOn:after{content:"";position:absolute;inset:2.5px;border-radius:50%;background:var(--dsw-alias-brand-primary)}',
-				'.sk-tagEdit{display:flex;flex-wrap:wrap;gap:5px;align-items:center}',
-				'.sk-tagX{appearance:none;border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;line-height:1;padding:0;display:inline-flex;align-items:center}',
-				'.sk-tagX:hover{color:var(--dsw-alias-state-error-primary)}',
-				'.sk-tagInput{font:inherit;font-size:12px;background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l2);border-radius:999px;color:inherit;padding:2px 9px;width:118px}',
-				'.sk-tagInput:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
+				'.sk-tagHeading{display:flex;align-items:center;justify-content:space-between;gap:10px}',
+				'.sk-tagScope{font-size:10.5px;color:var(--dsw-alias-label-quaternary)}',
+				'.sk-tagPanel{overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);transition:border-color .12s,box-shadow .12s}',
+				'.sk-tagPanel:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}',
+				'.sk-tagList{display:flex;flex-wrap:wrap;gap:6px;padding:9px 10px}',
+				'.sk-tagList .sk-tag{min-height:25px;padding:3px 6px 3px 9px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);font-size:11.5px;line-height:17px}',
+				'.sk-tagX{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-quaternary);cursor:pointer;line-height:1;padding:2px;border-radius:4px;display:inline-flex;align-items:center}',
+				'.sk-tagX:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-state-error-primary)}',
+				'.sk-tagX:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
+				'.sk-tagX:disabled{cursor:default;opacity:.45}',
+				'.sk-tagComposer{display:flex;align-items:center;gap:8px;padding:6px 7px 6px 10px}',
+				'.sk-tagList+.sk-tagComposer{border-top:1px solid var(--dsw-alias-border-l2)}',
+				'.sk-tagInput{min-width:0;flex:1;font:inherit;font-size:12.5px;line-height:1.5;background:transparent;border:0;color:var(--dsw-alias-label-primary);padding:4px 0}',
+				'.sk-tagInput::placeholder{color:var(--dsw-alias-label-quaternary)}',
+				'.sk-tagInput:focus{outline:0}',
+				'.sk-tagAdd{appearance:none;flex:none;min-width:54px;border:1px solid var(--dsw-alias-label-primary);border-radius:7px;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);cursor:pointer;font:inherit;font-size:11.5px;font-weight:600;line-height:1.4;padding:5px 10px}',
+				'.sk-tagAdd:hover:not(:disabled){opacity:.88}',
+				'.sk-tagAdd:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
+				'.sk-tagAdd:disabled{border-color:transparent;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-quaternary);cursor:default}',
+				'.sk-tagFoot{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:10.5px;line-height:1.4;color:var(--dsw-alias-label-quaternary)}',
+				'.sk-tagIssue{color:var(--dsw-alias-state-warn-primary)}',
 				'.sk-upd{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
 				'.sk-updDot{width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-label-quaternary);flex:none}',
 				'.sk-adv{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;overflow:hidden}',
@@ -254,14 +315,52 @@
 				'.sk-advBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.sk-advBody{border-top:1px solid var(--dsw-alias-border-l2);padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
 				'.sk-advBody code{overflow-wrap:anywhere;font-size:11px}',
-				// diff preview
-				'.sk-modalDiff{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}',
-				'.sk-diffRow{display:flex;gap:8px;font-size:12.5px;align-items:baseline}',
-				'.sk-diffMark{flex:none;width:14px;font-weight:700}',
-				'.sk-diffAdd{color:var(--dsw-alias-brand-primary)}',
-				'.sk-diffDel{color:var(--dsw-alias-state-error-primary)}',
-				'.sk-diffName{overflow-wrap:anywhere;min-width:0}',
-				'.sk-diffMeta{font-size:11px;color:var(--dsw-alias-label-quaternary);white-space:nowrap}'
+				// preset / slim previews
+				'[role="dialog"]:has(.sk-presetApply){width:min(700px,calc(100vw - 40px));max-width:none}',
+				'[role="dialog"]:has(.sk-presetSave){width:min(580px,calc(100vw - 40px));max-width:none}',
+				'.sk-presetApply{width:min(640px,calc(100vw - 96px));display:flex;flex-direction:column;gap:14px}',
+				'.sk-presetMode{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:3px;background:var(--dsw-alias-fill-tsp-secondary)}',
+				'.sk-presetModeBtn{appearance:none;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:13px;line-height:1.35;min-height:38px;padding:8px 12px;text-align:center;white-space:nowrap}',
+				'.sk-presetModeBtn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}',
+				'.sk-presetModeBtnOn{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08)}',
+				'.sk-presetImpact{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 2px}',
+				'.sk-presetImpactMain{font-size:13.5px;font-weight:600;color:var(--dsw-alias-label-primary);line-height:1.45}',
+				'.sk-presetImpactMeta{font-size:11.5px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
+				'.sk-presetListTitle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}',
+				'.sk-modalDiff{display:flex;flex-direction:column;gap:12px;max-height:300px;overflow-y:auto;padding-right:5px;scrollbar-gutter:stable}',
+				'.sk-diffGroup{display:flex;flex-direction:column}',
+				'.sk-diffGroupHead{display:flex;align-items:center;gap:7px;padding:0 2px 7px;border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}',
+				'.sk-diffGroupCount{font-size:11px;font-weight:400;color:var(--dsw-alias-label-quaternary)}',
+				'.sk-diffRow{display:flex;gap:10px;font-size:12.5px;align-items:center;min-height:34px;padding:5px 2px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
+				'.sk-diffRow:last-child{border-bottom:0}',
+				'.sk-diffName{overflow-wrap:anywhere;min-width:0;flex:1}',
+				'.sk-diffMeta{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
+				'.sk-diffState{flex:none;border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);padding:2px 8px;font-size:10.5px;line-height:1.4;color:var(--dsw-alias-label-secondary)}',
+				'.sk-diffStateAdd{color:var(--dsw-alias-brand-primary)}',
+				'.sk-diffStateDel{color:var(--dsw-alias-state-error-primary)}',
+				'.sk-presetFooter{width:100%;min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:nowrap}',
+				'.sk-presetFooterLeft{display:flex;align-items:center;gap:12px;min-width:0}',
+				'.sk-presetTextBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;padding:6px 0;white-space:nowrap}',
+				'.sk-presetTextBtn:hover{color:var(--dsw-alias-label-primary)}',
+				'.sk-presetTextDanger:hover{color:var(--dsw-alias-state-error-primary)}',
+				'.sk-presetPrimary{min-width:96px!important;background:var(--dsw-alias-label-primary)!important;border-color:var(--dsw-alias-label-primary)!important;color:var(--dsw-alias-bg-base)!important}',
+				'.sk-presetPrimary:hover:not(:disabled){opacity:.88}',
+				'.sk-presetPrimary:disabled{background:var(--dsw-alias-fill-tsp-secondary)!important;border-color:var(--dsw-alias-border-l2)!important;color:var(--dsw-alias-label-quaternary)!important}',
+				'.sk-presetSave{width:min(500px,calc(100vw - 96px));display:flex;flex-direction:column;gap:16px}',
+				'.sk-presetField{display:flex;flex-direction:column;gap:7px}',
+				'.sk-presetFieldHead{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;font-weight:600;color:var(--dsw-alias-label-primary)}',
+				'.sk-presetCounter{font-size:11px;font-weight:400;color:var(--dsw-alias-label-quaternary);font-variant-numeric:tabular-nums}',
+				'.sk-presetInput,.sk-presetTextarea{box-sizing:border-box;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:1.5;padding:9px 11px}',
+				'.sk-presetInput{height:40px}',
+				'.sk-presetTextarea{min-height:96px;resize:vertical}',
+				'.sk-presetInput:focus,.sk-presetTextarea:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px;border-color:transparent}',
+				'.sk-presetSaveSummary{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l2);border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
+				'.sk-presetSaveSummary strong{font-weight:600;color:var(--dsw-alias-label-primary)}',
+				'.sk-presetSaveSummary span{font-size:11px;color:var(--dsw-alias-label-quaternary)}',
+				'@media(max-width:900px){.ext-nav:not(.ext-navCollapsed){width:168px;padding:10px}.ext-main{padding:16px}.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
+				'@media(max-width:680px){.ext-nav{display:none}.ext-main{padding:12px}.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}}',
+				'@media(max-width:600px){[role="dialog"]:has(.sk-presetApply),[role="dialog"]:has(.sk-presetSave){width:calc(100vw - 24px)}.sk-presetApply,.sk-presetSave{width:auto}.sk-presetMode{grid-template-columns:1fr}.sk-presetImpact{align-items:flex-start;flex-direction:column;gap:3px}.sk-presetFooter{flex-wrap:wrap}.sk-presetFooterLeft{width:100%}}',
+				'@media(max-width:480px){.ext-top{padding:12px}.ext-topTitle{white-space:nowrap}.ext-topSub{display:none}.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}'
 			].join('');
 			document.head.appendChild(style);
 
@@ -650,6 +749,9 @@
 										: '在本项目恢复启用';
 					return h('button', {
 						type: 'button',
+						role: 'switch',
+						'aria-checked': on,
+						'aria-label': (on ? '停用 ' : '启用 ') + skill.name + '（仅当前项目）',
 						className: 'smgr-switch' + (on ? ' smgr-switchOn' : '') + (dim ? ' smgr-switchDim' : ''),
 						disabled: dim,
 						title: title,
@@ -1042,7 +1144,7 @@
 				);
 			}
 
-			// ── DSH-008 V1: SKILL 管理中心（项目管理 / 统一资源库）────────────
+			// ── DSH-008 V1: per-project SKILL management ─────────────────
 			/** Build the project options: current session workspace + DSH workspaces. */
 			function buildProjectOptions(ctx) {
 				var out = [];
@@ -1073,31 +1175,32 @@
 			/** Shared diff list (preset apply / 一键精简 preview). */
 			function DiffView(props) {
 				var diff = (props && props.diff) || {};
-				var rows = [];
-				(diff.toEnable || []).forEach(function (n) {
-					rows.push(h('div', { key: 'e' + n, className: 'sk-diffRow' },
-						h('span', { className: 'sk-diffMark sk-diffAdd' }, '＋'),
-						h('span', { className: 'sk-diffName' }, n),
-						h('span', { className: 'sk-diffMeta' }, '启用')));
-				});
-				(diff.toDisable || []).forEach(function (n) {
-					rows.push(h('div', { key: 'd' + n, className: 'sk-diffRow' },
-						h('span', { className: 'sk-diffMark sk-diffDel' }, '－'),
-						h('span', { className: 'sk-diffName' }, n),
-						h('span', { className: 'sk-diffMeta' }, '停用')));
-				});
-				(diff.sourceChanges || []).forEach(function (c) {
-					rows.push(h('div', { key: 's' + c.name, className: 'sk-diffRow' },
-						h('span', { className: 'sk-diffMark' }, '⇄'),
-						h('span', { className: 'sk-diffName' }, c.name),
-						h('span', { className: 'sk-diffMeta' }, '来源：' + (c.from || '默认') + ' → ' + (c.to || '默认'))));
-				});
-				if (rows.length === 0) {
-					rows.push(h('p', { key: 'none', className: 'sk-slimNote' }, '没有变化：当前配置已与该预设一致'));
+				var groups = [];
+				function group(title, key, values, renderRow) {
+					if (!Array.isArray(values) || values.length === 0) return;
+					groups.push(h('section', { key: key, className: 'sk-diffGroup', 'aria-label': title },
+						h('div', { className: 'sk-diffGroupHead' }, title, h('span', { className: 'sk-diffGroupCount' }, String(values.length))),
+						values.map(renderRow)));
 				}
-				rows.push(h('p', { key: 'final', className: 'sk-slimNote' },
+				group('将启用', 'enable', diff.toEnable || [], function (n) {
+					return h('div', { key: 'e' + n, className: 'sk-diffRow' },
+						h('span', { className: 'sk-diffName' }, n),
+						h('span', { className: 'sk-diffState sk-diffStateAdd' }, '启用'));
+				});
+				group('将停用', 'disable', diff.toDisable || [], function (n) {
+					return h('div', { key: 'd' + n, className: 'sk-diffRow' },
+						h('span', { className: 'sk-diffName' }, n),
+						h('span', { className: 'sk-diffState sk-diffStateDel' }, '停用'));
+				});
+				group('来源变更', 'source', diff.sourceChanges || [], function (c) {
+					return h('div', { key: 's' + c.name, className: 'sk-diffRow' },
+						h('span', { className: 'sk-diffName' }, c.name),
+						h('span', { className: 'sk-diffMeta' }, (c.from || '默认') + ' → ' + (c.to || '默认')));
+				});
+				if (groups.length === 0) groups.push(h('p', { key: 'none', className: 'sk-slimNote' }, '没有变化：当前配置已与该预设一致'));
+				if (!props || props.showFinal !== false) groups.push(h('p', { key: 'final', className: 'sk-slimNote' },
 					'应用后启用 ' + (diff.finalEnabled || []).length + ' 个 Skill；下一轮对话生效，无需重启'));
-				return h('div', { className: 'sk-modalDiff' }, rows);
+				return h('div', { className: 'sk-modalDiff' }, groups);
 			}
 			/**
 			 * The V1 body. Rendered only after the apiVersion 6 probe
@@ -1105,7 +1208,6 @@
 			 */
 			function SkillCenterV1Body(props) {
 				var ctx = props.ctx;
-				var [activePage, setActivePage] = React.useState('project'); // 'project' | 'library'
 				var [projects, setProjects] = React.useState([]);
 				var [project, setProject] = React.useState(null); // { cwd, title, kind }
 				var [projMenuOpen, setProjMenuOpen] = React.useState(false);
@@ -1118,8 +1220,8 @@
 				var [tagFilter, setTagFilter] = React.useState(null);
 				var [tagMenuOpen, setTagMenuOpen] = React.useState(false);
 				var [selectedRows, setSelectedRows] = React.useState({}); // name -> true
+				var [bulkMode, setBulkMode] = React.useState(false);
 				var [drawerName, setDrawerName] = React.useState(null);
-				var [drawerRow, setDrawerRow] = React.useState(null);
 				var [toggling, setToggling] = React.useState({}); // name -> true
 				var [sourceBusy, setSourceBusy] = React.useState(null); // name | null
 				var [presetModal, setPresetModal] = React.useState(null); // {name, desc, mode, diff}
@@ -1130,21 +1232,36 @@
 				var [saveName, setSaveName] = React.useState('');
 				var [saveDesc, setSaveDesc] = React.useState('');
 				var [tagDraft, setTagDraft] = React.useState('');
+				var [tagBusy, setTagBusy] = React.useState(false);
 				var [advOpen, setAdvOpen] = React.useState(false);
 				var genRef = React.useRef(0); // selected-project generation
 				var viewGenRef = React.useRef(0); // catalog request generation
 				var projectRef = React.useRef(null); // current project, kept in a ref for async guards
 				var [partialWarning, setPartialWarning] = React.useState(null); // P2-3 persistent partial-failure warning
+				var drawerRow = null;
+				if (view !== null && drawerName !== null) {
+					for (var drawerIndex = 0; drawerIndex < view.identities.length; drawerIndex += 1) {
+						if (view.identities[drawerIndex].name === drawerName) {
+							drawerRow = view.identities[drawerIndex];
+							break;
+						}
+					}
+				}
 				React.useEffect(function () { projectRef.current = project; }, [project]);
 
 				function patchRow(row2) {
 					setView(function (v) {
 						if (v === null) return v;
+						var identities = v.identities.map(function (r) { return r.name === row2.name ? row2 : r; });
+						var tags = {};
+						identities.forEach(function (r) {
+							(r.tags || []).forEach(function (tag) { tags[tag] = true; });
+						});
 						return Object.assign({}, v, {
-							identities: v.identities.map(function (r) { return r.name === row2.name ? row2 : r; })
+							identities: identities,
+							allTags: Object.keys(tags).sort()
 						});
 					});
-					setDrawerRow(function (d) { return d && d.name === row2.name ? row2 : d; });
 				}
 				function isCurrentProject(gen, cwd) {
 					var current = projectRef.current;
@@ -1179,16 +1296,24 @@
 					);
 				}, [ctx]);
 
-				// Initial project options + selection (persisted choice wins).
+				// Initial project options + selection. The active session workspace
+				// always wins so reopening the page cannot silently target an older
+				// project kept in localStorage.
 				React.useEffect(function () {
 					var options = buildProjectOptions(ctx);
 					setProjects(options);
 					var stored = null;
 					try { stored = window.localStorage.getItem('smgr.v1.project'); } catch (error) {}
 					var pick = null;
-					if (typeof stored === 'string' && stored !== '') {
+					var activeCwd = currentCwd(ctx);
+					if (typeof activeCwd === 'string' && activeCwd !== '') {
 						for (var i = 0; i < options.length; i += 1) {
-							if (options[i].cwd === stored) { pick = options[i]; break; }
+							if (options[i].cwd === activeCwd) { pick = options[i]; break; }
+						}
+					}
+					if (pick === null && typeof stored === 'string' && stored !== '') {
+						for (var j = 0; j < options.length; j += 1) {
+							if (options[j].cwd === stored) { pick = options[j]; break; }
 						}
 					}
 					if (pick === null) pick = options[0] || null;
@@ -1215,7 +1340,6 @@
 							if (dialogs[i].classList.contains('sk-drawer') === false) return;
 						}
 						setDrawerName(null);
-						setDrawerRow(null);
 						setTagDraft('');
 						setAdvOpen(false);
 					}
@@ -1237,10 +1361,10 @@
 					setViewError(null);
 					setPartialWarning(null);
 					setSelectedRows({});
+					setBulkMode(false);
 					setToggling({});
 					setSourceBusy(null);
 					setDrawerName(null);
-					setDrawerRow(null);
 					setTagDraft('');
 					setPresetModal(null);
 					setPresetBusy(false);
@@ -1320,6 +1444,7 @@
 						function (value) {
 							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setSelectedRows({});
+							setBulkMode(false);
 							if (value && value.partial === true) {
 								setPartialWarning('批量变更未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
 							}
@@ -1349,25 +1474,30 @@
 				}
 				function doTags(row, tags) {
 					var proj = project;
-					if (viewBusy === true) return;
+					if (viewBusy === true || tagBusy === true) return;
 					var gen = genRef.current;
+					setTagBusy(true);
 					setViewError(null);
 					apiCallAt('setTags', { cwd: proj ? proj.cwd : undefined, name: row.name, tags: tags }, ctx).then(
 						function (value) {
-							if (!isCurrentProject(gen, proj ? proj.cwd : '')) { return; }
+							if (!isCurrentProject(gen, proj ? proj.cwd : '')) { setTagBusy(false); return; }
 							if (value && value.view) { patchRow(value.view); }
 							setTagDraft('');
-							void loadPresets();
+							setTagBusy(false);
 						},
-						function (e) { if (isCurrentProject(gen, proj ? proj.cwd : '')) { setViewError(String((e && e.message) || e)); } }
+						function (e) {
+							setTagBusy(false);
+							if (isCurrentProject(gen, proj ? proj.cwd : '')) { setViewError(String((e && e.message) || e)); }
+						}
 					);
 				}
 				function commitTag() {
 					var row = drawerRow;
 					var v = tagDraft.trim();
-					if (row === null || v === '') return;
+					if (row === null || v === '' || tagBusy === true) return;
 					var tags = (row.tags || []).slice();
-					if (tags.indexOf(v) === -1) tags.push(v);
+					if (tags.length >= 20 || tags.indexOf(v) !== -1) return;
+					tags.push(v);
 					doTags(row, tags);
 				}
 
@@ -1413,6 +1543,7 @@
 							setPresetBusy(false);
 							setPresetModal(null);
 							setSelectedRows({});
+							setBulkMode(false);
 							if (value && value.partial === true) {
 								setPartialWarning('预设应用未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
 							}
@@ -1475,6 +1606,7 @@
 							setSlimBusy(false);
 							setSlimModal(null);
 							setSelectedRows({});
+							setBulkMode(false);
 							if (value && value.partial === true) {
 								setPartialWarning('一键精简未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
 							}
@@ -1494,13 +1626,26 @@
 				var visibleRows = [];
 				if (view !== null) {
 					visibleRows = view.identities.filter(matchesSearch);
-					if (activePage === 'project') {
-						if (enableFilter === 'on') visibleRows = visibleRows.filter(function (r) { return r.enabled === true; });
-						if (enableFilter === 'off') visibleRows = visibleRows.filter(function (r) { return r.enabled !== true; });
-					}
+					if (enableFilter === 'on') visibleRows = visibleRows.filter(function (r) { return r.enabled === true; });
+					if (enableFilter === 'off') visibleRows = visibleRows.filter(function (r) { return r.enabled !== true; });
 					if (tagFilter !== null) {
 						visibleRows = visibleRows.filter(function (r) { return Array.isArray(r.tags) && r.tags.indexOf(tagFilter) !== -1; });
 					}
+				}
+				var selectedVisibleCount = 0;
+				for (var visibleIndex = 0; visibleIndex < visibleRows.length; visibleIndex += 1) {
+					if (selectedRows[visibleRows[visibleIndex].name] === true) selectedVisibleCount += 1;
+				}
+				var allVisibleSelected = visibleRows.length > 0 && selectedVisibleCount === visibleRows.length;
+				function toggleVisibleSelection() {
+					setSelectedRows(function (selected) {
+						var next = Object.assign({}, selected);
+						visibleRows.forEach(function (row) {
+							if (allVisibleSelected) delete next[row.name];
+							else next[row.name] = true;
+						});
+						return next;
+					});
 				}
 
 				// ── row / drawer pieces ───────────────────────────────────────
@@ -1514,29 +1659,32 @@
 							: '在本项目启用（下一轮对话生效）';
 					return h('button', {
 						type: 'button',
+						role: 'switch',
+						'aria-checked': on,
+						'aria-label': (on ? '停用 ' : '启用 ') + row.name + '（仅当前项目）',
 						className: 'smgr-switch' + (on ? ' smgr-switchOn' : '') + (dim ? ' smgr-switchDim' : ''),
 						disabled: dim || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)),
 						title: title,
 						onClick: function (event) { event.stopPropagation(); doToggle(row); }
 					}, h('span', { className: 'smgr-switchKnob' }));
 				}
+				function openDrawer(row) {
+					setDrawerName(row.name);
+					setTagDraft('');
+					setAdvOpen(false);
+				}
 				function rowEl(row) {
 					var off = row.enabled !== true;
 					var checked = selectedRows[row.name] === true;
-					var isProjectPage = activePage === 'project';
 					return h(
 						'div',
 						{
 							key: row.name,
-							className: 'sk-row' + (drawerName === row.name ? ' sk-rowActive' : '') + (off && isProjectPage ? ' sk-rowOff' : ''),
-							onClick: function () {
-								setDrawerName(row.name);
-								setDrawerRow(row);
-								setTagDraft('');
-								setAdvOpen(false);
-							}
+							className: 'sk-row' + (drawerName === row.name ? ' sk-rowActive' : '')
+								+ (row.enabled === true ? ' sk-rowEnabled' : '')
+								+ (off ? ' sk-rowOff' : ''),
 						},
-						isProjectPage
+						bulkMode
 							? h('input', {
 								type: 'checkbox',
 								className: 'sk-check' + (checked ? ' sk-checkOn' : ''),
@@ -1553,10 +1701,21 @@
 								}
 							})
 							: null,
-						h('span', { className: 'sk-ic' }, h(P.IconSkillOutline16)),
 						h(
-							'div',
-							{ className: 'sk-rowMain' },
+							'button',
+							{
+								type: 'button',
+								className: 'sk-rowOpen',
+								'aria-label': '查看 ' + row.name + ' 详情',
+								onClick: function () { openDrawer(row); },
+								onKeyDown: function (event) {
+									if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+									event.preventDefault();
+									openDrawer(row);
+								}
+							},
+							h('span', { className: 'sk-ic' }, h(P.IconSkillOutline16)),
+							h('div', { className: 'sk-rowMain' },
 							h(
 								'div',
 								{ className: 'sk-rowTitle' },
@@ -1570,7 +1729,7 @@
 								row.sources.length > 1
 									? h('span', { className: 'sk-badge', title: '该 Skill 存在多个来源，可在详情中选择' }, '来源 ×' + row.sources.length)
 									: null,
-								isProjectPage && off
+								off
 									? h('span', { className: 'sk-badge', title: '本项目未启用：模型不会自动调用，仍可用 /' + row.name + ' 手动调用' }, '未启用')
 									: null
 							),
@@ -1578,8 +1737,9 @@
 							Array.isArray(row.tags) && row.tags.length > 0
 								? h('div', { className: 'sk-rowTags' }, row.tags.map(function (t) { return h('span', { key: t, className: 'sk-tag' }, t); }))
 								: null
+							)
 						),
-						h('div', { className: 'sk-rowSide' }, isProjectPage ? switchV1(row) : null)
+						h('div', { className: 'sk-rowSide' }, !bulkMode ? switchV1(row) : null)
 					);
 				}
 				function drawerEl() {
@@ -1596,6 +1756,17 @@
 					var canWrite = project !== null
 						&& viewBusy !== true
 						&& !(view && (view.configCorrupt === true || view.configFuture === true));
+					var tagValues = Array.isArray(row.tags) ? row.tags : [];
+					var normalizedTag = tagDraft.trim();
+					var tagAtLimit = tagValues.length >= 20;
+					var tagDuplicate = normalizedTag !== '' && tagValues.indexOf(normalizedTag) !== -1;
+					var tagCanAdd = canWrite && tagBusy !== true && normalizedTag !== '' && !tagAtLimit && !tagDuplicate;
+					var tagHelpId = 'sk-tag-help-' + row.name;
+					var tagIssue = tagAtLimit
+						? '已达到 20 个标签上限'
+						: tagDuplicate
+							? '这个标签已经存在'
+							: '按 Enter 添加';
 					return h(
 						'aside',
 						{ className: 'sk-drawer', role: 'dialog', 'aria-label': 'Skill 详情：' + row.name },
@@ -1609,15 +1780,14 @@
 								className: 'sk-icBtn',
 								'aria-label': '关闭详情',
 								title: '关闭（Esc）',
-								onClick: function () { setDrawerName(null); setDrawerRow(null); setTagDraft(''); setAdvOpen(false); }
+								onClick: function () { setDrawerName(null); setTagDraft(''); setAdvOpen(false); }
 							}, h(P.IconCloseOutline16))
 						),
 						h(
 							'div',
 							{ className: 'sk-drawerBody' },
-							activePage === 'project'
-								? h(
-									'div',
+							h(
+								'div',
 									{ className: 'sk-drawerRow' },
 									h(
 										'div',
@@ -1626,8 +1796,7 @@
 										h('div', { className: 'sk-slimNote' }, '关闭后模型在本项目不再自动调用，仍可用 /' + row.name + ' 手动调用；下一轮对话生效')
 									),
 									switchV1(row)
-								)
-								: null,
+								),
 							h(
 								'div',
 								{ className: 'sk-sec' },
@@ -1654,9 +1823,11 @@
 									h('div', { className: 'sk-secTitle' }, '可选来源' + (canWrite ? '' : '（未选择项目，不能切换）')),
 									h(
 										'div',
-										{ className: 'sk-srcList' },
-										h('button', {
-											type: 'button',
+									{ className: 'sk-srcList', role: 'radiogroup', 'aria-label': row.name + ' 的来源' },
+									h('button', {
+										type: 'button',
+										role: 'radio',
+										'aria-checked': row.sourceKey === null,
 											className: 'sk-src' + (row.sourceKey === null ? ' sk-srcOn' : ''),
 											disabled: !canWrite || sourceBusy === row.name,
 											onClick: function () { doSource(row.name, null); }
@@ -1671,10 +1842,12 @@
 										),
 										row.sources.map(function (s) {
 											var on = row.sourceKey === s.key;
-											return h('button', {
-												type: 'button',
-												key: s.key,
-												className: 'sk-src' + (on ? ' sk-srcOn' : ''),
+										return h('button', {
+											type: 'button',
+											key: s.key,
+											role: 'radio',
+											'aria-checked': on,
+											className: 'sk-src' + (on ? ' sk-srcOn' : ''),
 												disabled: !canWrite || s.broken === true || sourceBusy === row.name,
 												title: s.broken ? '该来源格式损坏，不能选择' : undefined,
 												onClick: function () { doSource(row.name, s.key); }
@@ -1703,40 +1876,56 @@
 							h(
 								'div',
 								{ className: 'sk-sec' },
-								h('div', { className: 'sk-secTitle' }, '标签（全局，跨项目共享）'),
+								h('div', { className: 'sk-tagHeading' },
+									h('div', { className: 'sk-secTitle' }, '标签'),
+									h('span', { className: 'sk-tagScope' }, '全局共享')),
 								h(
 									'div',
-									{ className: 'sk-tagEdit' },
-									(row.tags || []).map(function (t) {
-										return h('span', { key: t, className: 'sk-tag' },
-											t,
-											h('button', {
-												type: 'button',
-											className: 'sk-tagX',
-											title: '移除标签「' + t + '」',
-											disabled: !canWrite,
-												onClick: function () {
-													var rest = (row.tags || []).filter(function (x) { return x !== t; });
-													doTags(row, rest);
-												}
-											}, h(P.IconCloseOutline16, { size: 10 })));
-									}),
-									h('input', {
-										className: 'sk-tagInput',
-										placeholder: '＋ 添加标签',
-										value: tagDraft,
-										maxLength: 32,
-										disabled: !canWrite,
-										onChange: function (event) { setTagDraft(event.target.value); },
-										onKeyDown: function (event) { if (event.key === 'Enter') commitTag(); }
-									}),
-									h('button', {
-										type: 'button',
-										className: 'sk-chip',
-										disabled: !canWrite || tagDraft.trim() === '',
-										onClick: commitTag
-									}, '添加')
-								)
+									{ className: 'sk-tagPanel' },
+									tagValues.length > 0
+										? h('div', { className: 'sk-tagList', 'aria-label': '已有标签' }, tagValues.map(function (t) {
+											return h('span', { key: t, className: 'sk-tag' },
+												t,
+												h('button', {
+													type: 'button',
+													className: 'sk-tagX',
+													'aria-label': '移除标签「' + t + '」',
+													title: '移除标签「' + t + '」',
+													disabled: !canWrite || tagBusy === true,
+													onClick: function () {
+														var rest = tagValues.filter(function (x) { return x !== t; });
+														doTags(row, rest);
+													}
+												}, h(P.IconCloseOutline16, { size: 10 })));
+										}))
+										: null,
+									h('div', { className: 'sk-tagComposer' },
+										h('input', {
+											className: 'sk-tagInput',
+											'aria-label': '新标签',
+											'aria-describedby': tagHelpId,
+											placeholder: tagAtLimit ? '已达到标签上限' : '输入标签',
+											value: tagDraft,
+											maxLength: 32,
+											disabled: !canWrite || tagBusy === true || tagAtLimit,
+											onChange: function (event) { setTagDraft(event.target.value); },
+											onKeyDown: function (event) {
+												if (event.key === 'Enter') { event.preventDefault(); commitTag(); }
+											}
+										}),
+										h('button', {
+											type: 'button',
+											className: 'sk-tagAdd',
+											'aria-label': '添加标签',
+											disabled: !tagCanAdd,
+											onClick: commitTag
+										}, tagBusy ? '保存中…' : '添加'))
+								),
+								h('div', {
+									id: tagHelpId,
+									className: 'sk-tagFoot' + ((tagAtLimit || tagDuplicate) ? ' sk-tagIssue' : ''),
+									'aria-live': 'polite'
+								}, h('span', null, tagIssue), h('span', null, tagValues.length + '/20 · 每个最多 32 字符'))
 							),
 							h(
 								'div',
@@ -1791,7 +1980,14 @@
 						if (view.identities[k].enabled === true) enabledCount += 1;
 					}
 				}
+				var totalCount = view !== null ? view.identities.length : 0;
+				var disabledCount = Math.max(0, totalCount - enabledCount);
 				var selectedCount = Object.keys(selectedRows).length;
+				var recommendedPreset = null;
+				for (var presetIndex = 0; presetIndex < presets.length; presetIndex += 1) {
+					if (presets[presetIndex].defaultSlim === true) { recommendedPreset = presets[presetIndex]; break; }
+				}
+				if (recommendedPreset === null && presets.length > 0) recommendedPreset = presets[0];
 
 				return h(
 					'div',
@@ -1811,101 +2007,85 @@
 					: null,
 					h(
 						'div',
-						{ className: 'sk-tabs', role: 'tablist' },
-						h('button', {
-							type: 'button', role: 'tab', 'aria-selected': activePage === 'project',
-							className: 'sk-tab' + (activePage === 'project' ? ' sk-tabActive' : ''),
-							onClick: function () { setActivePage('project'); setSelectedRows({}); }
-						}, '项目管理'),
-						h('button', {
-							type: 'button', role: 'tab', 'aria-selected': activePage === 'library',
-							className: 'sk-tab' + (activePage === 'library' ? ' sk-tabActive' : ''),
-							onClick: function () { setActivePage('library'); setSelectedRows({}); }
-						}, '统一资源库')
-					),
-					h(
-						'div',
 						{ className: 'sk-content' },
 						h(
 							'div',
 							{ className: 'sk-listcol' },
-							activePage === 'project'
-								? h(
+							h(
 									'div',
-									{ className: 'sk-projectbar' },
-									h('span', { className: 'sk-projLabel' }, '当前项目'),
+									{ className: 'sk-projectCard' },
 									h(
 										'div',
-										{ style: { position: 'relative' } },
-										h('button', {
-											type: 'button',
-											className: 'sk-projBtn',
-											disabled: projects.length === 0,
-											onClick: function () {
-												// Refresh the workspace list each time the menu opens.
-												setProjects(buildProjectOptions(ctx));
-												setProjMenuOpen(!projMenuOpen);
-												setTagMenuOpen(false);
-											},
-											title: project ? project.cwd : '选择要管理的项目'
-										},
-											h('span', { className: 'sk-projTitle' }, project ? project.title : '（未选择）'),
-											h(P.IconChevronDownOutline14)),
-										projMenuOpen
-											? h(
-												'div',
-												{ className: 'sk-menu' },
-												projects.map(function (p) {
-													var isCurrent = p.cwd === currentCwd(ctx);
-													return h('button', {
-														type: 'button',
-														key: p.cwd,
-														className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''),
-														onClick: function () { chooseProject(p); }
-													},
-														isCurrent ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }),
-														h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title),
-														isCurrent ? h('span', { className: 'sk-menuHint' }, '当前工作区') : null
-													);
-												}),
-												h('div', { className: 'sk-menuSep' }),
-												h('button', {
-													type: 'button',
-													className: 'sk-menuBtn',
-													onClick: function () { setProjMenuOpen(false); addLocalProject(); }
-												}, h(P.IconPlusOutline16), '添加本地项目…')
-											)
-											: null
+										{ className: 'sk-projectIdentity' },
+										h('span', { className: 'sk-projectIcon' }, h(P.IconFolderOpenOutline16, { size: 24 })),
+										h('div', { className: 'sk-projectMeta' },
+											h('div', { className: 'sk-projectTitleLine' },
+												h('span', { className: 'sk-projectTitle' }, project ? project.title : '未选择项目'),
+												project && project.cwd === currentCwd(ctx)
+													? h('span', { className: 'sk-currentBadge' }, '当前工作区')
+													: h('span', { className: 'sk-currentBadge' }, '已选择项目')
+											),
+											project ? h('span', { className: 'sk-projectPath', title: project.cwd }, project.cwd) : null
+										)
 									),
 									h(
 										'div',
-										{ className: 'sk-chips' },
-										presets.map(function (p) {
-											return h('button', {
+										{ className: 'sk-projectStats' },
+										h('div', null,
+											h('div', { className: 'sk-statValue' }, enabledCount + ' 已启用 / ' + totalCount + ' Skills'),
+											h('div', { className: 'sk-statHint' }, '以下更改只影响此项目 · 下一轮对话生效')
+										)
+									),
+									h(
+										'div',
+										{ className: 'sk-projectActions' },
+										recommendedPreset !== null
+											? h('button', {
 												type: 'button',
-												key: p.name,
-												className: 'sk-chip' + (p.defaultSlim ? ' sk-chipDef' : ''),
-												title: (p.description ? p.description + ' · ' : '') + '应用前先预览（替换 / 合并）',
-												onClick: function () { openPreset(p); }
-											}, p.name, p.defaultSlim ? ' 默认精简' : ' · ' + p.skillCount + ' 个');
-										}),
+												className: 'sk-chip',
+												title: '先预览推荐预设，再决定替换或合并',
+												onClick: function () { openPreset(recommendedPreset); }
+											}, '应用推荐预设')
+											: null,
 										h('button', {
 											type: 'button',
 											className: 'sk-chip sk-chipAdd',
 											title: '把当前项目的启用集合与来源选择保存为可复用预设',
 											onClick: function () { setSaveName(''); setSaveDesc(''); setSaveOpen(true); }
-										}, h(P.IconPlusOutline16), '保存为预设')
+										}, '保存为预设'),
+										h(
+											'div',
+											{ style: { position: 'relative' } },
+										h('button', {
+											type: 'button',
+												className: 'sk-projBtn',
+												disabled: projects.length === 0,
+												onClick: function () {
+													setProjects(buildProjectOptions(ctx));
+													setProjMenuOpen(!projMenuOpen);
+													setTagMenuOpen(false);
+												},
+												title: project ? '当前项目：' + project.cwd : '选择要管理的项目'
+											}, '切换项目', h(P.IconChevronDownOutline14)),
+											projMenuOpen
+												? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0 } },
+													projects.map(function (p) {
+														var isCurrent = p.cwd === currentCwd(ctx);
+														return h('button', {
+															type: 'button', key: p.cwd,
+															className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''),
+															onClick: function () { chooseProject(p); }
+														},
+															isCurrent ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }),
+															h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title),
+															isCurrent ? h('span', { className: 'sk-menuHint' }, '当前工作区') : null);
+													}),
+													h('div', { className: 'sk-menuSep' }),
+													h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjMenuOpen(false); addLocalProject(); } },
+														h(P.IconPlusOutline16), '添加本地项目…'))
+												: null
+											)
 									)
-								)
-								: h(
-									'div',
-									{ className: 'sk-projectbar' },
-									h('span', { className: 'sk-projLabel' }, '资源库范围'),
-									h('span', { className: 'sk-menuHint', style: { whiteSpace: 'normal' } },
-										'全部 DSH 支持目录中的 Skill（同名已合并）；来源选择与开关作用于所选项目'),
-									project
-										? h('span', { className: 'sk-chip', title: project.cwd }, '项目：' + project.title)
-										: null
 								),
 							h(
 								'div',
@@ -1918,23 +2098,21 @@
 										className: 'sk-search',
 										placeholder: '搜索名称或完整描述…',
 										value: search,
-										onChange: function (event) { setSearch(event.target.value); }
+										onChange: function (event) { setSearch(event.target.value); setSelectedRows({}); }
 									})
 								),
-								activePage === 'project'
-									? h(
-										'div',
-										{ className: 'sk-filters' },
-										[['all', '全部'], ['on', '已启用'], ['off', '未启用']].map(function (f) {
-											return h('button', {
-												type: 'button',
-												key: f[0],
-												className: 'sk-filterBtn' + (enableFilter === f[0] ? ' sk-filterBtnActive' : ''),
-												onClick: function () { setEnableFilter(f[0]); }
-											}, f[1]);
-										})
-									)
-									: null,
+								h(
+									'div',
+									{ className: 'sk-filters' },
+									[['all', '全部', totalCount], ['on', '已启用', enabledCount], ['off', '未启用', disabledCount]].map(function (f) {
+										return h('button', {
+											type: 'button',
+											key: f[0],
+											className: 'sk-filterBtn' + (enableFilter === f[0] ? ' sk-filterBtnActive' : ''),
+											onClick: function () { setEnableFilter(f[0]); setSelectedRows({}); }
+										}, f[1], h('span', { className: 'sk-filterCount' }, f[2]));
+									})
+								),
 								h(
 									'div',
 									{ style: { position: 'relative' } },
@@ -1952,40 +2130,54 @@
 											h('button', {
 												type: 'button',
 												className: 'sk-menuBtn' + (tagFilter === null ? ' sk-menuBtnActive' : ''),
-												onClick: function () { setTagFilter(null); setTagMenuOpen(false); }
+											onClick: function () { setTagFilter(null); setTagMenuOpen(false); setSelectedRows({}); }
 											}, '全部标签'),
 											((view && view.allTags) || []).map(function (t) {
 												return h('button', {
 													type: 'button',
 													key: t,
 													className: 'sk-menuBtn' + (tagFilter === t ? ' sk-menuBtnActive' : ''),
-													onClick: function () { setTagFilter(t); setTagMenuOpen(false); }
+												onClick: function () { setTagFilter(t); setTagMenuOpen(false); setSelectedRows({}); }
 												}, t);
 											})
 										)
 										: null
 								),
-								h('span', { className: 'sk-spacer' }),
-								selectedCount > 0
-									? h(
-										'div',
-										{ className: 'sk-bulk' },
-										h('span', { className: 'sk-menuHint', style: { whiteSpace: 'nowrap' } }, '已选 ' + selectedCount + ' 个'),
-									h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(true); } }, '批量启用'),
-									h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(false); } }, '批量禁用'),
-										h('button', { type: 'button', className: 'sk-chip sk-chipAdd', onClick: function () { setSelectedRows({}); } }, '清除')
-									)
-									: null,
-								activePage === 'project'
-									? h('button', {
+							h('span', { className: 'sk-spacer' }),
+							bulkMode
+								? h('label', { className: 'sk-selectVisible' },
+									h('input', {
+										type: 'checkbox',
+										checked: allVisibleSelected,
+										disabled: visibleRows.length === 0 || viewBusy === true,
+										onChange: toggleVisibleSelection,
+										'aria-label': allVisibleSelected ? '取消选择当前结果' : '全选当前结果'
+									}),
+									'全选当前结果',
+									visibleRows.length > 0 ? h('span', { className: 'sk-filterCount' }, visibleRows.length) : null)
+								: null,
+							h('button', {
+									type: 'button',
+									className: 'sk-chip' + (bulkMode ? ' sk-chipDef' : ''),
+									'aria-pressed': bulkMode,
+									'aria-label': bulkMode ? '退出批量管理' : '进入批量管理',
+									title: bulkMode ? '退出批量管理并清除选择' : '选择多个 Skill 后统一启用或停用',
+									onClick: function () {
+										setSelectedRows({});
+										setBulkMode(!bulkMode);
+									}
+							}, bulkMode ? '完成' : '批量管理'),
+								h('button', {
 										type: 'button',
 										className: 'sk-chip',
 									disabled: project === null || viewBusy === true || (view !== null && enabledCount === 0) || (view && (view.configCorrupt === true || view.configFuture === true)),
 										title: '存在默认精简预设时按预设精简；否则关闭全部启用',
 										onClick: doSlimPreview
-									}, '一键精简')
-									: null
+								}, '一键精简')
 							),
+							bulkMode
+								? h('div', { className: 'sk-batchHint', role: 'status' }, '批量管理模式：勾选 Skill 后统一启用或停用，右侧单项开关已暂时隐藏。')
+								: null,
 							viewError !== null ? h('p', { className: 'sk-error', role: 'alert' }, viewError) : null,
 							h(
 								'div',
@@ -1993,24 +2185,38 @@
 								view === null && !viewError
 									? h('p', { className: 'sk-empty' }, viewBusy ? '正在扫描…' : '（空）')
 									: null,
-								visibleRows.length === 0 && view !== null
-									? h('p', { className: 'sk-empty' },
+							visibleRows.length === 0 && view !== null
+								? h('div', { className: 'sk-empty' },
+									h('div', null, search !== '' || tagFilter !== null || enableFilter !== 'all'
+										? (enableFilter === 'on' && enabledCount === 0 ? '这个项目还没有启用任何 Skill' : '没有匹配的 Skill')
+										: '没有发现任何 Skill'),
+									h('div', { className: 'sk-emptyActions' },
 										search !== '' || tagFilter !== null || enableFilter !== 'all'
-											? '没有匹配的 Skill'
-											: '没有发现任何 Skill')
-									: null,
-								visibleRows.map(rowEl)
-							),
+											? h('button', { type: 'button', className: 'sk-chip', onClick: function () { setSearch(''); setTagFilter(null); setEnableFilter('all'); } }, '查看全部 Skill')
+											: null,
+										recommendedPreset !== null
+											? h('button', { type: 'button', className: 'sk-chip', onClick: function () { openPreset(recommendedPreset); } }, '应用推荐预设')
+											: null))
+								: null,
+							visibleRows.map(rowEl)
+						),
+						bulkMode && selectedCount > 0
+							? h('div', { className: 'sk-bulkbar', role: 'region', 'aria-label': '批量操作' },
+								h('strong', null, '已选择 ' + selectedCount + ' 项'),
+								h('span', { className: 'sk-slimNote' }, '更改仅作用于 ' + (project ? project.title : '当前项目')),
+								h('span', { className: 'sk-spacer' }),
+								h('button', { type: 'button', className: 'sk-bulkPrimary', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(true); } }, '在本项目启用（' + selectedCount + '）'),
+								h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(false); } }, '在本项目停用（' + selectedCount + '）'),
+								h('button', { type: 'button', className: 'sk-chip sk-chipAdd', onClick: function () { setSelectedRows({}); } }, '清除选择'))
+							: null,
 							h(
 								'div',
 								{ className: 'sk-footer' },
-								activePage === 'project'
-									? (view && view.projectRoot
-										? h('span', null, '项目配置保存于 ', h('code', null, view.projectRoot), '/.dsh/skill-manager.json，仅在本机使用且不提交 Git；启停在下一轮对话生效')
-										: h('span', null, '未选择项目：仅显示用户级与内置 Skill'))
-									: h('span', null, '默认优先级：项目专属 > DSH 用户级 > 其他全局 > 内置；未显式选择时使用第一个可用来源'),
+								view && view.projectRoot
+									? h('span', null, '项目配置保存于 ', h('code', null, view.projectRoot), '/.dsh/skill-manager.json，仅在本机使用且不提交 Git；启停在下一轮对话生效')
+									: h('span', null, '未选择项目：仅显示用户级与内置 Skill'),
 								h('span', null, '共 ' + (view ? view.identities.length : 0) + ' 个 Skill'
-									+ (activePage === 'project' && view ? ' · 已启用 ' + enabledCount + ' 个' : ''))
+									+ (view ? ' · 已启用 ' + enabledCount + ' 个' : ''))
 							)
 						),
 						drawerName !== null ? drawerEl() : null
@@ -2020,38 +2226,48 @@
 						onClose: function () { setPresetModal(null); },
 						title: presetModal ? '应用预设「' + presetModal.name + '」' : '应用预设',
 						closeLabel: '关闭',
-						description: '先预览变化，再选择替换或合并。预设只保存 Skill 身份与所选通用来源：不锁定版本、不携带项目特化内容。',
+						description: '预览当前项目将发生的变化，再选择替换或合并；版本与项目特化内容不会写入预设。',
 						footer: h(
-							React.Fragment,
-							null,
-							h('span', { className: 'sk-spacer' }),
+							'div',
+							{ className: 'sk-presetFooter' },
 							presetModal
 								? h(React.Fragment, null,
-									h(Button, { variant: 'outline', onClick: function () { setDefaultPreset(presetModal.name); } }, '设为默认精简预设'),
-									h(Button, { variant: 'outline', onClick: function () { deletePreset(presetModal.name); } }, '删除预设'),
+									h('div', { className: 'sk-presetFooterLeft' },
+										h('button', { type: 'button', className: 'sk-presetTextBtn', title: '设为默认精简预设', onClick: function () { setDefaultPreset(presetModal.name); } }, '设为默认'),
+										h('button', { type: 'button', className: 'sk-presetTextBtn sk-presetTextDanger', onClick: function () { deletePreset(presetModal.name); } }, '删除预设')),
+									h('span', { className: 'sk-spacer' }),
 									h(Button, { variant: 'outline', onClick: function () { setPresetModal(null); } }, '取消'),
-								h(Button, { disabled: presetBusy || viewBusy === true || (project !== null && presetModal.cwd !== project.cwd), onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
+									h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || viewBusy === true || (project !== null && presetModal.cwd !== project.cwd), onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
 								: null
 						)
 					},
 						presetModal
 							? h(
 								'div',
-								{ className: 'sk-modalDiff' },
+								{ className: 'sk-presetApply' },
 								h(
 									'div',
-									{ className: 'sk-filters' },
+									{ className: 'sk-presetMode', role: 'radiogroup', 'aria-label': '预设应用方式' },
 									[['replace', '替换当前配置'], ['merge', '合并到当前配置']].map(function (m) {
 										return h('button', {
 											type: 'button',
+											role: 'radio',
+											'aria-checked': presetModal.mode === m[0],
 											key: m[0],
-											className: 'sk-filterBtn' + (presetModal.mode === m[0] ? ' sk-filterBtnActive' : ''),
+											className: 'sk-presetModeBtn' + (presetModal.mode === m[0] ? ' sk-presetModeBtnOn' : ''),
 											onClick: function () { switchPresetMode(m[0]); }
 										}, m[1]);
 									})
 								),
+								h('div', { className: 'sk-presetImpact', role: 'status', 'aria-live': 'polite' },
+									h('span', { className: 'sk-presetImpactMain' },
+										'将启用 ' + (presetModal.diff.toEnable || []).length + ' 个 Skill，停用 ' + (presetModal.diff.toDisable || []).length + ' 个'),
+									h('span', { className: 'sk-presetImpactMeta' }, (presetModal.diff.sourceChanges || []).length + ' 项来源变更')),
 								presetModal.desc ? h('p', { className: 'sk-slimNote' }, presetModal.desc) : null,
-								h(DiffView, { diff: presetModal.diff })
+								h('div', { className: 'sk-presetListTitle' },
+									h('span', null, '全部变更'),
+									h('span', { className: 'sk-presetImpactMeta' }, '下一轮对话生效')),
+								h(DiffView, { diff: presetModal.diff, showFinal: false })
 							)
 							: null
 					),
@@ -2077,34 +2293,46 @@
 						onClose: function () { setSaveOpen(false); },
 						title: '保存为自定义预设',
 						closeLabel: '关闭',
-						description: '保存当前项目的启用集合与所选来源（跨项目可复用；不保存版本与项目特化内容）。',
+						description: '保存当前项目的启用 Skill 与所选来源，可在其他项目复用。',
 						footer: h(
-							React.Fragment,
-							null,
+							'div',
+							{ className: 'sk-presetFooter' },
+							h('span', { className: 'sk-spacer' }),
 							h(Button, { variant: 'outline', onClick: function () { setSaveOpen(false); } }, '取消'),
-							h(Button, { disabled: presetBusy || saveName.trim() === '', onClick: savePreset }, presetBusy ? '保存中…' : '保存')
+							h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || saveName.trim() === '', onClick: savePreset }, presetBusy ? '保存中…' : '保存')
 						)
 					},
 						h(
 							'div',
-							{ style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-							h('input', {
-								className: 'sk-tagInput',
-								style: { width: '100%', borderRadius: 8 },
-								placeholder: '预设名称（1–64 字符）',
-								value: saveName,
-								maxLength: 64,
-								onChange: function (event) { setSaveName(event.target.value); },
-								onKeyDown: function (event) { if (event.key === 'Enter' && saveName.trim() !== '') savePreset(); }
-							}),
-							h('input', {
-								className: 'sk-tagInput',
-								style: { width: '100%', borderRadius: 8 },
-								placeholder: '描述（可选）',
-								value: saveDesc,
-								maxLength: 200,
-								onChange: function (event) { setSaveDesc(event.target.value); }
-							}),
+							{ className: 'sk-presetSave' },
+							h('label', { className: 'sk-presetField' },
+								h('span', { className: 'sk-presetFieldHead' },
+									h('span', null, '预设名称'),
+									h('span', { className: 'sk-presetCounter' }, saveName.length + '/64')),
+								h('input', {
+									className: 'sk-presetInput',
+									placeholder: '例如：日常研发 · 精简',
+									value: saveName,
+									maxLength: 64,
+									onChange: function (event) { setSaveName(event.target.value); },
+									onKeyDown: function (event) { if (event.key === 'Enter' && saveName.trim() !== '') savePreset(); }
+								})),
+							h('label', { className: 'sk-presetField' },
+								h('span', { className: 'sk-presetFieldHead' },
+									h('span', null, '描述（可选）'),
+									h('span', { className: 'sk-presetCounter' }, saveDesc.length + '/200')),
+								h('textarea', {
+									className: 'sk-presetTextarea',
+									placeholder: '说明适用场景、来源或使用建议',
+									value: saveDesc,
+									maxLength: 200,
+									onChange: function (event) { setSaveDesc(event.target.value); }
+								})),
+							project !== null
+								? h('div', { className: 'sk-presetSaveSummary' },
+									h('strong', null, '将保存当前项目的 ' + enabledCount + ' 个已启用 Skill 与所选来源'),
+									h('span', null, '可跨项目复用 · 不保存版本与项目特化内容'))
+								: null,
 							project === null
 								? h('p', { className: 'sk-slimNote' }, '需要项目上下文：请先在顶部选择项目。')
 								: null
@@ -2115,7 +2343,9 @@
 
 			/**
 			 * The SKILL tab: probes the host for the V1 (apiVersion 6)
-			 * `catalog` op; on an unknown op the running host predates
+			 * with a lightweight `capabilities` op. Hosts from the first V1
+			 * release do not expose it, so an unknown op falls back to one
+			 * `catalog` request; an unknown catalog means the host predates
 			 * DSH-008 and the legacy section is shown instead.
 			 */
 			function SkillCenterV1(props) {
@@ -2127,12 +2357,26 @@
 				React.useEffect(function () {
 					setProbe('loading');
 					setProbeError(null);
-					apiCallAt('catalog', {}, ctx).then(
-						function () { setProbe('v1'); },
+					function accept(value) {
+						if (value && Number(value.apiVersion) >= 6) setProbe('v1');
+						else setProbe('legacy');
+					}
+					function reject(e) {
+						var msg = String((e && e.message) || e);
+						if (msg.indexOf('未知操作') !== 0) { setProbe('error'); setProbeError(msg); return; }
+						apiCallAt('catalog', {}, ctx).then(
+							function (value) { accept(value); },
+							function (catalogError) {
+								var catalogMessage = String((catalogError && catalogError.message) || catalogError);
+								if (catalogMessage.indexOf('未知操作') === 0) setProbe('legacy');
+								else { setProbe('error'); setProbeError(catalogMessage); }
+							}
+						);
+					}
+					apiCallAt('capabilities', {}, ctx).then(
+						accept,
 						function (e) {
-							var msg = String((e && e.message) || e);
-							if (msg.indexOf('未知操作') === 0) setProbe('legacy');
-							else { setProbe('error'); setProbeError(msg); }
+							reject(e);
 						}
 					);
 				}, [attempt, ctx]);
@@ -2144,7 +2388,7 @@
 						'div',
 						{ className: 'smgr' },
 						h('p', { className: 'sk-banner' },
-							'当前 dsh web 尚未加载 DSH-008 的 host 接口（apiVersion 6）。重启 dsh web 后即可使用新版 SKILL 管理中心（项目管理 / 统一资源库）；现在显示旧版界面。'),
+							'当前 dsh web 尚未加载 DSH-008 的 host 接口（apiVersion 6）。重启 dsh web 后即可使用新版项目 SKILL 管理中心；现在显示旧版界面。'),
 						h(SkillManagerSection, { api: api })
 					);
 				}
@@ -2174,10 +2418,14 @@
 			}
 
 			var EXT_TABS = [
-				{ id: 'skill', label: 'SKILL', desc: 'Skills 技能管理' },
-				{ id: 'mcp', label: 'MCP', desc: 'Model Context Protocol 服务器', soon: true },
-				{ id: 'plugin', label: 'Plugin', desc: '已安装插件', soon: true }
+				{ id: 'skill', label: 'SKILL', desc: 'Skills 技能管理', icon: P.IconSkillOutline16 },
+				{ id: 'mcp', label: 'MCP', desc: 'Model Context Protocol 服务器', soon: true, icon: P.IconLinkOutline16 },
+				{ id: 'plugin', label: 'Plugin', desc: '已安装插件', soon: true, icon: P.IconCordisPluginOutline14 }
 			];
+			function readExtNavCollapsed() {
+				try { return window.localStorage.getItem('smgr.ext.navCollapsed') === '1'; }
+				catch (error) { return false; }
+			}
 
 			function ExtPlaceholder(props) {
 				return h(
@@ -2205,6 +2453,12 @@
 				var onCloseRef = React.useRef(onClose);
 				onCloseRef.current = onClose;
 				var [tab, setTab] = React.useState('skill');
+				var [navCollapsed, setNavCollapsed] = React.useState(readExtNavCollapsed);
+				function toggleNav() {
+					var next = !navCollapsed;
+					setNavCollapsed(next);
+					try { window.localStorage.setItem('smgr.ext.navCollapsed', next ? '1' : '0'); } catch (error) {}
+				}
 				React.useEffect(function () {
 					function onKey(event) {
 						if (event.key !== 'Escape') return;
@@ -2230,25 +2484,50 @@
 						{ className: 'ext-body' },
 						h(
 							'nav',
-							{ className: 'ext-nav', 'aria-label': '扩展类型' },
-							EXT_TABS.map(function (t) {
-								return h(
-									'button',
-									{
-										key: t.id,
-										type: 'button',
-										className: 'ext-navBtn' + (tab === t.id ? ' ext-navBtnActive' : ''),
-										onClick: function () { setTab(t.id); }
-									},
-									h(
-										'span',
-										{ className: 'ext-navLabel' },
-										t.label,
-										t.soon ? h('span', { className: 'ext-soon' }, '建设中') : null
-									),
-									h('span', { className: 'ext-navDesc' }, t.desc)
-								);
-							})
+							{ className: 'ext-nav' + (navCollapsed ? ' ext-navCollapsed' : ''), 'aria-label': '扩展类型' },
+							h(
+								'div',
+								{ className: 'ext-navHead' },
+								h('span', { className: 'ext-navTitle' }, '扩展类型'),
+								h('button', {
+									type: 'button',
+									className: 'ext-navToggle',
+									'aria-label': navCollapsed ? '展开扩展类型导航' : '收起扩展类型导航',
+									'aria-expanded': !navCollapsed,
+									title: navCollapsed ? '展开导航' : '收起导航',
+									onClick: toggleNav
+								}, h(navCollapsed ? P.IconChevronRightOutline14 : P.IconChevronLeftOutline14))
+							),
+							h(
+								'div',
+								{ className: 'ext-navList' },
+								EXT_TABS.map(function (t) {
+									return h(
+										'button',
+										{
+											key: t.id,
+											type: 'button',
+											className: 'ext-navBtn' + (tab === t.id ? ' ext-navBtnActive' : ''),
+											'aria-label': t.label + (t.soon ? '（建设中）' : ''),
+											title: navCollapsed ? t.label + (t.soon ? '（建设中）' : '') : undefined,
+											onClick: function () { setTab(t.id); }
+										},
+										h('span', { className: 'ext-navIcon' }, h(t.icon),
+											navCollapsed && t.soon ? h('span', { className: 'ext-navSoonDot', 'aria-hidden': true }) : null),
+										h(
+											'span',
+											{ className: 'ext-navCopy' },
+											h(
+												'span',
+												{ className: 'ext-navLabel' },
+												t.label,
+												t.soon ? h('span', { className: 'ext-soon' }, '建设中') : null
+											),
+											h('span', { className: 'ext-navDesc' }, t.desc)
+										)
+									);
+								})
+							)
 						),
 						h(
 							'main',

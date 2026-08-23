@@ -3,37 +3,46 @@
 DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增「扩展」一级入口，
 点开全页「扩展」视图，统一管理 DSH 的扩展能力（DSH-006；SKILL 管理中心 V1 重构 DSH-008）。
 
-- **SKILL 分区**（DSH-008 V1）：两个子页面 ——
-  - **项目管理**（默认）：按项目启用/禁用 Skill、批量启停、一键精简、
-    保存/应用自定义预设（替换/合并预览）、全局标签、项目选择器（复用 DSH 工作区 + 手动添加本地项目）。
-  - **统一资源库**：全部 DSH 支持目录中的 Skill 同名合并为一个身份，
-    详情列出全部来源，当前项目可显式选择来源。
+- **SKILL 分区**（DSH-008 V1）：单一项目管理页面，按项目启用/禁用 Skill、批量启停、
+  一键精简、保存/应用自定义预设（替换/合并预览）、全局标签和项目选择器；全部支持目录
+  中的同名 Skill 仍合并为一个身份，详情列出全部来源并允许当前项目显式选择来源。
   - 运行中的 host 尚未加载 apiVersion 6（未重启 `dsh web`）时，自动降级为
     旧版单页界面（见下方「旧版功能」）并显示提示条。
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 12 / DSH-008 V1）
+## 页面结构（build 18 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
 - **全页视图**：fixed 全屏覆盖（z-index 200，位于侧边浮动面板(30)之上、Modal(1000)/toast(1100)
   之下，SKILL 分区内的导入/删除确认弹窗仍正常浮于其上）。顶栏标题 + 关闭按钮；
-  左导航 SKILL / MCP / Plugin（建设中带徽标）；右内容区。Esc 或关闭按钮退出
+  左导航 SKILL / MCP / Plugin（建设中带徽标）可在 208px 完整态与 64px 图标态间切换，
+  收起状态保存在浏览器本地；右侧为内容区。Esc 或关闭按钮退出
   （弹窗打开时 Esc 优先给弹窗；详情抽屉打开时 Esc 先关抽屉）。
-- **SKILL 分区（V1）**：`项目管理 / 统一资源库` 两个子页签。
-  - **项目管理**：顶部「当前项目」选择器（当前 DSH 工作区 + 最近使用的工作区 +
-    添加本地项目）与「自定义预设」chip 行（默认精简预设带「默认精简」标记）；
-    工具栏为 搜索 / 全部·已启用·未启用 / 全部标签 筛选 / 一键精简；
-    行 = 图标 + 名称 + 项目特化/来源×N/未启用 徽标 + 完整描述 + 标签 + 启用开关；
-    勾选多行后可批量启用/禁用；底部说明「项目配置保存于 …/.dsh/skill-manager.json，
+- **SKILL 分区（V1）**：不再使用重复的子页签，直接进入项目管理单页。
+  - 顶部项目控制栏固定展示当前项目、完整路径、当前工作区标记、
+    已启用/总数与「仅影响此项目」说明；历史选择不会覆盖当前会话工作区，切换菜单仍包含
+    最近使用的工作区与添加本地项目；推荐预设与保存预设保留为次级动作；应用预设弹窗使用
+    「模式选择 → 影响摘要 → 分组变更列表 → 操作区」的固定层级，保存预设弹窗使用常驻字段标签、
+    字数计数、保存摘要和右对齐主操作，避免长列表与底部按钮挤压换行；
+    工具栏为 搜索 / 带数量的全部·已启用·未启用 / 全部标签 / 批量管理 / 一键精简；
+    「全部」视图始终沿用 catalog 顺序，不再按启用状态自动分组或移动行；已启用行保持原位并使用
+    品牌淡蓝底色，同时保留启用开关与数量，状态筛选只在用户主动选择时收窄结果；
+    默认行 = 图标 + 名称 + 项目特化/来源×N/未启用 徽标 + 完整描述 + 标签 + 启用开关；
+    进入显式「批量管理」模式后才显示全选与行复选框，同时隐藏单项开关，避免两个控件都被理解为启停；
+    勾选多行后在底部固定操作栏明确「在本项目启用/停用」，成功后自动退出批量模式；
+    空状态提供查看全部或应用推荐预设；底部说明「项目配置保存于 …/.dsh/skill-manager.json，
     仅在本机使用且不提交 Git；启停在下一轮对话生效」。
-  - **统一资源库**：同名 Skill 合并为一行（「来源 ×N」徽标），搜索/标签筛选，
-    点击行打开右侧详情抽屉切换来源；默认优先级 项目专属 > DSH 用户级 > 其他全局 > 内置。
+    同名 Skill 合并为一行（「来源 ×N」徽标）；点击行在详情中切换来源，默认优先级为
+    项目专属 > DSH 用户级 > 其他全局 > 内置。
   - **详情抽屉**：启用此 Skill 开关、完整描述、当前来源、可选来源（radio，
-    含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、标签编辑
-    （全局，跨项目共享）、更新状态（V1 不检测远端更新，不伪造数据）、
+    含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、一体化标签编辑器
+    （全局、跨项目共享；已有标签胶囊、回车添加、重复/20 个上限提示、请求期防重复提交）、
+    更新状态（V1 不检测远端更新，不伪造数据）、
     「为此项目特化」（V1.2 能力，只读展示 + 禁用按钮）、高级折叠（路径/格式/附属文件）。
+    详情从最新 catalog 派生，不再与列表保存重复快照；所有桌面宽度均使用 400px 覆盖式抽屉，
+    不改变项目卡片、工具栏或列表的宽度与换行，窄窗口最多占满可用宽度。
 - **SKILL 分区（旧版降级）**：host 未加载 apiVersion 6 时渲染
   `SkillManagerSection`（build 11 功能，见下），顶部显示重启提示条。
 
@@ -56,11 +65,20 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     frontmatter 标志（字节保真，永不加 `user-invocable`）。
   - `copy`：未修改的受管副本——改副本标志并刷新登记的 `copyHash`。
   - `original`：用户/全局/内置来源——生成/删除 marker 验证的派生开关文件。
+- **启用必须等于会话可调用**：若项目启用的原始来源自身带有
+  `disable-model-invocation`（例如旧全局默认关闭策略留下的用户 Skill），或来源只存在于
+  另一个 Agent preset 的 bundled 根，reconcile 会生成去除禁用标志的 rank-100 受管项目副本。
+  因此管理页的 enabled 集合可在任一 preset 的下一轮 `skill-catalog` 中真实出现，且不会修改
+  全局原文件；停用时保留副本并重新写入禁用标志。
 - **受管副本安全边界**：副本只凭 配置登记 + 精确 `copyHash`/`originHash` 识别，
   永不凭路径/文件名猜测；内容被用户修改过的副本（`copyHash` 不一致）视为项目文件：
   保留不动、来源切换报 409；`originHash` 不一致时行上显示「来源有更新」。
   来源选择到 rank 更高的来源 = 纯记录（删除冗余的已验证副本）；rank 更低的来源 =
   物化受管副本 + 删除被取代的 marker 开关。选择来源时开关状态同步进副本标志。
+- **Windows 目录发布**：完整 Skill 目录先复制并校验到不受 watcher 监听的
+  `<项目根>/.dsh/.skill-manager-swap/`；发布时先写 references/scripts/assets 等附属文件，
+  最后写 `SKILL.md` 作为目录可见性提交点，再做整目录哈希校验。这样既规避 Windows 下
+  被 watcher 占用目录导致的 `EPERM` rename，也不会让 provider 扫到半成品 Skill。
 - **一键精简**：存在默认精简预设（`defaultSlim`，至多一个）时按该预设替换；
   否则关闭全部启用（两者都先出 diff 预览）。
 - **预设**：全局存储（`~/.dsh/skill-manager.json` 的 `presets`），跨项目复用；
@@ -181,6 +199,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   - 旧版操作（保持兼容）：`list / read / save / delete / import / exportZip /
     setStatus / getPolicy / setPolicy`。
   - V1 操作（apiVersion 6，DSH-008）：
+    - `capabilities`：轻量返回 apiVersion 与功能清单，Client 进入 SKILL 时不再用完整 catalog 做能力探测。
     - `catalog`：合并身份目录（同名来源合并、优先级排序、reconcile 后重扫），
       返回 `identities`（每行含 `sources[]`、`defaultSourceKey`、`sourceKey`、
       `effectiveSourceKey`、`specialized`、`enabled`、`tags`、`updateInfo:null`）+ `allTags`。
@@ -195,15 +214,17 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     业务错误用 `ApiError` 携带 4xx（400 参数 / 404 不存在 / 409 冲突）。
     `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
-    `list` 幂等运行（旧版兼容）；Windows 文件锁问题由 tmp+rename 原子写入规避。
-- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：48 用例覆盖
+    `list` 幂等运行（旧版兼容）；配置文件用 tmp+rename 原子写入，目录副本使用受监控根外
+    暂存、附属文件优先、`SKILL.md` 最后发布并整目录哈希复核。
+- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：51 用例覆盖
   状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
   三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
   标签、预设 diff/应用、一键精简、旧版兼容与只读根 403；并覆盖并发写、
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
-  多来源预设冲突。
-- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：3 用例直接执行
-  真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖双页面、
+  多来源预设冲突，以及已全局关闭的用户 Skill / 其他 preset bundled Skill 在项目启用后
+  物化为真实可调用副本。
+- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：5 用例直接执行
+  真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖单页信息架构、可收起导航、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
   丢弃过期 catalog、mutation、preset preview 响应和旧 Host 降级。
 - **热更新边界**（实测）：client bundle 由进程按请求从磁盘读取 —— 改 client 刷新页面即生效；
@@ -212,10 +233,13 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   重启前：client 探测到 `catalog` 为未知操作，自动降级旧版界面并提示重启。
 - **Client 半**（`lib/client.js`）：classic-script bundle（`window.__ModuleLoader__.load`），
   只 require 壳内 seed 词（`react`、`@deepseek-ai/dsh-client-ui-primitives`），无 JSX/TS/构建；
-  build 12 起 SKILL 分区为 V1 双子页 + 详情抽屉（`SkillCenterV1`），
+  build 12 起 SKILL 分区使用 `SkillCenterV1`，build 18 收敛为项目管理单页 + 覆盖式详情抽屉，
   项目选择器复用 `ctx.get('sessions')` 当前工作区与 `ctx.get('workspaces')`
   （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时安全降级；
-  主题只用 `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
+  build 15 按 Product Design 方案 3 重构预设应用/保存弹窗，build 16 将详情标签区重构为
+  同一设计语言的一体化编辑面板，build 17 移除默认列表的启用/未启用自动分组并以淡蓝底色标记
+  保持原位的已启用行，build 18 移除重复资源库入口并加入可持久化的左导航收起态；主题只用
+  `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
   入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，
   目标路径做包含性校验；内置根一律只读（save/delete 返回 403）；

@@ -220,7 +220,7 @@ async function makeHarness(router, { current = '/project-a', workspaces = [] } =
 	return { dom, click, flush, button, open, cleanup };
 }
 
-test('real client bundle renders both pages, full descriptions, guarded update badge, drawer and actions', async (t) => {
+test('real client bundle renders the single project view, full descriptions, overlay drawer and actions', async (t) => {
 	const calls = [];
 	let currentRow = row('alpha-skill', '完整 description：这一整段内容必须原样展示，不能省略。', {
 		sources: [
@@ -231,6 +231,7 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	});
 	const router = async (body) => {
 		calls.push(body);
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
 		if (body.op === 'catalog') return view('/project-a', [currentRow]);
 		if (body.op === 'presets.list') return { presets: [{ name: '日常预设', description: 'preset', defaultSlim: false, skillCount: 1 }] };
 		if (body.op === 'setSource') {
@@ -248,41 +249,205 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	const h = await makeHarness(router);
 	t.after(h.cleanup);
 	await h.open();
-	assert.ok(h.button('项目管理'));
-	assert.ok(h.button('统一资源库'));
+	assert.equal(h.dom.window.document.querySelector('.sk-tabs'), null, 'redundant SKILL sub-page tabs are removed');
+	assert.equal(h.dom.window.document.querySelector('[role="tablist"]'), null);
+	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));
 	assert.ok(h.dom.window.document.body.textContent.includes('仅在本机使用且不提交 Git'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('可纳入 Git 版本管理'));
+	const pluginCss = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
+	assert.ok(pluginCss.includes('.sk-drawer{position:absolute'), 'drawer is an overlay instead of a flex sibling');
+	assert.ok(!pluginCss.includes('.sk-contentDrawer .sk-projectCard'), 'drawer no longer forces project-card wrapping');
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, currentRow.description);
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-badgeUpdate')].length, 1);
+	assert.ok(h.dom.window.document.body.textContent.includes('来源 ×2'), 'merged source identity remains in the project list');
+	const contentClassBeforeDrawer = h.dom.window.document.querySelector('.sk-content').className;
 
-	await h.click(h.dom.window.document.querySelector('.sk-row'));
+	const rowOpen = h.dom.window.document.querySelector('.sk-rowOpen');
+	await act(async () => {
+		rowOpen.focus();
+		rowOpen.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+	});
+	assert.ok(h.dom.window.document.querySelector('.sk-drawer'), 'Enter opens the Skill drawer');
+	await h.click(h.dom.window.document.querySelector('.sk-drawer button[aria-label="关闭详情"]'));
+	await act(async () => {
+		rowOpen.focus();
+		rowOpen.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+	});
+	assert.ok(h.dom.window.document.querySelector('.sk-drawer'), 'Space opens the Skill drawer');
+	assert.equal(h.dom.window.document.querySelector('.sk-content').className, contentClassBeforeDrawer, 'drawer does not mutate the list layout class');
 	assert.equal(h.dom.window.document.querySelector('.sk-descFull').textContent, currentRow.description);
+	assert.equal(h.dom.window.document.querySelector('.smgr-switch').getAttribute('role'), 'switch');
+	assert.equal(h.dom.window.document.querySelector('.sk-srcList').getAttribute('role'), 'radiogroup');
+	assert.ok([...h.dom.window.document.querySelectorAll('.sk-src')].every((item) => item.getAttribute('role') === 'radio'));
 	await h.click([...h.dom.window.document.querySelectorAll('.sk-src')].find((item) => item.textContent.includes('Claude 来源')));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setSource' && call.cwd === '/project-a' && call.source === 'global-claude'));
 
-	const tagInput = h.dom.window.document.querySelector('input[placeholder="＋ 添加标签"]');
+	assert.ok(h.dom.window.document.querySelector('.sk-tagPanel'), 'tag editor is a single grouped control');
+	assert.equal(h.dom.window.document.querySelector('.sk-tagScope').textContent, '全局共享');
+	assert.equal(h.dom.window.document.querySelector('.sk-tagFoot').textContent, '按 Enter 添加0/20 · 每个最多 32 字符');
+	const emptyTagAdd = h.dom.window.document.querySelector('.sk-tagAdd');
+	assert.equal(emptyTagAdd.disabled, true, 'empty tag keeps the add action disabled');
+	const tagInput = h.dom.window.document.querySelector('input[aria-label="新标签"]');
+	assert.equal(tagInput.getAttribute('maxlength'), '32');
+	assert.equal(tagInput.getAttribute('placeholder'), '输入标签');
 	await act(async () => {
 		Simulate.change(tagInput, { target: { value: '测试' } });
 	});
-	await h.click(h.button('添加'));
+	assert.equal(h.dom.window.document.querySelector('.sk-tagAdd').disabled, false);
+	await h.click(h.dom.window.document.querySelector('.sk-tagAdd'));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setTags' && call.tags.includes('测试')));
+	assert.ok(h.dom.window.document.querySelector('[aria-label="已有标签"]'));
+	assert.ok(h.dom.window.document.querySelector('button[aria-label="移除标签「测试」"]'));
+
+	const tagWrites = calls.filter((call) => call.op === 'setTags').length;
+	const duplicateInput = h.dom.window.document.querySelector('input[aria-label="新标签"]');
+	await act(async () => {
+		Simulate.change(duplicateInput, { target: { value: '测试' } });
+	});
+	assert.ok(h.dom.window.document.querySelector('.sk-tagIssue').textContent.includes('已经存在'));
+	assert.equal(h.dom.window.document.querySelector('.sk-tagAdd').disabled, true, 'duplicate tags cannot be submitted');
+	await act(async () => {
+		Simulate.keyDown(duplicateInput, { key: 'Enter' });
+	});
+	await h.flush();
+	assert.equal(calls.filter((call) => call.op === 'setTags').length, tagWrites);
+	await h.click([...h.dom.window.document.querySelectorAll('.sk-projBtn')].find((item) => item.textContent.includes('全部标签')));
+	assert.ok(h.button('测试'), 'new tag is immediately available in the global tag filter');
+	await h.click(h.button('测试'));
 
 	await act(async () => { h.dom.window.document.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
 	assert.equal(h.dom.window.document.querySelector('.sk-drawer'), null, 'first Esc closes only the drawer');
 	assert.ok(h.dom.window.document.querySelector('.ext-page'), 'Extensions page remains open');
 
-	await h.click(h.button('统一资源库'));
-	assert.equal(h.dom.window.document.querySelector('[role="tab"][aria-selected="true"]').textContent, '统一资源库');
-	assert.ok(h.dom.window.document.body.textContent.includes('来源 ×2'));
-	await h.click(h.button('项目管理'));
-	await h.click([...h.dom.window.document.querySelectorAll('button')].find((item) => item.textContent.includes('日常预设')));
+	await h.click(h.button('应用推荐预设'));
 	await h.flush();
 	assert.ok(h.dom.window.document.querySelector('.test-modal'));
+	assert.ok(h.dom.window.document.querySelector('.sk-presetApply'), 'preset preview uses the compact apply layout');
+	assert.equal(h.dom.window.document.querySelector('.sk-presetMode').getAttribute('role'), 'radiogroup');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-presetMode [role="radio"]').length, 2);
+	assert.ok(h.dom.window.document.querySelector('.sk-presetImpactMain').textContent.includes('将启用 1 个 Skill'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-presetFooterLeft button')].map((item) => item.textContent), ['设为默认', '删除预设']);
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-diffGroup').length, 1);
 	await h.click([...h.dom.window.document.querySelectorAll('button')].find((item) => item.textContent.startsWith('应用（')));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'presets.apply' && call.cwd === '/project-a'));
+
+	await h.click(h.button('保存为预设'));
+	assert.ok(h.dom.window.document.querySelector('.sk-presetSave'), 'save preset uses the compact labeled form');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-presetFieldHead').length, 2);
+	assert.equal(h.dom.window.document.querySelector('.sk-presetInput').getAttribute('maxlength'), '64');
+	assert.equal(h.dom.window.document.querySelector('.sk-presetTextarea').getAttribute('maxlength'), '200');
+	assert.ok(h.dom.window.document.querySelector('.sk-presetSaveSummary').textContent.includes('个已启用 Skill'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-presetCounter')].map((item) => item.textContent), ['0/64', '0/200']);
+	await h.click(h.button('取消'));
+	assert.equal(h.dom.window.document.querySelector('.sk-presetSave'), null);
+});
+
+test('extension type navigation collapses to icons and persists across reopen', async (t) => {
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return view('/project-a', [row('alpha-skill', 'alpha')]);
+		if (body.op === 'presets.list') return { presets: [] };
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.open();
+	assert.ok(!h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
+	assert.equal(h.dom.window.document.querySelectorAll('.ext-navIcon [data-icon="1"]').length, 3);
+	const collapse = h.dom.window.document.querySelector('button[aria-label="收起扩展类型导航"]');
+	assert.equal(collapse.getAttribute('aria-expanded'), 'true');
+	await h.click(collapse);
+	assert.ok(h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
+	assert.equal(h.dom.window.localStorage.getItem('smgr.ext.navCollapsed'), '1');
+	assert.deepEqual(
+		[...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.getAttribute('title')),
+		['SKILL', 'MCP（建设中）', 'Plugin（建设中）'],
+	);
+
+	await h.click(h.dom.window.document.querySelector('.ext-close'));
+	assert.equal(h.dom.window.document.querySelector('.ext-page'), null);
+	await h.open();
+	assert.ok(h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'), 'collapsed state survives page remount');
+	const expand = h.dom.window.document.querySelector('button[aria-label="展开扩展类型导航"]');
+	assert.equal(expand.getAttribute('aria-expanded'), 'false');
+	await h.click(expand);
+	assert.ok(!h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
+	assert.equal(h.dom.window.localStorage.getItem('smgr.ext.navCollapsed'), '0');
+});
+
+test('current workspace wins; enabled rows stay in catalog order and bulk selection remains counted', async (t) => {
+	const calls = [];
+	let rows = [
+		row('disabled-a', '未启用 A'),
+		row('enabled-skill', '已启用描述', { enabled: true, modelInvocable: true }),
+		row('disabled-b', '未启用 B'),
+	];
+	const router = async (body) => {
+		calls.push(body);
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return view(body.cwd || '/project-b', rows);
+		if (body.op === 'presets.list') return { presets: [] };
+		if (body.op === 'setEnabled') {
+			rows = rows.map((item) => item.name === body.name
+				? Object.assign({}, item, { enabled: body.enabled, modelInvocable: body.enabled })
+				: item);
+			return { view: rows.find((item) => item.name === body.name), partial: false, report: { failed: [], conflicts: [] } };
+		}
+		if (body.op === 'setMany') {
+			rows = rows.map((item) => body.names.includes(item.name) ? Object.assign({}, item, { enabled: body.enabled }) : item);
+			return { partial: false, report: { failed: [], conflicts: [] } };
+		}
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router, {
+		current: '/project-b',
+		workspaces: [{ path: '/project-a', title: 'project-a', updatedAt: '2' }],
+	});
+	t.after(h.cleanup);
+	h.dom.window.localStorage.setItem('smgr.v1.project', '/project-a');
+	await h.open();
+	assert.equal(h.dom.window.document.querySelector('.sk-projectTitle').textContent, 'project-b');
+	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('1 已启用 / 3 Skills'));
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-groupHead').length, 0, 'all view has no enabled/disabled group headings');
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['enabled-skill']);
+	assert.equal(h.button('全部3').textContent, '全部3');
+	assert.equal(h.button('已启用1').textContent, '已启用1');
+	assert.equal(h.button('未启用2').textContent, '未启用2');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 0, 'default mode hides bulk checkboxes');
+	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3, 'default mode shows per-Skill switches');
+	assert.equal(h.dom.window.document.querySelector('input[aria-label="全选当前结果"]'), null);
+	await h.click(h.button('已启用1'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['enabled-skill'], 'state filters remain user-invoked');
+	await h.click(h.button('全部3'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	const list = h.dom.window.document.querySelector('.sk-list');
+	list.scrollTop = 160;
+	await h.click(h.dom.window.document.querySelector('[aria-label="启用 disabled-a（仅当前项目）"]'));
+	await h.flush();
+	await h.click(h.dom.window.document.querySelector('[aria-label="启用 disabled-b（仅当前项目）"]'));
+	await h.flush();
+	assert.equal(list.scrollTop, 160, 'enabling rows preserves the current scroll context');
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	assert.equal(h.dom.window.document.querySelectorAll('[role="switch"][aria-checked="true"]').length, 3);
+
+	await h.click(h.button('批量管理'));
+	assert.ok(h.dom.window.document.querySelector('.sk-batchHint').textContent.includes('右侧单项开关已暂时隐藏'));
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 3, 'bulk mode reveals row checkboxes');
+	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 0, 'bulk mode hides per-Skill switches');
+
+	const selectVisible = h.dom.window.document.querySelector('input[aria-label="全选当前结果"]');
+	await act(async () => { Simulate.change(selectVisible, { target: { checked: true } }); });
+	assert.ok(h.dom.window.document.querySelector('.sk-bulkbar').textContent.includes('已选择 3 项'));
+	await h.click(h.button('在本项目启用（3）'));
+	await h.flush();
+	assert.ok(calls.some((call) => call.op === 'setMany' && call.cwd === '/project-b' && call.enabled === true && call.names.length === 3));
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 0, 'successful bulk action exits bulk mode');
+	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3);
 });
 
 test('project switch drops stale catalog, mutation and preset-preview responses', async (t) => {
@@ -291,6 +456,7 @@ test('project switch drops stale catalog, mutation and preset-preview responses'
 	const stalePreview = deferred();
 	let aCatalogCalls = 0;
 	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
 		if (body.op === 'presets.list') return { presets: [{ name: '竞态预设', skillCount: 1 }] };
 		if (body.op === 'catalog' && body.cwd === '/project-a') {
 			aCatalogCalls += 1;
@@ -348,6 +514,11 @@ test('unknown catalog op safely falls back to the legacy Skill Manager UI', asyn
 	const error = new Error('未知操作：catalog');
 	error.status = 400;
 	const router = async (body) => {
+		if (body.op === 'capabilities') {
+			const capabilityError = new Error('未知操作：capabilities');
+			capabilityError.status = 400;
+			throw capabilityError;
+		}
 		if (body.op === 'catalog') throw error;
 		if (body.op === 'list') return { apiVersion: 5, cwd: '/project-a', roots: [], bundled: [], policy: { globalDefaultOff: false } };
 		throw new Error(`unexpected op ${body.op}`);

@@ -22,7 +22,7 @@
  * observed by DSH's skill watcher, so changes apply on the next model turn
  * without restarting DSH.
  */
-import { mkdir, readFile, readdir, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
@@ -49,6 +49,7 @@ export const SHADOW_DESC_PREFIX = '[skill-manager] 本项目禁用开关';
 const SCOPE_ORDER = { project: 0, user: 1, global: 2, bundled: 3 };
 /** Copy size cap (bytes), same as the legacy copy mechanism. */
 const MAX_COPY_BYTES = 50 * 1024 * 1024;
+const TRANSIENT_RENAME_CODES = new Set(['EACCES', 'EBUSY', 'EPERM']);
 /** DSH's actual skill-resolution order (review P1-2): rank ascending, ties
  * broken by root registration order in computeRoots. Modeled separately from
  * the product display/selection order below so an explicit selection is
@@ -71,6 +72,23 @@ function optsOf(opts) {
 	const o = opts && typeof opts === 'object' ? opts : {};
 	o.home = typeof o.home === 'string' && o.home.length > 0 ? resolve(o.home) : homedir();
 	return o;
+}
+
+/** Bounded retry for Windows watcher/antivirus rename races. */
+async function renameWithRetry(from, to) {
+	let lastError;
+	for (let attempt = 0; attempt < 6; attempt += 1) {
+		try {
+			await rename(from, to);
+			return;
+		} catch (error) {
+			lastError = error;
+			const code = error && typeof error === 'object' ? error.code : undefined;
+			if (!TRANSIENT_RENAME_CODES.has(code) || attempt === 5) throw error;
+			await new Promise((resolveDelay) => setTimeout(resolveDelay, 50 * (attempt + 1)));
+		}
+	}
+	throw lastError;
 }
 
 /**
@@ -249,9 +267,9 @@ async function removePathWithLedger(path, ledger) {
 		return true;
 	}
 	const backup = join(dirname(path), `.${relative(dirname(path), path)}.bak-${randomUUID()}`);
-	await rename(path, backup);
+	await renameWithRetry(path, backup);
 	ledger.record(
-		() => rename(backup, path),
+		() => renameWithRetry(backup, path),
 		() => rm(backup, { recursive: true, force: true }),
 	);
 	return true;
@@ -523,8 +541,13 @@ export async function copySkillToProject(projectRoot, name, sourcePlan, flagSetT
 	const destDir = dirname(dest);
 	const skillsDir = dirname(destDir);
 	const uuid = randomUUID();
-	const stagingDir = join(skillsDir, `.${name}.${uuid}.staging`);
-	const backupDir = join(skillsDir, `.${name}.${uuid}.backup`);
+	// Stage beside (not inside) the watched skill root. Chokidar can observe a
+	// large staging bundle before its swap and hold a Windows handle that makes
+	// rename fail with EPERM. The sibling swap root keeps incomplete content out
+	// of the provider; publication below makes SKILL.md visible only at the end.
+	const swapRoot = join(dirname(skillsDir), '.skill-manager-swap');
+	const stagingDir = join(swapRoot, `${name}.${uuid}.staging`);
+	const backupDir = join(swapRoot, `${name}.${uuid}.backup`);
 	// Pre-check (no file damage): source files readable + total size bounded.
 	const sourceHashBefore = await hashSkillSource(sourcePlan.path, 'dir').catch((error) => {
 		throw new ApiError(404, `来源目录无法完整读取：${error instanceof Error ? error.message : String(error)}`);
@@ -546,9 +569,9 @@ export async function copySkillToProject(projectRoot, name, sourcePlan, flagSetT
 		if (totalBytes > MAX_COPY_BYTES) throw new ApiError(413, 'skill 副本超过 50MB 上限');
 		entries.push([file, data]);
 	}
-	// Write the full staging copy in the same parent directory; nothing of the
-	// existing destination is touched yet (review P1-4: a failed copy must not
-	// delete the old copy before the new one is verified in place).
+	// Write the full staging copy in the same project .dsh directory; nothing
+	// of the existing destination is touched yet (review P1-4: a failed copy
+	// must not delete the old copy before the new one is verified in place).
 	await mkdir(stagingDir, { recursive: true });
 	try {
 		for (const [file, data] of entries) {
@@ -562,6 +585,7 @@ export async function copySkillToProject(projectRoot, name, sourcePlan, flagSetT
 		}
 	} catch (error) {
 		await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+		await rmdir(swapRoot).catch(() => {});
 		throw error;
 	}
 	// Verify the staged bundle (file set + content) matches what was read; a
@@ -580,6 +604,7 @@ export async function copySkillToProject(projectRoot, name, sourcePlan, flagSetT
 	const sourceHashAfter = await hashSkillSource(sourcePlan.path, 'dir').catch(() => null);
 	if (stagedHash !== expectedHash || sourceHashAfter === null || sourceHashAfter !== sourceHashBefore) {
 		await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+		await rmdir(swapRoot).catch(() => {});
 		throw new ApiError(500, '副本暂存校验失败：来源内容在复制期间发生变化');
 	}
 	if (o.faults && typeof o.faults.beforeCopySwap === 'function') {
@@ -587,33 +612,74 @@ export async function copySkillToProject(projectRoot, name, sourcePlan, flagSetT
 			await o.faults.beforeCopySwap({ name, source: sourcePlan.path, destination: dest, format: 'dir' });
 		} catch (error) {
 			await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+			await rmdir(swapRoot).catch(() => {});
 			throw error;
 		}
 	}
-	// Swap: move the existing destination (if any) to a backup, rename staging in,
-	// and on any failure restore the backup and clean the staging dir.
+	// Publish the verified snapshot with SKILL.md written last. Windows can keep
+	// a directory tree busy long enough that renaming a large staging directory
+	// into the watched skill root repeatedly fails with EPERM. Writing ancillary
+	// files first keeps the destination undiscoverable until the final manifest
+	// appears, while the ledger still removes or restores the whole directory if
+	// a later config write fails.
 	const hadDest = (await stat(destDir).catch(() => undefined)) !== undefined;
-	if (hadDest) await rename(destDir, backupDir);
+	if (hadDest) await renameWithRetry(destDir, backupDir);
 	try {
-		await rename(stagingDir, destDir);
+		await mkdir(skillsDir, { recursive: true });
+		await mkdir(destDir);
+		let skillContent;
+		for (const [file, data] of entries) {
+			const rel = relative(srcDir, file).split(sep).join('/');
+			const content = rel === 'SKILL.md'
+				? Buffer.from(patchInvocationFlag(data.toString('utf8'), flagSetTrue).content, 'utf8')
+				: data;
+			if (rel === 'SKILL.md') {
+				skillContent = content;
+				continue;
+			}
+			const target = join(destDir, rel);
+			await mkdir(dirname(target), { recursive: true });
+			await writeFile(target, content);
+		}
+		if (skillContent === undefined) throw new ApiError(404, '来源目录缺少可读取的 SKILL.md');
+		await writeFile(join(destDir, 'SKILL.md'), skillContent);
+		const publishedHash = await hashSkillSource(join(destDir, 'SKILL.md'), 'dir');
+		if (publishedHash !== expectedHash) throw new ApiError(500, '副本发布校验失败：目标内容与暂存快照不一致');
 	} catch (error) {
-		if (hadDest) await rename(backupDir, destDir).catch(() => {});
+		await rm(destDir, { recursive: true, force: true }).catch(() => {});
+		let restoreError;
+		if (hadDest) {
+			try {
+				await renameWithRetry(backupDir, destDir);
+			} catch (caught) {
+				restoreError = caught;
+			}
+		}
 		await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+		await rmdir(swapRoot).catch(() => {});
+		if (restoreError !== undefined) {
+			throw new ApiError(500, `副本发布失败且旧副本恢复失败：${restoreError instanceof Error ? restoreError.message : String(restoreError)}`);
+		}
 		throw error;
 	}
+	await rm(stagingDir, { recursive: true, force: true });
+	await rmdir(swapRoot).catch(() => {});
 
 	if (hadDest) {
 		// The backup stays until the mutation commits (ledger cleanup) or a failed
-		// config commit rolls the swap back to the old copy (ledger undo). Dot
-		// names keep the backup and staging invisible to the skill scanner (dot
-		// entries are never discovered or hashed). Without a ledger (reconcile)
-		// the swap is already committed, so the backup is cleaned right away.
+		// config commit rolls the swap back to the old copy (ledger undo). The
+		// sibling swap root stays outside the watched skill root. Without a ledger
+		// (reconcile) the swap is already committed, so the backup is cleaned now.
 		// undo/cleanup surface their failures: a restore or cleanup that fails is
 		// reported, not swallowed (review P1-4/P2-3).
-		const cleanup = () => rm(backupDir, { recursive: true, force: true });
+		const cleanup = async () => {
+			await rm(backupDir, { recursive: true, force: true });
+			await rmdir(swapRoot).catch(() => {});
+		};
 		const undo = async () => {
 			await rm(destDir, { recursive: true, force: true });
-			await rename(backupDir, destDir);
+			await renameWithRetry(backupDir, destDir);
+			await rmdir(swapRoot).catch(() => {});
 		};
 		if (ledger !== undefined) ledger.record(undo, cleanup);
 		else await cleanup();
@@ -870,6 +936,38 @@ export async function reconcileProject(projectRoot, projectConfig, identities, o
 
 			// mechanism === 'original' (or degraded): the default-resolution
 			// winner is a user/global/bundled source.
+			// An enabled identity must also be model-invocable in the project.
+			// Removing a project shadow is insufficient when the desired source
+			// already carries disable-model-invocation (for example a user skill
+			// disabled by the legacy global policy). Bundled sources are likewise
+			// preset-local: a source discovered from another preset does not exist
+			// in this session's filesystem provider. Materialize either case as a
+			// rank-100 managed project copy with the invocation flag removed.
+			const configuredSource = projectConfig.sources[name];
+			const configuredSourceKey = configuredSource && typeof configuredSource.source === 'string'
+				? configuredSource.source
+				: null;
+			const desiredSourceKey = configuredSourceKey ?? defaultSourceKey;
+			const desiredSource = identity.sources.find((s) =>
+				s.key === desiredSourceKey && !s.broken && !s.shadow && !s.generated,
+			);
+			const needsInvocableCopy = wantEnabled && desiredSource !== undefined
+				&& (desiredSource.modelInvocable !== true || desiredSource.scope === 'bundled');
+			if (needsInvocableCopy) {
+				await ensureManagedCopy(
+					projectRoot,
+					projectConfig,
+					identity,
+					desiredSource.key,
+					false,
+					opts,
+					report,
+					configuredSourceKey !== null,
+					ledger,
+				);
+				await removeMarkerStub(projectRoot, name, report, ledger);
+				continue;
+			}
 			// The product default source (no explicit selection) can lose DSH
 			// rank resolution — e.g. a skill present in both a user root and
 			// an external global root. Materialize the default source as a
@@ -1131,10 +1229,10 @@ export async function applySourceSelection(projectRoot, projectConfig, identity,
 					const parent = dirname(target);
 					const base = relative(parent, target);
 					const backup = join(parent, `.${base}.bak-${randomUUID()}`);
-					await rename(target, backup);
+					await renameWithRetry(target, backup);
 					if (ledger !== undefined) {
 						ledger.record(
-							async () => rename(backup, target),
+							async () => renameWithRetry(backup, target),
 							() => rm(backup, { recursive: true, force: true })
 						);
 					}

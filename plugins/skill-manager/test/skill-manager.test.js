@@ -333,6 +333,59 @@ test('setEnabled: toggling a user skill creates/removes the stub and flips model
 	assert.equal(identity(v2, 'user-skill').modelInvocable, false);
 });
 
+test('catalog: enabled user skill with a globally disabled source materializes an invocable project copy', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const originalPath = await putSkill(env.userAgents, 'policy-disabled', 'globally disabled', { flag: true });
+	const originalRaw = await readFile(originalPath, 'utf8');
+	await writeProjectConfig(env.projectRoot, { enabled: ['policy-disabled'], sources: {} }, env.opts);
+
+	const api = makeApi(env.opts);
+	const { status, value } = await api('catalog', { cwd: env.cwd });
+	assert.equal(status, 200);
+	const row = identity(value, 'policy-disabled');
+	assert.equal(row.enabled, true);
+	assert.equal(row.modelInvocable, true);
+	assert.equal(row.effectiveSourceKey, 'project-dsh');
+	assert.ok(row.sources.some((source) => source.key === 'project-dsh' && source.generated));
+	const copyPath = join(env.projDsh, 'policy-disabled.md');
+	assert.ok(!(await readFile(copyPath, 'utf8')).includes('disable-model-invocation'));
+	assert.equal(await readFile(originalPath, 'utf8'), originalRaw, 'global source stays disabled and unchanged');
+	const { config } = await readProjectConfig(env.projectRoot, env.opts);
+	assert.equal(config.sources['policy-disabled'].generated, true);
+	assert.equal(config.sources['policy-disabled'].source, undefined, 'default materialization is not an explicit source selection');
+
+	const off = await api('setEnabled', { cwd: env.cwd, name: 'policy-disabled', enabled: false });
+	assert.equal(off.status, 200);
+	assert.ok((await readFile(copyPath, 'utf8')).includes('disable-model-invocation: true'));
+	assert.equal(await readFile(originalPath, 'utf8'), originalRaw);
+});
+
+test('catalog: enabled bundled skill materializes a project copy independent of the active preset', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	await putSkill(env.presetSkills, 'other-preset-skill', 'bundled elsewhere', {
+		format: 'dir',
+		files: { 'references/guide.md': 'bundled guide' },
+	});
+	await writeProjectConfig(env.projectRoot, { enabled: ['other-preset-skill'], sources: {} }, env.opts);
+
+	const api = makeApi(env.opts);
+	const { status, value } = await api('catalog', { cwd: env.cwd });
+	assert.equal(status, 200);
+	const row = identity(value, 'other-preset-skill');
+	assert.equal(row.enabled, true);
+	assert.equal(row.modelInvocable, true);
+	assert.equal(row.effectiveSourceKey, 'project-dsh');
+	assert.ok(row.sources.some((source) => source.key === 'project-dsh' && source.generated));
+	const copyPath = join(env.projDsh, 'other-preset-skill', 'SKILL.md');
+	assert.ok(!(await readFile(copyPath, 'utf8')).includes('disable-model-invocation'));
+	assert.equal(await readFile(join(env.projDsh, 'other-preset-skill', 'references', 'guide.md'), 'utf8'), 'bundled guide');
+	const { config } = await readProjectConfig(env.projectRoot, env.opts);
+	assert.equal(config.sources['other-preset-skill'].generated, true);
+	assert.equal(config.sources['other-preset-skill'].source, undefined);
+});
+
 test('setEnabled: project skill toggles its own frontmatter flag byte-safely', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);
@@ -735,6 +788,17 @@ test('presets: apply rejects unknown preset and missing skills', async (t) => {
 });
 
 // ── S6: legacy compatibility ────────────────────────────────────────────────
+test('capabilities: reports V1 support without scanning the catalog', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const api = makeApi(env.opts);
+	const { status, value } = await api('capabilities', {});
+	assert.equal(status, 200);
+	assert.equal(value.apiVersion, 6);
+	assert.ok(value.features.includes('project-enable'));
+	assert.ok(value.features.includes('unified-catalog'));
+});
+
 test('legacy list: unchanged shape with apiVersion 6', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);
@@ -1056,6 +1120,7 @@ test('source disappearance and swap failure leave no staging debris or damaged o
 	assert.match(await readFile(join(env.projDsh, 'swap-safe', 'SKILL.md'), 'utf8'), /old copy/);
 	const debris = (await readdir(env.projDsh)).filter((entry) => entry.includes('.staging') || entry.includes('.backup'));
 	assert.deepEqual(debris, []);
+	assert.equal(await stat(join(env.projectRoot, '.dsh', '.skill-manager-swap')).then(() => true, () => false), false);
 });
 
 test('config write failure rolls back a newly materialized source copy and stub removal', async (t) => {

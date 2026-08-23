@@ -450,6 +450,12 @@ function configPayload(view, config) {
 function makeHandler(deps) {
 	const opts = { agentPresets: deps.agentPresets, logger: deps.logger, home: deps.home, faults: deps.faults };
 	const ops = {
+		async capabilities() {
+			return {
+				apiVersion: PROJECT_API_VERSION,
+				features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim'],
+			};
+		},
 		async list(body) {
 			const cwd = await assertCwd(body.cwd);
 			const { roots, projectRoot } = await computeRoots(cwd, opts);
