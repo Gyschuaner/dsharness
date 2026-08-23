@@ -209,9 +209,9 @@
 				'.sk-filterBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary);font-weight:600}',
 				'.sk-filterCount{font-size:10px;color:var(--dsw-alias-label-quaternary);font-variant-numeric:tabular-nums}',
 				'.sk-spacer{flex:1}',
-				'.sk-bulk{display:inline-flex;gap:6px;align-items:center}',
 				'.sk-selectVisible{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap;cursor:pointer}',
 				'.sk-selectVisible input{margin:0}',
+				'.sk-batchHint{display:flex;align-items:center;gap:7px;margin:-2px 0 8px;padding:7px 10px;border:1px dashed var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-fill-tsp-secondary);font-size:12px;color:var(--dsw-alias-label-secondary)}',
 				'.sk-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:2px 0 6px}',
 				'.sk-groupHead{display:flex;align-items:center;gap:8px;padding:12px 10px 7px;border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);flex:none}',
 				'.sk-groupCount{font-weight:400;color:var(--dsw-alias-label-quaternary)}',
@@ -221,6 +221,7 @@
 				'.sk-rowOff .sk-ic{opacity:.58}',
 				'.sk-check{appearance:none;width:15px;height:15px;flex:none;margin-top:3px;border:1.5px solid var(--dsw-alias-border-l2);border-radius:4px;background:var(--dsw-alias-bg-module-platform);cursor:pointer;position:relative;padding:0}',
 				'.sk-check:hover{border-color:var(--dsw-alias-label-dimmed)}',
+				'.sk-check:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
 				'.sk-checkOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
 				'.sk-checkOn:after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}',
 				'.sk-ic{flex:none;color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;justify-content:center}',
@@ -1156,6 +1157,7 @@
 				var [tagFilter, setTagFilter] = React.useState(null);
 				var [tagMenuOpen, setTagMenuOpen] = React.useState(false);
 				var [selectedRows, setSelectedRows] = React.useState({}); // name -> true
+				var [bulkMode, setBulkMode] = React.useState(false);
 				var [drawerName, setDrawerName] = React.useState(null);
 				var [toggling, setToggling] = React.useState({}); // name -> true
 				var [sourceBusy, setSourceBusy] = React.useState(null); // name | null
@@ -1295,6 +1297,7 @@
 					setViewError(null);
 					setPartialWarning(null);
 					setSelectedRows({});
+					setBulkMode(false);
 					setToggling({});
 					setSourceBusy(null);
 					setDrawerName(null);
@@ -1377,6 +1380,7 @@
 						function (value) {
 							if (!isCurrentProject(gen, proj.cwd)) { return; }
 							setSelectedRows({});
+							setBulkMode(false);
 							if (value && value.partial === true) {
 								setPartialWarning('批量变更未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
 							}
@@ -1469,6 +1473,7 @@
 							setPresetBusy(false);
 							setPresetModal(null);
 							setSelectedRows({});
+							setBulkMode(false);
 							if (value && value.partial === true) {
 								setPartialWarning('预设应用未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
 							}
@@ -1531,6 +1536,7 @@
 							setSlimBusy(false);
 							setSlimModal(null);
 							setSelectedRows({});
+							setBulkMode(false);
 							if (value && value.partial === true) {
 								setPartialWarning('一键精简未完全生效：部分 Skill 的文件副作用失败。请刷新查看真实状态。');
 							}
@@ -1594,6 +1600,11 @@
 						onClick: function (event) { event.stopPropagation(); doToggle(row); }
 					}, h('span', { className: 'smgr-switchKnob' }));
 				}
+				function openDrawer(row) {
+					setDrawerName(row.name);
+					setTagDraft('');
+					setAdvOpen(false);
+				}
 				function rowEl(row) {
 					var off = row.enabled !== true;
 					var checked = selectedRows[row.name] === true;
@@ -1604,7 +1615,7 @@
 							key: row.name,
 							className: 'sk-row' + (drawerName === row.name ? ' sk-rowActive' : '') + (off && isProjectPage ? ' sk-rowOff' : ''),
 						},
-						isProjectPage
+						isProjectPage && bulkMode
 							? h('input', {
 								type: 'checkbox',
 								className: 'sk-check' + (checked ? ' sk-checkOn' : ''),
@@ -1627,10 +1638,11 @@
 								type: 'button',
 								className: 'sk-rowOpen',
 								'aria-label': '查看 ' + row.name + ' 详情',
-								onClick: function () {
-									setDrawerName(row.name);
-									setTagDraft('');
-									setAdvOpen(false);
+								onClick: function () { openDrawer(row); },
+								onKeyDown: function (event) {
+									if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+									event.preventDefault();
+									openDrawer(row);
 								}
 							},
 							h('span', { className: 'sk-ic' }, h(P.IconSkillOutline16)),
@@ -1658,7 +1670,7 @@
 								: null
 							)
 						),
-						h('div', { className: 'sk-rowSide' }, isProjectPage ? switchV1(row) : null)
+						h('div', { className: 'sk-rowSide' }, isProjectPage && !bulkMode ? switchV1(row) : null)
 					);
 				}
 				function groupedVisibleRows() {
@@ -1922,12 +1934,12 @@
 						h('button', {
 							type: 'button', role: 'tab', 'aria-selected': activePage === 'project',
 							className: 'sk-tab' + (activePage === 'project' ? ' sk-tabActive' : ''),
-							onClick: function () { setActivePage('project'); setSelectedRows({}); }
+							onClick: function () { setActivePage('project'); setSelectedRows({}); setBulkMode(false); }
 						}, '项目管理'),
 						h('button', {
 							type: 'button', role: 'tab', 'aria-selected': activePage === 'library',
 							className: 'sk-tab' + (activePage === 'library' ? ' sk-tabActive' : ''),
-							onClick: function () { setActivePage('library'); setSelectedRows({}); }
+							onClick: function () { setActivePage('library'); setSelectedRows({}); setBulkMode(false); }
 						}, '统一资源库')
 					),
 					h(
@@ -2082,7 +2094,7 @@
 										: null
 								),
 							h('span', { className: 'sk-spacer' }),
-							activePage === 'project'
+							activePage === 'project' && bulkMode
 								? h('label', { className: 'sk-selectVisible' },
 									h('input', {
 										type: 'checkbox',
@@ -2094,6 +2106,19 @@
 									'全选当前结果',
 									visibleRows.length > 0 ? h('span', { className: 'sk-filterCount' }, visibleRows.length) : null)
 								: null,
+							activePage === 'project'
+								? h('button', {
+									type: 'button',
+									className: 'sk-chip' + (bulkMode ? ' sk-chipDef' : ''),
+									'aria-pressed': bulkMode,
+									'aria-label': bulkMode ? '退出批量管理' : '进入批量管理',
+									title: bulkMode ? '退出批量管理并清除选择' : '选择多个 Skill 后统一启用或停用',
+									onClick: function () {
+										setSelectedRows({});
+										setBulkMode(!bulkMode);
+									}
+								}, bulkMode ? '完成' : '批量管理')
+								: null,
 								activePage === 'project'
 									? h('button', {
 										type: 'button',
@@ -2104,6 +2129,9 @@
 									}, '一键精简')
 									: null
 							),
+							bulkMode
+								? h('div', { className: 'sk-batchHint', role: 'status' }, '批量管理模式：勾选 Skill 后统一启用或停用，右侧单项开关已暂时隐藏。')
+								: null,
 							viewError !== null ? h('p', { className: 'sk-error', role: 'alert' }, viewError) : null,
 							h(
 								'div',
@@ -2126,7 +2154,7 @@
 								: null,
 							groupedVisibleRows()
 						),
-						activePage === 'project' && selectedCount > 0
+						activePage === 'project' && bulkMode && selectedCount > 0
 							? h('div', { className: 'sk-bulkbar', role: 'region', 'aria-label': '批量操作' },
 								h('strong', null, '已选择 ' + selectedCount + ' 项'),
 								h('span', { className: 'sk-slimNote' }, '更改仅作用于 ' + (project ? project.title : '当前项目')),

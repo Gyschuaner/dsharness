@@ -256,7 +256,18 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, currentRow.description);
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-badgeUpdate')].length, 1);
 
-	await h.click(h.dom.window.document.querySelector('.sk-rowOpen'));
+	const rowOpen = h.dom.window.document.querySelector('.sk-rowOpen');
+	await act(async () => {
+		rowOpen.focus();
+		rowOpen.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+	});
+	assert.ok(h.dom.window.document.querySelector('.sk-drawer'), 'Enter opens the Skill drawer');
+	await h.click(h.dom.window.document.querySelector('.sk-drawer button[aria-label="关闭详情"]'));
+	await act(async () => {
+		rowOpen.focus();
+		rowOpen.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+	});
+	assert.ok(h.dom.window.document.querySelector('.sk-drawer'), 'Space opens the Skill drawer');
 	assert.equal(h.dom.window.document.querySelector('.sk-descFull').textContent, currentRow.description);
 	assert.equal(h.dom.window.document.querySelector('.smgr-switch').getAttribute('role'), 'switch');
 	assert.equal(h.dom.window.document.querySelector('.sk-srcList').getAttribute('role'), 'radiogroup');
@@ -323,6 +334,14 @@ test('current workspace wins persisted project and visible rows support counted 
 	assert.equal(h.button('全部3').textContent, '全部3');
 	assert.equal(h.button('已启用1').textContent, '已启用1');
 	assert.equal(h.button('未启用2').textContent, '未启用2');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 0, 'default mode hides bulk checkboxes');
+	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3, 'default mode shows per-Skill switches');
+	assert.equal(h.dom.window.document.querySelector('input[aria-label="全选当前结果"]'), null);
+
+	await h.click(h.button('批量管理'));
+	assert.ok(h.dom.window.document.querySelector('.sk-batchHint').textContent.includes('右侧单项开关已暂时隐藏'));
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 3, 'bulk mode reveals row checkboxes');
+	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 0, 'bulk mode hides per-Skill switches');
 
 	const selectVisible = h.dom.window.document.querySelector('input[aria-label="全选当前结果"]');
 	await act(async () => { Simulate.change(selectVisible, { target: { checked: true } }); });
@@ -330,6 +349,8 @@ test('current workspace wins persisted project and visible rows support counted 
 	await h.click(h.button('在本项目启用（3）'));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setMany' && call.cwd === '/project-b' && call.enabled === true && call.names.length === 3));
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 0, 'successful bulk action exits bulk mode');
+	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3);
 });
 
 test('project switch drops stale catalog, mutation and preset-preview responses', async (t) => {

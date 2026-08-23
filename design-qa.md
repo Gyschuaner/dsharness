@@ -1,4 +1,4 @@
-# Skill Manager build 13 · Design QA
+# Skill Manager build 13–14 · Design QA
 
 ## Inputs
 
@@ -31,3 +31,14 @@
 - The implementation intentionally keeps preset actions in the project card instead of the generated direction's separate toolbar row, reducing vertical travel while preserving the same hierarchy and functionality.
 
 final result: passed
+
+## Build 14 interaction clarification
+
+- The default project list now exposes only the per-Skill enable/disable switch. Selection checkboxes and “select all” are absent, so the row has one clear state-changing control.
+- An explicit **批量管理** action enters batch mode. In that mode, row checkboxes, “全选当前结果”, and the fixed batch action bar appear while per-Skill switches are hidden; **完成** exits without changing state.
+- Successful bulk enable/disable, project switching, preset application, and slim preset application all clear the selection and return to the default single-item mode.
+- The native detail button handles mouse click, Enter, and Space consistently and keeps its visible keyboard focus style.
+- In-app browser write regression on `127.0.0.1:3080`: `game` 0/68 → single 1/68 → restored 0/68 → bulk 2/68 → restored 0/68; `dsharness` remained 11/68 with both Cordis Skills enabled. The generated `game/.dsh/skill-manager.json` was removed after the test, restoring the initial absent-file state.
+- Visual review at the normal desktop viewport confirmed that default and batch controls are mutually exclusive, the batch-mode hint is visible, row alignment is stable, and no error/warning console entries were produced.
+
+build 14 result: passed
