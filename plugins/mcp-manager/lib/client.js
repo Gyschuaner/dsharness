@@ -1,5 +1,5 @@
 /**
- * dsh-mcp-manager — Client half (DSH-026 / DSH-028, build 1).
+ * dsh-mcp-manager — Client half (DSH-026 / DSH-028, build 2).
  *
  * Plain classic JavaScript bundle: no imports, JSX or private product DOM
  * selectors. The page contributes one business section to the Extensions
@@ -83,6 +83,25 @@
 				'.mm-installed{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
 				'.mm-empty,.mm-loading,.mm-error{margin:24px 0;padding:18px 2px;color:var(--dsw-alias-label-tertiary)}',
 				'.mm-error{color:var(--dsw-alias-status-error,#d33b3b)}',
+				'.mm-connectingState{flex:1;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:52px 24px;text-align:center}',
+				'.mm-connectingVisual{position:relative;width:216px;height:132px;color:var(--dsw-alias-label-secondary)}',
+				'.mm-connectingCore{position:absolute;z-index:2;left:50%;top:54%;width:46px;height:46px;display:grid;place-items:center;transform:translate(-50%,-50%);color:var(--dsw-alias-label-primary);opacity:.76;animation:mm-connectingCore 2s linear infinite}',
+				'.mm-connectingCore svg{width:40px;height:40px}',
+				'.mm-connectingEndpoint{position:absolute;z-index:1;top:54%;width:22px;height:22px;display:grid;place-items:center;color:color-mix(in srgb,var(--dsw-alias-label-secondary) 74%,transparent);opacity:0;will-change:transform,opacity}',
+				'.mm-connectingEndpoint svg{width:18px;height:18px}',
+				'.mm-connectingEndpointLocal{left:16px;animation:mm-connectingLocal 2s cubic-bezier(.42,0,.18,1) infinite}',
+				'.mm-connectingEndpointRemote{right:16px;color:var(--dsw-static-blue-500);animation:mm-connectingRemote 2s cubic-bezier(.42,0,.18,1) infinite}',
+				'.mm-connectingLabel{position:relative;display:inline-block;font-family:"Inter Variable","Inter","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:20px;font-weight:450;font-variation-settings:"wght" 470;letter-spacing:.026em;color:color-mix(in srgb,var(--dsw-alias-label-secondary) 72%,transparent);filter:blur(.2px);white-space:nowrap}',
+				'.mm-connectingLabel:before{content:attr(data-text);position:absolute;inset:0;color:color-mix(in srgb,var(--dsw-alias-label-primary) 88%,var(--dsw-alias-label-secondary));filter:none;clip-path:inset(0 100% 0 0);animation:mm-connectingTextFocus 2s cubic-bezier(.4,0,.2,1) infinite}',
+				'.mm-connectingCursor{position:absolute;left:0;bottom:-6px;width:10px;height:1.25px;border-radius:999px;background:var(--dsw-static-blue-500);opacity:0;animation:mm-connectingCursor 2s cubic-bezier(.4,0,.2,1) infinite}',
+				'@keyframes mm-connectingLocal{0%,5%{transform:translate3d(-8px,-50%,0) scale(.8);opacity:.18}13%{opacity:.68}34%{transform:translate3d(64px,-50%,0) scale(1);opacity:.76}42%{transform:translate3d(78px,-50%,0) scale(.35);opacity:0}43%,94%{transform:translate3d(78px,-50%,0) scale(.35);opacity:0}95%{transform:translate3d(-8px,-50%,0) scale(.8);opacity:0}100%{transform:translate3d(-8px,-50%,0) scale(.8);opacity:.18}}',
+				'@keyframes mm-connectingRemote{0%,9%{transform:translate3d(8px,-50%,0) scale(.8);opacity:.2}17%{opacity:.95}36%{transform:translate3d(-64px,-50%,0) scale(1);opacity:.96}44%{transform:translate3d(-78px,-50%,0) scale(.35);opacity:0}45%,94%{transform:translate3d(-78px,-50%,0) scale(.35);opacity:0}95%{transform:translate3d(8px,-50%,0) scale(.8);opacity:0}100%{transform:translate3d(8px,-50%,0) scale(.8);opacity:.2}}',
+				'@keyframes mm-connectingCore{0%,27%,46%,100%{opacity:.76;transform:translate(-50%,-50%) scale(.96)}34%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}40%{opacity:.9;transform:translate(-50%,-50%) scale(1)}}',
+				'@keyframes mm-connectingTextFocus{0%,4%{clip-path:inset(0 100% 0 0);opacity:0}8%{opacity:1}48%,84%{clip-path:inset(0 0 0 0);opacity:1}91%,100%{clip-path:inset(0 0 0 0);opacity:0}}',
+				'@keyframes mm-connectingCursor{0%,4%{left:0;opacity:0}8%{left:0;opacity:.92}48%{left:calc(100% - 10px);opacity:.92}59%,100%{left:calc(100% - 10px);opacity:0}}',
+				'.mm-loadError{margin:24px 0;padding:18px 2px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}',
+				'.mm-loadError .mm-error{margin:0;padding:0;flex:1;min-width:240px}',
+				'@media (prefers-reduced-motion: reduce){.mm-connectingCore,.mm-connectingEndpoint,.mm-connectingLabel:before,.mm-connectingCursor{animation:none}.mm-connectingCore{opacity:1;transform:translate(-50%,-50%);color:var(--dsw-alias-label-primary)}.mm-connectingEndpoint{opacity:.78;transform:translateY(-50%)}.mm-connectingEndpointLocal{left:52px}.mm-connectingEndpointRemote{right:52px}.mm-connectingLabel{color:transparent;filter:none}.mm-connectingLabel:before{clip-path:inset(0);opacity:1}.mm-connectingCursor{left:calc(100% - 10px);opacity:.7}}',
 				'.mm-drawer{position:fixed;z-index:230;box-sizing:border-box;top:65px;right:0;bottom:0;width:400px;max-width:calc(100vw - 64px);border-left:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);box-shadow:-10px 0 24px rgba(16,24,40,.06);display:flex;flex-direction:column}',
 				'.mm-drawerHead{flex:none;padding:24px 24px 18px}',
 				'.mm-drawerTitleRow{display:flex;align-items:flex-start;gap:13px}',
@@ -354,13 +373,26 @@
 				);
 			}
 
+			function McpConnectingState() {
+				return h('div', { className: 'mm-connectingState', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' },
+					h('div', { className: 'mm-connectingVisual', 'aria-hidden': true },
+						h('span', { className: 'mm-connectingEndpoint mm-connectingEndpointLocal' }, h(P.IconCodeOutline16)),
+						h('span', { className: 'mm-connectingEndpoint mm-connectingEndpointRemote' }, h(P.IconApiOutline14)),
+						h('span', { className: 'mm-connectingCore' }, h(P.IconLinkOutline16))
+					),
+					h('span', { className: 'mm-connectingLabel', 'data-text': 'MCP Connecting' }, 'MCP Connecting', h('span', { className: 'mm-connectingCursor', 'aria-hidden': true }))
+				);
+			}
+
 			function McpManagerSection(props) {
 				var api = props.api;
 				var [tab, setTab] = React.useState('servers');
 				var [servers, setServers] = React.useState([]);
 				var [connected, setConnected] = React.useState(0);
 				var [loading, setLoading] = React.useState(true);
+				var [refreshing, setRefreshing] = React.useState(false);
 				var [error, setError] = React.useState('');
+				var [attempt, setAttempt] = React.useState(0);
 				var [query, setQuery] = React.useState('');
 				var [filter, setFilter] = React.useState('all');
 				var [selectedServer, setSelectedServer] = React.useState(null);
@@ -379,11 +411,14 @@
 					setToast({ message: message, error: isError });
 				}
 				function loadServers() {
-					setLoading(true); setError('');
 					return api.call('list').then(function (value) {
 						setServers(value.servers || []); setConnected(value.connected || 0);
 						setSelectedServer(function (current) { return current ? (value.servers || []).find(function (server) { return server.id === current.id; }) || null : null; });
-					}, function (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }).finally(function () { setLoading(false); });
+					});
+				}
+				function refreshServers() {
+					setRefreshing(true);
+					return loadServers().catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setRefreshing(false); });
 				}
 				function loadMarket(force) {
 					setMarketLoading(true);
@@ -392,7 +427,20 @@
 						setSelectedMarket(function (current) { return current ? (value.items || []).find(function (item) { return item.id === current.id; }) || current : null; });
 					}, function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setMarketLoading(false); });
 				}
-				React.useEffect(function () { loadServers(); }, []);
+				React.useEffect(function () {
+					var alive = true;
+					var settleTimer = null;
+					var startedAt = Date.now();
+					setLoading(true); setError('');
+					loadServers().catch(function (reason) {
+						if (alive) setError(reason instanceof Error ? reason.message : String(reason));
+					}).finally(function () {
+						if (!alive) return;
+						var remaining = Math.max(0, 680 - (Date.now() - startedAt));
+						settleTimer = window.setTimeout(function () { if (alive) setLoading(false); }, remaining);
+					});
+					return function () { alive = false; if (settleTimer !== null) window.clearTimeout(settleTimer); };
+				}, [attempt]);
 				React.useEffect(function () { if (tab === 'market' && !marketLoaded) loadMarket(false); }, [tab, marketLoaded]);
 				React.useEffect(function () {
 					function onKey(event) {
@@ -448,8 +496,8 @@
 				var visibleMarket = market.filter(function (item) { return needle === '' || item.repository.toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle); });
 
 				var serverBody;
-				if (loading) serverBody = h('p', { className: 'mm-loading', role: 'status' }, '正在读取 MCP 配置…');
-				else if (error) serverBody = h('p', { className: 'mm-error', role: 'alert' }, '加载 MCP Manager 失败：' + error);
+				if (loading) serverBody = h(McpConnectingState);
+				else if (error) serverBody = h('div', { className: 'mm-loadError' }, h('p', { className: 'mm-error', role: 'alert' }, '加载 MCP Manager 失败：' + error), h(Button, { type: 'button', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, h(P.IconRefreshOutline16), '重试'));
 				else serverBody = h('div', { className: 'mm-table', 'data-testid': 'server-list' },
 					h('div', { className: 'mm-tableHead', role: 'row' }, h('span', null, '服务器'), h('span', null, '状态'), h('span', { className: 'mm-transportCol' }, '传输方式'), h('span', { className: 'mm-toolCol' }, '工具数'), h('span', null, '启用')),
 					visibleServers.length ? visibleServers.map(function (server) {
@@ -476,7 +524,7 @@
 						h('button', { type: 'button', role: 'tab', className: 'mm-tab' + (tab === 'market' ? ' mm-tabOn' : ''), 'aria-selected': tab === 'market', onClick: function () { setTab('market'); setQuery(''); setSelectedServer(null); } }, '市场')
 					),
 					tab === 'servers' ? h('div', { className: 'mm-content' },
-						h('div', { className: 'mm-summary' }, h('span', { className: 'mm-summaryKey' }, '当前配置'), h('span', { className: 'mm-summaryValue' }, 'web'), h('div', { className: 'mm-summaryActions' }, h('span', { className: 'mm-connected' }, '已连接 ' + connected + ' / ' + servers.length), h(Button, { type: 'button', disabled: loading, onClick: loadServers }, h(P.IconRefreshOutline16), '重新检测'), h(Button, { type: 'button', primary: true, onClick: function () { setEditor({}); } }, h(P.IconPlusOutline16), '新增服务器'))),
+						h('div', { className: 'mm-summary' }, h('span', { className: 'mm-summaryKey' }, '当前配置'), h('span', { className: 'mm-summaryValue' }, 'web'), h('div', { className: 'mm-summaryActions' }, h('span', { className: 'mm-connected' }, '已连接 ' + connected + ' / ' + servers.length), h(Button, { type: 'button', disabled: loading || refreshing, onClick: refreshServers }, h(P.IconRefreshOutline16), refreshing ? '检测中…' : '重新检测'), h(Button, { type: 'button', primary: true, onClick: function () { setEditor({}); } }, h(P.IconPlusOutline16), '新增服务器'))),
 						h(Search, { value: query, onChange: setQuery, placeholder: '搜索服务器或工具' }),
 						h('div', { className: 'mm-filters' }, [['all', '全部 ' + servers.length], ['connected', '已连接 ' + connected], ['failed', '连接问题 ' + servers.filter(function (server) { return server.status === 'failed' || server.status === 'needs-environment'; }).length], ['disabled', '已停用 ' + servers.filter(function (server) { return server.status === 'disabled'; }).length]].map(function (item) { return h('button', { key: item[0], type: 'button', className: 'mm-filter' + (filter === item[0] ? ' mm-filterOn' : ''), onClick: function () { setFilter(item[0]); } }, item[1]); })),
 						serverBody

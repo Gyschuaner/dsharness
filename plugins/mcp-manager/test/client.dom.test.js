@@ -26,6 +26,13 @@ function jsonResponse(value, status = 200) {
 	};
 }
 
+function deferred() {
+	let resolve;
+	let reject;
+	const promise = new Promise((resolveValue, rejectValue) => { resolve = resolveValue; reject = rejectValue; });
+	return { promise, resolve, reject };
+}
+
 function server(overrides = {}) {
 	return {
 		id: 'mcp-manager-codegraph', serverName: 'codegraph', description: '代码库语义检索与关系图谱服务',
@@ -134,17 +141,75 @@ async function makeHarness(router) {
 		await act(async () => { element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })); });
 	}
 	async function flush() { await act(async () => { await new Promise((resolveValue) => setTimeout(resolveValue, 0)); }); }
+	async function pause(ms) { await act(async () => { await new Promise((resolveValue) => setTimeout(resolveValue, ms)); }); }
 	function button(text) { return [...dom.window.document.querySelectorAll('button')].find((item) => item.textContent.trim() === text); }
-	async function openMcp() {
+	async function openMcp(waitForReady = true) {
 		await click(dom.window.document.querySelector('.ext-trigger')); await flush();
 		await click(button('MCP')); await flush(); await flush();
+		if (waitForReady) { await pause(700); await flush(); }
 	}
 	async function cleanup() {
 		await act(async () => reactRoot.unmount()); dom.window.close();
 		for (const [key, value] of Object.entries(previous)) value === undefined ? delete globalThis[key] : globalThis[key] = value;
 	}
-	return { dom, click, flush, button, openMcp, cleanup, registrations };
+	return { dom, click, flush, pause, button, openMcp, cleanup, registrations };
 }
+
+test('initial MCP load uses the endpoint handshake state and reduced-motion fallback', async (t) => {
+	const list = deferred();
+	const router = async (body) => {
+		if (body.op === 'list') return list.promise;
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router); t.after(h.cleanup);
+	await h.openMcp(false);
+
+	const loading = h.dom.window.document.querySelector('.mm-connectingState');
+	assert.ok(loading, 'initial request renders a dedicated MCP connecting state');
+	assert.equal(loading.getAttribute('role'), 'status');
+	assert.equal(loading.getAttribute('aria-live'), 'polite');
+	assert.equal(loading.getAttribute('aria-atomic'), 'true');
+	assert.equal(h.dom.window.document.querySelector('.mm-connectingVisual').getAttribute('aria-hidden'), 'true');
+	assert.equal(h.dom.window.document.querySelectorAll('.mm-connectingEndpoint').length, 2);
+	assert.ok(h.dom.window.document.querySelector('.mm-connectingEndpointLocal [data-icon="1"]'), 'local process endpoint uses an official icon');
+	assert.ok(h.dom.window.document.querySelector('.mm-connectingEndpointRemote [data-icon="1"]'), 'remote API endpoint uses an official icon');
+	assert.ok(h.dom.window.document.querySelector('.mm-connectingCore [data-icon="1"]'), 'connection core uses the official Link icon');
+	assert.equal(h.dom.window.document.querySelector('.mm-connectingLabel').textContent, 'MCP Connecting');
+	assert.equal(h.dom.window.document.querySelector('.mm-connectingLabel').getAttribute('data-text'), 'MCP Connecting');
+	assert.ok(h.dom.window.document.querySelector('.mm-summary'), 'stable MCP page chrome stays visible while connecting');
+
+	const css = h.dom.window.document.querySelector('style[data-plugin="dsh-mcp-manager"]').textContent;
+	assert.ok(css.includes('@keyframes mm-connectingLocal'));
+	assert.ok(css.includes('@keyframes mm-connectingRemote'));
+	assert.ok(css.includes('@keyframes mm-connectingCore'));
+	assert.ok(css.includes('@keyframes mm-connectingTextFocus'));
+	assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'));
+
+	list.resolve({ apiVersion: 1, profile: 'web', connected: 1, servers: [server()] });
+	await h.pause(700); await h.flush();
+	assert.equal(h.dom.window.document.querySelector('.mm-connectingState'), null);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="server-list"] .mm-serverRow').length, 1);
+});
+
+test('MCP connecting exits to a retryable error and retry restores the list', async (t) => {
+	let attempts = 0;
+	const router = async (body) => {
+		if (body.op !== 'list') throw new Error(`unexpected op ${body.op}`);
+		attempts += 1;
+		if (attempts === 1) throw new Error('profile unavailable');
+		return { apiVersion: 1, profile: 'web', connected: 1, servers: [server()] };
+	};
+	const h = await makeHarness(router); t.after(h.cleanup);
+	await h.openMcp();
+	assert.equal(h.dom.window.document.querySelector('.mm-connectingState'), null);
+	assert.ok(h.dom.window.document.querySelector('[role="alert"]').textContent.includes('profile unavailable'));
+	assert.ok(h.button('重试'));
+	await h.click(h.button('重试'));
+	assert.ok(h.dom.window.document.querySelector('.mm-connectingState'));
+	await h.pause(700); await h.flush();
+	assert.equal(h.dom.window.document.querySelector('.mm-connectingState'), null);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="server-list"] .mm-serverRow').length, 1);
+});
 
 test('real MCP contribution renders without shell business placeholders and exposes honest runtime tools', async (t) => {
 	let servers = [server(), server({ id: 'mcp-manager-context7', serverName: 'context7', description: '当前文档', status: 'needs-environment', fiberPhase: null, toolCount: 0, tools: [], enabled: false, missingEnvironment: ['CONTEXT7_API_KEY'] })];

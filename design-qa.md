@@ -387,3 +387,53 @@ final result: passed
 ## Follow-up Polish
 
 - P3：当 MCP client 将来公开结构化连接错误与 retry telemetry 时，可在详情抽屉增加真实“最后检测/重试次数”，当前不应以推测值填充。
+
+---
+
+# MCP Connecting endpoint-handshake loading state QA
+
+- Source visual truth: `D:\Pythonproject\dsharness-DSH-026-mcp-manager\artifacts\design-qa\mcp-connecting-build1\reference-skill-finding-full.png`
+- Rendered loading state: `D:\Pythonproject\dsharness-DSH-026-mcp-manager\artifacts\design-qa\mcp-connecting-build1\implementation-loading.png`
+- Settled MCP page: `D:\Pythonproject\dsharness-DSH-026-mcp-manager\artifacts\design-qa\mcp-connecting-build1\implementation-full.png`
+- Focused same-input comparison: `D:\Pythonproject\dsharness-DSH-026-mcp-manager\artifacts\design-qa\mcp-connecting-build1\comparison.png`
+- Browser viewport: 982 × 953 CSS px in the Codex in-app browser.
+- State: MCP server list initial request, captured about 240 ms after entering the MCP section.
+
+## Findings
+
+- No actionable P0/P1/P2 visual or interaction issue remains.
+- The optical-focus text treatment, unboxed central glyph, centered rhythm, graphite/fog palette, and single blue accent deliberately match `Skill Finding`.
+- MCP identity is expressed with official primitives instead of custom artwork: a local process endpoint (`IconCodeOutline16`) and a blue remote API endpoint (`IconApiOutline14`) converge on the official link glyph (`IconLinkOutline16`), then the connection core pulses once.
+- The MCP core is slightly more visually dense than the Skill glyph because three official symbols overlap during the handshake keyframe. This is intentional and remains readable at the captured scale.
+
+## Required fidelity surfaces
+
+- Fonts and typography: `MCP Connecting` stays on one line at the same 14 px optical-focus scale. The sharp overlay and 10 px blue cursor traverse the soft base label over the 2 s cycle.
+- Spacing and layout rhythm: the animation uses the same 216 × 132 visual field and 26 px label gap as the selected Skill state. Tabs, profile summary, search, and filters remain stable while the server data connects.
+- Colors and visual tokens: graphite and fog use existing DSH label tokens; the remote endpoint and focus cursor use the existing static blue token. No gradients, glow, or new palette was introduced.
+- Image quality and asset fidelity: all three symbols come from DSH client UI primitives. No generated bitmap, custom SVG, emoji, CSS-drawn icon, or placeholder logo is used.
+- Copy and content: the only branded loading copy is `MCP Connecting`; failure copy is separate and gives a real retry action.
+
+## Interaction and accessibility evidence
+
+- Initial loading is held for at least 680 ms so the animation does not flash on a fast Host response, then exits to the real five-server list.
+- Failure exits to `role="alert"` with a `重试` button; retry re-enters the branded connecting state and restores the list. This lifecycle is covered by DOM integration tests.
+- `role="status"`, `aria-live="polite"`, `aria-atomic="true"`, and a decorative `aria-hidden` visual are present.
+- `prefers-reduced-motion` disables all animation while keeping the sharp label, connection core, and two static endpoints visible.
+- Live in-app browser accessibility snapshot exposed `MCP Connecting` as the active status; settled page rendered five server rows. Browser console errors: 0.
+
+## Comparison history
+
+1. The first rendered implementation was compared side by side with the live `Skill Finding` state at a normalized center crop. Its icon scale, text baseline, cursor weight, whitespace, and visual density matched without a P0/P1/P2 discrepancy.
+2. The moving still shows the local and remote endpoints already docking into the link core; this keyframe makes the MCP-specific handshake legible while preserving the selected Skill motion language. No second visual correction was required.
+
+## Implementation checklist
+
+- [x] Preserve the selected Skill optical-focus language.
+- [x] Add an MCP-specific local-to-remote endpoint handshake.
+- [x] Use only official UI primitives and existing theme tokens.
+- [x] Keep page chrome stable and enforce a 680 ms minimum dwell.
+- [x] Add retryable failure and reduced-motion states.
+- [x] Verify automated lifecycle, live browser rendering, accessibility tree, and console.
+
+final result: passed
