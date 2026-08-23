@@ -11,7 +11,7 @@
 - Explicit exclusions: 49 binary PNG evidence files, 29 Markdown instruction/design/history documents, and 24 historical patch snapshots. These are not executable runtime inputs; their paths and reasons remain recorded in `full-code-audit-coverage.json`.
 - Pre-change backup: annotated tag `backup/DSH-029-pre-typescript-20260824-021330`; verified bundle `D:\Pythonproject\dsharness-backups\DSH-029-pre-typescript-20260824-021330-66fc05414723.bundle`; SHA-256 `B43B14B1E2FDD31911672164559524A02E90DFEB61707CD11E7027E127FF530A`.
 
-## Coverage
+## First-pass coverage
 
 - Total tracked files: 162
 - Reviewed: 60
@@ -398,7 +398,10 @@ All confirmed findings are implemented on the DSH-029 branch; final commit IDs a
 
 ## Fix batches and commits
 
-- First-pass report frozen before business-code edits. Fix batches and commit SHAs will be appended after implementation.
+- `2484605` — migrated all 25 tracked hand-written JavaScript source/test files to TypeScript, added strict build/inventory gates, generated runtime artifacts, and fixed AUDIT-001 through AUDIT-020 with their regressions.
+- `118754d` — fixed AUDIT-021 by pinning generated JavaScript/declaration line endings to LF for reproducible Windows builds.
+- `f50bc76` — completed the final TypeScript rule pass by replacing the remaining loose null comparisons with explicit strict checks.
+- The first-pass finding report was frozen before business-code edits; the matrix above is the append-only completion record.
 
 ## Verification evidence
 
@@ -414,17 +417,23 @@ All confirmed findings are implemented on the DSH-029 branch; final commit IDs a
 - `pnpm run verify`: strict production TypeScript build, test TypeScript check, generated bundle build, 115 tests (111 passed, 4 explicitly platform-skipped, 0 failed), and the tracked-JavaScript inventory gate all passed.
 - `pnpm audit --audit-level high --registry https://registry.npmjs.org`: no known vulnerabilities.
 - `git diff --check`: passed.
-- Post-migration coverage ledger: 247 tracked paths, 71 reviewed, 176 generated/document/binary/vendor paths skipped with reasons, 0 pending, 100% coverage.
-- SIT, built-in browser, reload/restart, clean-checkout reproduction, and the final committed-diff review remain pending at this checkpoint.
+- Post-migration coverage ledger: 248 tracked paths, 71 reviewed, 177 generated/document/binary/vendor paths skipped with reasons, 0 pending, 100% coverage.
+- Independent Windows clone with a frozen install repeated `pnpm run verify` and finished with an empty porcelain status, proving the tracked compiler output is reproducible under the host Git configuration.
+- Isolated SIT profile loaded all five local plugins from the TypeScript build. Host/API and UI flows covered Skill catalog/detail and project toggles, MCP validation/create/edit/enable plus marketplace detail, Plugin search/toggle/import validation, and cold restart persistence.
+- Final in-app Browser cold-start smoke at `127.0.0.1:3085` rechecked SKILL, MCP server/market, GitHub metadata (including Stars/Forks), and Plugin local-list pages; a fresh tab reported 0 console errors and 0 warnings. The isolated service, tabs, profile, and workspaces were removed afterward.
 
 ## Re-review result
 
-Pending after all fixes and the TypeScript migration.
+- Open Code Review delegation selected 76 reviewable files from the final 124-file committed range and excluded 48 generated/map/document paths according to resolved repository rules.
+- The committed diff was re-read against correctness, security, transaction, path-containment, TypeScript, UI lifecycle, and test-coverage rules. No new functional defect remained.
+- Four remaining loose null comparisons were a rule-compliance issue rather than a runtime defect; `f50bc76` converted them to strict checks and the full 115-test gate was repeated successfully.
+- A browser-induced frontmatter change in the two project-native Skills was investigated and matched the documented DSH-008 acceptance rule: a fresh project intentionally starts with zero model-invocable Skills and reconciles project-native Skills through `disable-model-invocation`. The test-only changes were precisely restored and were not misreported as a defect.
 
 ## Residual risks and deferred work
 
-- No confirmed finding is deferred at first-pass freeze.
-- Production deployment is outside DSH-029 authorization. The user authorized merge/push to `main` only after verification.
+- No confirmed finding is deferred; all 21 confirmed findings are fixed and covered by regression evidence.
+- Four filesystem-permission/junction tests are explicitly skipped on this Windows filesystem because it does not enforce the required POSIX-like semantics. Equivalent parser, canonical-containment, rollback, and Windows junction tests passed; this is a test-environment limitation, not an observed product failure.
+- Production deployment is outside DSH-029 authorization. The user authorized merge/push to `main` after verification, not production rollout.
 
 ## Final summary (first-pass freeze)
 
@@ -441,3 +450,10 @@ Pending after all fixes and the TypeScript migration.
 - Confirmed findings after migration/re-review: 7 high, 9 medium, 5 actionable low (21 total).
 - Implemented fixes: 21; open confirmed defects at this checkpoint: 0.
 - Hand-written JavaScript remaining: 0. `plugins/*/src/*.ts` and TypeScript tests/configuration are the source of truth; `plugins/*/lib/*.js` is generated runtime output.
+
+## Final completion summary
+
+- Confirmed findings: 21 total (7 high, 9 medium, 5 low); fixed: 21; open: 0.
+- Final coverage: 248 tracked paths, 71 reviewed, 177 skipped with an explicit generated/document/binary/vendor reason, 0 pending, 100%.
+- Quality gate: strict TypeScript and test typecheck, deterministic build, 115 tests (111 passed, 4 platform-skipped, 0 failed), inventory gate, dependency audit, diff hygiene, isolated SIT, restart persistence, independent clean clone, and in-app Browser all passed.
+- Runtime source of truth: TypeScript under `plugins/*/src` and TypeScript tests; generated `plugins/*/lib/*.js` remains committed because DSH loads JavaScript at runtime.

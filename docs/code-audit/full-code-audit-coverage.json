@@ -4,7 +4,7 @@
   "base_commit": "66fc05414723b3f4b6c9e8ff25314411d8b2b31c",
   "branch": "fix/full-code-audit-20260824-DSH-029",
   "created_at_utc": "2026-08-23T19:27:38.8519466Z",
-  "updated_at_utc": "2026-08-23T19:27:47.1597279Z",
+  "updated_at_utc": "2026-08-23T19:51:18.9018287Z",
   "items": [
     {
       "path": ".agents/skills/cordis-plugin-development/SKILL.md",
@@ -581,6 +581,12 @@
       "status": "skipped",
       "reason": "non-code documentation or binary asset",
       "updated_at_utc": "2026-08-23T19:27:38.7108981Z"
+    },
+    {
+      "path": "docs/evidence/DSH-029-2026-08-24/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:51:18.9018287Z"
     },
     {
       "path": "docs/installed-plugins.md",
