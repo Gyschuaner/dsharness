@@ -429,7 +429,7 @@ test('extension type navigation collapses to icons and persists across reopen', 
 	t.after(h.cleanup);
 	await h.open();
 	assert.ok(!h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
-	assert.equal(h.dom.window.document.querySelectorAll('.ext-navIcon [data-icon="1"]').length, 2);
+	assert.equal(h.dom.window.document.querySelectorAll('.ext-navIcon [data-icon="1"]').length, 1);
 	const collapse = h.dom.window.document.querySelector('button[aria-label="收起扩展类型导航"]');
 	assert.equal(collapse.getAttribute('aria-expanded'), 'true');
 	await h.click(collapse);
@@ -437,7 +437,7 @@ test('extension type navigation collapses to icons and persists across reopen', 
 	assert.equal(h.dom.window.localStorage.getItem('dsh.extensions.navCollapsed'), '1');
 	assert.deepEqual(
 		[...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.getAttribute('title')),
-		['SKILL', 'MCP（建设中）'],
+		['SKILL'],
 	);
 
 	await h.click(h.dom.window.document.querySelector('.ext-close'));
@@ -451,7 +451,7 @@ test('extension type navigation collapses to icons and persists across reopen', 
 	assert.equal(h.dom.window.localStorage.getItem('dsh.extensions.navCollapsed'), '0');
 });
 
-test('extension shell owns the frame entry, composes Skill and does not synthesize a Plugin placeholder', async (t) => {
+test('extension shell owns the frame entry, composes Skill and does not synthesize business placeholders', async (t) => {
 	const router = async (body) => {
 		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
 		if (body.op === 'catalog') return view('/project-a', [row('alpha-skill', 'alpha')]);
@@ -464,15 +464,15 @@ test('extension shell owns the frame entry, composes Skill and does not synthesi
 	assert.equal(h.registrations.get('sidebar.footer.action')[0].definition.id, 'extensions-page');
 	assert.deepEqual(
 		h.registrations.get('extension.manager.section').map((entry) => entry.definition.id).sort(),
-		['mcp', 'skill'],
+		['skill'],
 	);
 	assert.equal(h.dom.window.document.querySelectorAll('style[data-plugin="dsh-extension-manager"]').length, 1);
 	assert.equal(h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent.includes('.ext-page'), false);
 	await h.open();
-	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'MCP建设中']);
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL']);
 	assert.ok(h.dom.window.document.querySelector('.sk-root'), 'the Skill contribution renders through the shell-owned Slot');
-	await h.click(h.button('MCP建设中'));
-	assert.ok(h.dom.window.document.body.textContent.includes('MCP 管理（建设中）'));
+	assert.equal(h.button('MCP建设中'), undefined, 'the shell no longer fabricates an MCP placeholder');
+	assert.equal(h.button('Plugin建设中'), undefined, 'the shell no longer fabricates a Plugin placeholder');
 });
 
 test('Skill catalog loading uses the optical Skill Finding state with a reduced-motion fallback', async (t) => {

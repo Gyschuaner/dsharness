@@ -262,7 +262,7 @@ test('Plugin loading exits to a retryable error and retry restores the real list
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-row').length, 1);
 });
 
-test('real Plugin contribution replaces the placeholder and renders the denoised local page', async (t) => {
+test('real Plugin contribution renders without shell business placeholders and shows the denoised local page', async (t) => {
 	let plugins = [
 		localPlugin('dsh-extension-manager', { protected: true }),
 		localPlugin('dsh-plugin-manager', { protected: true }),
@@ -281,7 +281,7 @@ test('real Plugin contribution replaces the placeholder and renders the denoised
 	};
 	const h = await makeHarness(router);
 	t.after(h.cleanup);
-	assert.deepEqual(h.registrations.get('extension.manager.section').map((entry) => entry.definition.id).sort(), ['mcp', 'plugin', 'skill']);
+	assert.deepEqual(h.registrations.get('extension.manager.section').map((entry) => entry.definition.id).sort(), ['plugin', 'skill']);
 	await h.openPlugin();
 	assert.ok(h.dom.window.document.querySelector('.pm-root'));
 	assert.equal(h.dom.window.document.querySelector('.pm-head h2').textContent, 'Plugin');
@@ -289,7 +289,7 @@ test('real Plugin contribution replaces the placeholder and renders the denoised
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-row').length, 3);
 	assert.equal(h.dom.window.document.querySelectorAll('.pm-switch').length, 3);
 	assert.equal(h.dom.window.document.querySelectorAll('.pm-switch:disabled').length, 2);
-	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'MCP建设中', 'Plugin']);
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'Plugin']);
 
 	const listNode = h.dom.window.document.querySelector('[data-testid="local-list"]');
 	await h.click([...h.dom.window.document.querySelectorAll('.pm-row')].find((item) => item.textContent.includes('dsh-skill-manager')));

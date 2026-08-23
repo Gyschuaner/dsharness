@@ -15,22 +15,15 @@ dsharness/
 ├── upstream.lock.json        # 官方源码、工具链、补丁与最终 tree 锁定
 ├── upstream-patches/         # 需要应用到官方源码的本地补丁
 ├── plugins/
-│   ├── skill-manager/        # skill 文件管理插件（DSH Web GUI 设置页）
-│       ├── package.json      #  包名 dsh-skill-manager，零裸依赖
-│       ├── lib/
-│       │   ├── index.js      #  host 半：注册 /api/skill-manager JSON 路由
-│       │   └── client.js     #  client 半：settings.section 页面
-│       └── README.md         #  插件功能 / 安装 / 技术说明
-│   ├── extension-manager/    # 通用“扩展”主页入口、全页壳与分区 Slot
+│   ├── extension-manager/    # 通用“扩展”全页壳与业务分区 Slot
+│   ├── skill-manager/        # SKILL 管理业务分区与 Host API
+│   ├── mcp-manager/          # MCP 服务器管理与精选 GitHub 市场（DSH-026/028）
+│   │   ├── lib/              # Host API、受管 Cordis 状态与 Client 页面
+│   │   └── test/             # 状态机、安全边界与真实 bundle DOM 测试
 │   ├── plugin-manager/       # 本地插件管理 + GitHub 插件市场（DSH-027）
-│       ├── lib/index.js      # Host：/api/plugin-manager
-│       ├── lib/client.js     # Client：本地插件 / 插件市场双页
-│       └── test/             # Host 事务与 Client DOM 回归
+│   │   ├── lib/              # Host API、导入事务与 Client 页面
+│   │   └── test/             # Host 事务与 Client DOM 回归
 │   └── image-context-guard/  # 已退役的 DSH-004 临时保护源码，仅供历史回溯
-│       ├── package.json
-│       ├── lib/index.js      # host 半：llm/stream 请求边界裁剪
-│       ├── test/             # Node.js 自动化测试
-│       └── README.md
 ├── dev/
 │   ├── install-dsh-source.ps1     # 拉取、打补丁、构建并注册 dsh
 │   ├── verify-dsh-source.ps1      # 校验工具链、源码 tree、补丁和 Web

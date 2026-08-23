@@ -1,10 +1,10 @@
 /**
  * dsh-extension-manager — client half (browser bundle).
- * build: 2 (DSH-006 / DSH-027)
+ * build: 3 (DSH-006 / DSH-026 / DSH-027)
  *
  * Owns the frame-level 「扩展」 entry and full-page navigation. Business
  * plugins contribute sections through `extension.manager.section`; this
- * package ships only the MCP roadmap placeholder.
+ * package does not synthesize business placeholders.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -36,7 +36,7 @@
 				'.ext-close{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 9px;line-height:1;margin-left:auto;display:inline-flex}',
 				'.ext-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.ext-body{flex:1;min-height:0;display:flex}',
-				'.ext-nav{box-sizing:border-box;flex:none;width:156px;border-right:1px solid var(--dsw-alias-border-l2);padding:10px 8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;transition:width .16s ease,padding .16s ease}',
+				'.ext-nav{box-sizing:border-box;flex:none;width:188px;border-right:1px solid var(--dsw-alias-border-l2);padding:10px 8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;transition:width .16s ease,padding .16s ease}',
 				'.ext-navCollapsed{width:64px;padding-left:8px;padding-right:8px}',
 				'.ext-navHead{display:flex;align-items:center;min-height:32px;padding:0 4px}',
 				'.ext-navTitle{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--dsw-alias-label-quaternary)}',
@@ -57,12 +57,7 @@
 				'.ext-navCollapsed .ext-navToggle{margin-left:0}',
 				'.ext-navCollapsed .ext-navBtn{display:flex;align-items:center;justify-content:center;width:46px;min-height:44px;padding:10px 0}',
 				'.ext-navCollapsed .ext-navIcon{width:20px;height:20px}',
-				'.ext-main{flex:1;min-width:0;min-height:0;overflow:hidden;padding:16px 20px}',
-				'.ext-placeholder{max-width:520px;display:flex;flex-direction:column;gap:10px;padding:48px 0}',
-				'.ext-phIcon{color:var(--dsw-alias-label-quaternary)}',
-				'.ext-placeholder h3{margin:0;font-size:16px;font-weight:600}',
-				'.ext-placeholder p{margin:0;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.7}',
-				'.ext-phSoon{color:var(--dsw-alias-label-quaternary);font-size:12px}',
+				'.ext-main{flex:1;min-width:0;min-height:0;overflow:hidden;padding:16px 8px}',
 				'.ext-empty{margin:0;padding:48px 0;color:var(--dsw-alias-label-tertiary);font-size:13px}',
 				'@media(max-width:900px){.ext-nav:not(.ext-navCollapsed){width:168px;padding:10px}.ext-main{padding:16px}}',
 				'@media(max-width:680px){.ext-nav{display:none}.ext-main{padding:12px}}',
@@ -112,9 +107,7 @@
 							id: id,
 							label: resolveLabel(options.label, id.toUpperCase()),
 							order: Number.isFinite(options.order) ? options.order : 0,
-							// MCP remains the shell-owned roadmap placeholder. Plugin is now a
-							// real contribution from dsh-plugin-manager (DSH-027).
-							soon: id === 'mcp'
+							soon: false
 						};
 					}).filter(function (row) { return row.id !== ''; }).sort(function (a, b) {
 						return a.order - b.order || a.id.localeCompare(b.id);
@@ -135,25 +128,6 @@
 					if (value === null) value = window.localStorage.getItem('smgr.ext.navCollapsed');
 					return value === '1';
 				} catch (error) { return false; }
-			}
-
-			function ExtensionPlaceholder(props) {
-				return h(
-					'div',
-					{ className: 'ext-placeholder' },
-					h('div', { className: 'ext-phIcon' }, h(ExtIcon, { size: 28 })),
-					h('h3', null, props.title),
-					h('p', null, props.body),
-					h('p', { className: 'ext-phSoon' }, '预计能力：' + props.planned)
-				);
-			}
-
-			function McpPlaceholder() {
-				return h(ExtensionPlaceholder, {
-					title: 'MCP 管理（建设中）',
-					body: 'MCP（Model Context Protocol）服务器把外部工具接入 DSH，模型会以原生工具形式调用它们。当前 MCP 服务器在 web profile 的 cordis 配置中以 dsh-mcp-client 插件行声明。',
-					planned: '服务器列表与连接状态、工具清单、新增/编辑/删除配置、保存后热加载（无需重启 dsh web）。'
-				});
 			}
 
 			function ExtensionsPage(props) {
@@ -251,9 +225,6 @@
 						inject: function () { return { sectionLedger: ledger }; },
 						children: { 'extension.manager.section': { kind: 'list', scope: 'root' } }
 					}, ExtensionsEntry);
-				});
-				slots.inject('extension.manager.section', function* () {
-					yield slots.register({ name: 'extension.manager.section', id: 'mcp', order: 20, label: function () { return 'MCP'; } }, McpPlaceholder);
 				});
 			};
 			return module.exports;

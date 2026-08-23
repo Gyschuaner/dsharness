@@ -296,3 +296,94 @@ final result: passed
 - P3: If future catalog work consistently completes below 300 ms, consider a minimum visibility threshold or skip the loader entirely to avoid a flash; do not delay a fast response only to show the animation.
 
 final result: passed
+
+---
+
+# MCP Manager Design QA
+
+final result: passed
+
+## Comparison Target
+
+- Source visual truth:
+  - `C:\Users\chuansgu\AppData\Local\Temp\codex-clipboard-5cc77b18-4d93-445a-9f43-f3e12ce425cd.png`（MCP 市场 + GitHub 详情）
+  - `C:\Users\chuansgu\AppData\Local\Temp\codex-clipboard-60c6e1e3-611e-4d38-986e-fd8cbd42593e.png`（服务器列表 + 详情）
+- Browser-rendered implementation:
+  - `.tmp/qa/market-pass2.png`
+  - `.tmp/qa/server-pass3.png`
+- Same-input comparison evidence:
+  - `.tmp/qa/market-comparison-pass2.png`
+  - `.tmp/qa/server-comparison-pass2.png`（第二轮列宽修正前）
+  - `.tmp/qa/server-comparison-pass3.png`（第二轮列宽修正后）
+- Local URL: `http://127.0.0.1:3180/`
+- State: light theme；比较截图中的市场选中 GitHub 官方 Server 并展开详情；服务器页使用
+  5 条隔离测试配置并展开 context7 详情。最终集成冒烟基于最新 `origin/main`，左导航同时
+  加载 SKILL、MCP 与 Plugin 三个真实业务分区。
+
+## Viewport and Normalization
+
+- Source pixels: `1487 x 1058`，两张一致。
+- Implementation pixels / CSS viewport: `1488 x 1058`，browser viewport override，device density 1。
+- 比较拼图将 source 横向补齐 1 px 到 `1488 x 1058`，未裁剪内容；实现截图保持原始尺寸。
+- 响应式补充检查：`900 x 800`、`720 x 800`、`640 x 760`，三个宽度均满足 `scrollWidth === clientWidth`；640 宽时扩展导航隐藏，详情抽屉保持 12 px 左侧余量。
+
+## Findings
+
+没有剩余的 P0 / P1 / P2 问题。
+
+可接受差异：
+
+- 隔离 profile 未挂载 SKILL Manager，因此左侧只显示 MCP 和 Plugin；这是测试组合差异，不是 MCP 页面缺失。
+- 市场使用 MCP Registry 可信图标和 GitHub owner avatar，因而 Microsoft、Context7、AWS 等图标比设计稿中的统一 GitHub 图标更真实；这直接落实了“图标能获取就显示真实图标”的产品要求。
+- GitHub 描述、推送日期与 Release 为浏览器验收当时的在线返回值，不锁死设计稿中的示例文本。
+- 服务器验收配置全部停用，故状态和工具数与设计稿示例不同；真实 Loader phase 和 `tools.schemas()` 投影已由自动化覆盖，页面不会伪造重试次数或错误详情。
+- 服务器页保留与市场页一致的两 Tab 导航；两张来源图对此并不一致，统一导航让用户可从任一页面直接切换，属于有意的产品一致性调整。
+
+## Required Fidelity Surfaces
+
+- Fonts and typography: 沿用 DSH Web 的字体栈；标题、正文、辅助信息、表头和标签权重分层与来源一致。首轮发现 repository 名称和描述落在同一行，已改为独立纵向块；长 GitHub 描述单行截断。
+- Spacing and layout rhythm: 顶栏、188 px 左导航、主内容边距、92 px 市场行、84 px 服务器行和 400 px 抽屉已与来源对齐。第二轮补充 drawer-open 的 400 px 内容预留，服务器所有列不再被抽屉覆盖。
+- Colors and visual tokens: 使用 DSH 中性色 token，交互主色固定为来源的 `#1677ff`；选中行使用低饱和蓝底，错误/连接/停用状态保持语义色。
+- Image quality and asset fidelity: 市场图片均为 Host 验证后的 HTTPS PNG/JPEG/WebP；MCP Registry 优先、GitHub avatar 回退。没有手写 SVG、CSS 图标或 emoji 占位。
+- Copy and content: 页面只展示 Host 能可靠提供的配置、Loader phase、工具 schema 和 GitHub/Registry 字段；已移除来源不可靠的“最后检测”“重试次数”等示例信息。
+- Icons: Shell 和操作控件使用 DSH primitives 图标库；市场项目使用真实远程项目图标；加载失败时使用 primitives 通用链接图标。
+- Accessibility: Tab、按钮、switch、dialog、label 和 aria 状态完整；Esc 层级关闭、键盘 focus ring、图片空 alt 和无横向溢出均已验证。
+
+## Full-view and Focused Evidence
+
+- Full-view: `market-comparison-pass2.png` 显示左右三栏比例、搜索、5 行市场结果、选中态和 400 px 详情抽屉与来源一致；真实项目图标是有意增强。
+- Full-view: `server-comparison-pass2.png` 验证 5 行表格、筛选、详情抽屉、底部操作区和去噪密度。
+- Focused region: 原始尺寸拼图已能清楚读取市场行图标/标题/描述、仓库键值、Topics、Release，以及服务器表头/列/详情工具区，因此无需额外裁切。`server-comparison-pass3.png` 进一步确认 drawer-open 后状态、传输、工具数与开关列全部可见。
+
+## Comparison History
+
+### Iteration 1 — blocked
+
+- [P2] 市场和服务器的标题/描述 span 未建立纵向布局，浏览器将两段文本连在一行。
+  - Fix: `.mm-marketCopy` / `.mm-serverCopy` 改为纵向 flex，标题和描述显式 block。
+- [P2] 扩展左导航为 156 px，而来源为约 188 px，导致主区域比例和搜索框起点漂移。
+  - Fix: 左导航改为 188 px，主内容水平 padding 改为 8 px，使实际内容起点与来源对齐。
+- [P2] 详情抽屉打开时覆盖服务器表格后四列。
+  - Fix: 桌面宽度下 `.mm-rootHasDrawer` 为内容预留 400 px；980 px 以下继续使用覆盖式抽屉。
+- [P3] 市场选中行依赖浏览器默认黑色 focus outline。
+  - Fix: 使用 1 px `#1677ff` focus ring，与页面主色一致。
+
+### Iteration 2 — passed
+
+- `market-comparison-pass2.png`：左导航、主内容起点、5 行密度、真实图标、选中态和详情抽屉无 P0/P1/P2 偏差。
+- `server-comparison-pass3.png`：drawer-open 状态下表头和 5 列均完整可见，概要操作、行密度与抽屉 footer 没有重叠或裁切。
+- Fresh browser tab console: 0 error / 0 warn。
+
+## Primary Interactions Tested
+
+- 扩展入口与 MCP 分区加载。
+- 服务器 / 市场 Tab 切换、搜索和列表渲染。
+- 服务器详情、环境变量缺失时拒绝启用、重新检测入口。
+- 市场 GitHub/Registry 元数据、真实图标、详情抽屉、安装为停用配置、已安装状态回写。
+- 最新 `origin/main` 四插件组合：SKILL / MCP / Plugin 导航均为真实贡献，无壳占位；
+  市场 5 行、GitHub 详情与远程头像正常，fresh tab console 0 error / 0 warn。
+- Esc 内层关闭由 DOM 集成测试覆盖；新增/编辑/删除 dialog 语义和路由由自动化覆盖。
+
+## Follow-up Polish
+
+- P3：当 MCP client 将来公开结构化连接错误与 retry telemetry 时，可在详情抽屉增加真实“最后检测/重试次数”，当前不应以推测值填充。

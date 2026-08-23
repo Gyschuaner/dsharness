@@ -1,7 +1,7 @@
 {
-  "name": "dsh-extension-manager",
-  "version": "0.3.0",
-  "description": "DeepSeek Harness Extensions shell: sidebar entry, full-page navigation, and an extension section Slot.",
+  "name": "dsh-mcp-manager",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness MCP server manager and curated MCP marketplace.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

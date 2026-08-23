@@ -1,7 +1,7 @@
 # dsh-extension-manager
 
 DeepSeek Harness 的通用“扩展”页面壳（DSH-006）。它只负责主页侧边栏入口、全页框架、
-分区导航与 MCP 一期占位，不包含任何 Skill / Plugin 业务或 Host API。
+分区导航，不包含任何 Skill / MCP / Plugin 业务或 Host API。
 
 ## 组合契约
 
@@ -13,6 +13,7 @@ DeepSeek Harness 的通用“扩展”页面壳（DSH-006）。它只负责主�
   `/api/skill-manager` 与 SKILL 管理界面。
 - `dsh-plugin-manager` 注册 `id: plugin`，独立拥有 `/api/plugin-manager`、本地插件管理
   与插件市场；壳不再提供 Plugin 占位。
+- `dsh-mcp-manager` 注册 `id: mcp`，独立拥有 `/api/mcp-manager`、服务器管理与市场界面。
 - 插件加载顺序不影响组合；声明消失时，Cordis Slot 生命周期会同步移除分区挂载。
 
 ## 本地挂载
