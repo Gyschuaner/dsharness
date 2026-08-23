@@ -231,6 +231,7 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	});
 	const router = async (body) => {
 		calls.push(body);
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
 		if (body.op === 'catalog') return view('/project-a', [currentRow]);
 		if (body.op === 'presets.list') return { presets: [{ name: '日常预设', description: 'preset', defaultSlim: false, skillCount: 1 }] };
 		if (body.op === 'setSource') {
@@ -255,8 +256,11 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, currentRow.description);
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-badgeUpdate')].length, 1);
 
-	await h.click(h.dom.window.document.querySelector('.sk-row'));
+	await h.click(h.dom.window.document.querySelector('.sk-rowOpen'));
 	assert.equal(h.dom.window.document.querySelector('.sk-descFull').textContent, currentRow.description);
+	assert.equal(h.dom.window.document.querySelector('.smgr-switch').getAttribute('role'), 'switch');
+	assert.equal(h.dom.window.document.querySelector('.sk-srcList').getAttribute('role'), 'radiogroup');
+	assert.ok([...h.dom.window.document.querySelectorAll('.sk-src')].every((item) => item.getAttribute('role') === 'radio'));
 	await h.click([...h.dom.window.document.querySelectorAll('.sk-src')].find((item) => item.textContent.includes('Claude 来源')));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setSource' && call.cwd === '/project-a' && call.source === 'global-claude'));
@@ -268,6 +272,9 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	await h.click(h.button('添加'));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setTags' && call.tags.includes('测试')));
+	await h.click([...h.dom.window.document.querySelectorAll('.sk-projBtn')].find((item) => item.textContent.includes('全部标签')));
+	assert.ok(h.button('测试'), 'new tag is immediately available in the global tag filter');
+	await h.click(h.button('测试'));
 
 	await act(async () => { h.dom.window.document.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
 	assert.equal(h.dom.window.document.querySelector('.sk-drawer'), null, 'first Esc closes only the drawer');
@@ -277,12 +284,52 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	assert.equal(h.dom.window.document.querySelector('[role="tab"][aria-selected="true"]').textContent, '统一资源库');
 	assert.ok(h.dom.window.document.body.textContent.includes('来源 ×2'));
 	await h.click(h.button('项目管理'));
-	await h.click([...h.dom.window.document.querySelectorAll('button')].find((item) => item.textContent.includes('日常预设')));
+	await h.click(h.button('应用推荐预设'));
 	await h.flush();
 	assert.ok(h.dom.window.document.querySelector('.test-modal'));
 	await h.click([...h.dom.window.document.querySelectorAll('button')].find((item) => item.textContent.startsWith('应用（')));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'presets.apply' && call.cwd === '/project-a'));
+});
+
+test('current workspace wins persisted project and visible rows support counted bulk selection', async (t) => {
+	const calls = [];
+	let rows = [
+		row('enabled-skill', '已启用描述', { enabled: true, modelInvocable: true }),
+		row('disabled-a', '未启用 A'),
+		row('disabled-b', '未启用 B'),
+	];
+	const router = async (body) => {
+		calls.push(body);
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return view(body.cwd || '/project-b', rows);
+		if (body.op === 'presets.list') return { presets: [] };
+		if (body.op === 'setMany') {
+			rows = rows.map((item) => body.names.includes(item.name) ? Object.assign({}, item, { enabled: body.enabled }) : item);
+			return { partial: false, report: { failed: [], conflicts: [] } };
+		}
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router, {
+		current: '/project-b',
+		workspaces: [{ path: '/project-a', title: 'project-a', updatedAt: '2' }],
+	});
+	t.after(h.cleanup);
+	h.dom.window.localStorage.setItem('smgr.v1.project', '/project-a');
+	await h.open();
+	assert.equal(h.dom.window.document.querySelector('.sk-projectTitle').textContent, 'project-b');
+	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('1 已启用 / 3 Skills'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-groupHead')].map((item) => item.textContent.trim()), ['已启用(1)', '未启用(2)']);
+	assert.equal(h.button('全部3').textContent, '全部3');
+	assert.equal(h.button('已启用1').textContent, '已启用1');
+	assert.equal(h.button('未启用2').textContent, '未启用2');
+
+	const selectVisible = h.dom.window.document.querySelector('input[aria-label="全选当前结果"]');
+	await act(async () => { Simulate.change(selectVisible, { target: { checked: true } }); });
+	assert.ok(h.dom.window.document.querySelector('.sk-bulkbar').textContent.includes('已选择 3 项'));
+	await h.click(h.button('在本项目启用（3）'));
+	await h.flush();
+	assert.ok(calls.some((call) => call.op === 'setMany' && call.cwd === '/project-b' && call.enabled === true && call.names.length === 3));
 });
 
 test('project switch drops stale catalog, mutation and preset-preview responses', async (t) => {
@@ -291,6 +338,7 @@ test('project switch drops stale catalog, mutation and preset-preview responses'
 	const stalePreview = deferred();
 	let aCatalogCalls = 0;
 	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
 		if (body.op === 'presets.list') return { presets: [{ name: '竞态预设', skillCount: 1 }] };
 		if (body.op === 'catalog' && body.cwd === '/project-a') {
 			aCatalogCalls += 1;
@@ -348,6 +396,11 @@ test('unknown catalog op safely falls back to the legacy Skill Manager UI', asyn
 	const error = new Error('未知操作：catalog');
 	error.status = 400;
 	const router = async (body) => {
+		if (body.op === 'capabilities') {
+			const capabilityError = new Error('未知操作：capabilities');
+			capabilityError.status = 400;
+			throw capabilityError;
+		}
 		if (body.op === 'catalog') throw error;
 		if (body.op === 'list') return { apiVersion: 5, cwd: '/project-a', roots: [], bundled: [], policy: { globalDefaultOff: false } };
 		throw new Error(`unexpected op ${body.op}`);

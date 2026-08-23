@@ -735,6 +735,17 @@ test('presets: apply rejects unknown preset and missing skills', async (t) => {
 });
 
 // ── S6: legacy compatibility ────────────────────────────────────────────────
+test('capabilities: reports V1 support without scanning the catalog', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const api = makeApi(env.opts);
+	const { status, value } = await api('capabilities', {});
+	assert.equal(status, 200);
+	assert.equal(value.apiVersion, 6);
+	assert.ok(value.features.includes('project-enable'));
+	assert.ok(value.features.includes('unified-catalog'));
+});
+
 test('legacy list: unchanged shape with apiVersion 6', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);

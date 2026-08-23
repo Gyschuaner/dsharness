@@ -13,7 +13,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 12 / DSH-008 V1）
+## 页面结构（build 13 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
@@ -22,11 +22,13 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
   左导航 SKILL / MCP / Plugin（建设中带徽标）；右内容区。Esc 或关闭按钮退出
   （弹窗打开时 Esc 优先给弹窗；详情抽屉打开时 Esc 先关抽屉）。
 - **SKILL 分区（V1）**：`项目管理 / 统一资源库` 两个子页签。
-  - **项目管理**：顶部「当前项目」选择器（当前 DSH 工作区 + 最近使用的工作区 +
-    添加本地项目）与「自定义预设」chip 行（默认精简预设带「默认精简」标记）；
-    工具栏为 搜索 / 全部·已启用·未启用 / 全部标签 筛选 / 一键精简；
+  - **项目管理**：顶部项目控制栏固定展示当前项目、完整路径、当前工作区标记、
+    已启用/总数与「仅影响此项目」说明；历史选择不会覆盖当前会话工作区，切换菜单仍包含
+    最近使用的工作区与添加本地项目；推荐预设与保存预设保留为次级动作；
+    工具栏为 搜索 / 带数量的全部·已启用·未启用 / 全部标签 / 全选当前结果 / 一键精简；
     行 = 图标 + 名称 + 项目特化/来源×N/未启用 徽标 + 完整描述 + 标签 + 启用开关；
-    勾选多行后可批量启用/禁用；底部说明「项目配置保存于 …/.dsh/skill-manager.json，
+    列表按已启用/未启用分组，勾选多行后在底部固定操作栏明确「在本项目启用/停用」；
+    空状态提供查看全部或应用推荐预设；底部说明「项目配置保存于 …/.dsh/skill-manager.json，
     仅在本机使用且不提交 Git；启停在下一轮对话生效」。
   - **统一资源库**：同名 Skill 合并为一行（「来源 ×N」徽标），搜索/标签筛选，
     点击行打开右侧详情抽屉切换来源；默认优先级 项目专属 > DSH 用户级 > 其他全局 > 内置。
@@ -34,6 +36,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、标签编辑
     （全局，跨项目共享）、更新状态（V1 不检测远端更新，不伪造数据）、
     「为此项目特化」（V1.2 能力，只读展示 + 禁用按钮）、高级折叠（路径/格式/附属文件）。
+    详情从最新 catalog 派生，不再与列表保存重复快照；窄窗口改为覆盖式抽屉。
 - **SKILL 分区（旧版降级）**：host 未加载 apiVersion 6 时渲染
   `SkillManagerSection`（build 11 功能，见下），顶部显示重启提示条。
 
@@ -181,6 +184,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   - 旧版操作（保持兼容）：`list / read / save / delete / import / exportZip /
     setStatus / getPolicy / setPolicy`。
   - V1 操作（apiVersion 6，DSH-008）：
+    - `capabilities`：轻量返回 apiVersion 与功能清单，Client 进入 SKILL 时不再用完整 catalog 做能力探测。
     - `catalog`：合并身份目录（同名来源合并、优先级排序、reconcile 后重扫），
       返回 `identities`（每行含 `sources[]`、`defaultSourceKey`、`sourceKey`、
       `effectiveSourceKey`、`specialized`、`enabled`、`tags`、`updateInfo:null`）+ `allTags`。
