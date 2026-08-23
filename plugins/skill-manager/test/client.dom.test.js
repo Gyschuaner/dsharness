@@ -475,7 +475,7 @@ test('extension shell owns the frame entry and composes Skill in either plugin l
 	assert.ok(h.dom.window.document.body.textContent.includes('MCP 管理（建设中）'));
 });
 
-test('Skill catalog loading uses the animated scan state with a reduced-motion fallback', async (t) => {
+test('Skill catalog loading uses the optical Skill Finding state with a reduced-motion fallback', async (t) => {
 	const catalog = deferred();
 	const router = async (body) => {
 		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
@@ -487,22 +487,30 @@ test('Skill catalog loading uses the animated scan state with a reduced-motion f
 	t.after(h.cleanup);
 	await h.open();
 
-	const scanState = h.dom.window.document.querySelector('.sk-scanState');
-	assert.ok(scanState, 'catalog loading renders the dedicated scan state');
-	assert.equal(scanState.getAttribute('role'), 'status');
-	assert.equal(scanState.getAttribute('aria-live'), 'polite');
-	assert.equal(h.dom.window.document.querySelector('.sk-scanVisual').getAttribute('aria-hidden'), 'true');
-	assert.ok(h.dom.window.document.querySelector('.sk-scanIcon [data-icon="1"]'), 'scan state reuses the official Skill icon');
-	assert.equal(h.dom.window.document.querySelector('.sk-scanCopy strong').textContent, '正在扫描 Skill');
+	const findingState = h.dom.window.document.querySelector('.sk-findingState');
+	assert.ok(findingState, 'catalog loading renders the dedicated finding state');
+	assert.equal(findingState.getAttribute('role'), 'status');
+	assert.equal(findingState.getAttribute('aria-live'), 'polite');
+	assert.equal(findingState.getAttribute('aria-atomic'), 'true');
+	assert.equal(h.dom.window.document.querySelector('.sk-findingVisual').getAttribute('aria-hidden'), 'true');
+	assert.ok(h.dom.window.document.querySelector('.sk-findingCore [data-icon="1"]'), 'finding state reuses the official Skill icon');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-findingParticle').length, 3);
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-findingParticleAccent').length, 1);
+	assert.equal(h.dom.window.document.querySelector('.sk-findingLabel').textContent, 'Skill Finding');
+	assert.equal(h.dom.window.document.querySelector('.sk-findingLabel').getAttribute('data-text'), 'Skill Finding');
+	assert.ok(h.dom.window.document.querySelector('.sk-findingCursor'));
+	assert.equal(findingState.textContent.includes('正在扫描 Skill'), false);
+	assert.equal(findingState.textContent.includes('整理项目配置与可用来源'), false);
 	const pluginCss = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
-	assert.ok(pluginCss.includes('@keyframes sk-scanPulse'));
-	assert.ok(pluginCss.includes('@keyframes sk-scanSweep'));
+	assert.ok(pluginCss.includes('@keyframes sk-findingNorth'));
+	assert.ok(pluginCss.includes('@keyframes sk-findingTextFocus'));
+	assert.ok(pluginCss.includes('@keyframes sk-findingCursor'));
 	assert.ok(pluginCss.includes('@media (prefers-reduced-motion: reduce)'));
 
 	catalog.resolve(view('/project-a', [row('alpha-skill', 'alpha')]));
 	await h.flush();
 	await h.flush();
-	assert.equal(h.dom.window.document.querySelector('.sk-scanState'), null, 'scan state leaves when the catalog arrives');
+	assert.equal(h.dom.window.document.querySelector('.sk-findingState'), null, 'finding state leaves when the catalog arrives');
 });
 
 test('current workspace wins; enabled rows stay in catalog order and bulk selection remains counted', async (t) => {

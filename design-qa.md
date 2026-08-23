@@ -244,3 +244,55 @@ build 14 result: passed
 - [x] Browser screenshots, console inspection, and DOM regression tests
 
 final result: passed
+
+---
+
+# Skill Finding optical-focus loading state QA
+
+- Source visual truth: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-finding-build24\reference.png`
+- Rendered implementation: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-finding-build24\implementation-full.png`
+- Focused comparison: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-finding-build24\comparison.png`
+- Browser viewport: 1280 × 720 CSS px, device pixel ratio 1.5
+- Source pixels: 1420 × 1144; center-cropped without distortion and normalized to 510 × 398
+- Implementation pixels: 1280 × 720; loading region cropped to 510 × 398 at the same visual scale
+- State: SKILL catalog initial loading, approximately 360 ms after opening Extensions
+
+**Findings**
+
+- No actionable P0/P1/P2 differences remain.
+- The implementation intentionally uses the product's official `IconSkillOutline16`, so its stroke geometry is slightly stronger than the generated reference. This preserves icon-system consistency and remains within the reference's visual hierarchy.
+- Particle positions differ from the still reference because the captured implementation is an in-motion keyframe. Their starting radius, asymmetry, single blue accent, and convergence direction match the selected concept.
+
+**Required fidelity surfaces**
+
+- Fonts and typography: `Skill Finding` is exact and remains on one line. The live style is 14 px, weight 450, 20 px line height, and 0.026 em tracking. A sharp overlay and 10 px blue focus cursor progressively replace the softly blurred base text.
+- Spacing and layout rhythm: the unboxed 40 px Skill icon sits in a 216 × 132 motion field with a 26 px gap to the label. The component remains centered in the existing SKILL content surface without adding a card, tile, or shadow.
+- Colors and visual tokens: graphite, fog gray, and one cobalt accent are mapped to existing DSH label and blue tokens. There are no gradients, glows, or ad-hoc hard-coded theme colors.
+- Image quality and asset fidelity: the official product icon component is reused. No raster placeholder, emoji, handcrafted SVG, or replacement logo is present.
+- Copy and content: the only loading copy is `Skill Finding`; the former Chinese title and subtitle are absent.
+
+**Interaction and accessibility evidence**
+
+- Closing and reopening Extensions displays the loading status, then exits it and renders 68 Skill rows.
+- `role="status"`, `aria-live="polite"`, `aria-atomic="true"`, and a decorative `aria-hidden` visual are present.
+- `prefers-reduced-motion` disables all motion, keeps a fully sharp label and official icon, and leaves one static blue point.
+- Browser console check returned no entries.
+
+**Comparison history**
+
+1. Initial implementation retained a large icon relative to the selected mock. It was reduced from 44 px to 40 px, then recaptured in `implementation-full.png`.
+2. The first animation timing deferred most motion beyond the typical catalog response. The cycle was compressed from 3.6 s to 2.4 s and meaningful particle/text motion was moved into the first second. The final browser run showed the loading state, cleanly exited it, and rendered the catalog.
+
+**Implementation Checklist**
+
+- [x] Preserve the selected optical-focus composition.
+- [x] Synchronize particle absorption with the text-focus cursor.
+- [x] Use the official Skill icon and existing theme tokens.
+- [x] Cover the loading lifecycle and reduced-motion fallback in DOM tests.
+- [x] Verify the live browser flow and console.
+
+**Follow-up Polish**
+
+- P3: If future catalog work consistently completes below 300 ms, consider a minimum visibility threshold or skip the loader entirely to avoid a flash; do not delay a fast response only to show the animation.
+
+final result: passed
