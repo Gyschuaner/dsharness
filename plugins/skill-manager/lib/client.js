@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 18
+ * build: 19
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -59,6 +59,10 @@
  * selection remains in the project Skill drawer. The drawer now overlays the
  * list at every desktop width without reflowing it, and the SKILL / MCP /
  * Plugin navigation can collapse to an icon rail with browser-local state.
+ * build 19: visual-noise reduction compresses project context and navigation,
+ * moves presets and infrequent batch actions into menus, shows only the first
+ * description sentence in stable catalog rows, and defers source choices and
+ * technical metadata inside the overlay drawer until explicitly requested.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -124,6 +128,7 @@
 				'.smgr-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
 				'.smgr-switchKnob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .12s,background .12s;pointer-events:none}',
 				'.smgr-switchOn .smgr-switchKnob{transform:translateX(13px);background:#fff}',
+				'.sk-root .smgr-switchOn{background:var(--dsw-static-blue-500);border-color:var(--dsw-static-blue-500)}',
 				'.smgr-switchDim{opacity:.5;cursor:not-allowed}',
 				'.smgr-bulkBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;border-radius:6px;padding:4px 7px;font-size:11px;line-height:1;white-space:nowrap}',
 				'.smgr-bulkBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
@@ -141,28 +146,27 @@
 				'.ext-icon{flex:none;color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;justify-content:center}',
 				'.ext-layerRail .ext-icon{color:var(--dsw-alias-label-primary)}',
 				'.ext-page{position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;background:var(--dsw-alias-bg-base);display:flex;flex-direction:column;color:var(--dsw-alias-label-primary)}',
-				'.ext-top{flex:none;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--dsw-alias-border-l2);padding:14px 20px}',
+				'.ext-top{flex:none;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--dsw-alias-border-l2);padding:13px 20px}',
 				'.ext-topTitle{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}',
 				'.ext-topTitle .ext-icon{color:var(--dsw-alias-label-primary)}',
-				'.ext-topSub{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
+				'.ext-topSub{font-size:13px;color:var(--dsw-alias-label-quaternary);font-weight:500}',
 				'.ext-close{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 9px;font-size:15px;line-height:1;margin-left:auto}',
 				'.ext-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.ext-body{flex:1;min-height:0;display:flex}',
-				'.ext-nav{box-sizing:border-box;flex:none;width:208px;border-right:1px solid var(--dsw-alias-border-l2);padding:12px 10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;transition:width .16s ease,padding .16s ease}',
+				'.ext-nav{box-sizing:border-box;flex:none;width:156px;border-right:1px solid var(--dsw-alias-border-l2);padding:10px 8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;transition:width .16s ease,padding .16s ease}',
 				'.ext-navCollapsed{width:64px;padding-left:8px;padding-right:8px}',
 				'.ext-navHead{display:flex;align-items:center;min-height:32px;padding:0 4px}',
 				'.ext-navTitle{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--dsw-alias-label-quaternary)}',
 				'.ext-navToggle{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex:none}',
 				'.ext-navToggle:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.ext-navList{display:flex;flex-direction:column;gap:6px}',
-				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:10px;padding:9px 10px;text-align:left;font:inherit;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:9px;align-items:center;min-height:54px}',
+				'.ext-navList{display:flex;flex-direction:column;gap:3px}',
+				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:9px;padding:8px 9px;text-align:left;font:inherit;display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:8px;align-items:center;min-height:40px}',
 				'.ext-navBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.ext-navBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary)}',
-				'.ext-navBtnActive:hover{background:var(--dsw-alias-fill-tsp-secondary)}',
-				'.ext-navIcon{position:relative;grid-row:1 / span 2;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;color:currentColor}',
-				'.ext-navCopy{min-width:0;display:flex;flex-direction:column;gap:2px}',
+				'.ext-navBtnActive{background:var(--dsw-alias-fill-tsp-secondary);background:color-mix(in srgb,var(--dsw-static-blue-500) 8%,var(--dsw-alias-bg-module-platform));color:var(--dsw-alias-label-primary)}',
+				'.ext-navBtnActive:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 11%,var(--dsw-alias-bg-module-platform))}',
+				'.ext-navIcon{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;color:currentColor}',
+				'.ext-navCopy{min-width:0;display:flex;align-items:center}',
 				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}',
-				'.ext-navDesc{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
 				'.ext-soon{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-tertiary);padding:0 6px;font-size:10px;font-weight:500;line-height:16px;white-space:nowrap}',
 				'.ext-navSoonDot{position:absolute;right:-1px;top:-1px;width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-label-quaternary);border:1px solid var(--dsw-alias-bg-base)}',
 				'.ext-navCollapsed .ext-navTitle,.ext-navCollapsed .ext-navCopy{display:none}',
@@ -170,7 +174,7 @@
 				'.ext-navCollapsed .ext-navToggle{margin-left:0}',
 				'.ext-navCollapsed .ext-navBtn{display:flex;align-items:center;justify-content:center;width:46px;min-height:44px;padding:10px 0}',
 				'.ext-navCollapsed .ext-navIcon{width:20px;height:20px}',
-				'.ext-main{flex:1;min-width:0;min-height:0;overflow:hidden;padding:20px 24px}',
+				'.ext-main{flex:1;min-width:0;min-height:0;overflow:hidden;padding:16px 20px}',
 				'.ext-placeholder{max-width:520px;display:flex;flex-direction:column;gap:10px;padding:48px 0}',
 				'.ext-phIcon{color:var(--dsw-alias-label-quaternary)}',
 				'.ext-placeholder h3{margin:0;font-size:16px;font-weight:600}',
@@ -180,22 +184,22 @@
 				'.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%;max-width:1180px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
 				'.sk-content{position:relative;isolation:isolate;display:flex;flex:1;min-height:0}',
 				'.sk-listcol{flex:1;min-width:0;display:flex;flex-direction:column}',
-				'.sk-projectCard{display:flex;align-items:center;gap:18px;margin:14px 0 12px;padding:14px 16px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);flex:none}',
-				'.sk-projectIdentity{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}',
-				'.sk-projectIcon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;color:var(--dsw-alias-label-primary)}',
-				'.sk-projectMeta{display:flex;flex-direction:column;gap:3px;min-width:0}',
+				'.sk-projectCard{display:flex;align-items:center;gap:14px;margin:6px 0 12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);flex:none}',
+				'.sk-projectIdentity{display:flex;align-items:center;gap:8px;min-width:0;flex:1}',
+				'.sk-projectMeta{display:flex;align-items:center;gap:8px;min-width:0}',
 				'.sk-projectTitleLine{display:flex;align-items:center;gap:7px;flex-wrap:wrap}',
-				'.sk-projectTitle{font-size:17px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-				'.sk-projectPath{font-size:11.5px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:520px}',
+				'.sk-projectTitle{font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 				'.sk-currentBadge{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);padding:2px 7px;font-size:10px;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
-				'.sk-projectStats{display:flex;align-items:center;gap:12px;padding-left:18px;border-left:1px solid var(--dsw-alias-border-l2);flex:none}',
-				'.sk-statValue{font-size:18px;font-weight:650;line-height:1.15}',
-				'.sk-statHint{font-size:11px;color:var(--dsw-alias-label-tertiary);margin-top:3px}',
+				'.sk-projectStats{display:flex;align-items:center;gap:6px;padding-left:14px;border-left:1px solid var(--dsw-alias-border-l2);flex:none}',
+				'.sk-statValue{font-size:12px;font-weight:600;line-height:1.3;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
 				'.sk-projectActions{display:flex;align-items:center;gap:7px;flex:none}',
 				'.sk-projLabel{font-size:12px;color:var(--dsw-alias-label-tertiary);flex:none}',
 				'.sk-projBtn{appearance:none;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);cursor:pointer;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;max-width:340px}',
 				'.sk-projBtn:hover:not(:disabled){border-color:var(--dsw-alias-label-dimmed)}',
 				'.sk-projBtn:disabled{opacity:.6;cursor:default}',
+				'.sk-quietBtn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 8px;font:inherit;font-size:12px;white-space:nowrap}',
+				'.sk-quietBtn:hover:not(:disabled),.sk-quietBtnOn{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+				'.sk-quietBtn:disabled{opacity:.5;cursor:default}',
 				'.sk-projTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;min-width:0}',
 				'.sk-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:260px;max-width:440px;max-height:340px;overflow-y:auto;background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l2);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.2);padding:5px;display:flex;flex-direction:column;gap:1px}',
 				'.sk-menuBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;font:inherit;font-size:13px;text-align:left;border-radius:7px;padding:7px 9px;display:flex;align-items:center;gap:8px;min-width:0}',
@@ -209,7 +213,7 @@
 				'.sk-chip:disabled{opacity:.55;cursor:default}',
 				'.sk-chipDef{border-color:var(--dsw-static-blue-500);color:var(--dsw-static-blue-500);font-weight:600}',
 				'.sk-chipAdd{border-style:dashed}',
-				'.sk-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex:none;flex-wrap:wrap}',
+				'.sk-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex:none;flex-wrap:wrap}',
 				'.sk-searchWrap{position:relative;flex:1;min-width:170px;display:flex;align-items:center}',
 				'.sk-searchWrap>.sk-ic{position:absolute;left:9px;color:var(--dsw-alias-label-quaternary);pointer-events:none}',
 				'.sk-search{width:100%;background:var(--dsw-alias-bg-module-platform);color:inherit;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px 10px 6px 30px;font:inherit;font-size:13px}',
@@ -223,37 +227,33 @@
 				'.sk-selectVisible{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap;cursor:pointer}',
 				'.sk-selectVisible input{margin:0}',
 				'.sk-batchHint{display:flex;align-items:center;gap:7px;margin:-2px 0 8px;padding:7px 10px;border:1px dashed var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-fill-tsp-secondary);font-size:12px;color:var(--dsw-alias-label-secondary)}',
-				'.sk-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:2px 0 6px}',
-				'.sk-row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-bottom:1px solid var(--dsw-alias-border-l2);cursor:pointer;flex:none}',
+				'.sk-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;padding:2px 0 6px}',
+				'.sk-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;cursor:pointer;flex:none}',
 				'.sk-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
 				'.sk-rowEnabled{background:var(--dsw-alias-bg-layer-3);background:color-mix(in srgb,var(--dsw-static-blue-500) 8%,var(--dsw-alias-bg-module-platform))}',
 				'.sk-rowEnabled:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 12%,var(--dsw-alias-bg-module-platform))}',
 				'.sk-rowActive{background:var(--dsw-alias-interactive-bg-hover-solid)}',
 				'.sk-rowEnabled.sk-rowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 14%,var(--dsw-alias-bg-module-platform))}',
-				'.sk-rowOff .sk-ic{opacity:.58}',
 				'.sk-check{appearance:none;width:15px;height:15px;flex:none;margin-top:3px;border:1.5px solid var(--dsw-alias-border-l2);border-radius:4px;background:var(--dsw-alias-bg-module-platform);cursor:pointer;position:relative;padding:0}',
 				'.sk-check:hover{border-color:var(--dsw-alias-label-dimmed)}',
 				'.sk-check:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
 				'.sk-checkOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
 				'.sk-checkOn:after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}',
 				'.sk-ic{flex:none;color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;justify-content:center}',
-				'.sk-row .sk-ic{margin-top:2px}',
-				'.sk-rowOpen{appearance:none;border:0;background:transparent;color:inherit;display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0;padding:0;text-align:left;font:inherit;cursor:pointer;border-radius:6px}',
-				'.sk-rowOpen:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:3px}',
+				'.sk-rowOpen{appearance:none;border:0;background:transparent;color:inherit;display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:0;text-align:left;font:inherit;cursor:pointer;border-radius:6px}',
+				'.sk-rowOpen:focus-visible{outline:2px solid var(--dsw-static-blue-500);outline-offset:3px}',
 				'.sk-rowMain{flex:1;min-width:0}',
-				'.sk-rowTitle{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+				'.sk-rowTitle{display:flex;align-items:center;gap:6px;min-width:0}',
 				'.sk-rowName{font-size:13px;font-weight:600;overflow-wrap:anywhere}',
 				'.sk-badge{white-space:nowrap;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:500;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-secondary)}',
 				'.sk-badgeSpec{background:color-mix(in srgb,var(--dsw-static-blue-500) 14%,transparent);color:var(--dsw-static-blue-500)}',
 				'.sk-badgeUpdate{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 14%,transparent);color:var(--dsw-alias-state-error-primary)}',
 				'.sk-badgeWarn{background:var(--dsw-alias-state-warn-primary);color:#fff}',
-				'.sk-rowDesc{margin-top:2px;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.55;overflow-wrap:anywhere}',
-				'.sk-rowTags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}',
+				'.sk-rowDesc{margin-top:2px;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 				'.sk-tag{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-secondary);padding:0 7px;font-size:11px;line-height:16px;display:inline-flex;align-items:center;gap:3px}',
 				'.sk-rowSide{flex:none;display:flex;align-items:center;gap:8px;margin-top:2px}',
 				'.sk-empty{margin:0;font-size:12px;color:var(--dsw-alias-label-quaternary);padding:24px 4px}',
 				'.sk-error{margin:0 0 8px;font-size:13px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
-				'.sk-footer{flex:none;display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);margin-top:10px;padding-top:8px;font-size:11px;color:var(--dsw-alias-label-quaternary);flex-wrap:wrap;overflow-wrap:anywhere}',
 				'.sk-bulkbar{flex:none;display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);box-shadow:0 -4px 18px rgba(0,0,0,.06)}',
 				'.sk-bulkbar strong{font-size:12.5px;white-space:nowrap}',
 				'.sk-bulkPrimary{appearance:none;border:1px solid var(--dsw-alias-brand-primary);border-radius:8px;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font:inherit;font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;white-space:nowrap}',
@@ -273,6 +273,8 @@
 				'.sk-drawerBody{padding:2px 16px 22px;display:flex;flex-direction:column;gap:14px}',
 				'.sk-drawerRow{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;padding:9px 12px}',
 				'.sk-drawerRowLabel{font-size:13px;font-weight:600}',
+				'.sk-sourceSummary{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;padding:8px 10px;background:var(--dsw-alias-bg-layer-3)}',
+				'.sk-sourceCurrent{display:flex;flex-direction:column;gap:2px;min-width:0}',
 				'.sk-sec{display:flex;flex-direction:column;gap:6px}',
 				'.sk-secTitle{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-tertiary)}',
 				'.sk-descFull{margin:0;font-size:12.5px;line-height:1.6;color:var(--dsw-alias-label-primary);overflow-wrap:anywhere;white-space:pre-wrap}',
@@ -292,6 +294,7 @@
 				'.sk-tagPanel{overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);transition:border-color .12s,box-shadow .12s}',
 				'.sk-tagPanel:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}',
 				'.sk-tagList{display:flex;flex-wrap:wrap;gap:6px;padding:9px 10px}',
+				'.sk-tagListBare{padding:0}',
 				'.sk-tagList .sk-tag{min-height:25px;padding:3px 6px 3px 9px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);font-size:11.5px;line-height:17px}',
 				'.sk-tagX{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-quaternary);cursor:pointer;line-height:1;padding:2px;border-radius:4px;display:inline-flex;align-items:center}',
 				'.sk-tagX:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-state-error-primary)}',
@@ -422,6 +425,28 @@
 			}
 
 			// ── small helpers ─────────────────────────────────────────────────
+			/** Compact list copy without throwing away the full drawer description. */
+			function firstSentence(text) {
+				var value = String(text || '').replace(/\s+/g, ' ').trim();
+				if (value === '') return '';
+				for (var i = 0; i < value.length; i += 1) {
+					var ch = value[i];
+					var isBoundary = ch === '。' || ch === '！' || ch === '？' || ch === '!' || ch === '?';
+					if (ch === '.') {
+						var before = value[i - 1] || '';
+						var after = value[i + 1] || '';
+						var token = value.slice(0, i + 1).split(' ').pop().toLowerCase();
+						var abbreviation = /^(?:e\.g\.|i\.e\.|etc\.|vs\.|mr\.|mrs\.|ms\.|dr\.)$/.test(token);
+						isBoundary = !abbreviation && !(/[0-9]/.test(before) && /[0-9]/.test(after)) && (after === '' || /\s|[\"'”’）\]]/.test(after));
+					}
+					if (!isBoundary) continue;
+					var end = i + 1;
+					while (end < value.length && /[\"'”’）\]]/.test(value[end])) end += 1;
+					return value.slice(0, end);
+				}
+				return value;
+			}
+
 			/**
 			 * V1 fetch helper: like apiCall, but only pins body.cwd from the
 			 * current session when the caller did not set it (project ops
@@ -1215,10 +1240,12 @@
 				var [viewError, setViewError] = React.useState(null);
 				var [viewBusy, setViewBusy] = React.useState(false);
 				var [presets, setPresets] = React.useState([]);
+				var [presetMenuOpen, setPresetMenuOpen] = React.useState(false);
 				var [search, setSearch] = React.useState('');
 				var [enableFilter, setEnableFilter] = React.useState('all'); // 'all'|'on'|'off'
 				var [tagFilter, setTagFilter] = React.useState(null);
 				var [tagMenuOpen, setTagMenuOpen] = React.useState(false);
+				var [actionMenuOpen, setActionMenuOpen] = React.useState(false);
 				var [selectedRows, setSelectedRows] = React.useState({}); // name -> true
 				var [bulkMode, setBulkMode] = React.useState(false);
 				var [drawerName, setDrawerName] = React.useState(null);
@@ -1233,7 +1260,9 @@
 				var [saveDesc, setSaveDesc] = React.useState('');
 				var [tagDraft, setTagDraft] = React.useState('');
 				var [tagBusy, setTagBusy] = React.useState(false);
+				var [tagComposerOpen, setTagComposerOpen] = React.useState(false);
 				var [advOpen, setAdvOpen] = React.useState(false);
+				var [sourceOpen, setSourceOpen] = React.useState(false);
 				var genRef = React.useRef(0); // selected-project generation
 				var viewGenRef = React.useRef(0); // catalog request generation
 				var projectRef = React.useRef(null); // current project, kept in a ref for async guards
@@ -1341,7 +1370,9 @@
 						}
 						setDrawerName(null);
 						setTagDraft('');
+						setTagComposerOpen(false);
 						setAdvOpen(false);
+						setSourceOpen(false);
 					}
 					document.addEventListener('keydown', onKey);
 					return function () { document.removeEventListener('keydown', onKey); };
@@ -1349,6 +1380,8 @@
 
 				function chooseProject(p) {
 					setProjMenuOpen(false);
+					setPresetMenuOpen(false);
+					setActionMenuOpen(false);
 					if (p === null || (project !== null && project.cwd === p.cwd)) return;
 					// Switching project: bump the generation, invalidate the in-flight
 					// view, and clear all selection/UI state so a stale response can never
@@ -1366,6 +1399,8 @@
 					setSourceBusy(null);
 					setDrawerName(null);
 					setTagDraft('');
+					setTagComposerOpen(false);
+					setSourceOpen(false);
 					setPresetModal(null);
 					setPresetBusy(false);
 					setSlimModal(null);
@@ -1671,7 +1706,9 @@
 				function openDrawer(row) {
 					setDrawerName(row.name);
 					setTagDraft('');
+					setTagComposerOpen(false);
 					setAdvOpen(false);
+					setSourceOpen(false);
 				}
 				function rowEl(row) {
 					var off = row.enabled !== true;
@@ -1708,14 +1745,14 @@
 								className: 'sk-rowOpen',
 								'aria-label': '查看 ' + row.name + ' 详情',
 								onClick: function () { openDrawer(row); },
+								onMouseUp: function (event) { event.currentTarget.blur(); },
 								onKeyDown: function (event) {
 									if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
 									event.preventDefault();
 									openDrawer(row);
 								}
 							},
-							h('span', { className: 'sk-ic' }, h(P.IconSkillOutline16)),
-							h('div', { className: 'sk-rowMain' },
+							h('div', { className: 'sk-rowMain', title: row.description || undefined },
 							h(
 								'div',
 								{ className: 'sk-rowTitle' },
@@ -1728,15 +1765,9 @@
 									: null,
 								row.sources.length > 1
 									? h('span', { className: 'sk-badge', title: '该 Skill 存在多个来源，可在详情中选择' }, '来源 ×' + row.sources.length)
-									: null,
-								off
-									? h('span', { className: 'sk-badge', title: '本项目未启用：模型不会自动调用，仍可用 /' + row.name + ' 手动调用' }, '未启用')
 									: null
 							),
-							row.description ? h('div', { className: 'sk-rowDesc' }, row.description) : null,
-							Array.isArray(row.tags) && row.tags.length > 0
-								? h('div', { className: 'sk-rowTags' }, row.tags.map(function (t) { return h('span', { key: t, className: 'sk-tag' }, t); }))
-								: null
+							row.description ? h('div', { className: 'sk-rowDesc' }, firstSentence(row.description)) : null
 							)
 						),
 						h('div', { className: 'sk-rowSide' }, !bulkMode ? switchV1(row) : null)
@@ -1773,14 +1804,14 @@
 						h(
 							'div',
 							{ className: 'sk-drawerHead' },
-							h('span', { className: 'sk-ic' }, h(P.IconSkillOutline16)),
 							h('div', { className: 'sk-drawerName' }, row.name),
+							h('span', { className: 'sk-badge' + (row.enabled === true ? ' sk-badgeSpec' : '') }, row.enabled === true ? '已启用' : '未启用'),
 							h('button', {
 								type: 'button',
 								className: 'sk-icBtn',
 								'aria-label': '关闭详情',
 								title: '关闭（Esc）',
-								onClick: function () { setDrawerName(null); setTagDraft(''); setAdvOpen(false); }
+								onClick: function () { setDrawerName(null); setTagDraft(''); setTagComposerOpen(false); setAdvOpen(false); setSourceOpen(false); }
 							}, h(P.IconCloseOutline16))
 						),
 						h(
@@ -1808,22 +1839,30 @@
 							h(
 								'div',
 								{ className: 'sk-sec' },
-								h('div', { className: 'sk-secTitle' }, '当前来源'),
-								eff
-									? h('div', { className: 'sk-srcName' }, eff.label,
-										row.specialized === true && eff.key === row.effectiveSourceKey
-											? h('span', { className: 'sk-badge sk-badgeSpec' }, '项目副本')
-											: null)
-									: h('span', { className: 'sk-slimNote' }, '无可用来源')
-							),
-							row.sources.length > 0
-								? h(
-									'div',
-									{ className: 'sk-sec' },
-									h('div', { className: 'sk-secTitle' }, '可选来源' + (canWrite ? '' : '（未选择项目，不能切换）')),
-									h(
+								h('div', { className: 'sk-secTitle' }, '来源'),
+								h('div', { className: 'sk-sourceSummary' },
+									h('div', { className: 'sk-sourceCurrent' },
+										eff
+											? h('div', { className: 'sk-srcName' }, eff.label,
+												row.specialized === true && eff.key === row.effectiveSourceKey
+													? h('span', { className: 'sk-badge sk-badgeSpec' }, '项目副本')
+													: null)
+											: h('span', { className: 'sk-slimNote' }, '无可用来源'),
+										eff ? h('span', { className: 'sk-srcMeta' }, eff.scope === 'project' ? '项目来源' : eff.scope === 'bundled' ? '内置来源' : '用户来源') : null
+									),
+									row.sources.length > 0
+										? h('button', {
+											type: 'button',
+											className: 'sk-quietBtn' + (sourceOpen ? ' sk-quietBtnOn' : ''),
+											'aria-expanded': sourceOpen,
+											onClick: function () { setSourceOpen(!sourceOpen); }
+										}, sourceOpen ? '收起' : '更改来源', h(P.IconChevronDownOutline14, { style: { transform: sourceOpen ? 'rotate(180deg)' : 'none' } }))
+										: null
+								),
+								sourceOpen && row.sources.length > 0
+									? h(
 										'div',
-									{ className: 'sk-srcList', role: 'radiogroup', 'aria-label': row.name + ' 的来源' },
+										{ className: 'sk-srcList', role: 'radiogroup', 'aria-label': row.name + ' 的来源' },
 									h('button', {
 										type: 'button',
 										role: 'radio',
@@ -1871,19 +1910,16 @@
 											);
 										})
 									)
-								)
-								: null,
+									: null
+							),
 							h(
 								'div',
 								{ className: 'sk-sec' },
 								h('div', { className: 'sk-tagHeading' },
 									h('div', { className: 'sk-secTitle' }, '标签'),
 									h('span', { className: 'sk-tagScope' }, '全局共享')),
-								h(
-									'div',
-									{ className: 'sk-tagPanel' },
-									tagValues.length > 0
-										? h('div', { className: 'sk-tagList', 'aria-label': '已有标签' }, tagValues.map(function (t) {
+								tagValues.length > 0
+									? h('div', { className: 'sk-tagList sk-tagListBare', 'aria-label': '已有标签' }, tagValues.map(function (t) {
 											return h('span', { key: t, className: 'sk-tag' },
 												t,
 												h('button', {
@@ -1898,8 +1934,19 @@
 													}
 												}, h(P.IconCloseOutline16, { size: 10 })));
 										}))
-										: null,
-									h('div', { className: 'sk-tagComposer' },
+									: null,
+								h('button', {
+									type: 'button',
+									className: 'sk-quietBtn' + (tagComposerOpen ? ' sk-quietBtnOn' : ''),
+									'aria-expanded': tagComposerOpen,
+									disabled: !canWrite || tagAtLimit,
+									onClick: function () { setTagDraft(''); setTagComposerOpen(!tagComposerOpen); }
+								}, tagComposerOpen ? h(P.IconChevronDownOutline14, { style: { transform: 'rotate(180deg)' } }) : h(P.IconPlusOutline16), tagComposerOpen ? '收起标签输入' : '添加标签'),
+								tagComposerOpen
+									? h(
+										'div',
+										{ className: 'sk-tagPanel' },
+										h('div', { className: 'sk-tagComposer' },
 										h('input', {
 											className: 'sk-tagInput',
 											'aria-label': '新标签',
@@ -1919,27 +1966,14 @@
 											'aria-label': '添加标签',
 											disabled: !tagCanAdd,
 											onClick: commitTag
-										}, tagBusy ? '保存中…' : '添加'))
-								),
-								h('div', {
-									id: tagHelpId,
-									className: 'sk-tagFoot' + ((tagAtLimit || tagDuplicate) ? ' sk-tagIssue' : ''),
-									'aria-live': 'polite'
-								}, h('span', null, tagIssue), h('span', null, tagValues.length + '/20 · 每个最多 32 字符'))
-							),
-							h(
-								'div',
-								{ className: 'sk-sec' },
-								h('div', { className: 'sk-secTitle' }, '更新状态'),
-								h('div', { className: 'sk-upd' }, h('span', { className: 'sk-updDot' }),
-									'V1 不检测远端更新；出现真实更新数据后才会提示「可更新」')
-							),
-							h(
-								'div',
-								{ className: 'sk-sec' },
-								h('div', { className: 'sk-secTitle' }, '为此项目特化'),
-								h('p', { className: 'sk-slimNote' }, '把通用 Skill 复制进本项目并逐步修改成项目专属内容。属于 V1.2 后续能力，当前版本不可用。'),
-								h('button', { type: 'button', className: 'sk-chip', disabled: true, title: 'V1.2 能力，敬请期待' }, '配置特化')
+										}, tagBusy ? '保存中…' : '添加')),
+										h('div', {
+											id: tagHelpId,
+											className: 'sk-tagFoot' + ((tagAtLimit || tagDuplicate) ? ' sk-tagIssue' : ''),
+											'aria-live': 'polite'
+										}, h('span', null, tagIssue), h('span', null, tagValues.length + '/20 · 每个最多 32 字符'))
+									)
+									: null
 							),
 							h(
 								'div',
@@ -1950,13 +1984,16 @@
 									onClick: function () { setAdvOpen(!advOpen); }
 								},
 									h(P.IconChevronDownOutline14, { style: { transform: advOpen ? 'rotate(180deg)' : 'none', transition: 'transform .12s' } }),
-									'高级'),
+									'更多信息'),
 								advOpen
 									? h(
 										'div',
 										{ className: 'sk-advBody' },
 										h('div', null, '当前来源路径：', h('code', null, (eff && eff.path) || '—')),
+										view && view.projectRoot ? h('div', null, '项目配置：', h('code', null, view.projectRoot + '/.dsh/skill-manager.json'), '（仅本机，不提交 Git）') : null,
 										h('div', null, '格式：', eff ? (eff.format === 'dir' ? '目录（附属文件 ' + eff.files.length + ' 个）' : '单文件') : '—'),
+										h('div', null, '更新：', row.updateInfo !== null && row.updateInfo !== undefined ? String(row.updateInfo) : '当前版本不检测远端更新'),
+										h('div', null, '项目特化：V1.2 后续能力，当前版本不可用'),
 										eff && Array.isArray(eff.files) && eff.files.length > 0
 											? h('div', null, '附属文件：', h('code', null, eff.files.join(', ')))
 											: null,
@@ -2017,53 +2054,32 @@
 									h(
 										'div',
 										{ className: 'sk-projectIdentity' },
-										h('span', { className: 'sk-projectIcon' }, h(P.IconFolderOpenOutline16, { size: 24 })),
 										h('div', { className: 'sk-projectMeta' },
-											h('div', { className: 'sk-projectTitleLine' },
-												h('span', { className: 'sk-projectTitle' }, project ? project.title : '未选择项目'),
-												project && project.cwd === currentCwd(ctx)
-													? h('span', { className: 'sk-currentBadge' }, '当前工作区')
-													: h('span', { className: 'sk-currentBadge' }, '已选择项目')
-											),
-											project ? h('span', { className: 'sk-projectPath', title: project.cwd }, project.cwd) : null
+											h('span', { className: 'sk-currentBadge' }, project && project.cwd === currentCwd(ctx) ? '当前项目' : '所选项目'),
+											h('span', { className: 'sk-projectTitle', title: project ? project.cwd : undefined }, project ? project.title : '未选择项目')
 										)
 									),
 									h(
 										'div',
 										{ className: 'sk-projectStats' },
-										h('div', null,
-											h('div', { className: 'sk-statValue' }, enabledCount + ' 已启用 / ' + totalCount + ' Skills'),
-											h('div', { className: 'sk-statHint' }, '以下更改只影响此项目 · 下一轮对话生效')
-										)
+										h('div', { className: 'sk-statValue' }, '已启用 ' + enabledCount + ' / ' + totalCount)
 									),
 									h(
 										'div',
 										{ className: 'sk-projectActions' },
-										recommendedPreset !== null
-											? h('button', {
-												type: 'button',
-												className: 'sk-chip',
-												title: '先预览推荐预设，再决定替换或合并',
-												onClick: function () { openPreset(recommendedPreset); }
-											}, '应用推荐预设')
-											: null,
-										h('button', {
-											type: 'button',
-											className: 'sk-chip sk-chipAdd',
-											title: '把当前项目的启用集合与来源选择保存为可复用预设',
-											onClick: function () { setSaveName(''); setSaveDesc(''); setSaveOpen(true); }
-										}, '保存为预设'),
 										h(
 											'div',
 											{ style: { position: 'relative' } },
 										h('button', {
 											type: 'button',
-												className: 'sk-projBtn',
+												className: 'sk-quietBtn sk-projBtn' + (projMenuOpen ? ' sk-quietBtnOn' : ''),
 												disabled: projects.length === 0,
 												onClick: function () {
 													setProjects(buildProjectOptions(ctx));
 													setProjMenuOpen(!projMenuOpen);
 													setTagMenuOpen(false);
+													setPresetMenuOpen(false);
+													setActionMenuOpen(false);
 												},
 												title: project ? '当前项目：' + project.cwd : '选择要管理的项目'
 											}, '切换项目', h(P.IconChevronDownOutline14)),
@@ -2084,7 +2100,29 @@
 													h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjMenuOpen(false); addLocalProject(); } },
 														h(P.IconPlusOutline16), '添加本地项目…'))
 												: null
-											)
+											),
+										h(
+											'div',
+											{ style: { position: 'relative' } },
+											h('button', {
+												type: 'button',
+												className: 'sk-quietBtn' + (presetMenuOpen ? ' sk-quietBtnOn' : ''),
+												'aria-expanded': presetMenuOpen,
+												onClick: function () {
+													setPresetMenuOpen(!presetMenuOpen);
+													setProjMenuOpen(false);
+													setTagMenuOpen(false);
+													setActionMenuOpen(false);
+												}
+											}, '预设', h(P.IconChevronDownOutline14)),
+											presetMenuOpen
+												? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } },
+													recommendedPreset !== null
+														? h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); openPreset(recommendedPreset); } }, '应用推荐预设')
+														: null,
+													h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); setSaveName(''); setSaveDesc(''); setSaveOpen(true); } }, '保存为预设'))
+												: null
+										)
 									)
 								),
 							h(
@@ -2096,7 +2134,7 @@
 									h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)),
 									h('input', {
 										className: 'sk-search',
-										placeholder: '搜索名称或完整描述…',
+										placeholder: '搜索 Skill',
 										value: search,
 										onChange: function (event) { setSearch(event.target.value); setSelectedRows({}); }
 									})
@@ -2118,15 +2156,21 @@
 									{ style: { position: 'relative' } },
 									h('button', {
 										type: 'button',
-										className: 'sk-projBtn',
-										onClick: function () { setTagMenuOpen(!tagMenuOpen); setProjMenuOpen(false); }
+										className: 'sk-quietBtn' + (tagMenuOpen || tagFilter !== null ? ' sk-quietBtnOn' : ''),
+										'aria-expanded': tagMenuOpen,
+										onClick: function () {
+											setTagMenuOpen(!tagMenuOpen);
+											setProjMenuOpen(false);
+											setPresetMenuOpen(false);
+											setActionMenuOpen(false);
+										}
 									},
-										tagFilter !== null ? tagFilter : '全部标签',
+										tagFilter !== null ? tagFilter : '筛选',
 										h(P.IconChevronDownOutline14)),
 									tagMenuOpen
 										? h(
 											'div',
-											{ className: 'sk-menu' },
+											{ className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } },
 											h('button', {
 												type: 'button',
 												className: 'sk-menuBtn' + (tagFilter === null ? ' sk-menuBtnActive' : ''),
@@ -2143,7 +2187,6 @@
 										)
 										: null
 								),
-							h('span', { className: 'sk-spacer' }),
 							bulkMode
 								? h('label', { className: 'sk-selectVisible' },
 									h('input', {
@@ -2156,24 +2199,40 @@
 									'全选当前结果',
 									visibleRows.length > 0 ? h('span', { className: 'sk-filterCount' }, visibleRows.length) : null)
 								: null,
-							h('button', {
+							bulkMode
+								? h('button', {
 									type: 'button',
-									className: 'sk-chip' + (bulkMode ? ' sk-chipDef' : ''),
-									'aria-pressed': bulkMode,
-									'aria-label': bulkMode ? '退出批量管理' : '进入批量管理',
-									title: bulkMode ? '退出批量管理并清除选择' : '选择多个 Skill 后统一启用或停用',
-									onClick: function () {
-										setSelectedRows({});
-										setBulkMode(!bulkMode);
-									}
-							}, bulkMode ? '完成' : '批量管理'),
-								h('button', {
+									className: 'sk-quietBtn sk-quietBtnOn',
+									onClick: function () { setSelectedRows({}); setBulkMode(false); }
+								}, '完成批量管理')
+								: h(
+									'div',
+									{ style: { position: 'relative' } },
+									h('button', {
 										type: 'button',
-										className: 'sk-chip',
-									disabled: project === null || viewBusy === true || (view !== null && enabledCount === 0) || (view && (view.configCorrupt === true || view.configFuture === true)),
-										title: '存在默认精简预设时按预设精简；否则关闭全部启用',
-										onClick: doSlimPreview
-								}, '一键精简')
+										className: 'sk-quietBtn' + (actionMenuOpen ? ' sk-quietBtnOn' : ''),
+										'aria-label': '更多操作',
+										'aria-expanded': actionMenuOpen,
+										onClick: function () {
+											setActionMenuOpen(!actionMenuOpen);
+											setTagMenuOpen(false);
+											setProjMenuOpen(false);
+											setPresetMenuOpen(false);
+										}
+									}, '更多', h(P.IconChevronDownOutline14)),
+									actionMenuOpen
+										? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } },
+											h('button', {
+												type: 'button', className: 'sk-menuBtn',
+												onClick: function () { setActionMenuOpen(false); setSelectedRows({}); setBulkMode(true); }
+											}, '批量管理'),
+											h('button', {
+												type: 'button', className: 'sk-menuBtn',
+												disabled: project === null || viewBusy === true || (view !== null && enabledCount === 0) || (view && (view.configCorrupt === true || view.configFuture === true)),
+												onClick: function () { setActionMenuOpen(false); doSlimPreview(); }
+											}, '一键精简'))
+										: null
+								)
 							),
 							bulkMode
 								? h('div', { className: 'sk-batchHint', role: 'status' }, '批量管理模式：勾选 Skill 后统一启用或停用，右侧单项开关已暂时隐藏。')
@@ -2208,16 +2267,7 @@
 								h('button', { type: 'button', className: 'sk-bulkPrimary', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(true); } }, '在本项目启用（' + selectedCount + '）'),
 								h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(false); } }, '在本项目停用（' + selectedCount + '）'),
 								h('button', { type: 'button', className: 'sk-chip sk-chipAdd', onClick: function () { setSelectedRows({}); } }, '清除选择'))
-							: null,
-							h(
-								'div',
-								{ className: 'sk-footer' },
-								view && view.projectRoot
-									? h('span', null, '项目配置保存于 ', h('code', null, view.projectRoot), '/.dsh/skill-manager.json，仅在本机使用且不提交 Git；启停在下一轮对话生效')
-									: h('span', null, '未选择项目：仅显示用户级与内置 Skill'),
-								h('span', null, '共 ' + (view ? view.identities.length : 0) + ' 个 Skill'
-									+ (view ? ' · 已启用 ' + enabledCount + ' 个' : ''))
-							)
+								: null
 						),
 						drawerName !== null ? drawerEl() : null
 					),
@@ -2476,7 +2526,7 @@
 						'header',
 						{ className: 'ext-top' },
 						h('div', { className: 'ext-topTitle' }, h(ExtIcon, { size: 20 }), '扩展'),
-						h('span', { className: 'ext-topSub' }, '统一管理 DSH 的扩展能力：SKILL / MCP / Plugin'),
+						h('span', { className: 'ext-topSub' }, '/ ' + tab.toUpperCase()),
 						h('button', { type: 'button', className: 'ext-close', 'aria-label': '关闭扩展页', title: '关闭（Esc）', onClick: onClose }, '✕')
 					),
 					h(
@@ -2522,8 +2572,7 @@
 												{ className: 'ext-navLabel' },
 												t.label,
 												t.soon ? h('span', { className: 'ext-soon' }, '建设中') : null
-											),
-											h('span', { className: 'ext-navDesc' }, t.desc)
+											)
 										)
 									);
 								})

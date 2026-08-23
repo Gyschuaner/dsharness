@@ -34,6 +34,43 @@ final result: passed
 
 ---
 
+# Skill Manager build 19 · Visual-noise reduction QA
+
+## Inputs
+
+- Selected Product Design reference: `C:\Users\chuansgu\.codex\generated_images\01a02d80-ab9f-7f10-ae90-23b61ac6563f\exec-2d3c5cc1-c738-4076-84b9-01512deec2b5.png`
+- Browser-rendered list: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-manager-build19\01-list-denoised.png`
+- Browser-rendered drawer: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-manager-build19\02-drawer-denoised.png`
+- Browser-rendered collapsed navigation: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-manager-build19\03-nav-collapsed.png`
+- Equal-size side-by-side comparison (reference left, implementation right): `D:\Pythonproject\dsharness\artifacts\design-qa\skill-manager-build19\04-reference-vs-implementation.png`
+- Local implementation URL: `http://127.0.0.1:3080/`
+
+## State and geometry
+
+- In-app Browser viewport and implementation captures: 1252 × 945 CSS px. The selected 1443 × 1090 reference was normalized to the same 1252 × 945 size only for the side-by-side comparison.
+- Real project: `game`, 68 catalog identities, 11 enabled. Browser QA did not toggle a real Skill, change its source, add a tag, or apply a preset.
+- Expanded extension navigation is 156px; collapsed navigation is 64px. No `.ext-navDesc` nodes remain, while official icons, accessible names, construction state, titles, and persisted collapse behavior remain.
+- Before and after opening `cordis-plugin-development`, the list column remains x=176px and 1057.33px wide. The overlay drawer is 400.67px wide and does not alter list geometry.
+
+## Comparison history
+
+1. **P2 · repeated information** — the first implementation pass retained a footer that repeated the already-visible 11/68 project count. Removed the footer; project scope and technical configuration remain available in context or in the drawer's on-demand information.
+2. **P2 · tag-editor density** — the first comparison showed an always-open input panel where the selected direction used a quiet add affordance. Changed the default to existing tag chips plus `添加标签`; the validated input, character limit, duplicate protection, Enter action, and remove controls appear only after expansion.
+3. **P2 · state emphasis** — the active extension destination and enabled switches were too close to neutral gray. Reused the existing blue token for a soft active-nav fill, enabled switches, row tint, and keyboard focus without introducing new colors or custom assets.
+
+## Final assessment
+
+- The page matches the selected hierarchy: compact extension header, slim navigation, one-line project context, wide search, counted state filters, stable catalog rows, blue enabled state, and a right overlay drawer.
+- Catalog rows no longer repeat a generic Skill icon, global tag chips, or a `未启用` badge. They retain the name, only meaningful status/source badges, the description's first sentence, and the single project toggle. Full description text remains unchanged in the drawer.
+- Recommended/save preset actions live in one `预设` menu; batch management and one-click slim live in `更多`. Entering bulk mode still reveals checkboxes, hides per-row switches, and preserves the existing bulk action bar.
+- Drawer source choices and tag input are collapsed by default. `更改来源`, `添加标签`, and `更多信息` expose the full existing capability without keeping optional or future information in the primary visual layer.
+- Keyboard detail access, switch/radio semantics, named dialog, Esc ordering, project switching, and accessible navigation labels remain covered by real-bundle DOM tests.
+- No actionable P0/P1/P2 issue remains after the final side-by-side comparison.
+
+final result: passed
+
+---
+
 # Skill Manager build 18 · Single-page navigation and overlay drawer QA
 
 ## Inputs

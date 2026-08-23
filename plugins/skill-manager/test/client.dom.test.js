@@ -220,9 +220,9 @@ async function makeHarness(router, { current = '/project-a', workspaces = [] } =
 	return { dom, click, flush, button, open, cleanup };
 }
 
-test('real client bundle renders the single project view, full descriptions, overlay drawer and actions', async (t) => {
+test('real client bundle renders a denoised project view, first-sentence rows, full drawer descriptions and actions', async (t) => {
 	const calls = [];
-	let currentRow = row('alpha-skill', '完整 description：这一整段内容必须原样展示，不能省略。', {
+	let currentRow = row('alpha-skill', '列表只保留第一句话。详情中仍然完整展示第二句话，不能丢失。', {
 		sources: [
 			source('user-dsh', 'DSH 用户来源', 'user'),
 			source('global-claude', 'Claude 来源', 'claude'),
@@ -252,12 +252,13 @@ test('real client bundle renders the single project view, full descriptions, ove
 	assert.equal(h.dom.window.document.querySelector('.sk-tabs'), null, 'redundant SKILL sub-page tabs are removed');
 	assert.equal(h.dom.window.document.querySelector('[role="tablist"]'), null);
 	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));
-	assert.ok(h.dom.window.document.body.textContent.includes('仅在本机使用且不提交 Git'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('仅本机，不提交 Git'), 'technical project path is hidden from the primary list');
 	assert.ok(!h.dom.window.document.body.textContent.includes('可纳入 Git 版本管理'));
 	const pluginCss = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
 	assert.ok(pluginCss.includes('.sk-drawer{position:absolute'), 'drawer is an overlay instead of a flex sibling');
 	assert.ok(!pluginCss.includes('.sk-contentDrawer .sk-projectCard'), 'drawer no longer forces project-card wrapping');
-	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, currentRow.description);
+	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, '列表只保留第一句话。');
+	assert.equal([...h.dom.window.document.querySelectorAll('.sk-row .sk-badge')].filter((item) => item.textContent === '未启用').length, 0, 'disabled state is communicated by the switch instead of a repeated badge');
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-badgeUpdate')].length, 1);
 	assert.ok(h.dom.window.document.body.textContent.includes('来源 ×2'), 'merged source identity remains in the project list');
 	const contentClassBeforeDrawer = h.dom.window.document.querySelector('.sk-content').className;
@@ -277,14 +278,18 @@ test('real client bundle renders the single project view, full descriptions, ove
 	assert.equal(h.dom.window.document.querySelector('.sk-content').className, contentClassBeforeDrawer, 'drawer does not mutate the list layout class');
 	assert.equal(h.dom.window.document.querySelector('.sk-descFull').textContent, currentRow.description);
 	assert.equal(h.dom.window.document.querySelector('.smgr-switch').getAttribute('role'), 'switch');
+	assert.equal(h.dom.window.document.querySelector('.sk-srcList'), null, 'source choices stay collapsed until requested');
+	await h.click(h.button('更改来源'));
 	assert.equal(h.dom.window.document.querySelector('.sk-srcList').getAttribute('role'), 'radiogroup');
 	assert.ok([...h.dom.window.document.querySelectorAll('.sk-src')].every((item) => item.getAttribute('role') === 'radio'));
 	await h.click([...h.dom.window.document.querySelectorAll('.sk-src')].find((item) => item.textContent.includes('Claude 来源')));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setSource' && call.cwd === '/project-a' && call.source === 'global-claude'));
 
-	assert.ok(h.dom.window.document.querySelector('.sk-tagPanel'), 'tag editor is a single grouped control');
 	assert.equal(h.dom.window.document.querySelector('.sk-tagScope').textContent, '全局共享');
+	assert.equal(h.dom.window.document.querySelector('.sk-tagPanel'), null, 'tag editor stays collapsed until requested');
+	await h.click(h.button('添加标签'));
+	assert.ok(h.dom.window.document.querySelector('.sk-tagPanel'), 'tag editor opens as a single grouped control');
 	assert.equal(h.dom.window.document.querySelector('.sk-tagFoot').textContent, '按 Enter 添加0/20 · 每个最多 32 字符');
 	const emptyTagAdd = h.dom.window.document.querySelector('.sk-tagAdd');
 	assert.equal(emptyTagAdd.disabled, true, 'empty tag keeps the add action disabled');
@@ -313,14 +318,17 @@ test('real client bundle renders the single project view, full descriptions, ove
 	});
 	await h.flush();
 	assert.equal(calls.filter((call) => call.op === 'setTags').length, tagWrites);
-	await h.click([...h.dom.window.document.querySelectorAll('.sk-projBtn')].find((item) => item.textContent.includes('全部标签')));
+	await h.click(h.button('筛选'));
 	assert.ok(h.button('测试'), 'new tag is immediately available in the global tag filter');
 	await h.click(h.button('测试'));
+	await h.click(h.button('更多信息'));
+	assert.ok(h.dom.window.document.body.textContent.includes('仅本机，不提交 Git'), 'technical project path remains available on demand');
 
 	await act(async () => { h.dom.window.document.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
 	assert.equal(h.dom.window.document.querySelector('.sk-drawer'), null, 'first Esc closes only the drawer');
 	assert.ok(h.dom.window.document.querySelector('.ext-page'), 'Extensions page remains open');
 
+	await h.click(h.button('预设'));
 	await h.click(h.button('应用推荐预设'));
 	await h.flush();
 	assert.ok(h.dom.window.document.querySelector('.test-modal'));
@@ -334,6 +342,7 @@ test('real client bundle renders the single project view, full descriptions, ove
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'presets.apply' && call.cwd === '/project-a'));
 
+	await h.click(h.button('预设'));
 	await h.click(h.button('保存为预设'));
 	assert.ok(h.dom.window.document.querySelector('.sk-presetSave'), 'save preset uses the compact labeled form');
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-presetFieldHead').length, 2);
@@ -410,7 +419,7 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	h.dom.window.localStorage.setItem('smgr.v1.project', '/project-a');
 	await h.open();
 	assert.equal(h.dom.window.document.querySelector('.sk-projectTitle').textContent, 'project-b');
-	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('1 已启用 / 3 Skills'));
+	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('已启用 1 / 3'));
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-groupHead').length, 0, 'all view has no enabled/disabled group headings');
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['enabled-skill']);
@@ -435,6 +444,7 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
 	assert.equal(h.dom.window.document.querySelectorAll('[role="switch"][aria-checked="true"]').length, 3);
 
+	await h.click(h.button('更多'));
 	await h.click(h.button('批量管理'));
 	assert.ok(h.dom.window.document.querySelector('.sk-batchHint').textContent.includes('右侧单项开关已暂时隐藏'));
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 3, 'bulk mode reveals row checkboxes');
@@ -499,7 +509,8 @@ test('project switch drops stale catalog, mutation and preset-preview responses'
 	await h.click([...h.dom.window.document.querySelectorAll('button')].find((item) => item.textContent.includes('project-a')));
 	staleCatalog.resolve(view('/project-a', [row('shared-skill', 'A again')]));
 	await h.flush();
-	const preset = [...h.dom.window.document.querySelectorAll('button')].find((item) => item.textContent.includes('竞态预设'));
+	await h.click(h.button('预设'));
+	const preset = h.button('应用推荐预设');
 	if (preset) {
 		await h.click(preset);
 		await h.click(h.dom.window.document.querySelector('.sk-projBtn'));
