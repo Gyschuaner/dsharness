@@ -19,8 +19,9 @@
 
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
-| dsh-extension-manager | 0.1.0（build 1） | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；不包含 Skill 业务 |
+| dsh-extension-manager | 0.2.0（build 2） | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
 | dsh-skill-manager | 0.1.0（build 22） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 | 只负责 SKILL 分区与 `/api/skill-manager`，向 extension-manager 贡献页面 |
+| dsh-plugin-manager | 0.1.0（build 1） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027 | 独立 Plugin 分区；本地插件管理、受控导入、GitHub 市场与 `/api/plugin-manager` |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
@@ -31,7 +32,7 @@
 
 ## 宿主差异（2026-08-17）
 
-- **Windows**：extension-manager、skill-manager 与 better-sidebar 已安装；两个本仓库插件均以
+- **Windows**：extension-manager、skill-manager、plugin-manager 与 better-sidebar 已安装；三个本仓库插件均以
   junction 指向当前 checkout。better-sidebar-smooth
   未安装（该胶囊动画撕裂在 Windows 宿主同样存在，需要时按 macOS 同法接入）。
 - **macOS**：历史上安装过 image-context-guard；同步 DSH-022 后应移除该依赖和挂载。
@@ -47,7 +48,7 @@
   - 回退：`dsh plugin --profile web remove <name>`，若 `dsh.profile.bundles` 有残留
     手工删除该条目，重启生效。
   - 版本事实以 profile `package.json` 的依赖声明 + npm 包内容为准；本表登记上游提交便于追溯。
-- **本仓库 link 插件**（extension-manager / skill-manager）：按 DSH-003 流程
+- **本仓库 link 插件**（extension-manager / skill-manager / plugin-manager）：按 DSH-003 流程
   （junction + 逐文件哈希校验），见 `dev/setup-plugin-junction.ps1` 与 README「快速开始」。
 - **node-pty 前置**：pnpm 默认拦截构建脚本，需白名单放行（DSH-007 添加，
   better-sidebar 终端所需）：pnpm 10 用 `onlyBuiltDependencies: [node-pty]`，
@@ -60,12 +61,18 @@
   0.12.2）。显式 `add <name>@<版本>` 可绕过，pnpm 自动把该版本写入
   `minimumReleaseAgeExclude`。
 - **双挂载检查**：`~/.dsh/profiles/web/cordis.patch.yml` 中不得出现与 npm 通道插件
-  重复的手工 insert 行（better-sidebar 无手工行；extension-manager / skill-manager 为 link 通道，
+  重复的手工 insert 行（better-sidebar 无手工行；extension-manager / skill-manager / plugin-manager 为 link 通道，
   各自的手工行是唯一挂载点）。
 - **重启边界**：host 半变化（新插件、bundle 变更、host 代码更新）需重启 dsh web
   （`.\restart-dsh-web.ps1`，会话持久化在磁盘、可恢复）；client 半变化硬刷新浏览器即可。
 
 ## 变更日志
+
+- **2026-08-24（DSH-027）**：新增独立 `dsh-plugin-manager`，接管 Plugin 分区并移除
+  extension-manager 的 Plugin 占位。本地页以 profile 直接依赖和组合 patch 为事实来源，
+  启停只写受管覆盖块；导入走官方 `dsh plugin` 且默认忽略第三方安装脚本。市场首页使用
+  受控 GitHub 清单，详情按需请求并带缓存/离线降级。Windows web profile 新增 link
+  依赖、junction 与独立 Cordis 行。
 
 - **2026-08-24（DSH-006）**：把通用“扩展”入口与全页导航壳从
   `dsh-skill-manager` 拆到新的 `dsh-extension-manager`。新壳独立注册

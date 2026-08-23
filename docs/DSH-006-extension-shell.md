@@ -11,7 +11,7 @@ sidebar.footer.action
    └─ extension.manager.section（list, root）
       ├─ skill  ← dsh-skill-manager
       ├─ mcp    ← extension-manager 一期占位
-      └─ plugin ← extension-manager 一期占位
+      └─ plugin ← dsh-plugin-manager
 ```
 
 ## 职责
@@ -20,23 +20,28 @@ sidebar.footer.action
   - 唯一注册 `sidebar.footer.action` 的 `extensions-page`。
   - 在注册上声明 `extension.manager.section`，根据 Slot ledger 生成有序导航。
   - 维护通用全页框架、响应式导航、浏览器本地收起状态与 Esc/关闭行为。
-  - 一期内注册 MCP / Plugin 占位；正式业务落地时可拆为独立贡献插件。
+  - 仅保留 MCP 一期占位；Plugin 业务已由 DSH-027 拆为独立贡献插件。
 - `plugins/skill-manager`
   - 注册 `extension.manager.section` 的 `skill` 分区。
   - 独立维护 `/api/skill-manager`、项目配置、扫描合并、启停、来源、标签与预设。
   - 不注册主页 Slot，不包含 `.ext-*` 样式或通用扩展文案。
+- `plugins/plugin-manager`
+  - 注册 `extension.manager.section` 的 `plugin` 分区。
+  - 独立维护 `/api/plugin-manager`、本地插件管理与 GitHub 插件市场。
+  - 不注册主页 Slot，也不依赖 Skill Manager。
 
 ## 生命周期与加载顺序
 
-两个插件都使用 `slots.inject`。Skill 可先于壳加载并等待声明；壳也可先加载并在 Skill
-出现后接收注册。壳卸载时，Cordis 会级联撤销其声明的分区 Slot，避免残留孤立页面。
+三个插件都使用 `slots.inject`。业务插件可先于壳加载并等待声明；壳也可先加载并在业务
+插件出现后接收注册。壳卸载时，Cordis 会级联撤销其声明的分区 Slot，避免残留孤立页面。
 
 ## 验证门槛
 
 - 源码中只有 `dsh-extension-manager` 注册 `sidebar.footer.action`。
 - `dsh-skill-manager` 只注册 `extension.manager.section`。
-- DOM 集成测试覆盖两种加载顺序、三分区顺序、壳样式归属和 SKILL 页面渲染。
-- 运行配置同时包含两个独立 Cordis 行；3080 实机只显示一个“扩展”入口。
+- `dsh-plugin-manager` 只注册 `extension.manager.section`，壳不再合成 Plugin 占位。
+- DOM 集成测试覆盖分区组合、壳样式归属和 SKILL / Plugin 页面渲染。
+- 运行配置同时包含三个独立 Cordis 行；3080 实机只显示一个“扩展”入口。
 
 2026-08-24 实际结果：真实 bundle DOM 8/8；全量插件 57 pass / 0 fail / 4 skip；
 3080 从扫描态过渡到 `game` 11/68，MCP/Plugin 占位切换正常，console 0 error/warn。
