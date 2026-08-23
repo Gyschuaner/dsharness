@@ -6,11 +6,11 @@ import { inject, makeHandler } from '../lib/index.js';
 
 function request(method, body) {
 	const req = Readable.from(body === undefined ? [] : [Buffer.from(body)]);
-	req.method = method;
+	(req as any).method = method;
 	return req;
 }
 
-async function invoke(handler, method, body) {
+async function invoke(handler, method, body?) {
 	let status = null;
 	let headers = null;
 	let payload = '';

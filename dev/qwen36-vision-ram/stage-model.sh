@@ -16,12 +16,12 @@ for name in "$MODEL_NAME" "$MMPROJ_NAME"; do
   [[ -f "$source_file" ]] || { printf 'Missing source file: %s\n' "$source_file" >&2; exit 1; }
   mkdir -p "$RAM_ROOT"
   source_size="$(stat -c %s "$source_file")"
-  if [[ -f "$target_file" && "$(stat -c %s "$target_file")" == "$source_size" ]]; then
+  if [[ -f "$target_file" && "$(stat -c %s "$target_file")" == "$source_size" ]] && cmp -s -- "$source_file" "$target_file"; then
     printf 'RAM_FILE_REUSED name=%s bytes=%s\n' "$name" "$source_size"
     continue
   fi
   [[ ! -e "$target_file" ]] || {
-    printf 'Existing RAM file has the wrong size; refusing to overwrite: %s\n' "$target_file" >&2
+    printf 'Existing RAM file differs from source; refusing to overwrite: %s\n' "$target_file" >&2
     exit 1
   }
   available="$(df --output=avail -B1 /dev/shm | tail -n 1 | tr -d ' ')"
@@ -34,8 +34,8 @@ for name in "$MODEL_NAME" "$MMPROJ_NAME"; do
   partial="$target_file.partial.$$"
   trap 'rm -f -- "$partial"' EXIT
   cp -- "$source_file" "$partial"
-  [[ "$(stat -c %s "$partial")" == "$source_size" ]] || {
-    printf 'RAM copy size verification failed: %s\n' "$name" >&2
+  [[ "$(stat -c %s "$partial")" == "$source_size" ]] && cmp -s -- "$source_file" "$partial" || {
+    printf 'RAM copy content verification failed: %s\n' "$name" >&2
     exit 1
   }
   mv -- "$partial" "$target_file"

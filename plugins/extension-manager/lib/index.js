@@ -6,7 +6,6 @@
  */
 const name = 'extension-manager';
 const inject = [];
-
-function apply() {}
-
+function apply() { }
 export { name, inject, apply };
+//# sourceMappingURL=index.js.map

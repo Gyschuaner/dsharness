@@ -4,6 +4,7 @@
   "description": "Local CSS patch for dsh-better-sidebar: syncs the session header padding-right transition with the 300ms layout animation so the Session log capsule no longer jumps 50px against the slide when the side panel opens or closes.",
   "type": "module",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
@@ -13,6 +14,10 @@
     "client": {
       "platform": "web"
     }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "license": "MIT"
 }

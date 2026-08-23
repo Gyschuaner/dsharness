@@ -12,3 +12,6 @@ __pycache__/
 /.dsh/skill-manager.json
 /.dsh/skills/__smgr-shadow-*.md
 /.dsh/skills/.*
+
+# TypeScript incremental build metadata is local and non-runtime.
+plugins/*/lib/tsconfig.tsbuildinfo

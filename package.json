@@ -1,0 +1,20 @@
+{
+  "name": "deepseek-harness-local-plugins",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.22.0",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.tests.json --pretty false",
+    "test": "pnpm run build && tsx --test plugins/*/test/*.test.ts test/*.test.ts",
+    "verify:typescript": "tsx scripts/verify-typescript.mts",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run verify:typescript"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.0",
+    "@types/react": "18.3.28",
+    "tsx": "4.22.4",
+    "typescript": "6.0.3"
+  }
+}

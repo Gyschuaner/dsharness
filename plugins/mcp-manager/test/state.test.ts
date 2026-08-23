@@ -12,7 +12,7 @@ import {
 	parseServers,
 } from '../lib/state.js';
 
-async function fixture(t, options = {}) {
+async function fixture(t, options: any = {}) {
 	const profileDir = await mkdtemp(join(tmpdir(), 'dsh-mcp-manager-'));
 	t.after(() => rm(profileDir, { recursive: true, force: true }));
 	const patchPath = join(profileDir, 'cordis.patch.yml');
@@ -109,7 +109,7 @@ test('rejects unsafe or duplicate configuration without changing the patch', asy
 test('reports corrupt blocks and failed writes without damaging the original file', async (t) => {
 	const corrupt = `outside\n${SERVERS_START}\nmissing end\n`;
 	const first = await fixture(t, { patch: corrupt });
-	await assert.rejects(first.manager.call('list'), (error) => error.code === 'MANAGED_BLOCK_CORRUPT');
+	await assert.rejects(first.manager.call('list'), (error) => (error as any).code === 'MANAGED_BLOCK_CORRUPT');
 	assert.equal(await readFile(first.patchPath, 'utf8'), corrupt);
 
 	const original = "- insert:\n  - id: 'safe'\n";
@@ -119,6 +119,33 @@ test('reports corrupt blocks and failed writes without damaging the original fil
 	});
 	await assert.rejects(second.manager.call('create', { server: stdio() }), /disk full/);
 	assert.equal(await readFile(second.patchPath, 'utf8'), original);
+});
+
+test('managed block parser rejects duplicate and reversed marker pairs', () => {
+	const valid = `${SERVERS_START}\n- id: one\n${SERVERS_END}\n`;
+	assert.equal(extractManagedBlock(valid).trim(), '- id: one');
+	assert.equal(extractManagedBlock(`note: '${SERVERS_START}'\n${valid}`).trim(), '- id: one');
+	assert.throws(() => extractManagedBlock(`${valid}${valid}`), (error) => (error as any).code === 'MANAGED_BLOCK_CORRUPT');
+	assert.throws(() => extractManagedBlock(`${SERVERS_END}\n${SERVERS_START}\n`), (error) => (error as any).code === 'MANAGED_BLOCK_CORRUPT');
+});
+
+test('environment references in env and headers are required even when requiredEnv is omitted', async (t) => {
+	const first = await fixture(t, { env: {} });
+	await assert.rejects(
+		first.manager.call('create', { server: stdio({ enabled: true, requiredEnv: [], env: { TOKEN: 'MCP_TOKEN' } }) }),
+		(error) => (error as any).code === 'ENV_REQUIRED' && /MCP_TOKEN/.test((error as Error).message),
+	);
+	await assert.rejects(
+		first.manager.call('create', { server: { serverName: 'remote-ref', transport: 'streamable-http', url: 'https://example.com/mcp', headers: { Authorization: 'MCP_AUTH' }, enabled: true } }),
+		(error) => (error as any).code === 'ENV_REQUIRED' && /MCP_AUTH/.test((error as Error).message),
+	);
+});
+
+test('marker text inside server metadata is data, not a second managed block marker', async (t) => {
+	const f = await fixture(t);
+	await f.manager.call('create', { server: stdio({ description: `documentation mentions ${SERVERS_START}` }) });
+	const listed = await f.manager.call('list');
+	assert.equal(listed.servers.length, 1);
 });
 
 test('projects runtime phases and exact MCP tool schemas without inventing retry data', async (t) => {
@@ -158,7 +185,7 @@ test('blocks enabling a server whose required environment is absent', async (t) 
 	assert.equal(created.server.status, 'disabled');
 	await assert.rejects(
 		manager.call('setEnabled', { id: created.server.id, enabled: true }),
-		(error) => error.code === 'ENV_REQUIRED',
+		(error) => (error as any).code === 'ENV_REQUIRED',
 	);
 });
 
@@ -206,7 +233,7 @@ test('market uses Registry icon first, GitHub avatar fallback, cache, and disabl
 	assert.equal(repeated.changed, false);
 	await assert.rejects(
 		manager.call('marketplace.install', { id: 'awslabs/mcp' }),
-		(error) => error.code === 'MARKET_NOT_INSTALLABLE',
+		(error) => (error as any).code === 'MARKET_NOT_INSTALLABLE',
 	);
 });
 

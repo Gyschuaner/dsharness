@@ -126,15 +126,15 @@ async function makeHarness(router, { current = '/project-a', workspaces = [], pl
 	globalThis.MutationObserver = dom.window.MutationObserver;
 	globalThis.localStorage = dom.window.localStorage;
 	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-	globalThis.fetch = async (_url, init) => {
+	(globalThis as any).fetch = async (_url: any, init: any) => {
 		const body = JSON.parse(init.body);
 		try {
 			return jsonResponse(await router(body));
 		} catch (error) {
-			return jsonResponse(error instanceof Error ? error.message : String(error), error && error.status ? error.status : 500);
+			return jsonResponse(error instanceof Error ? error.message : String(error), (error as any)?.status || 500);
 		}
 	};
-	dom.window.fetch = globalThis.fetch;
+	dom.window.fetch = (globalThis as any).fetch;
 
 	const sessions = {
 		list: {
@@ -144,7 +144,7 @@ async function makeHarness(router, { current = '/project-a', workspaces = [], pl
 	const workspaceService = {
 		list: { getSnapshot: () => ({ items: workspaces }) },
 	};
-	const specs = new Map([['sidebar.footer.action', { kind: 'list', scope: 'root' }]]);
+	const specs = new Map<string, any>([['sidebar.footer.action', { kind: 'list', scope: 'root' }]]);
 	const registrations = new Map();
 	const waiters = new Map();
 	const listeners = new Map();
@@ -160,7 +160,7 @@ async function makeHarness(router, { current = '/project-a', workspaces = [], pl
 		}
 		return result;
 	}
-	function declare(children) {
+	function declare(children: any) {
 		for (const [name, spec] of Object.entries(children || {})) {
 			specs.set(name, spec);
 			const pending = waiters.get(name) || [];
@@ -224,7 +224,7 @@ async function makeHarness(router, { current = '/project-a', workspaces = [], pl
 	}
 	const primitives = new Proxy({ Button, Modal }, { get: (target, key) => target[key] || icon });
 	function loadPlugin(kind) {
-		let loadedDefinition = null;
+		let loadedDefinition: any = null;
 		dom.window.__ModuleLoader__ = { load: (definition) => { loadedDefinition = definition; } };
 		const bundlePath = kind === 'skill'
 			? join(here, '..', 'lib', 'client.js')
@@ -242,7 +242,7 @@ async function makeHarness(router, { current = '/project-a', workspaces = [], pl
 	const sidebarEntries = slots.entries('sidebar.footer.action');
 	assert.equal(sidebarEntries.length, 1, 'the Extensions shell is the only sidebar registration');
 	const registration = sidebarEntries[0];
-	function renderSlot(name, owner = {}, options = {}) {
+	function renderSlot(name, owner: any = {}, options: any = {}) {
 		const selected = slots.entries(name).filter((entry) => options.only === undefined || entry.definition.id === options.only);
 		return React.createElement(React.Fragment, null, selected.map((entry) => React.createElement(
 			entry.component,
@@ -416,6 +416,65 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-presetCounter')].map((item) => item.textContent), ['0/64', '0/200']);
 	await h.click(h.button('取消'));
 	assert.equal(h.dom.window.document.querySelector('.sk-presetSave'), null);
+});
+
+test('string-valued broken sources are disabled in the source selector', async (t) => {
+	const broken = Object.assign(source('global-claude', '损坏来源', 'broken'), { broken: 'frontmatter 无法解析' });
+	const currentRow = row('broken-source-skill', 'source validation', {
+		sources: [source('user-dsh', '可用来源', 'ok'), broken],
+	});
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return view('/project-a', [currentRow]);
+		if (body.op === 'presets.list') return { presets: [] };
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const harness = await makeHarness(router);
+	t.after(harness.cleanup);
+	await harness.open();
+	await harness.click(harness.dom.window.document.querySelector('.sk-rowOpen'));
+	await harness.click(harness.button('更改来源'));
+	const brokenButton = [...harness.dom.window.document.querySelectorAll('.sk-src')]
+		.find((item) => item.textContent.includes('损坏来源')) as HTMLButtonElement;
+	assert.ok(brokenButton);
+	assert.equal(brokenButton.disabled, true);
+	assert.match(brokenButton.title, /损坏/);
+});
+
+test('all five client bundles inject at most one owned style across repeated factory evaluation', () => {
+	const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+	const primitives = new Proxy({}, { get: () => () => null });
+	const bundles = [
+		['dsh-skill-manager', join(here, '..', 'lib', 'client.js')],
+		['dsh-extension-manager', join(here, '..', '..', 'extension-manager', 'lib', 'client.js')],
+		['dsh-mcp-manager', join(here, '..', '..', 'mcp-manager', 'lib', 'client.js')],
+		['dsh-plugin-manager', join(here, '..', '..', 'plugin-manager', 'lib', 'client.js')],
+		['dsh-better-sidebar-smooth', join(here, '..', '..', 'better-sidebar-smooth', 'lib', 'client.js')],
+	] as const;
+	for (const [id, path] of bundles) {
+		if (id === 'dsh-better-sidebar-smooth') {
+			const stale = dom.window.document.createElement('style');
+			stale.id = 'bsr-smooth-style';
+			stale.setAttribute('data-plugin', id);
+			stale.textContent = 'body { color: red; }';
+			dom.window.document.head.appendChild(stale);
+		}
+		for (let attempt = 0; attempt < 2; attempt += 1) {
+			let definition: any = null;
+			(dom.window as any).__ModuleLoader__ = { load(value: any) { definition = value; } };
+			new Function('window', 'document', readFileSync(path, 'utf8'))(dom.window, dom.window.document);
+			assert.ok(definition, `${id} registered`);
+			const plugin = definition.factory((name: string) => {
+				if (name === 'react') return React;
+				if (name === '@deepseek-ai/dsh-client-ui-primitives') return primitives;
+				throw new Error(`unexpected require ${name}`);
+			});
+			if (id === 'dsh-better-sidebar-smooth') plugin.apply({});
+		}
+		assert.equal(dom.window.document.querySelectorAll(`style[data-plugin="${id}"]`).length, 1, `${id} style is idempotent`);
+		if (id === 'dsh-better-sidebar-smooth') assert.notEqual(dom.window.document.getElementById('bsr-smooth-style')?.textContent, 'body { color: red; }');
+	}
+	dom.window.close();
 });
 
 test('extension type navigation collapses to icons and persists across reopen', async (t) => {
@@ -677,11 +736,11 @@ test('project switch drops stale catalog, mutation and preset-preview responses'
 });
 
 test('unknown catalog op safely falls back to the legacy Skill Manager UI', async (t) => {
-	const error = new Error('未知操作：catalog');
+	const error: any = new Error('未知操作：catalog');
 	error.status = 400;
 	const router = async (body) => {
 		if (body.op === 'capabilities') {
-			const capabilityError = new Error('未知操作：capabilities');
+			const capabilityError: any = new Error('未知操作：capabilities');
 			capabilityError.status = 400;
 			throw capabilityError;
 		}

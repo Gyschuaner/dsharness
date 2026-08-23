@@ -18,11 +18,13 @@ dsharness/
 │   ├── extension-manager/    # 通用“扩展”全页壳与业务分区 Slot
 │   ├── skill-manager/        # SKILL 管理业务分区与 Host API
 │   ├── mcp-manager/          # MCP 服务器管理与精选 GitHub 市场（DSH-026/028）
-│   │   ├── lib/              # Host API、受管 Cordis 状态与 Client 页面
-│   │   └── test/             # 状态机、安全边界与真实 bundle DOM 测试
+│   │   ├── src/              # TypeScript Host、状态与 Client 源码（唯一源码真相）
+│   │   ├── lib/              # tsc 生成的运行时 JS、声明与 source map
+│   │   └── test/             # TypeScript 状态机、安全边界与真实 bundle DOM 测试
 │   ├── plugin-manager/       # 本地插件管理 + GitHub 插件市场（DSH-027）
-│   │   ├── lib/              # Host API、导入事务与 Client 页面
-│   │   └── test/             # Host 事务与 Client DOM 回归
+│   │   ├── src/              # TypeScript Host、导入事务与 Client 源码
+│   │   ├── lib/              # tsc 生成的运行时产物
+│   │   └── test/             # TypeScript Host 事务与 Client DOM 回归
 │   └── image-context-guard/  # 已退役的 DSH-004 临时保护源码，仅供历史回溯
 ├── dev/
 │   ├── install-dsh-source.ps1     # 拉取、打补丁、构建并注册 dsh
@@ -75,7 +77,8 @@ cd dsharness
 
 ## 接入一个新插件到本仓库
 
-1. 把插件源码复制到 `plugins/<name>/`（保持 `package.json` + `lib/` 结构）。
+1. 把插件源码放到 `plugins/<name>/src/*.ts`，并保持 `package.json`、插件级
+   `tsconfig.json` 与根 TypeScript project references；`lib/` 是构建产物，不直接编辑。
 2. 运行 junction 脚本，把运行时的 `~/.dsh/plugins/<name>` 指向仓库：
    ```powershell
    .\dev\setup-plugin-junction.ps1 -PluginName skill-manager
@@ -87,6 +90,20 @@ cd dsharness
    git commit -m "feat(<DP编号>): 接入 <name> 插件"
    git push
    ```
+
+## 本地插件构建与验证
+
+仓库内所有自维护插件源码和测试统一使用 TypeScript；DSH 运行时继续从各插件的
+`lib/*.js` 加载，因此生成物随源码一并提交。Node 与 pnpm 就绪后执行：
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm run verify
+```
+
+`verify` 会依次执行严格生产源码类型检查、测试源码检查、运行时构建、全量回归，
+并确认不存在手写 `.js`，且每个 `src/*.ts` 都有对应的 `lib/*.js`。新增插件时也要把
+它加入根 `tsconfig.json` 的 project references。
 
 ## 上游源码（deepseek-harness）
 

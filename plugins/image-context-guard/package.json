@@ -4,12 +4,15 @@
   "description": "Limits each DSH model request to the nine newest image blocks without mutating durable session history.",
   "type": "module",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "exports": {
     ".": "./lib/index.js",
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "node --test"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts"
   },
   "license": "MIT"
 }

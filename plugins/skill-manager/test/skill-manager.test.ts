@@ -9,7 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -23,13 +23,14 @@ import {
 	readGlobalConfig,
 	readProjectConfig,
 	writeProjectConfig,
+	writeGlobalConfig,
 	validateTagList,
 	globalConfigPath,
 	projectConfigPath,
 } from '../lib/state.js';
 
 // ── fixtures ────────────────────────────────────────────────────────────────
-function skillMd(name, description, { flag = false, userInvocable = null } = {}) {
+function skillMd(name, description, { flag = false, userInvocable = null }: any = {}) {
 	const lines = ['---', `name: ${name}`, `description: ${description}`];
 	if (flag) lines.push('disable-model-invocation: true');
 	if (userInvocable !== null) lines.push(`user-invocable: ${userInvocable}`);
@@ -38,7 +39,7 @@ function skillMd(name, description, { flag = false, userInvocable = null } = {})
 }
 
 /** Write one skill (flat or dir bundle) under a root directory. */
-async function putSkill(rootDir, name, description, { format = 'flat', flag = false, files = {} } = {}) {
+async function putSkill(rootDir, name, description, { format = 'flat', flag = false, files = {} }: any = {}) {
 	if (format === 'dir') {
 		const dir = join(rootDir, name);
 		await mkdir(join(dir, 'references'), { recursive: true });
@@ -46,7 +47,7 @@ async function putSkill(rootDir, name, description, { format = 'flat', flag = fa
 		for (const [rel, content] of Object.entries(files)) {
 			const p = join(dir, rel);
 			await mkdir(join(p, '..'), { recursive: true });
-			await writeFile(p, content, 'utf8');
+			await writeFile(p, content as any, 'utf8');
 		}
 		return join(dir, 'SKILL.md');
 	}
@@ -70,7 +71,7 @@ async function makeEnv() {
 	const agentPresets = {
 		list: async () => [{ id: 'preset-a', path: join(root, 'preset', 'cordis.yml') }],
 	};
-	const opts = { home, agentPresets, logger: { warn: () => {} } };
+	const opts: any = { home, agentPresets, logger: { warn: () => {} } };
 	return {
 		root,
 		home,
@@ -177,8 +178,8 @@ test('project config: missing root is rejected with 400', async (t) => {
 test('assertCwd: rejects missing and non-directory paths, resolves relative', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);
-	await assert.rejects(() => assertCwd(join(env.root, 'ghost')), (e) => e.status === 400);
-	await assert.rejects(() => assertCwd(join(env.userDsh, 'a.md')), (e) => e.status === 400);
+	await assert.rejects(() => assertCwd(join(env.root, 'ghost')), (e) => (e as any).status === 400);
+	await assert.rejects(() => assertCwd(join(env.userDsh, 'a.md')), (e) => (e as any).status === 400);
 	const resolved = await assertCwd(join(env.cwd, '..', 'beta'));
 	assert.equal(resolved, env.betaRoot);
 	assert.equal(await assertCwd(undefined), undefined);
@@ -216,6 +217,28 @@ test('global config: preserves legacy globalDefaultOff and unknown fields', asyn
 	assert.equal(config.globalDefaultOff, true);
 	assert.equal(raw.someFutureField, 42);
 	assert.ok(globalConfigPath(env.opts).endsWith('skill-manager.json'));
+});
+
+test('global config refuses corrupt, future-version and unreadable truth files without clobbering them', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const path = globalConfigPath(env.opts);
+	await mkdir(dirname(path), { recursive: true });
+	await writeFile(path, '{broken', 'utf8');
+	const corrupt = await readGlobalConfig(env.opts);
+	assert.equal(corrupt.corrupt, true);
+	await assert.rejects(writeGlobalConfig({ tags: { alpha: ['x'] } }, env.opts), (error) => (error as any).status === 409);
+	assert.equal(await readFile(path, 'utf8'), '{broken');
+
+	await writeFile(path, JSON.stringify({ schema: 'dsh-skill-manager/global', apiVersion: 999, globalDefaultOff: false, tags: {}, presets: {} }), 'utf8');
+	const future = await readGlobalConfig(env.opts);
+	assert.equal(future.future, true);
+	await assert.rejects(writeGlobalConfig({ tags: { beta: ['y'] } }, env.opts), (error) => (error as any).status === 409);
+	assert.equal(JSON.parse(await readFile(path, 'utf8')).apiVersion, 999);
+
+	await rm(path, { force: true });
+	await mkdir(path);
+	await assert.rejects(readGlobalConfig(env.opts), (error) => (error as any).status === 500 && /无法读取|I\/O|权限/.test((error as Error).message));
 });
 
 // ── S2: scanning & same-name merge ──────────────────────────────────────────
@@ -511,6 +534,14 @@ test('setSource: selecting a rank-losing source materializes a managed copy', as
 	assert.equal(entry.source, 'user-dsh');
 	assert.match(entry.copyHash, /^sha256:/);
 	assert.match(entry.originHash, /^sha256:/);
+
+	// The catalog helper is also an integration surface. A previous migration
+	// accidentally returned the whole copy result object in this boolean field.
+	const snapshot = await internals.buildProjectView(env.cwd, env.opts);
+	const selected = snapshot.identities.get('src-skill');
+	assert.ok(selected);
+	const selection = await internals.applySourceSelection(env.cwd, snapshot.config, selected, 'user-dsh', env.opts);
+	assert.equal(typeof selection.copyCreated, 'boolean');
 });
 
 test('setSource: default materializes a copy when rank loses; pure selection removes it', async (t) => {
@@ -527,7 +558,8 @@ test('setSource: default materializes a copy when rank loses; pure selection rem
 	assert.ok(row.sources.some((s) => s.key === 'project-dsh' && s.generated), 'default copy exists');
 	// Selecting the rank-winning global source is a pure selection: the now
 	// redundant managed copy is removed (marker-verified).
-	await api('setSource', { cwd: env.cwd, name: 'reset-skill', source: 'global-codex' });
+	const pure = await api('setSource', { cwd: env.cwd, name: 'reset-skill', source: 'global-codex' });
+	assert.equal(pure.status, 200);
 	row = identity((await api('catalog', { cwd: env.cwd })).value, 'reset-skill');
 	assert.equal(row.sourceKey, 'global-codex');
 	assert.equal(row.sources.find((s) => s.key === 'project-dsh'), undefined);
@@ -537,6 +569,42 @@ test('setSource: default materializes a copy when rank loses; pure selection rem
 	row = restored.value.view;
 	assert.equal(row.sourceKey, null);
 	assert.ok(row.sources.some((s) => s.key === 'project-dsh' && s.generated), 'default copy back');
+});
+
+test('legacy contentHash verifies managed copies, while unmarked copies are never auto-deleted', async (t) => {
+	const legacy = await makeEnv();
+	t.after(legacy.cleanup);
+	await putSkill(legacy.userDsh, 'legacy-copy', 'user origin');
+	await putSkill(legacy.globalCodex, 'legacy-copy', 'global origin');
+	const legacyApi = makeApi(legacy.opts);
+	await legacyApi('catalog', { cwd: legacy.cwd });
+	let legacyRead = await readProjectConfig(legacy.projectRoot, legacy.opts);
+	const legacyEntry = legacyRead.config.sources['legacy-copy'];
+	assert.ok(legacyEntry?.copyHash);
+	legacyEntry.contentHash = legacyEntry.copyHash;
+	delete legacyEntry.copyHash;
+	await writeProjectConfig(legacy.projectRoot, legacyRead.config, legacy.opts, legacyRead.raw);
+	const switched = await legacyApi('setSource', { cwd: legacy.cwd, name: 'legacy-copy', source: 'global-codex' });
+	assert.equal(switched.status, 200, JSON.stringify(switched.value));
+	await assert.rejects(access(join(legacy.projDsh, 'legacy-copy.md')));
+
+	const unmarked = await makeEnv();
+	t.after(unmarked.cleanup);
+	await putSkill(unmarked.userDsh, 'unmarked-copy', 'user origin');
+	await putSkill(unmarked.globalCodex, 'unmarked-copy', 'global origin');
+	const unmarkedApi = makeApi(unmarked.opts);
+	await unmarkedApi('catalog', { cwd: unmarked.cwd });
+	const copyPath = join(unmarked.projDsh, 'unmarked-copy.md');
+	const before = await readFile(copyPath, 'utf8');
+	const unmarkedRead = await readProjectConfig(unmarked.projectRoot, unmarked.opts);
+	const unmarkedEntry = unmarkedRead.config.sources['unmarked-copy'];
+	assert.ok(unmarkedEntry);
+	delete unmarkedEntry.copyHash;
+	delete unmarkedEntry.contentHash;
+	await writeProjectConfig(unmarked.projectRoot, unmarkedRead.config, unmarked.opts, unmarkedRead.raw);
+	const blocked = await unmarkedApi('setSource', { cwd: unmarked.cwd, name: 'unmarked-copy', source: 'global-codex' });
+	assert.equal(blocked.status, 409);
+	assert.equal(await readFile(copyPath, 'utf8'), before);
 });
 
 test('setSource: conflicts are rejected without touching files', async (t) => {
@@ -578,6 +646,14 @@ test('setSource: user-modified copy is protected (409, file kept)', async (t) =>
 	// Selecting a rank-losing origin is also blocked while the copy diverges.
 	const swap = await api('setSource', { cwd: env.cwd, name: 'keepme', source: 'user-dsh' });
 	assert.equal(swap.status, 409);
+	assert.equal(await readFile(copyPath, 'utf8').then((c) => c.includes('user-edited version')), true);
+	// Selecting the rank-winning global source would normally be a pure
+	// selection. It must still refuse while the rank-100 managed copy was
+	// modified, or config and runtime resolution would diverge.
+	const pure = await api('setSource', { cwd: env.cwd, name: 'keepme', source: 'global-codex' });
+	assert.equal(pure.status, 409);
+	const persisted = (await readProjectConfig(env.projectRoot, env.opts)).config.sources.keepme;
+	assert.equal(persisted.generated, true);
 	assert.equal(await readFile(copyPath, 'utf8').then((c) => c.includes('user-edited version')), true);
 });
 
@@ -826,6 +902,30 @@ test('capabilities: reports V1 support without scanning the catalog', async (t) 
 	assert.ok(value.features.includes('unified-catalog'));
 });
 
+test('HTTP handler rejects oversized bodies and prototype-chain operation names', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const api = makeApi(env.opts);
+	const inherited = await api('toString');
+	assert.equal(inherited.status, 400);
+	assert.match(inherited.value.error.message, /未知操作/);
+
+	const handler = internals.makeHandler({ agentPresets: env.opts.agentPresets, logger: env.opts.logger, home: env.home });
+	let status = 0;
+	let data = '';
+	const req = {
+		method: 'POST',
+		[Symbol.asyncIterator]: async function* () { yield Buffer.alloc(8 * 1024 * 1024 + 1, 0x20); },
+	};
+	const res = {
+		writeHead(nextStatus) { status = nextStatus; },
+		end(chunk) { data += chunk || ''; },
+	};
+	await handler(req, res);
+	assert.equal(status, 413);
+	assert.match(JSON.parse(data).error.message, /请求体过大/);
+});
+
 test('legacy list: unchanged shape with apiVersion 6', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);
@@ -918,6 +1018,26 @@ test('read-only roots: bundled save/delete 403, global delete 403', async (t) =>
 	assert.equal(delBundled.status, 403);
 	const delGlobal = await api('delete', { cwd: env.cwd, root: 'global-codex', name: 'ro-global' });
 	assert.equal(delGlobal.status, 403);
+});
+
+test('save refuses a child junction that resolves outside the selected skill root', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const outside = join(env.root, 'outside-skill');
+	await mkdir(outside, { recursive: true });
+	const original = skillMd('escape-skill', 'outside');
+	await writeFile(join(outside, 'SKILL.md'), original, 'utf8');
+	const link = join(env.projDsh, 'escape-skill');
+	try {
+		await symlink(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+	} catch (error) {
+		t.skip(`junction/symlink unavailable: ${error instanceof Error ? error.message : String(error)}`);
+		return;
+	}
+	const api = makeApi(env.opts);
+	const response = await api('save', { cwd: env.cwd, root: 'project-dsh', name: 'escape-skill', content: skillMd('escape-skill', 'changed') });
+	assert.equal(response.status, 400);
+	assert.equal(await readFile(join(outside, 'SKILL.md'), 'utf8'), original);
 });
 
 test('hashSkillSource: flat and dir bundles are stable and sensitive to edits', async (t) => {

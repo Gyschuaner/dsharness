@@ -86,14 +86,14 @@ async function makeHarness(router) {
 	// auto-focused field mounts.
 	dom.window.HTMLElement.prototype.attachEvent = function () {};
 	dom.window.HTMLElement.prototype.detachEvent = function () {};
-	globalThis.fetch = async (_url, init) => {
+	(globalThis as any).fetch = async (_url: any, init: any) => {
 		const body = JSON.parse(init.body);
 		try { return jsonResponse(await router(body)); }
 		catch (error) { return jsonResponse(error instanceof Error ? error.message : String(error), 500); }
 	};
 	dom.window.fetch = globalThis.fetch;
 
-	const specs = new Map([['sidebar.footer.action', { kind: 'list', scope: 'root' }]]);
+	const specs = new Map<string, any>([['sidebar.footer.action', { kind: 'list', scope: 'root' }]]);
 	const registrations = new Map();
 	const waiters = new Map();
 	const listeners = new Map();
@@ -107,7 +107,7 @@ async function makeHarness(router) {
 		if (result && typeof result.next === 'function') for (let step = result.next(); !step.done; step = result.next()) {}
 		return result;
 	}
-	function declare(children) {
+	function declare(children: any) {
 		for (const [name, spec] of Object.entries(children || {})) {
 			specs.set(name, spec);
 			const pending = waiters.get(name) || [];
@@ -166,7 +166,7 @@ async function makeHarness(router) {
 	load(join(here, '..', 'lib', 'client.js'));
 
 	const sidebar = slots.entries('sidebar.footer.action')[0];
-	function renderSlot(name, owner = {}, options = {}) {
+	function renderSlot(name, owner: any = {}, options: any = {}) {
 		const selected = slots.entries(name).filter((entry) => options.only === undefined || entry.definition.id === options.only);
 		return React.createElement(React.Fragment, null, selected.map((entry) => React.createElement(entry.component, Object.assign({ key: entry.definition.id }, owner, entry.definition.inject ? entry.definition.inject() : {}, entry.definition.children ? { renderSlot } : {}))));
 	}

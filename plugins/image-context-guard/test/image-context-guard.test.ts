@@ -16,7 +16,7 @@ function text(value) {
   return { type: 'text', text: value }
 }
 
-function message(id, content, source = { kind: 'user' }) {
+function message(id, content, source: any = { kind: 'user' }) {
   return { id, role: 'user', source, content }
 }
 
@@ -126,7 +126,7 @@ test('counts and trims images nested inside tool results', () => {
   ])
   assert.equal(result.request.messages[1], input.messages[1])
   assert.equal(result.request.messages[0].content.length, 2)
-  assert.ok(result.request.messages[0].content.every((block) => block.type === 'text'))
+  assert.ok((result.request.messages[0].content as any[]).every((block) => block.type === 'text'))
 })
 
 test('enforces the limit when the same image object appears more than once', () => {
@@ -176,7 +176,7 @@ test('middleware re-enters the LLM seam with a bounded copy', async () => {
       },
     },
   }
-  apply(ctx)
+  apply(ctx as any)
   const input = request([
     message('history', Array.from({ length: 12 }, (_, index) => image(index))),
   ])
@@ -205,7 +205,7 @@ test('middleware passes safe requests and downstream failures through unchanged'
     logger: { warn: assert.fail },
     llm: { stream: assert.fail },
   }
-  apply(ctx)
+  apply(ctx as any)
   const input = request([message('current', [image('only')])])
   const downstream = (async function* () {
     throw expected
