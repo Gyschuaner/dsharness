@@ -34,6 +34,38 @@ final result: passed
 
 ---
 
+# Skill Manager build 18 · Single-page navigation and overlay drawer QA
+
+## Inputs
+
+- User-reported fixed extension navigation: `C:\Users\chuansgu\AppData\Local\Temp\codex-clipboard-307115d7-ffd1-4ac7-8052-706fcba6fa6e.png`
+- Browser-rendered overlay drawer: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-manager-build18\01-overlay-drawer.png`
+- Browser-rendered collapsed navigation: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-manager-build18\02-collapsed-nav.png`
+- Local implementation URL: `http://127.0.0.1:3080/`
+
+## Information architecture and layout findings
+
+- The former project-management and unified-library pages both rendered the same merged 68-Skill catalog with the same search and tag controls. Source switching was already available in the project drawer, so the duplicate sub-page tabs were removed without removing merged identities, source badges, source priority, or project-specific selection.
+- At the 1252 × 900 browser viewport, the expanded extension navigation is 208px and collapses to a 64px icon rail. The main content grows into the released space; Skill, MCP, and Plugin retain official icons, accessible names, construction status, and collapsed-state titles.
+- The detail drawer is a 400px absolute overlay. Before and after opening `cordis-plugin-development`, the Skill list, project card, and toolbar remained 997.33px wide at x=232px. The drawer exposed three source radio options and did not change list geometry or wrapping.
+
+## Primary interactions and accessibility checked
+
+- No project-management/unified-library tablist is rendered; the page enters project management directly.
+- Collapse changes the control from `aria-label="收起扩展类型导航"` / `aria-expanded=true` to `aria-label="展开扩展类型导航"` / `aria-expanded=false`.
+- Refreshing the DSH page and reopening Extensions preserved the 64px collapsed state; expanding restored 208px. Final browser state was restored to expanded navigation.
+- The detail drawer remains a named dialog, its close button and Esc close only the drawer, and the extension page remains open.
+- DOM regression covers the single-page structure, absolute drawer CSS, absence of drawer-induced layout classes, official nav icons, tooltips, persistence across remount, and expansion.
+
+## Findings
+
+- No actionable P0/P1/P2 issue remains in this pass. The overlay intentionally has no full-page dim backdrop so users retain list context and can close or switch the selected Skill quickly.
+- MCP and Plugin remain explicit construction placeholders; their collapsed icons carry a small neutral status dot and full accessible title rather than showing an unreadable miniature badge.
+
+final result: passed
+
+---
+
 # Skill Manager build 16 · Tag editor Design QA
 
 ## Inputs

@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 17
+ * build: 18
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -45,8 +45,7 @@
  * context card, per-state counts/grouping, select-visible bulk actions,
  * current-workspace-safe defaults, derived drawer/tag state, responsive
  * drawer behavior, and accessible switch/radio/detail controls. The SKILL
- * tab continues to host two
- * sub-pages (项目管理 / 统一资源库) served by the host's apiVersion 6
+ * management view is served by the host's apiVersion 6
  * ops (catalog / setEnabled / setMany / setSource / setTags / presets.* /
  * slim.*): project selector over DSH workspaces, per-project enable
  * state, merged same-name identities with source selection, global tags,
@@ -56,6 +55,10 @@
  * build 17: the project list no longer regroups rows by enabled state.
  * Catalog order and scroll context stay stable while a soft blue row tint,
  * the switch, and the optional state filters communicate enabled status.
+ * build 18: the redundant unified-library sub-page is removed; merged source
+ * selection remains in the project Skill drawer. The drawer now overlays the
+ * list at every desktop width without reflowing it, and the SKILL / MCP /
+ * Plugin navigation can collapse to an icon rail with browser-local state.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -145,33 +148,38 @@
 				'.ext-close{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 9px;font-size:15px;line-height:1;margin-left:auto}',
 				'.ext-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.ext-body{flex:1;min-height:0;display:flex}',
-				'.ext-nav{flex:none;width:190px;border-right:1px solid var(--dsw-alias-border-l2);padding:12px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}',
-				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:10px;padding:9px 12px;text-align:left;font:inherit;display:flex;flex-direction:column;gap:2px;align-items:flex-start}',
+				'.ext-nav{box-sizing:border-box;flex:none;width:208px;border-right:1px solid var(--dsw-alias-border-l2);padding:12px 10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;transition:width .16s ease,padding .16s ease}',
+				'.ext-navCollapsed{width:64px;padding-left:8px;padding-right:8px}',
+				'.ext-navHead{display:flex;align-items:center;min-height:32px;padding:0 4px}',
+				'.ext-navTitle{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--dsw-alias-label-quaternary)}',
+				'.ext-navToggle{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex:none}',
+				'.ext-navToggle:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+				'.ext-navList{display:flex;flex-direction:column;gap:6px}',
+				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:10px;padding:9px 10px;text-align:left;font:inherit;display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:9px;align-items:center;min-height:54px}',
 				'.ext-navBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.ext-navBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary)}',
 				'.ext-navBtnActive:hover{background:var(--dsw-alias-fill-tsp-secondary)}',
-				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}',
+				'.ext-navIcon{position:relative;grid-row:1 / span 2;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;color:currentColor}',
+				'.ext-navCopy{min-width:0;display:flex;flex-direction:column;gap:2px}',
+				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}',
 				'.ext-navDesc{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
 				'.ext-soon{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-tertiary);padding:0 6px;font-size:10px;font-weight:500;line-height:16px;white-space:nowrap}',
+				'.ext-navSoonDot{position:absolute;right:-1px;top:-1px;width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-label-quaternary);border:1px solid var(--dsw-alias-bg-base)}',
+				'.ext-navCollapsed .ext-navTitle,.ext-navCollapsed .ext-navCopy{display:none}',
+				'.ext-navCollapsed .ext-navHead{justify-content:center;padding:0}',
+				'.ext-navCollapsed .ext-navToggle{margin-left:0}',
+				'.ext-navCollapsed .ext-navBtn{display:flex;align-items:center;justify-content:center;width:46px;min-height:44px;padding:10px 0}',
+				'.ext-navCollapsed .ext-navIcon{width:20px;height:20px}',
 				'.ext-main{flex:1;min-width:0;min-height:0;overflow:hidden;padding:20px 24px}',
 				'.ext-placeholder{max-width:520px;display:flex;flex-direction:column;gap:10px;padding:48px 0}',
 				'.ext-phIcon{color:var(--dsw-alias-label-quaternary)}',
 				'.ext-placeholder h3{margin:0;font-size:16px;font-weight:600}',
 				'.ext-placeholder p{margin:0;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.7}',
 				'.ext-phSoon{color:var(--dsw-alias-label-quaternary);font-size:12px}',
-				// ── DSH-008 V1: SKILL 管理中心 (项目管理 / 统一资源库) ─────────
+				// ── DSH-008 V1: per-project SKILL management ─────────────────
 				'.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%;max-width:1180px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
-				'.sk-tabs{display:flex;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2);flex:none}',
-				'.sk-tab{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:13px;font-weight:500;padding:8px 10px 10px;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:6px}',
-				'.sk-tab:hover{color:var(--dsw-alias-label-primary)}',
-				'.sk-tabActive{color:var(--dsw-alias-label-primary);font-weight:600;border-bottom-color:var(--dsw-alias-brand-primary)}',
-				'.sk-content{display:flex;flex:1;min-height:0}',
-				'.sk-contentDrawer .sk-projectCard{align-items:flex-start;flex-wrap:wrap}',
-				'.sk-contentDrawer .sk-projectIdentity{flex-basis:100%}',
-				'.sk-contentDrawer .sk-projectStats{padding-left:0;border-left:0}',
-				'.sk-contentDrawer .sk-projectActions{margin-left:auto}',
+				'.sk-content{position:relative;isolation:isolate;display:flex;flex:1;min-height:0}',
 				'.sk-listcol{flex:1;min-width:0;display:flex;flex-direction:column}',
-				'.sk-projectbar{display:flex;align-items:center;gap:10px;margin:14px 0 12px;flex-wrap:wrap;flex:none}',
 				'.sk-projectCard{display:flex;align-items:center;gap:18px;margin:14px 0 12px;padding:14px 16px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);flex:none}',
 				'.sk-projectIdentity{display:flex;align-items:flex-start;gap:10px;min-width:0;flex:1}',
 				'.sk-projectIcon{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;color:var(--dsw-alias-label-primary)}',
@@ -256,7 +264,7 @@
 				'.sk-bannerWarn{border-style:solid;border-color:var(--dsw-alias-state-warn-primary);color:var(--dsw-alias-label-secondary)}',
 				'.sk-slimNote{margin:0;font-size:11px;color:var(--dsw-alias-label-quaternary);line-height:1.55}',
 				// drawer
-				'.sk-drawer{flex:none;width:370px;max-width:46%;border-left:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);overflow-y:auto;display:flex;flex-direction:column}',
+				'.sk-drawer{position:absolute;z-index:20;inset:0 0 0 auto;width:min(400px,100%);max-width:none;border-left:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);box-shadow:-12px 0 32px rgba(0,0,0,.18);overflow-y:auto;display:flex;flex-direction:column}',
 				'.sk-drawerHead{display:flex;align-items:center;gap:9px;padding:14px 16px 10px;position:sticky;top:0;background:var(--dsw-alias-bg-base);z-index:2}',
 				'.sk-drawerHead .sk-ic{color:var(--dsw-alias-label-primary)}',
 				'.sk-drawerName{font-size:15px;font-weight:600;flex:1;min-width:0;overflow-wrap:anywhere}',
@@ -349,8 +357,8 @@
 				'.sk-presetSaveSummary{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l2);border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
 				'.sk-presetSaveSummary strong{font-weight:600;color:var(--dsw-alias-label-primary)}',
 				'.sk-presetSaveSummary span{font-size:11px;color:var(--dsw-alias-label-quaternary)}',
-				'@media(max-width:900px){.ext-nav{width:138px;padding:10px}.ext-main{padding:16px}.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-content{position:relative}.sk-drawer{position:absolute;z-index:20;inset:0 0 0 auto;width:min(420px,100%);max-width:none;box-shadow:-12px 0 32px rgba(0,0,0,.18)}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
-				'@media(max-width:680px){.ext-nav{display:none}.ext-main{padding:12px}.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}.sk-tabs{padding-left:0}}',
+				'@media(max-width:900px){.ext-nav:not(.ext-navCollapsed){width:168px;padding:10px}.ext-main{padding:16px}.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
+				'@media(max-width:680px){.ext-nav{display:none}.ext-main{padding:12px}.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}}',
 				'@media(max-width:600px){[role="dialog"]:has(.sk-presetApply),[role="dialog"]:has(.sk-presetSave){width:calc(100vw - 24px)}.sk-presetApply,.sk-presetSave{width:auto}.sk-presetMode{grid-template-columns:1fr}.sk-presetImpact{align-items:flex-start;flex-direction:column;gap:3px}.sk-presetFooter{flex-wrap:wrap}.sk-presetFooterLeft{width:100%}}',
 				'@media(max-width:480px){.ext-top{padding:12px}.ext-topTitle{white-space:nowrap}.ext-topSub{display:none}.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}'
 			].join('');
@@ -1136,7 +1144,7 @@
 				);
 			}
 
-			// ── DSH-008 V1: SKILL 管理中心（项目管理 / 统一资源库）────────────
+			// ── DSH-008 V1: per-project SKILL management ─────────────────
 			/** Build the project options: current session workspace + DSH workspaces. */
 			function buildProjectOptions(ctx) {
 				var out = [];
@@ -1200,7 +1208,6 @@
 			 */
 			function SkillCenterV1Body(props) {
 				var ctx = props.ctx;
-				var [activePage, setActivePage] = React.useState('project'); // 'project' | 'library'
 				var [projects, setProjects] = React.useState([]);
 				var [project, setProject] = React.useState(null); // { cwd, title, kind }
 				var [projMenuOpen, setProjMenuOpen] = React.useState(false);
@@ -1619,10 +1626,8 @@
 				var visibleRows = [];
 				if (view !== null) {
 					visibleRows = view.identities.filter(matchesSearch);
-					if (activePage === 'project') {
-						if (enableFilter === 'on') visibleRows = visibleRows.filter(function (r) { return r.enabled === true; });
-						if (enableFilter === 'off') visibleRows = visibleRows.filter(function (r) { return r.enabled !== true; });
-					}
+					if (enableFilter === 'on') visibleRows = visibleRows.filter(function (r) { return r.enabled === true; });
+					if (enableFilter === 'off') visibleRows = visibleRows.filter(function (r) { return r.enabled !== true; });
 					if (tagFilter !== null) {
 						visibleRows = visibleRows.filter(function (r) { return Array.isArray(r.tags) && r.tags.indexOf(tagFilter) !== -1; });
 					}
@@ -1671,16 +1676,15 @@
 				function rowEl(row) {
 					var off = row.enabled !== true;
 					var checked = selectedRows[row.name] === true;
-					var isProjectPage = activePage === 'project';
 					return h(
 						'div',
 						{
 							key: row.name,
 							className: 'sk-row' + (drawerName === row.name ? ' sk-rowActive' : '')
-								+ (isProjectPage && row.enabled === true ? ' sk-rowEnabled' : '')
-								+ (off && isProjectPage ? ' sk-rowOff' : ''),
+								+ (row.enabled === true ? ' sk-rowEnabled' : '')
+								+ (off ? ' sk-rowOff' : ''),
 						},
-						isProjectPage && bulkMode
+						bulkMode
 							? h('input', {
 								type: 'checkbox',
 								className: 'sk-check' + (checked ? ' sk-checkOn' : ''),
@@ -1725,7 +1729,7 @@
 								row.sources.length > 1
 									? h('span', { className: 'sk-badge', title: '该 Skill 存在多个来源，可在详情中选择' }, '来源 ×' + row.sources.length)
 									: null,
-								isProjectPage && off
+								off
 									? h('span', { className: 'sk-badge', title: '本项目未启用：模型不会自动调用，仍可用 /' + row.name + ' 手动调用' }, '未启用')
 									: null
 							),
@@ -1735,7 +1739,7 @@
 								: null
 							)
 						),
-						h('div', { className: 'sk-rowSide' }, isProjectPage && !bulkMode ? switchV1(row) : null)
+						h('div', { className: 'sk-rowSide' }, !bulkMode ? switchV1(row) : null)
 					);
 				}
 				function drawerEl() {
@@ -1782,9 +1786,8 @@
 						h(
 							'div',
 							{ className: 'sk-drawerBody' },
-							activePage === 'project'
-								? h(
-									'div',
+							h(
+								'div',
 									{ className: 'sk-drawerRow' },
 									h(
 										'div',
@@ -1793,8 +1796,7 @@
 										h('div', { className: 'sk-slimNote' }, '关闭后模型在本项目不再自动调用，仍可用 /' + row.name + ' 手动调用；下一轮对话生效')
 									),
 									switchV1(row)
-								)
-								: null,
+								),
 							h(
 								'div',
 								{ className: 'sk-sec' },
@@ -2005,26 +2007,11 @@
 					: null,
 					h(
 						'div',
-						{ className: 'sk-tabs', role: 'tablist' },
-						h('button', {
-							type: 'button', role: 'tab', 'aria-selected': activePage === 'project',
-							className: 'sk-tab' + (activePage === 'project' ? ' sk-tabActive' : ''),
-							onClick: function () { setActivePage('project'); setSelectedRows({}); setBulkMode(false); }
-						}, '项目管理'),
-						h('button', {
-							type: 'button', role: 'tab', 'aria-selected': activePage === 'library',
-							className: 'sk-tab' + (activePage === 'library' ? ' sk-tabActive' : ''),
-							onClick: function () { setActivePage('library'); setSelectedRows({}); setBulkMode(false); }
-						}, '统一资源库')
-					),
-					h(
-						'div',
-						{ className: 'sk-content' + (drawerName !== null ? ' sk-contentDrawer' : '') },
+						{ className: 'sk-content' },
 						h(
 							'div',
 							{ className: 'sk-listcol' },
-							activePage === 'project'
-								? h(
+							h(
 									'div',
 									{ className: 'sk-projectCard' },
 									h(
@@ -2099,16 +2086,6 @@
 												: null
 											)
 									)
-								)
-								: h(
-									'div',
-									{ className: 'sk-projectbar' },
-									h('span', { className: 'sk-projLabel' }, '资源库范围'),
-									h('span', { className: 'sk-menuHint', style: { whiteSpace: 'normal' } },
-										'全部 DSH 支持目录中的 Skill（同名已合并）；来源选择与开关作用于所选项目'),
-									project
-										? h('span', { className: 'sk-chip', title: project.cwd }, '项目：' + project.title)
-										: null
 								),
 							h(
 								'div',
@@ -2124,20 +2101,18 @@
 										onChange: function (event) { setSearch(event.target.value); setSelectedRows({}); }
 									})
 								),
-								activePage === 'project'
-									? h(
-										'div',
-										{ className: 'sk-filters' },
-										[['all', '全部', totalCount], ['on', '已启用', enabledCount], ['off', '未启用', disabledCount]].map(function (f) {
-											return h('button', {
-												type: 'button',
-												key: f[0],
-												className: 'sk-filterBtn' + (enableFilter === f[0] ? ' sk-filterBtnActive' : ''),
-												onClick: function () { setEnableFilter(f[0]); setSelectedRows({}); }
-											}, f[1], h('span', { className: 'sk-filterCount' }, f[2]));
-										})
-									)
-									: null,
+								h(
+									'div',
+									{ className: 'sk-filters' },
+									[['all', '全部', totalCount], ['on', '已启用', enabledCount], ['off', '未启用', disabledCount]].map(function (f) {
+										return h('button', {
+											type: 'button',
+											key: f[0],
+											className: 'sk-filterBtn' + (enableFilter === f[0] ? ' sk-filterBtnActive' : ''),
+											onClick: function () { setEnableFilter(f[0]); setSelectedRows({}); }
+										}, f[1], h('span', { className: 'sk-filterCount' }, f[2]));
+									})
+								),
 								h(
 									'div',
 									{ style: { position: 'relative' } },
@@ -2169,7 +2144,7 @@
 										: null
 								),
 							h('span', { className: 'sk-spacer' }),
-							activePage === 'project' && bulkMode
+							bulkMode
 								? h('label', { className: 'sk-selectVisible' },
 									h('input', {
 										type: 'checkbox',
@@ -2181,8 +2156,7 @@
 									'全选当前结果',
 									visibleRows.length > 0 ? h('span', { className: 'sk-filterCount' }, visibleRows.length) : null)
 								: null,
-							activePage === 'project'
-								? h('button', {
+							h('button', {
 									type: 'button',
 									className: 'sk-chip' + (bulkMode ? ' sk-chipDef' : ''),
 									'aria-pressed': bulkMode,
@@ -2192,17 +2166,14 @@
 										setSelectedRows({});
 										setBulkMode(!bulkMode);
 									}
-								}, bulkMode ? '完成' : '批量管理')
-								: null,
-								activePage === 'project'
-									? h('button', {
+							}, bulkMode ? '完成' : '批量管理'),
+								h('button', {
 										type: 'button',
 										className: 'sk-chip',
 									disabled: project === null || viewBusy === true || (view !== null && enabledCount === 0) || (view && (view.configCorrupt === true || view.configFuture === true)),
 										title: '存在默认精简预设时按预设精简；否则关闭全部启用',
 										onClick: doSlimPreview
-									}, '一键精简')
-									: null
+								}, '一键精简')
 							),
 							bulkMode
 								? h('div', { className: 'sk-batchHint', role: 'status' }, '批量管理模式：勾选 Skill 后统一启用或停用，右侧单项开关已暂时隐藏。')
@@ -2223,13 +2194,13 @@
 										search !== '' || tagFilter !== null || enableFilter !== 'all'
 											? h('button', { type: 'button', className: 'sk-chip', onClick: function () { setSearch(''); setTagFilter(null); setEnableFilter('all'); } }, '查看全部 Skill')
 											: null,
-										recommendedPreset !== null && activePage === 'project'
+										recommendedPreset !== null
 											? h('button', { type: 'button', className: 'sk-chip', onClick: function () { openPreset(recommendedPreset); } }, '应用推荐预设')
 											: null))
 								: null,
 							visibleRows.map(rowEl)
 						),
-						activePage === 'project' && bulkMode && selectedCount > 0
+						bulkMode && selectedCount > 0
 							? h('div', { className: 'sk-bulkbar', role: 'region', 'aria-label': '批量操作' },
 								h('strong', null, '已选择 ' + selectedCount + ' 项'),
 								h('span', { className: 'sk-slimNote' }, '更改仅作用于 ' + (project ? project.title : '当前项目')),
@@ -2241,13 +2212,11 @@
 							h(
 								'div',
 								{ className: 'sk-footer' },
-								activePage === 'project'
-									? (view && view.projectRoot
-										? h('span', null, '项目配置保存于 ', h('code', null, view.projectRoot), '/.dsh/skill-manager.json，仅在本机使用且不提交 Git；启停在下一轮对话生效')
-										: h('span', null, '未选择项目：仅显示用户级与内置 Skill'))
-									: h('span', null, '默认优先级：项目专属 > DSH 用户级 > 其他全局 > 内置；未显式选择时使用第一个可用来源'),
+								view && view.projectRoot
+									? h('span', null, '项目配置保存于 ', h('code', null, view.projectRoot), '/.dsh/skill-manager.json，仅在本机使用且不提交 Git；启停在下一轮对话生效')
+									: h('span', null, '未选择项目：仅显示用户级与内置 Skill'),
 								h('span', null, '共 ' + (view ? view.identities.length : 0) + ' 个 Skill'
-									+ (activePage === 'project' && view ? ' · 已启用 ' + enabledCount + ' 个' : ''))
+									+ (view ? ' · 已启用 ' + enabledCount + ' 个' : ''))
 							)
 						),
 						drawerName !== null ? drawerEl() : null
@@ -2419,7 +2388,7 @@
 						'div',
 						{ className: 'smgr' },
 						h('p', { className: 'sk-banner' },
-							'当前 dsh web 尚未加载 DSH-008 的 host 接口（apiVersion 6）。重启 dsh web 后即可使用新版 SKILL 管理中心（项目管理 / 统一资源库）；现在显示旧版界面。'),
+							'当前 dsh web 尚未加载 DSH-008 的 host 接口（apiVersion 6）。重启 dsh web 后即可使用新版项目 SKILL 管理中心；现在显示旧版界面。'),
 						h(SkillManagerSection, { api: api })
 					);
 				}
@@ -2449,10 +2418,14 @@
 			}
 
 			var EXT_TABS = [
-				{ id: 'skill', label: 'SKILL', desc: 'Skills 技能管理' },
-				{ id: 'mcp', label: 'MCP', desc: 'Model Context Protocol 服务器', soon: true },
-				{ id: 'plugin', label: 'Plugin', desc: '已安装插件', soon: true }
+				{ id: 'skill', label: 'SKILL', desc: 'Skills 技能管理', icon: P.IconSkillOutline16 },
+				{ id: 'mcp', label: 'MCP', desc: 'Model Context Protocol 服务器', soon: true, icon: P.IconLinkOutline16 },
+				{ id: 'plugin', label: 'Plugin', desc: '已安装插件', soon: true, icon: P.IconCordisPluginOutline14 }
 			];
+			function readExtNavCollapsed() {
+				try { return window.localStorage.getItem('smgr.ext.navCollapsed') === '1'; }
+				catch (error) { return false; }
+			}
 
 			function ExtPlaceholder(props) {
 				return h(
@@ -2480,6 +2453,12 @@
 				var onCloseRef = React.useRef(onClose);
 				onCloseRef.current = onClose;
 				var [tab, setTab] = React.useState('skill');
+				var [navCollapsed, setNavCollapsed] = React.useState(readExtNavCollapsed);
+				function toggleNav() {
+					var next = !navCollapsed;
+					setNavCollapsed(next);
+					try { window.localStorage.setItem('smgr.ext.navCollapsed', next ? '1' : '0'); } catch (error) {}
+				}
 				React.useEffect(function () {
 					function onKey(event) {
 						if (event.key !== 'Escape') return;
@@ -2505,25 +2484,50 @@
 						{ className: 'ext-body' },
 						h(
 							'nav',
-							{ className: 'ext-nav', 'aria-label': '扩展类型' },
-							EXT_TABS.map(function (t) {
-								return h(
-									'button',
-									{
-										key: t.id,
-										type: 'button',
-										className: 'ext-navBtn' + (tab === t.id ? ' ext-navBtnActive' : ''),
-										onClick: function () { setTab(t.id); }
-									},
-									h(
-										'span',
-										{ className: 'ext-navLabel' },
-										t.label,
-										t.soon ? h('span', { className: 'ext-soon' }, '建设中') : null
-									),
-									h('span', { className: 'ext-navDesc' }, t.desc)
-								);
-							})
+							{ className: 'ext-nav' + (navCollapsed ? ' ext-navCollapsed' : ''), 'aria-label': '扩展类型' },
+							h(
+								'div',
+								{ className: 'ext-navHead' },
+								h('span', { className: 'ext-navTitle' }, '扩展类型'),
+								h('button', {
+									type: 'button',
+									className: 'ext-navToggle',
+									'aria-label': navCollapsed ? '展开扩展类型导航' : '收起扩展类型导航',
+									'aria-expanded': !navCollapsed,
+									title: navCollapsed ? '展开导航' : '收起导航',
+									onClick: toggleNav
+								}, h(navCollapsed ? P.IconChevronRightOutline14 : P.IconChevronLeftOutline14))
+							),
+							h(
+								'div',
+								{ className: 'ext-navList' },
+								EXT_TABS.map(function (t) {
+									return h(
+										'button',
+										{
+											key: t.id,
+											type: 'button',
+											className: 'ext-navBtn' + (tab === t.id ? ' ext-navBtnActive' : ''),
+											'aria-label': t.label + (t.soon ? '（建设中）' : ''),
+											title: navCollapsed ? t.label + (t.soon ? '（建设中）' : '') : undefined,
+											onClick: function () { setTab(t.id); }
+										},
+										h('span', { className: 'ext-navIcon' }, h(t.icon),
+											navCollapsed && t.soon ? h('span', { className: 'ext-navSoonDot', 'aria-hidden': true }) : null),
+										h(
+											'span',
+											{ className: 'ext-navCopy' },
+											h(
+												'span',
+												{ className: 'ext-navLabel' },
+												t.label,
+												t.soon ? h('span', { className: 'ext-soon' }, '建设中') : null
+											),
+											h('span', { className: 'ext-navDesc' }, t.desc)
+										)
+									);
+								})
+							)
 						),
 						h(
 							'main',

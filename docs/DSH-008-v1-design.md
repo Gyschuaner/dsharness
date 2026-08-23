@@ -19,8 +19,8 @@
 | S4 | 全局标签 | 全局配置 `tags`（按 skill 身份）；catalog 行携带；两子页面同步展示与筛选 | 单测 + DOM 测试：持久化、两页同步 |
 | S5 | 自定义预设 | 全局配置 `presets`（只存 skill 身份 + 所选通用来源，不锁版本、不携特化）；保存/删除/预览（准确 diff）/应用（替换或合并）；「一键精简」= 应用默认精简预设（无默认预设时 = 全关预览） | 单测：diff 正确性、替换/合并语义、默认精简集唯一性 |
 | S6 | Host API v6 与兼容 | 保留全部旧 op（list/read/save/delete/import/exportZip/setStatus/getPolicy/setPolicy 行为不变）；新增 `catalog / projectState / setEnabled / setMany / setSource / setTags / presets.list / presets.save / presets.delete / presets.preview / presets.apply / slim.preview / slim.apply`；apiVersion 5→6 | 单测：旧 op 回归 + 新 op 契约 + 旧 Client 字段兼容 |
-| S7 | Client 项目管理页 | 双页导航（项目管理默认/统一资源库）；左栏（当前项目下拉、最近打开、添加本地项目、自定义预设）；列表（搜索/已启用/未启用/全部标签/批量精简/批量启停）；行（图标、名称、项目特化/可更新徽标、标签、完整 description、开关）；右抽屉（描述、当前来源、可选来源、标签编辑、启用状态、附属文件、特化=后续能力）；旧 Host（apiVersion<6）降级为原 UI | DOM 集成测试：渲染、筛选、开关、抽屉、预设预览、事件隔离 |
-| S8 | Client 统一资源库页 | 全来源合并身份列表（来源数徽标）；抽屉列出全部真实来源 + 当前项目来源选择；标签筛选/编辑；搜索 | DOM 集成测试 |
+| S7 | Client 项目管理页 | 单页项目管理；列表（搜索/已启用/未启用/全部标签/批量精简/批量启停）；行（图标、名称、项目特化/可更新/来源数徽标、标签、完整 description、开关）；覆盖式右抽屉（描述、当前来源、全部可选来源、标签编辑、启用状态、附属文件、特化=后续能力）；旧 Host（apiVersion<6）降级为原 UI | DOM 集成测试：渲染、筛选、开关、抽屉、预设预览、事件隔离、布局类不变 |
+| S8 | Client 来源合并 | 全来源在项目管理单页合并为身份列表（来源数徽标）；抽屉列出全部真实来源 + 当前项目来源选择；标签筛选/编辑；搜索；不再提供重复的统一资源库子页面 | DOM 集成测试 |
 | S9 | 验证与 QA | 全部 `node --test` 通过；client bundle 语法检查；重启 dsh web 验证 apiVersion 6；HTTP 冒烟；视觉对照（可执行部分）；`design-qa.md` | 测试报告 + HTTP 响应 + 截图对照（用户侧） |
 | S10 | 回写与交付 | DP 任务/用例执行/SIT 流转；飞书技术文档 + `dp document ensure`；Obsidian 研发记录；Git 提交（含 DSH-008） | DP 查询验证 |
 
@@ -117,8 +117,8 @@
 
 ### 2.7 Client（handoff §9.5 + 视觉稿）
 
-- 入口不变：`sidebar.footer.action`「扩展」全页；SKILL tab 内变为两个一级子页面（项目管理默认 / 统一资源库），MCP/Plugin 占位不变。
-- 状态：`activePage / selectedProject / selectedSkill / search / enableFilter / tagFilter / selectedRows / presetPreview / slimPreview / drawer`；页面/项目/抽屉切换清理无效选中；行点击与开关点击 `stopPropagation` 防串扰；description 完整多行、不截断不翻译。
+- 入口不变：`sidebar.footer.action`「扩展」全页；SKILL 直接进入项目管理单页，来源合并/切换内聚到列表与详情；MCP/Plugin 占位不变。左侧扩展类型导航可收起为 64px 图标栏并记住浏览器本地状态。
+- 状态：`selectedProject / selectedSkill / search / enableFilter / tagFilter / selectedRows / presetPreview / slimPreview / drawer`；项目/抽屉切换清理无效选中；行点击与开关点击 `stopPropagation` 防串扰；description 完整多行、不截断不翻译。
 - **项目切换与过期响应丢弃（P1-5）**：`genRef`（单调递增 view 代）+ `projectRef`（当前项目 ref）。`chooseProject` 切换项目时递增 `genRef` 并清空 `view/viewError/drawer/selectedRows/toggling/sourceBusy/presetModal/slimModal` + `viewBusy`；`loadView` 捕获 `gen` 与 `cwd`，仅当代号一致时落地结果，慢 catalog 永不覆盖新项目的 view。所有写操作（`doToggle`/`doBulk`/`doSource`/`doTags`/`applyPreset`/`doSlimApply`）在发起时捕获 `proj` 快照与 `gen`，响应到达当代号不一致（项目已切换）则丢弃（不 patch、不刷新），一致才应用 + `partial` 警告 + `loadView(proj)`；`viewBusy`/`configCorrupt`/`configFuture` 期间写操作禁用。
 - 项目选择：`ctx.get('sessions')` 当前会话 cwd 为默认项目；`ctx.get('workspaces').list.getSnapshot()` 提供最近打开（`items` 按 `updatedAt` 降序，按 projectRoot 去重）；「添加本地项目」优先 `workspaces.pickDirectory()` + `workspaces.create({path})`，能力缺失/取消时降级为手动路径输入（能力不存在时安全降级，handoff §9.5）。
 - 旧 Host 降级：`apiVersion < 6` → 渲染原 `SkillManagerSection`（保留为 legacy 组件）+ 顶部「重启 dsh web 后启用新版」提示条。
@@ -128,9 +128,9 @@
 ### 2.8 测试策略
 
 - **Host**：`test/skill-manager.test.js`（node:test + 临时目录 + homedir 注入，不碰真实 `~/.dsh`），覆盖 handoff §12 自动化清单全部条目 + 旧 op 回归。
-- **Client**：`test/client.dom.test.js`（jsdom + 上游 node_modules 的 React 18.3.1 + fetch 桩 + `__ModuleLoader__` 桩）加载真实 `client.js` bundle，断言真实渲染/交互：双页切换、项目选择、搜索/筛选、开关写盘、抽屉打开/来源选择/标签编辑、预设预览 diff、旧 Host 降级、事件隔离。
+- **Client**：`test/client.dom.test.js`（jsdom + 上游 node_modules 的 React 18.3.1 + fetch 桩 + `__ModuleLoader__` 桩）加载真实 `client.js` bundle，断言真实渲染/交互：单页项目管理、可收起导航及重开持久化、项目选择、搜索/筛选、开关写盘、覆盖式抽屉/来源选择/标签编辑、预设预览 diff、旧 Host 降级、事件隔离。
 - **运行时**：重启后 `POST /api/skill-manager` 验证 apiVersion 6；client bundle 伺服内容 = 仓库文件（逐字节）。
-- **浏览器**：在内置浏览器直接验收 `http://127.0.0.1:3080/`；确认扩展 Slot 实际挂载、项目管理 / 统一资源库双页、完整 description、Cordis 两个 Skill、详情来源区与 V1.2 特化占位，检查 console 无新增页面错误。写操作与乱序响应由可重复的 Client DOM 套件覆盖。
+- **浏览器**：在内置浏览器直接验收 `http://127.0.0.1:3080/`；确认扩展 Slot 实际挂载、项目管理单页、完整 description、Cordis 两个 Skill、详情来源区与 V1.2 特化占位、抽屉打开前后列表几何尺寸不变，以及左导航收起/刷新保留/展开，检查 console 无新增页面错误。写操作与乱序响应由可重复的 Client DOM 套件覆盖。
 
 ## 3. 执行顺序与依赖
 
@@ -165,3 +165,12 @@ S9/S10 贯穿：DP 任务描述随进度更新；用例执行记录在验证证�
 - 已启用行使用品牌蓝与页面模块底色混合得到的淡蓝底色，并继续保留 `switch`、项目卡已启用数量和带数量的状态筛选，避免只依赖颜色传达状态。
 - 「已启用 / 未启用」保留为用户主动选择的可选筛选，不再在「全部」视图中强制形成两个工作区；批量管理、预设、来源和逐项目配置语义保持不变。
 - Client DOM 回归新增交错启用状态的顺序、连续启用、滚动位置、淡蓝状态样式及开关状态断言。
+
+## 7. 2026-08-23 build 18：单页信息架构与不挤压详情
+
+- 对应 DP Bug `BUG-3BB3965F`：实机审计确认“统一资源库”与项目管理使用同一份合并 catalog、相同搜索/标签能力，唯一有价值的来源选择已存在于详情，因此移除重复子页签，直接进入项目 Skill 管理。
+- 详情抽屉在所有桌面宽度下改为 `position:absolute` 的 400px 覆盖层；不再给 `.sk-content` 添加会触发项目卡片换行的 drawer 状态类，也不再作为 flex 子项压缩列表。
+- 左侧扩展类型导航使用官方 Skill、Link、Cordis Plugin 与 Chevron 图标，支持 208px 完整态和 64px 图标态；按钮保留 `aria-label`/`title`，收起状态通过 `smgr.ext.navCollapsed` 在浏览器本地保存。
+- 内置浏览器 1252×900 实测：抽屉打开前后列表、项目卡片、工具栏均保持 `997.33px` 宽且 x 坐标同为 `232px`；Cordis Skill 详情仍展示 3 个来源单选项；导航刷新后保持 64px 收起态，展开后恢复 208px。
+- 自动化：56 项，52 pass / 0 fail / 4 skip；新增单页结构、覆盖式 CSS/稳定布局类、导航图标、收起/重开持久化与展开回归。截图见 `artifacts/design-qa/skill-manager-build18/`。
+- 测试用例 `56a9d807-3e49-4596-85f1-063c87d6c278` 已加入计划 `d53a9a04-0c07-4142-a01a-d866207d56d4`；`dp testplan execute` 仍命中平台既有“用例号校验失败”，本次追踪号 `7265b026-901a-4411-9bf3-8763d7c14a47`，因此只保留可复验的自动化与浏览器证据，不伪造 DP passed 执行记录。

@@ -220,7 +220,7 @@ async function makeHarness(router, { current = '/project-a', workspaces = [] } =
 	return { dom, click, flush, button, open, cleanup };
 }
 
-test('real client bundle renders both pages, full descriptions, guarded update badge, drawer and actions', async (t) => {
+test('real client bundle renders the single project view, full descriptions, overlay drawer and actions', async (t) => {
 	const calls = [];
 	let currentRow = row('alpha-skill', '完整 description：这一整段内容必须原样展示，不能省略。', {
 		sources: [
@@ -249,12 +249,18 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	const h = await makeHarness(router);
 	t.after(h.cleanup);
 	await h.open();
-	assert.ok(h.button('项目管理'));
-	assert.ok(h.button('统一资源库'));
+	assert.equal(h.dom.window.document.querySelector('.sk-tabs'), null, 'redundant SKILL sub-page tabs are removed');
+	assert.equal(h.dom.window.document.querySelector('[role="tablist"]'), null);
+	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));
 	assert.ok(h.dom.window.document.body.textContent.includes('仅在本机使用且不提交 Git'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('可纳入 Git 版本管理'));
+	const pluginCss = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
+	assert.ok(pluginCss.includes('.sk-drawer{position:absolute'), 'drawer is an overlay instead of a flex sibling');
+	assert.ok(!pluginCss.includes('.sk-contentDrawer .sk-projectCard'), 'drawer no longer forces project-card wrapping');
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, currentRow.description);
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-badgeUpdate')].length, 1);
+	assert.ok(h.dom.window.document.body.textContent.includes('来源 ×2'), 'merged source identity remains in the project list');
+	const contentClassBeforeDrawer = h.dom.window.document.querySelector('.sk-content').className;
 
 	const rowOpen = h.dom.window.document.querySelector('.sk-rowOpen');
 	await act(async () => {
@@ -268,6 +274,7 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 		rowOpen.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
 	});
 	assert.ok(h.dom.window.document.querySelector('.sk-drawer'), 'Space opens the Skill drawer');
+	assert.equal(h.dom.window.document.querySelector('.sk-content').className, contentClassBeforeDrawer, 'drawer does not mutate the list layout class');
 	assert.equal(h.dom.window.document.querySelector('.sk-descFull').textContent, currentRow.description);
 	assert.equal(h.dom.window.document.querySelector('.smgr-switch').getAttribute('role'), 'switch');
 	assert.equal(h.dom.window.document.querySelector('.sk-srcList').getAttribute('role'), 'radiogroup');
@@ -314,10 +321,6 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	assert.equal(h.dom.window.document.querySelector('.sk-drawer'), null, 'first Esc closes only the drawer');
 	assert.ok(h.dom.window.document.querySelector('.ext-page'), 'Extensions page remains open');
 
-	await h.click(h.button('统一资源库'));
-	assert.equal(h.dom.window.document.querySelector('[role="tab"][aria-selected="true"]').textContent, '统一资源库');
-	assert.ok(h.dom.window.document.body.textContent.includes('来源 ×2'));
-	await h.click(h.button('项目管理'));
 	await h.click(h.button('应用推荐预设'));
 	await h.flush();
 	assert.ok(h.dom.window.document.querySelector('.test-modal'));
@@ -340,6 +343,39 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-presetCounter')].map((item) => item.textContent), ['0/64', '0/200']);
 	await h.click(h.button('取消'));
 	assert.equal(h.dom.window.document.querySelector('.sk-presetSave'), null);
+});
+
+test('extension type navigation collapses to icons and persists across reopen', async (t) => {
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return view('/project-a', [row('alpha-skill', 'alpha')]);
+		if (body.op === 'presets.list') return { presets: [] };
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.open();
+	assert.ok(!h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
+	assert.equal(h.dom.window.document.querySelectorAll('.ext-navIcon [data-icon="1"]').length, 3);
+	const collapse = h.dom.window.document.querySelector('button[aria-label="收起扩展类型导航"]');
+	assert.equal(collapse.getAttribute('aria-expanded'), 'true');
+	await h.click(collapse);
+	assert.ok(h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
+	assert.equal(h.dom.window.localStorage.getItem('smgr.ext.navCollapsed'), '1');
+	assert.deepEqual(
+		[...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.getAttribute('title')),
+		['SKILL', 'MCP（建设中）', 'Plugin（建设中）'],
+	);
+
+	await h.click(h.dom.window.document.querySelector('.ext-close'));
+	assert.equal(h.dom.window.document.querySelector('.ext-page'), null);
+	await h.open();
+	assert.ok(h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'), 'collapsed state survives page remount');
+	const expand = h.dom.window.document.querySelector('button[aria-label="展开扩展类型导航"]');
+	assert.equal(expand.getAttribute('aria-expanded'), 'false');
+	await h.click(expand);
+	assert.ok(!h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
+	assert.equal(h.dom.window.localStorage.getItem('smgr.ext.navCollapsed'), '0');
 });
 
 test('current workspace wins; enabled rows stay in catalog order and bulk selection remains counted', async (t) => {
