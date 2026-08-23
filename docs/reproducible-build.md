@@ -268,3 +268,12 @@ Markdown 行，完成和刷新后保留完整 Markdown 工具结果。会话视�
 独立副本、独占发布、完整性复核和只读权限；聚焦回归 131 条通过（另 1 条 Windows
 符号链接夹具跳过），TypeScript、全仓 lint 和官方 Host/Client/Web 构建通过。最终
 tree 更新为 `00939824bca71da4be792e11369cf6641f637b71`。
+
+生产发布于 2026-08-23 完成：功能分支以合并提交
+`c805c3e02f52b359e3693c29801c349adc8f392b` 进入并推送 `main`，随后从锁定的
+`dsh-v0.1.1-rc.2` 基线完整回放 24 个补丁，精确命中上述 tree，并完成 frozen install
+及 Host/Client/Web 构建。3080 使用 `dev/vision-bridge.dp-gateway.patch.yml` 启动，
+HTTP、skill-manager API v6 和生产视觉链路均通过。实际上传图片后，持久 reminder
+记录会话隔离的 `local_path`；`vision_inspect` 返回 Markdown，刷新后 reminder、Look
+和最终回答继续保留。DP 部署记录为 `dsh-local-20260823-c805c3e`；回滚时将全局 `dsh`
+重新链接到上一版 DSH-023 构建目录，并用相同视觉桥覆盖参数重启。
