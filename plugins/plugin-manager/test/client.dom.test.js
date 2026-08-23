@@ -41,6 +41,16 @@ function jsonResponse(value, status = 200) {
 	};
 }
 
+function deferred() {
+	let resolveValue;
+	let rejectValue;
+	const promise = new Promise((resolve, reject) => {
+		resolveValue = resolve;
+		rejectValue = reject;
+	});
+	return { promise, resolve: resolveValue, reject: rejectValue };
+}
+
 function localPlugin(name, overrides = {}) {
 	return Object.assign({
 		name,
@@ -168,12 +178,14 @@ async function makeHarness(router) {
 		await act(async () => { element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })); });
 	}
 	async function flush() { await act(async () => { await new Promise((resolveValue) => setTimeout(resolveValue, 0)); }); }
+	async function pause(ms) { await act(async () => { await new Promise((resolveValue) => setTimeout(resolveValue, ms)); }); }
 	function button(text) { return [...dom.window.document.querySelectorAll('button')].find((item) => item.textContent.trim() === text); }
-	async function openPlugin() {
+	async function openPlugin(waitForReady = true) {
 		await click(dom.window.document.querySelector('.ext-trigger'));
 		await flush();
 		await click(button('Plugin'));
 		await flush(); await flush();
+		if (waitForReady) { await pause(700); await flush(); }
 	}
 	async function cleanup() {
 		await act(async () => reactRoot.unmount());
@@ -183,8 +195,72 @@ async function makeHarness(router) {
 			else globalThis[key] = value;
 		}
 	}
-	return { dom, click, flush, button, openPlugin, cleanup, registrations };
+	return { dom, click, flush, pause, button, openPlugin, cleanup, registrations };
 }
+
+test('initial Plugin load uses the branded module assembly state and reduced-motion fallback', async (t) => {
+	const local = deferred();
+	const market = deferred();
+	const router = async (body) => {
+		if (body.op === 'list') return local.promise;
+		if (body.op === 'marketplace') return market.promise;
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.openPlugin(false);
+
+	const loading = h.dom.window.document.querySelector('.pm-loadingState');
+	assert.ok(loading, 'initial request renders a dedicated Plugin loading state');
+	assert.equal(loading.getAttribute('role'), 'status');
+	assert.equal(loading.getAttribute('aria-live'), 'polite');
+	assert.equal(loading.getAttribute('aria-atomic'), 'true');
+	assert.equal(h.dom.window.document.querySelector('.pm-loadingVisual').getAttribute('aria-hidden'), 'true');
+	assert.equal(h.dom.window.document.querySelectorAll('.pm-loadingModule').length, 4);
+	assert.equal(h.dom.window.document.querySelectorAll('.pm-loadingModuleAccent').length, 1);
+	assert.ok(h.dom.window.document.querySelector('.pm-loadingCore [data-icon="1"]'), 'loading state uses the official Cordis Plugin icon');
+	assert.equal(h.dom.window.document.querySelector('.pm-loadingLabel').textContent, 'Plugin Loading');
+	assert.equal(h.dom.window.document.querySelector('.pm-loadingLabel').getAttribute('data-text'), 'Plugin Loading');
+	assert.ok(h.dom.window.document.querySelector('.pm-head'), 'stable page chrome stays visible like Skill Finding');
+
+	const css = h.dom.window.document.querySelector('style[data-plugin="dsh-plugin-manager"]').textContent;
+	assert.ok(css.includes('@keyframes pm-loadingNorthWest'));
+	assert.ok(css.includes('@keyframes pm-loadingCore'));
+	assert.ok(css.includes('@keyframes pm-loadingTextFocus'));
+	assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'));
+
+	local.resolve({ apiVersion: 1, plugins: [localPlugin('dsh-plugin-manager', { protected: true })] });
+	market.resolve({ apiVersion: 1, items: [] });
+	await h.pause(700);
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelector('.pm-loadingState'), null);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-row').length, 1);
+});
+
+test('Plugin loading exits to a retryable error and retry restores the real list', async (t) => {
+	let listAttempts = 0;
+	const router = async (body) => {
+		if (body.op === 'list') {
+			listAttempts += 1;
+			if (listAttempts === 1) throw new Error('profile unavailable');
+			return { apiVersion: 1, plugins: [localPlugin('dsh-plugin-manager', { protected: true })] };
+		}
+		if (body.op === 'marketplace') return { apiVersion: 1, items: [] };
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.openPlugin();
+	assert.equal(h.dom.window.document.querySelector('.pm-loadingState'), null);
+	assert.ok(h.dom.window.document.querySelector('[role="alert"]').textContent.includes('profile unavailable'));
+	assert.ok(h.button('重试'));
+	await h.click(h.button('重试'));
+	assert.ok(h.dom.window.document.querySelector('.pm-loadingState'));
+	await h.pause(700);
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelector('.pm-loadingState'), null);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-row').length, 1);
+});
 
 test('real Plugin contribution replaces the placeholder and renders the denoised local page', async (t) => {
 	let plugins = [

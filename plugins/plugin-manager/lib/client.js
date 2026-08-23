@@ -1,5 +1,5 @@
 /**
- * dsh-plugin-manager — Client half (DSH-027, build 1).
+ * dsh-plugin-manager — Client half (DSH-027, build 2).
  *
  * Plain JavaScript classic bundle: no JSX, TypeScript or imports. The plugin
  * contributes only the Plugin business section to dsh-extension-manager.
@@ -58,6 +58,29 @@
 				'.pm-switch:disabled{cursor:not-allowed;opacity:.5}',
 				'.pm-empty,.pm-loading,.pm-error{margin:24px 8px;padding:20px 0;color:var(--dsw-alias-label-tertiary)}',
 				'.pm-error{color:var(--dsw-alias-status-error, #c93535)}',
+				'.pm-loadingState{flex:1;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:52px 24px;text-align:center}',
+				'.pm-loadingVisual{position:relative;width:216px;height:132px;color:var(--dsw-alias-label-secondary)}',
+				'.pm-loadingCore{position:absolute;z-index:2;left:50%;top:54%;width:46px;height:46px;display:grid;place-items:center;transform:translate(-50%,-50%);color:var(--dsw-alias-label-primary);opacity:.76;animation:pm-loadingCore 1.8s linear infinite}',
+				'.pm-loadingCore svg{width:40px;height:40px}',
+				'.pm-loadingModule{position:absolute;z-index:1;width:18px;height:18px;display:grid;place-items:center;color:color-mix(in srgb,var(--dsw-alias-label-secondary) 72%,transparent);opacity:0;will-change:transform,opacity}',
+				'.pm-loadingModule svg{width:16px;height:16px}',
+				'.pm-loadingModuleNorthWest{left:16px;top:14px;animation:pm-loadingNorthWest 1.8s cubic-bezier(.42,0,.18,1) infinite}',
+				'.pm-loadingModuleNorthEast{right:16px;top:12px;color:var(--dsw-static-blue-500);animation:pm-loadingNorthEast 1.8s cubic-bezier(.42,0,.18,1) infinite}',
+				'.pm-loadingModuleSouthWest{left:14px;bottom:12px;animation:pm-loadingSouthWest 1.8s cubic-bezier(.42,0,.18,1) infinite}',
+				'.pm-loadingModuleSouthEast{right:16px;bottom:12px;animation:pm-loadingSouthEast 1.8s cubic-bezier(.42,0,.18,1) infinite}',
+				'.pm-loadingLabel{position:relative;display:inline-block;font-family:"Inter Variable","Inter","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:20px;font-weight:450;font-variation-settings:"wght" 470;letter-spacing:.026em;color:color-mix(in srgb,var(--dsw-alias-label-secondary) 72%,transparent);filter:blur(.2px);white-space:nowrap}',
+				'.pm-loadingLabel:before{content:attr(data-text);position:absolute;inset:0;color:color-mix(in srgb,var(--dsw-alias-label-primary) 88%,var(--dsw-alias-label-secondary));filter:none;clip-path:inset(0 100% 0 0);animation:pm-loadingTextFocus 1.8s cubic-bezier(.4,0,.2,1) infinite}',
+				'.pm-loadingCursor{position:absolute;left:0;bottom:-6px;width:10px;height:1.25px;border-radius:999px;background:var(--dsw-static-blue-500);opacity:0;animation:pm-loadingCursor 1.8s cubic-bezier(.4,0,.2,1) infinite}',
+				'@keyframes pm-loadingNorthWest{0%{transform:translate3d(-8px,-6px,0) scale(.76);opacity:.18}10%{opacity:.62}28%{transform:translate3d(64px,38px,0) scale(1);opacity:.7}38%{transform:translate3d(86px,51px,0) scale(.18);opacity:0}39%,94%{transform:translate3d(86px,51px,0) scale(.18);opacity:0}95%{transform:translate3d(-8px,-6px,0) scale(.76);opacity:0}100%{transform:translate3d(-8px,-6px,0) scale(.76);opacity:.18}}',
+				'@keyframes pm-loadingNorthEast{0%,5%{transform:translate3d(8px,-6px,0) scale(.8);opacity:.2}14%{opacity:.94}30%{transform:translate3d(-64px,39px,0) scale(1);opacity:.96}40%{transform:translate3d(-85px,52px,0) scale(.18);opacity:0}41%,94%{transform:translate3d(-85px,52px,0) scale(.18);opacity:0}95%{transform:translate3d(8px,-6px,0) scale(.8);opacity:0}100%{transform:translate3d(8px,-6px,0) scale(.8);opacity:.2}}',
+				'@keyframes pm-loadingSouthWest{0%,10%{transform:translate3d(-8px,6px,0) scale(.74);opacity:.16}18%{opacity:.56}32%{transform:translate3d(64px,-30px,0) scale(1);opacity:.64}42%{transform:translate3d(87px,-43px,0) scale(.18);opacity:0}43%,94%{transform:translate3d(87px,-43px,0) scale(.18);opacity:0}95%{transform:translate3d(-8px,6px,0) scale(.74);opacity:0}100%{transform:translate3d(-8px,6px,0) scale(.74);opacity:.16}}',
+				'@keyframes pm-loadingSouthEast{0%,15%{transform:translate3d(8px,6px,0) scale(.74);opacity:.14}23%{opacity:.5}34%{transform:translate3d(-62px,-30px,0) scale(.96);opacity:.58}44%{transform:translate3d(-85px,-43px,0) scale(.18);opacity:0}45%,94%{transform:translate3d(-85px,-43px,0) scale(.18);opacity:0}95%{transform:translate3d(8px,6px,0) scale(.74);opacity:0}100%{transform:translate3d(8px,6px,0) scale(.74);opacity:.14}}',
+				'@keyframes pm-loadingCore{0%,25%,31%,37%,43%,100%{opacity:.76;transform:translate(-50%,-50%) scale(.96)}28%,34%,40%{opacity:1;transform:translate(-50%,-50%) scale(1.04)}}',
+				'@keyframes pm-loadingTextFocus{0%,4%{clip-path:inset(0 100% 0 0);opacity:0}8%{opacity:1}46%,84%{clip-path:inset(0 0 0 0);opacity:1}91%,100%{clip-path:inset(0 0 0 0);opacity:0}}',
+				'@keyframes pm-loadingCursor{0%,4%{left:0;opacity:0}8%{left:0;opacity:.92}46%{left:calc(100% - 10px);opacity:.92}57%,100%{left:calc(100% - 10px);opacity:0}}',
+				'.pm-loadError{margin:24px 8px;padding:20px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}',
+				'.pm-loadError .pm-error{margin:0;padding:0;flex:1;min-width:240px}',
+				'@media (prefers-reduced-motion: reduce){.pm-loadingCore,.pm-loadingModule,.pm-loadingLabel:before,.pm-loadingCursor{animation:none}.pm-loadingCore{opacity:1;transform:translate(-50%,-50%);color:var(--dsw-alias-label-primary)}.pm-loadingModule{display:none}.pm-loadingModuleNorthEast{display:grid;right:42px;top:33px;opacity:.8;transform:none}.pm-loadingLabel{color:transparent;filter:none}.pm-loadingLabel:before{clip-path:inset(0);opacity:1}.pm-loadingCursor{left:calc(100% - 10px);opacity:.7}}',
 				'.pm-drawer{position:fixed;z-index:230;box-sizing:border-box;top:66px;right:0;bottom:0;width:400px;max-width:calc(100vw - 64px);border-left:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);box-shadow:-10px 0 24px rgba(16,24,40,.06);display:flex;flex-direction:column}',
 				'.pm-drawerHead{flex:none;padding:24px 24px 16px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
 				'.pm-drawerTitleRow{display:flex;align-items:flex-start;gap:12px}',
@@ -259,6 +282,24 @@
 				);
 			}
 
+			function PluginLoadingState() {
+				var modules = [
+					['NorthWest', false],
+					['NorthEast', true],
+					['SouthWest', false],
+					['SouthEast', false]
+				];
+				return h('div', { className: 'pm-loadingState', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' },
+					h('div', { className: 'pm-loadingVisual', 'aria-hidden': true },
+						modules.map(function (module) {
+							return h('span', { key: module[0], className: 'pm-loadingModule pm-loadingModule' + module[0] + (module[1] ? ' pm-loadingModuleAccent' : '') }, h(P.IconCordisPluginOutline14));
+						}),
+						h('span', { className: 'pm-loadingCore' }, h(P.IconCordisPluginOutline14))
+					),
+					h('span', { className: 'pm-loadingLabel', 'data-text': 'Plugin Loading' }, 'Plugin Loading', h('span', { className: 'pm-loadingCursor', 'aria-hidden': true }))
+				);
+			}
+
 			function PluginManagerSection(props) {
 				var api = props.api;
 				var [tab, setTab] = React.useState('local');
@@ -267,6 +308,7 @@
 				var [market, setMarket] = React.useState([]);
 				var [loading, setLoading] = React.useState(true);
 				var [error, setError] = React.useState('');
+				var [attempt, setAttempt] = React.useState(0);
 				var [busy, setBusy] = React.useState('');
 				var [selectedLocal, setSelectedLocal] = React.useState(null);
 				var [selectedMarket, setSelectedMarket] = React.useState(null);
@@ -293,12 +335,18 @@
 
 				React.useEffect(function () {
 					var alive = true;
+					var settleTimer = null;
+					var startedAt = Date.now();
 					setLoading(true); setError('');
 					Promise.all([loadLocal(), loadMarket()]).catch(function (reason) {
 						if (alive) setError(reason instanceof Error ? reason.message : String(reason));
-					}).finally(function () { if (alive) setLoading(false); });
-					return function () { alive = false; };
-				}, []);
+					}).finally(function () {
+						if (!alive) return;
+						var remaining = Math.max(0, 680 - (Date.now() - startedAt));
+						settleTimer = window.setTimeout(function () { if (alive) setLoading(false); }, remaining);
+					});
+					return function () { alive = false; if (settleTimer !== null) window.clearTimeout(settleTimer); };
+				}, [attempt]);
 
 				React.useEffect(function () {
 					function onKey(event) {
@@ -346,8 +394,8 @@
 				var visibleMarket = market.filter(function (item) { return needle === '' || item.repository.toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle); });
 
 				var body;
-				if (loading) body = h('p', { className: 'pm-loading', role: 'status' }, '正在读取插件配置…');
-				else if (error) body = h('p', { className: 'pm-error', role: 'alert' }, '加载 Plugin Manager 失败：' + error);
+				if (loading) body = h(PluginLoadingState);
+				else if (error) body = h('div', { className: 'pm-loadError' }, h('p', { className: 'pm-error', role: 'alert' }, '加载 Plugin Manager 失败：' + error), h(Button, { type: 'button', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, '重试'));
 				else if (tab === 'local') body = visibleLocal.length === 0 ? h('p', { className: 'pm-empty' }, '没有匹配的本地插件。') : h('div', { className: 'pm-list', 'data-testid': 'local-list' }, visibleLocal.map(function (plugin) {
 					return h('div', { key: plugin.name, className: 'pm-row pm-rowClick' + (selectedLocal && selectedLocal.name === plugin.name ? ' pm-rowSelected' : ''), onClick: function () { setSelectedMarket(null); setSelectedLocal(plugin); } },
 						h('div', { className: 'pm-rowMain' }, h('span', { className: 'pm-pluginIcon' }, h(Icon, { type: 'plugin', size: 15 })), h('div', { className: 'pm-rowCopy' }, h('div', { className: 'pm-rowTitle' }, plugin.name), h('div', { className: 'pm-rowDesc' }, plugin.description || '此插件没有提供描述。'), h('div', { className: 'pm-rowMeta' }, h('span', null, plugin.version), h('span', null, '·'), h('span', null, plugin.source), plugin.protected ? h('span', null, '· 运行所必需') : null))),

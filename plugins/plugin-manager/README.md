@@ -5,6 +5,14 @@ DeepSeek Harness 的独立 Plugin 管理分区（DSH-027）。它向
 并通过 `/api/plugin-manager` 提供本地插件清单、受保护的启停、插件导入，以及按需加载
 GitHub 详情的受控插件市场。
 
+## Plugin Loading
+
+初次读取本地插件与市场索引时，Client 使用与 Skill Finding 同一套版式和动效节奏，
+但把视觉语义改为四个 Cordis Plugin 模块向中心接口归位，并以 `Plugin Loading`
+标记当前阶段。正常快速请求至少保留约 680ms，避免加载态一闪而过；
+`prefers-reduced-motion: reduce` 下停止全部位移与循环动画，只保留静态官方插件图标和文案。
+接口失败后动画退出并显示可重试错误，不会让页面停留在空白或无限加载状态。
+
 ## 边界
 
 - `dsh-extension-manager` 只拥有主页“扩展”入口、全页壳和分区导航。
