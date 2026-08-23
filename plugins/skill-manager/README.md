@@ -13,7 +13,7 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
   [`dsh-extension-manager`](../extension-manager/README.md) 负责。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 22 / DSH-008 V1）
+## 页面结构（build 24 / DSH-008 V1）
 
 - **组合入口**：Client 只通过 `slots.inject('extension.manager.section', ...)` 注册
   `id: skill` 的业务分区。`dsh-extension-manager` 独立注册 `sidebar.footer.action`，
@@ -254,7 +254,9 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   保持原位的已启用行，build 18 移除重复资源库入口并加入可持久化的左导航收起态，build 19
   将项目上下文压为单行、低频动作收进菜单、列表 description 收为第一句并按需展开来源与技术信息，build 20
   为单项启停加入乐观更新、安静保存态与失败回滚，build 21 为首次 catalog 加入居中的 Skill 扫描加载态，
-  build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区；主题只用
+  build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区，build 24 将加载态收敛为无底板的光学聚焦动画：
+  三颗非对称粒子在首秒依次汇入官方 Skill 图标，`Skill Finding` 同步由雾灰聚焦为墨色并带短蓝色焦点游标，
+  同时提供 `prefers-reduced-motion` 静态降级；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
   Skill 页面注册在 `extension.manager.section`；本插件中不再出现 `sidebar.footer.action` 或 `.ext-*` 壳样式。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，

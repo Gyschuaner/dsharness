@@ -218,18 +218,24 @@
 				'.sk-rowSide{flex:none;display:flex;align-items:center;gap:8px;margin-top:2px}',
 				'.sk-saving{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
 				'.sk-empty{margin:0;font-size:12px;color:var(--dsw-alias-label-quaternary);padding:24px 4px}',
-				'.sk-scanState{flex:1;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:52px 24px;text-align:center}',
-				'.sk-scanVisual{position:relative;width:76px;height:76px;display:grid;place-items:center;color:var(--dsw-static-blue-500)}',
-				'.sk-scanHalo{position:absolute;inset:6px;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 25%,transparent);border-radius:50%;animation:sk-scanPulse 2.2s ease-in-out infinite}',
-				'.sk-scanIcon{position:relative;z-index:1;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 28%,var(--dsw-alias-border-l2));border-radius:12px;background:var(--dsw-alias-bg-layer-3);box-shadow:0 6px 18px color-mix(in srgb,var(--dsw-static-blue-500) 13%,transparent);animation:sk-scanFloat 2.2s ease-in-out infinite}',
-				'.sk-scanSweep{position:absolute;z-index:2;left:8px;right:8px;top:8px;height:2px;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-static-blue-500),transparent);box-shadow:0 0 8px color-mix(in srgb,var(--dsw-static-blue-500) 55%,transparent);animation:sk-scanSweep 1.8s ease-in-out infinite;pointer-events:none}',
-				'.sk-scanCopy{display:flex;flex-direction:column;gap:4px}',
-				'.sk-scanCopy strong{font-size:14px;font-weight:600;color:var(--dsw-alias-label-primary)}',
-				'.sk-scanCopy span{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-tertiary)}',
-				'@keyframes sk-scanPulse{0%,100%{transform:scale(.9);opacity:.5}50%{transform:scale(1.08);opacity:1}}',
-				'@keyframes sk-scanFloat{0%,100%{transform:translateY(1px)}50%{transform:translateY(-3px)}}',
-				'@keyframes sk-scanSweep{0%{transform:translateY(0);opacity:0}16%{opacity:.9}84%{opacity:.9}100%{transform:translateY(60px);opacity:0}}',
-				'@media (prefers-reduced-motion: reduce){.sk-scanHalo,.sk-scanIcon,.sk-scanSweep{animation:none}.sk-scanHalo{opacity:.8}.sk-scanSweep{transform:translateY(30px);opacity:.45}}',
+				'.sk-findingState{flex:1;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:52px 24px;text-align:center}',
+				'.sk-findingVisual{position:relative;width:216px;height:132px;color:var(--dsw-alias-label-secondary)}',
+				'.sk-findingCore{position:absolute;z-index:2;left:50%;top:56%;width:44px;height:44px;display:grid;place-items:center;transform:translate(-50%,-50%);color:var(--dsw-alias-label-primary);opacity:.78;animation:sk-findingFocus 2.4s linear infinite}',
+				'.sk-findingCore svg{width:40px;height:40px}',
+				'.sk-findingParticle{position:absolute;z-index:1;display:block;width:6px;height:6px;border-radius:50%;background:color-mix(in srgb,var(--dsw-alias-label-secondary) 70%,transparent);opacity:0;will-change:transform,opacity}',
+				'.sk-findingParticleNorth{left:calc(50% - 3px);top:3px;width:7px;height:7px;animation:sk-findingNorth 2.4s cubic-bezier(.42,0,.18,1) infinite}',
+				'.sk-findingParticleEast{left:calc(100% - 22px);top:48px;width:7px;height:7px;background:var(--dsw-static-blue-500);animation:sk-findingEast 2.4s cubic-bezier(.42,0,.18,1) infinite}',
+				'.sk-findingParticleSouthWest{left:22px;top:105px;animation:sk-findingSouthWest 2.4s cubic-bezier(.42,0,.18,1) infinite}',
+				'.sk-findingLabel{position:relative;display:inline-block;font-family:"Inter Variable","Inter","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:20px;font-weight:450;font-variation-settings:"wght" 470;letter-spacing:.026em;color:color-mix(in srgb,var(--dsw-alias-label-secondary) 72%,transparent);filter:blur(.2px);white-space:nowrap}',
+				'.sk-findingLabel:before{content:attr(data-text);position:absolute;inset:0;color:color-mix(in srgb,var(--dsw-alias-label-primary) 88%,var(--dsw-alias-label-secondary));filter:none;clip-path:inset(0 100% 0 0);animation:sk-findingTextFocus 2.4s cubic-bezier(.4,0,.2,1) infinite}',
+				'.sk-findingCursor{position:absolute;left:0;bottom:-6px;width:10px;height:1.25px;border-radius:999px;background:var(--dsw-static-blue-500);opacity:0;animation:sk-findingCursor 2.4s cubic-bezier(.4,0,.2,1) infinite}',
+				'@keyframes sk-findingNorth{0%{transform:translate3d(0,-5px,0) scale(.78);opacity:.24}9%{opacity:.66}20%{transform:translate3d(4px,28px,0) scale(1);opacity:.72}30%{transform:translate3d(1px,57px,0) scale(.64);opacity:.48}34%,94%{transform:translate3d(0,69px,0) scale(.12);opacity:0}95%{transform:translate3d(0,-5px,0) scale(.78);opacity:0}100%{transform:translate3d(0,-5px,0) scale(.78);opacity:.24}}',
+				'@keyframes sk-findingEast{0%,7%{transform:translate3d(7px,-2px,0) scale(.8);opacity:.22}16%{opacity:.94}27%{transform:translate3d(-46px,7px,0) scale(1);opacity:.96}38%{transform:translate3d(-76px,18px,0) scale(.62);opacity:.6}42%,94%{transform:translate3d(-87px,22px,0) scale(.12);opacity:0}95%{transform:translate3d(7px,-2px,0) scale(.8);opacity:0}100%{transform:translate3d(7px,-2px,0) scale(.8);opacity:.22}}',
+				'@keyframes sk-findingSouthWest{0%,15%{transform:translate3d(-6px,5px,0) scale(.76);opacity:.18}24%{opacity:.58}36%{transform:translate3d(48px,-14px,0) scale(1);opacity:.64}48%{transform:translate3d(76px,-25px,0) scale(.6);opacity:.44}52%,94%{transform:translate3d(86px,-31px,0) scale(.12);opacity:0}95%{transform:translate3d(-6px,5px,0) scale(.76);opacity:0}100%{transform:translate3d(-6px,5px,0) scale(.76);opacity:.18}}',
+				'@keyframes sk-findingFocus{0%,25%,35%,44%,56%,100%{opacity:.78}30%,40%,50%{opacity:1}}',
+				'@keyframes sk-findingTextFocus{0%,4%{clip-path:inset(0 100% 0 0);opacity:0}8%{opacity:1}52%,86%{clip-path:inset(0 0 0 0);opacity:1}92%,100%{clip-path:inset(0 0 0 0);opacity:0}}',
+				'@keyframes sk-findingCursor{0%,4%{left:0;opacity:0}8%{left:0;opacity:.92}52%{left:calc(100% - 10px);opacity:.92}61%,100%{left:calc(100% - 10px);opacity:0}}',
+				'@media (prefers-reduced-motion: reduce){.sk-findingCore,.sk-findingParticle,.sk-findingLabel:before,.sk-findingCursor{animation:none}.sk-findingCore{opacity:1;color:var(--dsw-alias-label-primary)}.sk-findingParticle{display:none}.sk-findingParticleEast{display:block;opacity:.9;transform:translate3d(-24px,10px,0)}.sk-findingLabel{color:transparent;filter:none}.sk-findingLabel:before{clip-path:inset(0);opacity:1}.sk-findingCursor{left:calc(100% - 10px);opacity:.7}}',
 				'.sk-error{margin:0 0 8px;font-size:13px;color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere}',
 				'.sk-bulkbar{flex:none;display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);box-shadow:0 -4px 18px rgba(0,0,0,.06)}',
 				'.sk-bulkbar strong{font-size:12.5px;white-space:nowrap}',
@@ -1204,22 +1210,30 @@
 					'应用后启用 ' + (diff.finalEnabled || []).length + ' 个 Skill；下一轮对话生效，无需重启'));
 				return h('div', { className: 'sk-modalDiff' }, groups);
 			}
-			function SkillScanState(props) {
-				var title = (props && props.title) || '正在扫描 Skill';
-				var detail = (props && props.detail) || '整理项目配置与可用来源';
+			function SkillFindingState() {
+				var particles = [
+					['North', false],
+					['East', true],
+					['SouthWest', false]
+				];
 				return h(
 					'div',
-					{ className: 'sk-scanState', role: 'status', 'aria-live': 'polite' },
+					{ className: 'sk-findingState', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' },
 					h(
 						'div',
-						{ className: 'sk-scanVisual', 'aria-hidden': true },
-						h('span', { className: 'sk-scanHalo' }),
-						h('span', { className: 'sk-scanSweep' }),
-						h('span', { className: 'sk-scanIcon' }, h(P.IconSkillOutline16))
+						{ className: 'sk-findingVisual', 'aria-hidden': true },
+						particles.map(function (particle) {
+							return h('span', {
+								key: particle[0],
+								className: 'sk-findingParticle sk-findingParticle' + particle[0]
+									+ (particle[1] ? ' sk-findingParticleAccent' : '')
+							});
+						}),
+						h('span', { className: 'sk-findingCore' }, h(P.IconSkillOutline16))
 					),
-					h('div', { className: 'sk-scanCopy' },
-						h('strong', null, title),
-						h('span', null, detail))
+					h('span', { className: 'sk-findingLabel', 'data-text': 'Skill Finding' },
+						'Skill Finding',
+						h('span', { className: 'sk-findingCursor', 'aria-hidden': true }))
 				);
 			}
 			/**
@@ -2248,7 +2262,7 @@
 								{ className: 'sk-list' },
 								view === null && !viewError
 									? (viewBusy
-										? h(SkillScanState)
+										? h(SkillFindingState)
 										: h('p', { className: 'sk-empty' }, '（空）'))
 									: null,
 							visibleRows.length === 0 && view !== null
@@ -2438,10 +2452,7 @@
 					);
 				}, [attempt, ctx]);
 				if (probe === 'loading') {
-					return h('div', { className: 'sk-root' }, h(SkillScanState, {
-						title: '正在准备 Skill',
-						detail: '连接管理中心，读取项目索引'
-					}));
+					return h('div', { className: 'sk-root' }, h(SkillFindingState));
 				}
 				if (probe === 'legacy') {
 					return h(
