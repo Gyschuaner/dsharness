@@ -342,11 +342,11 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	assert.equal(h.dom.window.document.querySelector('.sk-presetSave'), null);
 });
 
-test('current workspace wins persisted project and visible rows support counted bulk selection', async (t) => {
+test('current workspace wins; enabled rows stay in catalog order and bulk selection remains counted', async (t) => {
 	const calls = [];
 	let rows = [
-		row('enabled-skill', '已启用描述', { enabled: true, modelInvocable: true }),
 		row('disabled-a', '未启用 A'),
+		row('enabled-skill', '已启用描述', { enabled: true, modelInvocable: true }),
 		row('disabled-b', '未启用 B'),
 	];
 	const router = async (body) => {
@@ -354,6 +354,12 @@ test('current workspace wins persisted project and visible rows support counted 
 		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
 		if (body.op === 'catalog') return view(body.cwd || '/project-b', rows);
 		if (body.op === 'presets.list') return { presets: [] };
+		if (body.op === 'setEnabled') {
+			rows = rows.map((item) => item.name === body.name
+				? Object.assign({}, item, { enabled: body.enabled, modelInvocable: body.enabled })
+				: item);
+			return { view: rows.find((item) => item.name === body.name), partial: false, report: { failed: [], conflicts: [] } };
+		}
 		if (body.op === 'setMany') {
 			rows = rows.map((item) => body.names.includes(item.name) ? Object.assign({}, item, { enabled: body.enabled }) : item);
 			return { partial: false, report: { failed: [], conflicts: [] } };
@@ -369,13 +375,29 @@ test('current workspace wins persisted project and visible rows support counted 
 	await h.open();
 	assert.equal(h.dom.window.document.querySelector('.sk-projectTitle').textContent, 'project-b');
 	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('1 已启用 / 3 Skills'));
-	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-groupHead')].map((item) => item.textContent.trim()), ['已启用(1)', '未启用(2)']);
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-groupHead').length, 0, 'all view has no enabled/disabled group headings');
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['enabled-skill']);
 	assert.equal(h.button('全部3').textContent, '全部3');
 	assert.equal(h.button('已启用1').textContent, '已启用1');
 	assert.equal(h.button('未启用2').textContent, '未启用2');
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 0, 'default mode hides bulk checkboxes');
 	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3, 'default mode shows per-Skill switches');
 	assert.equal(h.dom.window.document.querySelector('input[aria-label="全选当前结果"]'), null);
+	await h.click(h.button('已启用1'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['enabled-skill'], 'state filters remain user-invoked');
+	await h.click(h.button('全部3'));
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	const list = h.dom.window.document.querySelector('.sk-list');
+	list.scrollTop = 160;
+	await h.click(h.dom.window.document.querySelector('[aria-label="启用 disabled-a（仅当前项目）"]'));
+	await h.flush();
+	await h.click(h.dom.window.document.querySelector('[aria-label="启用 disabled-b（仅当前项目）"]'));
+	await h.flush();
+	assert.equal(list.scrollTop, 160, 'enabling rows preserves the current scroll context');
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
+	assert.equal(h.dom.window.document.querySelectorAll('[role="switch"][aria-checked="true"]').length, 3);
 
 	await h.click(h.button('批量管理'));
 	assert.ok(h.dom.window.document.querySelector('.sk-batchHint').textContent.includes('右侧单项开关已暂时隐藏'));

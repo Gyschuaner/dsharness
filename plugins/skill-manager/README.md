@@ -13,7 +13,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 16 / DSH-008 V1）
+## 页面结构（build 17 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
@@ -28,6 +28,8 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     「模式选择 → 影响摘要 → 分组变更列表 → 操作区」的固定层级，保存预设弹窗使用常驻字段标签、
     字数计数、保存摘要和右对齐主操作，避免长列表与底部按钮挤压换行；
     工具栏为 搜索 / 带数量的全部·已启用·未启用 / 全部标签 / 批量管理 / 一键精简；
+    「全部」视图始终沿用 catalog 顺序，不再按启用状态自动分组或移动行；已启用行保持原位并使用
+    品牌淡蓝底色，同时保留启用开关与数量，状态筛选只在用户主动选择时收窄结果；
     默认行 = 图标 + 名称 + 项目特化/来源×N/未启用 徽标 + 完整描述 + 标签 + 启用开关；
     进入显式「批量管理」模式后才显示全选与行复选框，同时隐藏单项开关，避免两个控件都被理解为启停；
     勾选多行后在底部固定操作栏明确「在本项目启用/停用」，成功后自动退出批量模式；
@@ -235,7 +237,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   项目选择器复用 `ctx.get('sessions')` 当前工作区与 `ctx.get('workspaces')`
   （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时安全降级；
   build 15 按 Product Design 方案 3 重构预设应用/保存弹窗，build 16 将详情标签区重构为
-  同一设计语言的一体化编辑面板；主题只用
+  同一设计语言的一体化编辑面板，build 17 移除默认列表的启用/未启用自动分组并以淡蓝底色标记
+  保持原位的已启用行；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
   入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，

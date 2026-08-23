@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 16
+ * build: 17
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -53,6 +53,9 @@
  * presets with replace/merge preview, and 一键精简. When the running host
  * predates apiVersion 6 (unknown `catalog` op), the page degrades to the
  * legacy section above with a notice.
+ * build 17: the project list no longer regroups rows by enabled state.
+ * Catalog order and scroll context stay stable while a soft blue row tint,
+ * the switch, and the optional state filters communicate enabled status.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -213,11 +216,12 @@
 				'.sk-selectVisible input{margin:0}',
 				'.sk-batchHint{display:flex;align-items:center;gap:7px;margin:-2px 0 8px;padding:7px 10px;border:1px dashed var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-fill-tsp-secondary);font-size:12px;color:var(--dsw-alias-label-secondary)}',
 				'.sk-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:2px 0 6px}',
-				'.sk-groupHead{display:flex;align-items:center;gap:8px;padding:12px 10px 7px;border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);flex:none}',
-				'.sk-groupCount{font-weight:400;color:var(--dsw-alias-label-quaternary)}',
 				'.sk-row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-bottom:1px solid var(--dsw-alias-border-l2);cursor:pointer;flex:none}',
 				'.sk-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+				'.sk-rowEnabled{background:var(--dsw-alias-bg-layer-3);background:color-mix(in srgb,var(--dsw-static-blue-500) 8%,var(--dsw-alias-bg-module-platform))}',
+				'.sk-rowEnabled:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 12%,var(--dsw-alias-bg-module-platform))}',
 				'.sk-rowActive{background:var(--dsw-alias-interactive-bg-hover-solid)}',
+				'.sk-rowEnabled.sk-rowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 14%,var(--dsw-alias-bg-module-platform))}',
 				'.sk-rowOff .sk-ic{opacity:.58}',
 				'.sk-check{appearance:none;width:15px;height:15px;flex:none;margin-top:3px;border:1.5px solid var(--dsw-alias-border-l2);border-radius:4px;background:var(--dsw-alias-bg-module-platform);cursor:pointer;position:relative;padding:0}',
 				'.sk-check:hover{border-color:var(--dsw-alias-label-dimmed)}',
@@ -1672,7 +1676,9 @@
 						'div',
 						{
 							key: row.name,
-							className: 'sk-row' + (drawerName === row.name ? ' sk-rowActive' : '') + (off && isProjectPage ? ' sk-rowOff' : ''),
+							className: 'sk-row' + (drawerName === row.name ? ' sk-rowActive' : '')
+								+ (isProjectPage && row.enabled === true ? ' sk-rowEnabled' : '')
+								+ (off && isProjectPage ? ' sk-rowOff' : ''),
 						},
 						isProjectPage && bulkMode
 							? h('input', {
@@ -1731,23 +1737,6 @@
 						),
 						h('div', { className: 'sk-rowSide' }, isProjectPage && !bulkMode ? switchV1(row) : null)
 					);
-				}
-				function groupedVisibleRows() {
-					if (activePage !== 'project') return visibleRows.map(rowEl);
-					var enabledRows = visibleRows.filter(function (row) { return row.enabled === true; });
-					var disabledRows = visibleRows.filter(function (row) { return row.enabled !== true; });
-					var groups = [];
-					if (enabledRows.length > 0) {
-						groups.push(h('div', { key: 'enabled-head', className: 'sk-groupHead' },
-							'已启用', h('span', { className: 'sk-groupCount' }, '(' + enabledRows.length + ')')));
-						enabledRows.forEach(function (row) { groups.push(rowEl(row)); });
-					}
-					if (disabledRows.length > 0) {
-						groups.push(h('div', { key: 'disabled-head', className: 'sk-groupHead' },
-							'未启用', h('span', { className: 'sk-groupCount' }, '(' + disabledRows.length + ')')));
-						disabledRows.forEach(function (row) { groups.push(rowEl(row)); });
-					}
-					return groups;
 				}
 				function drawerEl() {
 					var row = drawerRow;
@@ -2238,7 +2227,7 @@
 											? h('button', { type: 'button', className: 'sk-chip', onClick: function () { openPreset(recommendedPreset); } }, '应用推荐预设')
 											: null))
 								: null,
-							groupedVisibleRows()
+							visibleRows.map(rowEl)
 						),
 						activePage === 'project' && bulkMode && selectedCount > 0
 							? h('div', { className: 'sk-bulkbar', role: 'region', 'aria-label': '批量操作' },
