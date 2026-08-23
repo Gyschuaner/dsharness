@@ -84,6 +84,8 @@
 2. **生成来源副本**（配置登记且哈希一致）→ 同法改副本自身标志。
 3. **其余**（用户/全局/内置）→ 开关 stub `<projectRoot>/.dsh/skills/<name>.md`（rank 100、`disable-model-invocation: true`、description 带既有 `[skill-manager] 本项目禁用开关` marker）。stub 存在 = disabled；缺失 = 默认启用状态。
    - **新项目默认全关** = reconcile 为每个「第 3 类且 DSH-winner 可被模型调用」的身份创建 stub（一次性、幂等；后续 list 不再重复写）。
+   - **启用项可调用性修复（BUG-D12CCE97）**：如果 enabled 身份的目标原始来源自身带有 `disable-model-invocation`，仅删除 stub 仍无法进入模型目录；如果目标来源来自其他 preset 的 bundled 根，当前 preset 也未必扫描它。两种情况都必须物化为 rank-100 受管项目副本，并移除副本上的禁用标志。默认来源生成的登记不写 `source`，显式来源继续保留 `source`；原文件不修改，停用时只给受管副本恢复禁用标志。
+   - **Windows 大目录安全发布（BUG-D12CCE97）**：受管目录先完整复制并校验到 `<projectRoot>/.dsh/.skill-manager-swap/`（不在 skill watcher 根内）；发布目标时先写附属文件，最后写 `SKILL.md` 作为 provider 可见的提交点，随后验证整目录哈希。目标已有旧副本时仍先移入事务备份，失败可回滚；不用对被 watcher 占用的完整目录做最终 rename，规避 Windows `EPERM`。
    - 全局 `globalDefaultOff` 开启且用户级原件已带全局标志时，该身份的禁用已由原件表达，stub 冗余 → 不创建（与旧 `enforceGlobalPolicy` 的清理规则协同，避免互相删除）。
 - `user-invocable` 默认 true 不受任何机制影响 → `/skill-name` 手动调用永远可用（验收 3/12）。
 - 清理规则：stub 仅在（a）配置声明该身份 enabled，或（b）对应原件已不存在（孤儿）时删除，且删除前必须 `isShadowFile` marker 验证；普通 skill 文件、用户修改的副本永不被删除/覆盖。
@@ -153,5 +155,5 @@ S9/S10 贯穿：DP 任务描述随进度更新；用例执行记录在验证证�
 - 抽屉从最新 catalog 派生，不再保存陈旧行副本；标签变更会立即刷新全局标签集合。详情按钮、开关、来源选择补齐 button/switch/radiogroup/radio 语义和项目范围标签。
 - `capabilities` 成为 apiVersion 6 的轻量探测操作，正常路径不再为了识别 V1 重复拉取完整 catalog；旧 host 继续通过 `catalog` unknown-op 安全降级。
 - 布局改为页面骨架固定、Skill 列表单独滚动，抽屉和批量条不会随长列表滚出视口；760/600/375 px 均无横向溢出，600 px 以下隐藏左侧扩展导航，375 px 隐藏顶部副标题。
-- 自动化：53 项，49 pass / 0 fail / 4 skip（Windows 权限/符号链接约束）；运行时 3080 `apiVersion 6`，实机切项目验证 `dsharness 11/68` 与 `game 0/68` 相互独立，浏览器无页面脚本 error。
+- 自动化：55 项，51 pass / 0 fail / 4 skip（Windows 权限/符号链接约束）；运行时 3080 `apiVersion 6`，实机切项目验证项目配置与下一轮 `skill-catalog` 一致，浏览器无页面脚本 error。
 - Product Design 对照与响应式证据记录在仓库根 `design-qa.md`，最终结论 `passed`。本轮仅选择、筛选、打开详情，不执行真实启停写操作。

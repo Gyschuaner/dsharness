@@ -63,11 +63,20 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     frontmatter 标志（字节保真，永不加 `user-invocable`）。
   - `copy`：未修改的受管副本——改副本标志并刷新登记的 `copyHash`。
   - `original`：用户/全局/内置来源——生成/删除 marker 验证的派生开关文件。
+- **启用必须等于会话可调用**：若项目启用的原始来源自身带有
+  `disable-model-invocation`（例如旧全局默认关闭策略留下的用户 Skill），或来源只存在于
+  另一个 Agent preset 的 bundled 根，reconcile 会生成去除禁用标志的 rank-100 受管项目副本。
+  因此管理页的 enabled 集合可在任一 preset 的下一轮 `skill-catalog` 中真实出现，且不会修改
+  全局原文件；停用时保留副本并重新写入禁用标志。
 - **受管副本安全边界**：副本只凭 配置登记 + 精确 `copyHash`/`originHash` 识别，
   永不凭路径/文件名猜测；内容被用户修改过的副本（`copyHash` 不一致）视为项目文件：
   保留不动、来源切换报 409；`originHash` 不一致时行上显示「来源有更新」。
   来源选择到 rank 更高的来源 = 纯记录（删除冗余的已验证副本）；rank 更低的来源 =
   物化受管副本 + 删除被取代的 marker 开关。选择来源时开关状态同步进副本标志。
+- **Windows 目录发布**：完整 Skill 目录先复制并校验到不受 watcher 监听的
+  `<项目根>/.dsh/.skill-manager-swap/`；发布时先写 references/scripts/assets 等附属文件，
+  最后写 `SKILL.md` 作为目录可见性提交点，再做整目录哈希校验。这样既规避 Windows 下
+  被 watcher 占用目录导致的 `EPERM` rename，也不会让 provider 扫到半成品 Skill。
 - **一键精简**：存在默认精简预设（`defaultSlim`，至多一个）时按该预设替换；
   否则关闭全部启用（两者都先出 diff 预览）。
 - **预设**：全局存储（`~/.dsh/skill-manager.json` 的 `presets`），跨项目复用；
@@ -203,13 +212,15 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     业务错误用 `ApiError` 携带 4xx（400 参数 / 404 不存在 / 409 冲突）。
     `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
-    `list` 幂等运行（旧版兼容）；Windows 文件锁问题由 tmp+rename 原子写入规避。
-- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：49 用例覆盖
+    `list` 幂等运行（旧版兼容）；配置文件用 tmp+rename 原子写入，目录副本使用受监控根外
+    暂存、附属文件优先、`SKILL.md` 最后发布并整目录哈希复核。
+- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：51 用例覆盖
   状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
   三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
   标签、预设 diff/应用、一键精简、旧版兼容与只读根 403；并覆盖并发写、
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
-  多来源预设冲突。
+  多来源预设冲突，以及已全局关闭的用户 Skill / 其他 preset bundled Skill 在项目启用后
+  物化为真实可调用副本。
 - **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：4 用例直接执行
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖双页面、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
