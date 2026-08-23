@@ -11,7 +11,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 20 / DSH-008 V1）
+## 页面结构（build 21 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
@@ -47,6 +47,8 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     或展示不可用按钮；V1 仍不伪造远端更新数据。
     详情从最新 catalog 派生，不再与列表保存重复快照；所有桌面宽度均使用 400px 覆盖式抽屉，
     不改变项目卡片、工具栏或列表的宽度与换行，窄窗口最多占满可用宽度。
+- **首次加载态**：首次进入 SKILL 页、catalog 尚未返回时，居中展示官方 Skill 图标、呼吸光环、
+  扫描光和「正在扫描 Skill / 整理项目配置与可用来源」状态文案；`prefers-reduced-motion` 下退化为静态状态。
 - **SKILL 分区（旧版降级）**：host 未加载 apiVersion 6 时渲染
   `SkillManagerSection`（build 11 功能，见下），顶部显示重启提示条。
 
@@ -233,10 +235,10 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
   多来源预设冲突，以及已全局关闭的用户 Skill / 其他 preset bundled Skill 在项目启用后
   物化为真实可调用副本；并验证单项快速路径、缓存失效安全回退、配置写入失败时文件与配置回滚。
-- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：6 用例直接执行
+- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：7 用例直接执行
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖单页信息架构、可收起导航、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
-  丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚和旧 Host 降级。
+  丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚、扫描加载态和旧 Host 降级。
 - **热更新边界**（实测）：client bundle 由进程按请求从磁盘读取 —— 改 client 刷新页面即生效；
   host 代码没有模块级 HMR（组合树中 hmr 服务 `disabled: true`）—— 改 host 需要重启 `dsh web`
   （会话持久化在磁盘，重启后原会话可恢复，仅进行中的轮次会中断）。
@@ -250,7 +252,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   同一设计语言的一体化编辑面板，build 17 移除默认列表的启用/未启用自动分组并以淡蓝底色标记
   保持原位的已启用行，build 18 移除重复资源库入口并加入可持久化的左导航收起态，build 19
   将项目上下文压为单行、低频动作收进菜单、列表 description 收为第一句并按需展开来源与技术信息，build 20
-  为单项启停加入乐观更新、安静保存态与失败回滚；主题只用
+  为单项启停加入乐观更新、安静保存态与失败回滚，build 21 为首次 catalog 加入居中的 Skill 扫描加载态；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
   入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，
