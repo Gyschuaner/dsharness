@@ -81,6 +81,7 @@ $VisionBridgeBundlePath = Join-Path $SourceDirectory 'packages/vision/vision-bri
 $VisionBridgeRowPath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.tsx'
 $VisionBridgeRowStylePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.module.css'
 $VisionBridgeThrottlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts'
+$AttachmentSessionViewPath = Join-Path $SourceDirectory 'packages/attachment/attachment-local/src/session-view.ts'
 $ToolCallTreeStylePath = Join-Path $SourceDirectory 'packages/client/ui-tool/src/client/tool/ToolCallTree.module.css'
 $ToolEventTypesPath = Join-Path $SourceDirectory 'packages/core/tools/src/types.ts'
 $KnownEventTypesPath = Join-Path $SourceDirectory 'packages/core/session/src/known-event-types.ts'
@@ -94,18 +95,25 @@ if (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) {
         $VisionBridgeSource.Contains('Image file paths to import into this conversation and inspect.') -and
         $VisionBridgeSource -match "'vision/image-import'" -and
         $VisionBridgeSource -match 'importPathImages') 'DSH-023 vision_inspect 支持本会话附件与本地路径'
+    Check ($VisionBridgeSource -match 'materializeImageForSession' -and
+        $VisionBridgeSource.Contains('local_path:') -and
+        $VisionBridgeSource.Contains('只输出简洁、任务导向的 Markdown 正文') -and
+        $VisionBridgeSource -match "schema:\s*\{\s*type:\s*'string'\s*\}") 'DSH-024 会话图片路径与 Markdown 视觉结果'
 }
 if (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) {
     $VisionBridgeBundle = Get-Content -LiteralPath $VisionBridgeBundlePath -Raw -Encoding UTF8
     Check ($VisionBridgeBundle.Contains('Inspect conversation attachments or local image files with the configured vision model.') -and
         $VisionBridgeBundle.Contains('Image file paths to import into this conversation and inspect.') -and
         $VisionBridgeBundle -match 'vision/image-import') 'DSH-023 构建产物包含路径导入逻辑'
+    Check ($VisionBridgeBundle -match 'materializeImageForSession' -and
+        $VisionBridgeBundle.Contains('local_path:') -and
+        $VisionBridgeBundle.Contains('只输出简洁、任务导向的 Markdown 正文')) 'DSH-024 构建产物包含会话路径与 Markdown 逻辑'
 }
 if (Test-Path -LiteralPath $VisionBridgeRowPath -PathType Leaf) {
     $VisionBridgeRow = Get-Content -LiteralPath $VisionBridgeRowPath -Raw -Encoding UTF8
     Check ($VisionBridgeRow -match 'title="Look"' -and $VisionBridgeRow -match 'progressText' -and $VisionBridgeRow -match '>ing<') 'DSH-020 Look ing 行消费视觉流式进度'
     Check ($VisionBridgeRow -match 'latestLine\(model\.summary\)' -and $VisionBridgeRow -match 'data-follow-end' -and $VisionBridgeRow -match 'useThrottledVisualUpdate') 'BUG-374ECAE5 Looking 行跟随最新视觉文字'
-    Check ($VisionBridgeRow -match 'function visualProgress' -and $VisionBridgeRow -match 'structuredObject\(text\)\?\.observations' -and $VisionBridgeRow -match 'return visualSummary\(text\)') 'BUG-40D0E1BE Looking 在 summary 后继续投影 observations'
+    Check ($VisionBridgeRow -match 'function latestLine' -and $VisionBridgeRow -match 'latestLine\(model\.summary\)') 'DSH-024 Looking 跟随最新 Markdown 行'
 } else {
     Check $false 'DSH-020 vision-inspect 客户端呈现存在'
 }
@@ -119,6 +127,14 @@ if ((Test-Path -LiteralPath $VisionBridgeRowStylePath -PathType Leaf) -and (Test
     Check $false 'BUG-374ECAE5 视觉与 Tool 行样式存在'
 }
 Check (Test-Path -LiteralPath $VisionBridgeThrottlePath -PathType Leaf) 'BUG-374ECAE5 视觉节流更新实现存在'
+if (Test-Path -LiteralPath $AttachmentSessionViewPath -PathType Leaf) {
+    $AttachmentSessionView = Get-Content -LiteralPath $AttachmentSessionViewPath -Raw -Encoding UTF8
+    Check ($AttachmentSessionView -match "join\(root, 'session-view', scope\)" -and
+        $AttachmentSessionView -match 'await link\(temporary, target\)' -and
+        $AttachmentSessionView -match 'await handle\.chmod\(0o400\)') 'DSH-024 会话图片视图隔离、独占发布且只读'
+} else {
+    Check $false 'DSH-024 会话图片视图源码存在'
+}
 if ((Test-Path -LiteralPath $ToolEventTypesPath -PathType Leaf) -and (Test-Path -LiteralPath $KnownEventTypesPath -PathType Leaf)) {
     $ToolEventTypes = Get-Content -LiteralPath $ToolEventTypesPath -Raw -Encoding UTF8
     $KnownEventTypes = Get-Content -LiteralPath $KnownEventTypesPath -Raw -Encoding UTF8
