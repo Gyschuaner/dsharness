@@ -117,7 +117,7 @@
 
 ### 2.7 Client（handoff §9.5 + 视觉稿）
 
-- 入口不变：`sidebar.footer.action`「扩展」全页；SKILL 直接进入项目管理单页，来源合并/切换内聚到列表与详情；MCP/Plugin 占位不变。左侧扩展类型导航可收起为 64px 图标栏并记住浏览器本地状态。
+- 组合边界（build 22）：`dsh-extension-manager` 独立拥有 `sidebar.footer.action`「扩展」入口、全页壳、导航与 MCP/Plugin 占位，并声明 `extension.manager.section` 列表 Slot；`dsh-skill-manager` 仅注册 `id: skill` 的业务页面。SKILL 直接进入项目管理单页，来源合并/切换内聚到列表与详情。
 - 状态：`selectedProject / selectedSkill / search / enableFilter / tagFilter / selectedRows / presetPreview / slimPreview / drawer`；项目/抽屉切换清理无效选中；行点击与开关点击 `stopPropagation` 防串扰；description 完整多行、不截断不翻译。
 - **项目切换与过期响应丢弃（P1-5）**：`genRef`（单调递增 view 代）+ `projectRef`（当前项目 ref）。`chooseProject` 切换项目时递增 `genRef` 并清空 `view/viewError/drawer/selectedRows/toggling/sourceBusy/presetModal/slimModal` + `viewBusy`；`loadView` 捕获 `gen` 与 `cwd`，仅当代号一致时落地结果，慢 catalog 永不覆盖新项目的 view。所有写操作（`doToggle`/`doBulk`/`doSource`/`doTags`/`applyPreset`/`doSlimApply`）在发起时捕获 `proj` 快照与 `gen`，响应到达当代号不一致（项目已切换）则丢弃（不 patch、不刷新），一致才应用 + `partial` 警告 + `loadView(proj)`；`viewBusy`/`configCorrupt`/`configFuture` 期间写操作禁用。
 - 项目选择：`ctx.get('sessions')` 当前会话 cwd 为默认项目；`ctx.get('workspaces').list.getSnapshot()` 提供最近打开（`items` 按 `updatedAt` 降序，按 projectRoot 去重）；「添加本地项目」优先 `workspaces.pickDirectory()` + `workspaces.create({path})`，能力缺失/取消时降级为手动路径输入（能力不存在时安全降级，handoff §9.5）。
@@ -205,3 +205,16 @@ S9/S10 贯穿：DP 任务描述随进度更新；用例执行记录在验证证�
 - Client DOM：7 pass / 0 fail；Host 回归保持 49 pass / 0 fail / 4 skip；`npm pack --dry-run`、语法检查和 `git diff --check` 通过。
 - 内置浏览器 3080 实测在 catalog 延迟期间看到居中扫描态，catalog 返回后正常回到 68 行列表；页面未新增 console error/warn，未写项目配置。
 - DP：研发任务 `d261bf63-a3f4-4a46-b776-93e963bbecb3`（`done`）；测试用例 `6977f0bc-86c8-4248-ab91-3e55b1843c9f` 已加入计划 `14df386a-eb6e-41dc-8970-3f82c7274f7c`；SIT 平台执行尚未回写。
+
+## 11. 2026-08-24 build 22：扩展壳与 Skill 业务解耦
+
+- 对应 DSH-006 研发任务 `7d03961b-b4a4-46df-8a34-aeabb5d987d6`。此前
+  `dsh-skill-manager` 同时注册主页 `sidebar.footer.action`、维护 SKILL/MCP/Plugin
+  通用导航和实现 Skill 业务，导致主页级扩展能力依赖具体业务插件。
+- 新增 `dsh-extension-manager`：唯一注册主页“扩展”入口，在该注册上声明根作用域列表 Slot
+  `extension.manager.section`，动态投影分区导航，并继续拥有 MCP / Plugin 一期占位。
+- `dsh-skill-manager` 删除全部 `.ext-*` 样式与入口/壳组件，只通过
+  `slots.inject('extension.manager.section', ...)` 注册 `id: skill` 页面；Host API 与
+  SKILL 交互代码不变。壳与业务插件先后任意加载均能组合。
+- 导航收起状态迁移到 `dsh.extensions.navCollapsed`，首次读取兼容旧
+  `smgr.ext.navCollapsed`。Client DOM 增加职责边界与反向加载顺序回归。

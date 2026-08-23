@@ -1,7 +1,7 @@
 {
-  "name": "dsh-skill-manager",
+  "name": "dsh-extension-manager",
   "version": "0.1.0",
-  "description": "DeepSeek Harness SKILL management center with per-project enablement, unified sources, tags, presets, and an Extensions section contribution.",
+  "description": "DeepSeek Harness Extensions shell: sidebar entry, full-page navigation, and an extension section Slot.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

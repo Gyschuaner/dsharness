@@ -1,13 +1,13 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 21
+ * build: 22
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
  * window.__ModuleLoader__. The factory requires only shell seed words
- * (react, @deepseek-ai/dsh-client-ui-primitives) and registers a
- * `sidebar.footer.action` entry: the 「扩展」 sidebar-foot row that opens
- * the frame-wide Extensions page (SKILL / MCP / Plugin).
+ * (react, @deepseek-ai/dsh-client-ui-primitives) and contributes the SKILL
+ * page to the `extension.manager.section` Slot owned by
+ * dsh-extension-manager.
  *
  * build 3: skill packages — skills sharing a prefix (first hyphen part)
  * with 3+ members collapse into one package row (default folded, per-root
@@ -69,6 +69,9 @@
  * build 21: the first catalog load gets a centered Skill scan state with a
  * restrained pulse/sweep animation, descriptive status copy, and a
  * prefers-reduced-motion static fallback.
+ * build 22: the generic sidebar entry, full-page shell, and MCP / Plugin
+ * placeholders move to dsh-extension-manager. This plugin now owns only the
+ * SKILL section and its `/api/skill-manager` business API.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -141,51 +144,6 @@
 				'.smgr-policy{display:flex;align-items:center;gap:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;padding:8px 12px}',
 				'.smgr-policyMain{flex:1;min-width:0}',
 				'.smgr-policyDesc{display:block;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
-				// ── DSH-006: sidebar-foot 「扩展」 entry + full page ────────────
-				'.ext-layer{flex:none;align-items:center;width:100%;height:49px;margin:8px 0 0;display:flex;position:relative}',
-				'.ext-layerRail{width:36px;height:36px;margin:0}',
-				'.ext-trigger{width:100%;height:49px;color:var(--dsw-alias-label-primary);cursor:pointer;background:0 0;border:none;border-radius:12px;align-items:center;gap:8px;padding:0 8px 0 6px;font-family:inherit;font-size:14px;display:inline-flex;overflow:hidden}',
-				'.ext-trigger:hover{background:var(--dsw-alias-interactive-bg-hover-solid)}',
-				'.ext-triggerActive,.ext-triggerActive:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-				'.ext-triggerLabel{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}',
-				'.ext-layerRail .ext-trigger{border-radius:50%;justify-content:center;gap:0;width:36px;height:36px;padding:0}',
-				'.ext-icon{flex:none;color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;justify-content:center}',
-				'.ext-layerRail .ext-icon{color:var(--dsw-alias-label-primary)}',
-				'.ext-page{position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;background:var(--dsw-alias-bg-base);display:flex;flex-direction:column;color:var(--dsw-alias-label-primary)}',
-				'.ext-top{flex:none;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--dsw-alias-border-l2);padding:13px 20px}',
-				'.ext-topTitle{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}',
-				'.ext-topTitle .ext-icon{color:var(--dsw-alias-label-primary)}',
-				'.ext-topSub{font-size:13px;color:var(--dsw-alias-label-quaternary);font-weight:500}',
-				'.ext-close{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 9px;font-size:15px;line-height:1;margin-left:auto}',
-				'.ext-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.ext-body{flex:1;min-height:0;display:flex}',
-				'.ext-nav{box-sizing:border-box;flex:none;width:156px;border-right:1px solid var(--dsw-alias-border-l2);padding:10px 8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;transition:width .16s ease,padding .16s ease}',
-				'.ext-navCollapsed{width:64px;padding-left:8px;padding-right:8px}',
-				'.ext-navHead{display:flex;align-items:center;min-height:32px;padding:0 4px}',
-				'.ext-navTitle{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--dsw-alias-label-quaternary)}',
-				'.ext-navToggle{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex:none}',
-				'.ext-navToggle:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.ext-navList{display:flex;flex-direction:column;gap:3px}',
-				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:9px;padding:8px 9px;text-align:left;font:inherit;display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:8px;align-items:center;min-height:40px}',
-				'.ext-navBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.ext-navBtnActive{background:var(--dsw-alias-fill-tsp-secondary);background:color-mix(in srgb,var(--dsw-static-blue-500) 8%,var(--dsw-alias-bg-module-platform));color:var(--dsw-alias-label-primary)}',
-				'.ext-navBtnActive:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 11%,var(--dsw-alias-bg-module-platform))}',
-				'.ext-navIcon{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;color:currentColor}',
-				'.ext-navCopy{min-width:0;display:flex;align-items:center}',
-				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}',
-				'.ext-soon{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-tertiary);padding:0 6px;font-size:10px;font-weight:500;line-height:16px;white-space:nowrap}',
-				'.ext-navSoonDot{position:absolute;right:-1px;top:-1px;width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-label-quaternary);border:1px solid var(--dsw-alias-bg-base)}',
-				'.ext-navCollapsed .ext-navTitle,.ext-navCollapsed .ext-navCopy{display:none}',
-				'.ext-navCollapsed .ext-navHead{justify-content:center;padding:0}',
-				'.ext-navCollapsed .ext-navToggle{margin-left:0}',
-				'.ext-navCollapsed .ext-navBtn{display:flex;align-items:center;justify-content:center;width:46px;min-height:44px;padding:10px 0}',
-				'.ext-navCollapsed .ext-navIcon{width:20px;height:20px}',
-				'.ext-main{flex:1;min-width:0;min-height:0;overflow:hidden;padding:16px 20px}',
-				'.ext-placeholder{max-width:520px;display:flex;flex-direction:column;gap:10px;padding:48px 0}',
-				'.ext-phIcon{color:var(--dsw-alias-label-quaternary)}',
-				'.ext-placeholder h3{margin:0;font-size:16px;font-weight:600}',
-				'.ext-placeholder p{margin:0;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.7}',
-				'.ext-phSoon{color:var(--dsw-alias-label-quaternary);font-size:12px}',
 				// ── DSH-008 V1: per-project SKILL management ─────────────────
 				'.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%;max-width:1180px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
 				'.sk-content{position:relative;isolation:isolate;display:flex;flex:1;min-height:0}',
@@ -379,10 +337,10 @@
 				'.sk-presetSaveSummary{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l2);border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
 				'.sk-presetSaveSummary strong{font-weight:600;color:var(--dsw-alias-label-primary)}',
 				'.sk-presetSaveSummary span{font-size:11px;color:var(--dsw-alias-label-quaternary)}',
-				'@media(max-width:900px){.ext-nav:not(.ext-navCollapsed){width:168px;padding:10px}.ext-main{padding:16px}.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
-				'@media(max-width:680px){.ext-nav{display:none}.ext-main{padding:12px}.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}}',
+				'@media(max-width:900px){.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
+				'@media(max-width:680px){.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}}',
 				'@media(max-width:600px){[role="dialog"]:has(.sk-presetApply),[role="dialog"]:has(.sk-presetSave){width:calc(100vw - 24px)}.sk-presetApply,.sk-presetSave{width:auto}.sk-presetMode{grid-template-columns:1fr}.sk-presetImpact{align-items:flex-start;flex-direction:column;gap:3px}.sk-presetFooter{flex-wrap:wrap}.sk-presetFooterLeft{width:100%}}',
-				'@media(max-width:480px){.ext-top{padding:12px}.ext-topTitle{white-space:nowrap}.ext-topSub{display:none}.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}'
+				'@media(max-width:480px){.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}'
 			].join('');
 			document.head.appendChild(style);
 
@@ -2505,183 +2463,6 @@
 				return h(SkillCenterV1Body, { api: api, ctx: ctx });
 			}
 
-			// ── DSH-006: 扩展 entry icon + full page ─────────────────────────
-			/** Extensions grid glyph: three filled tiles + one dashed "future" slot. */
-			function ExtIcon(props) {
-				var size = (props && props.size) || 16;
-				return h(
-					'svg',
-					{ width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
-					h('rect', { x: 1.5, y: 1.5, width: 5.5, height: 5.5, rx: 1.5, fill: 'currentColor' }),
-					h('rect', { x: 9, y: 1.5, width: 5.5, height: 5.5, rx: 1.5, fill: 'currentColor', opacity: 0.55 }),
-					h('rect', { x: 1.5, y: 9, width: 5.5, height: 5.5, rx: 1.5, fill: 'currentColor', opacity: 0.55 }),
-					h('rect', { x: 9, y: 9, width: 5.5, height: 5.5, rx: 1.5, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeDasharray: '2 1.8' })
-				);
-			}
-
-			var EXT_TABS = [
-				{ id: 'skill', label: 'SKILL', desc: 'Skills 技能管理', icon: P.IconSkillOutline16 },
-				{ id: 'mcp', label: 'MCP', desc: 'Model Context Protocol 服务器', soon: true, icon: P.IconLinkOutline16 },
-				{ id: 'plugin', label: 'Plugin', desc: '已安装插件', soon: true, icon: P.IconCordisPluginOutline14 }
-			];
-			function readExtNavCollapsed() {
-				try { return window.localStorage.getItem('smgr.ext.navCollapsed') === '1'; }
-				catch (error) { return false; }
-			}
-
-			function ExtPlaceholder(props) {
-				return h(
-					'div',
-					{ className: 'ext-placeholder' },
-					h('div', { className: 'ext-phIcon' }, h(ExtIcon, { size: 28 })),
-					h('h3', null, props.title),
-					h('p', null, props.body),
-					h('p', { className: 'ext-phSoon' }, '预计能力：' + props.planned)
-				);
-			}
-
-			/** The frame-wide Extensions page (SKILL / MCP / Plugin). */
-			function ExtensionsPage(props) {
-				var api = props.api;
-				var ctx = props.ctx;
-				var onClose = props.onClose;
-				// Keep the latest onClose in a ref so the Esc listener is
-				// registered exactly once per mount. The inline onClose prop
-				// changes identity on every re-render of the sidebar entry;
-				// re-registering on each change drifted this page-level
-				// handler to AFTER the drawer's own Esc handler, whose React
-				// close flushes synchronously — so the page handler then saw
-				// no dialog left and closed the whole Extensions page.
-				var onCloseRef = React.useRef(onClose);
-				onCloseRef.current = onClose;
-				var [tab, setTab] = React.useState('skill');
-				var [navCollapsed, setNavCollapsed] = React.useState(readExtNavCollapsed);
-				function toggleNav() {
-					var next = !navCollapsed;
-					setNavCollapsed(next);
-					try { window.localStorage.setItem('smgr.ext.navCollapsed', next ? '1' : '0'); } catch (error) {}
-				}
-				React.useEffect(function () {
-					function onKey(event) {
-						if (event.key !== 'Escape') return;
-						// An inner dialog (the drawer) owns Esc first.
-						if (document.querySelector('[role="dialog"]') !== null) return;
-						onCloseRef.current();
-					}
-					document.addEventListener('keydown', onKey);
-					return function () { document.removeEventListener('keydown', onKey); };
-				}, []);
-				return h(
-					'div',
-					{ className: 'ext-page', role: 'region', 'aria-label': '扩展管理' },
-					h(
-						'header',
-						{ className: 'ext-top' },
-						h('div', { className: 'ext-topTitle' }, h(ExtIcon, { size: 20 }), '扩展'),
-						h('span', { className: 'ext-topSub' }, '/ ' + tab.toUpperCase()),
-						h('button', { type: 'button', className: 'ext-close', 'aria-label': '关闭扩展页', title: '关闭（Esc）', onClick: onClose }, '✕')
-					),
-					h(
-						'div',
-						{ className: 'ext-body' },
-						h(
-							'nav',
-							{ className: 'ext-nav' + (navCollapsed ? ' ext-navCollapsed' : ''), 'aria-label': '扩展类型' },
-							h(
-								'div',
-								{ className: 'ext-navHead' },
-								h('span', { className: 'ext-navTitle' }, '扩展类型'),
-								h('button', {
-									type: 'button',
-									className: 'ext-navToggle',
-									'aria-label': navCollapsed ? '展开扩展类型导航' : '收起扩展类型导航',
-									'aria-expanded': !navCollapsed,
-									title: navCollapsed ? '展开导航' : '收起导航',
-									onClick: toggleNav
-								}, h(navCollapsed ? P.IconChevronRightOutline14 : P.IconChevronLeftOutline14))
-							),
-							h(
-								'div',
-								{ className: 'ext-navList' },
-								EXT_TABS.map(function (t) {
-									return h(
-										'button',
-										{
-											key: t.id,
-											type: 'button',
-											className: 'ext-navBtn' + (tab === t.id ? ' ext-navBtnActive' : ''),
-											'aria-label': t.label + (t.soon ? '（建设中）' : ''),
-											title: navCollapsed ? t.label + (t.soon ? '（建设中）' : '') : undefined,
-											onClick: function () { setTab(t.id); }
-										},
-										h('span', { className: 'ext-navIcon' }, h(t.icon),
-											navCollapsed && t.soon ? h('span', { className: 'ext-navSoonDot', 'aria-hidden': true }) : null),
-										h(
-											'span',
-											{ className: 'ext-navCopy' },
-											h(
-												'span',
-												{ className: 'ext-navLabel' },
-												t.label,
-												t.soon ? h('span', { className: 'ext-soon' }, '建设中') : null
-											)
-										)
-									);
-								})
-							)
-						),
-						h(
-							'main',
-							{ className: 'ext-main' },
-							tab === 'skill'
-								? h(SkillCenterV1, { api: api, ctx: ctx })
-								: tab === 'mcp'
-									? h(ExtPlaceholder, {
-										key: 'mcp',
-										title: 'MCP 管理（建设中）',
-										body: 'MCP（Model Context Protocol）服务器把外部工具接入 DSH，模型会以原生工具形式调用它们。当前 MCP 服务器在 web profile 的 cordis 配置中以 dsh-mcp-client 插件行声明。',
-										planned: '服务器列表与连接状态、工具清单、新增/编辑/删除配置、保存后热加载（无需重启 dsh web）。'
-									})
-									: h(ExtPlaceholder, {
-										key: 'plugin',
-										title: '插件管理（建设中）',
-										body: '展示已安装到 web profile 的 DSH 插件（如 skill-manager）：名称、版本、来源与启用状态。',
-										planned: '已安装插件列表、启用/停用（从组合树摘除/挂回）、安装来源与版本信息。'
-									})
-						)
-					)
-				);
-			}
-
-			/** Sidebar-foot 「扩展」 row: icon + label (wide) or round icon (rail). */
-			function ExtensionsEntry(props) {
-				var wide = props.wide;
-				var api = props.api;
-				var [open, setOpen] = React.useState(false);
-				return h(
-					React.Fragment,
-					null,
-					h(
-						'div',
-						{ className: 'ext-layer' + (wide ? '' : ' ext-layerRail') },
-						h(
-							'button',
-							{
-								type: 'button',
-								className: 'ext-trigger' + (open ? ' ext-triggerActive' : ''),
-								'aria-label': '扩展',
-								'aria-expanded': open,
-								title: wide ? '扩展' : undefined,
-								onClick: function () { setOpen(true); }
-							},
-							h(ExtIcon, { size: wide ? 16 : 18 }),
-							wide ? h('span', { className: 'ext-triggerLabel' }, '扩展') : null
-						)
-					),
-					open ? h(ExtensionsPage, { api: api, ctx: props.ctx, onClose: function () { setOpen(false); } }) : null
-				);
-			}
-
 			// ── plugin module (the client half of dsh-skill-manager) ──────────
 			var module = { exports: {} };
 			module.exports.name = 'skill-manager-ui';
@@ -2689,16 +2470,15 @@
 			module.exports.apply = function (ctx) {
 				var slots = ctx.get('slots');
 				if (slots === undefined || typeof slots.register !== 'function') return;
-				// DSH-006: the Skills management page moved out of Settings into
-				// the frame-wide Extensions page; the only entry is the
-				// sidebar-foot 「扩展」 row (additive seat, no shell change).
-				slots.inject('sidebar.footer.action', function () {
+				// DSH-006 build 22: the generic Extensions shell owns the sidebar
+				// entry. This plugin contributes only its SKILL business page.
+				slots.inject('extension.manager.section', function () {
 					return slots.register(
 						{
-							name: 'sidebar.footer.action',
-							id: 'extensions-page',
-							order: 100,
-							label: function () { return '扩展'; },
+							name: 'extension.manager.section',
+							id: 'skill',
+							order: 10,
+							label: function () { return 'SKILL'; },
 							inject: function () {
 								return {
 									api: {
@@ -2711,7 +2491,7 @@
 								};
 							}
 						},
-						ExtensionsEntry
+						SkillCenterV1
 					);
 				});
 			};

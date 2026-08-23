@@ -110,7 +110,7 @@ function jsonResponse(value, status = 200) {
 	};
 }
 
-async function makeHarness(router, { current = '/project-a', workspaces = [] } = {}) {
+async function makeHarness(router, { current = '/project-a', workspaces = [], pluginOrder = ['skill', 'extension'] } = {}) {
 	const dom = new JSDOM('<!doctype html><html><head></head><body><div id="root"></div></body></html>', { url: 'http://127.0.0.1:3080/' });
 	const previous = {};
 	for (const key of ['window', 'document', 'HTMLElement', 'Node', 'Event', 'MouseEvent', 'KeyboardEvent', 'MutationObserver', 'localStorage', 'fetch', 'IS_REACT_ACT_ENVIRONMENT']) {
@@ -136,7 +136,6 @@ async function makeHarness(router, { current = '/project-a', workspaces = [] } =
 	};
 	dom.window.fetch = globalThis.fetch;
 
-	let registration = null;
 	const sessions = {
 		list: {
 			getSnapshot: () => ({ current: 'session-a', byId: { 'session-a': { cwd: current } } }),
@@ -145,11 +144,59 @@ async function makeHarness(router, { current = '/project-a', workspaces = [] } =
 	const workspaceService = {
 		list: { getSnapshot: () => ({ items: workspaces }) },
 	};
+	const specs = new Map([['sidebar.footer.action', { kind: 'list', scope: 'root' }]]);
+	const registrations = new Map();
+	const waiters = new Map();
+	const listeners = new Map();
+	const versions = new Map();
+	function notify(name) {
+		versions.set(name, (versions.get(name) || 0) + 1);
+		for (const listener of listeners.get(name) || []) listener();
+	}
+	function invoke(callback) {
+		const result = callback();
+		if (result && typeof result.next === 'function') {
+			for (let step = result.next(); !step.done; step = result.next()) {}
+		}
+		return result;
+	}
+	function declare(children) {
+		for (const [name, spec] of Object.entries(children || {})) {
+			specs.set(name, spec);
+			const pending = waiters.get(name) || [];
+			waiters.delete(name);
+			for (const callback of pending) invoke(callback);
+		}
+	}
 	const slots = {
-		inject: (_name, callback) => callback(),
-		register: (definition, component) => {
-			registration = { definition, component };
-			return registration;
+		inject(name, callback) {
+			if (specs.has(name)) return invoke(callback);
+			const pending = waiters.get(name) || [];
+			pending.push(callback);
+			waiters.set(name, pending);
+			return () => {};
+		},
+		register(definition, component) {
+			assert.ok(specs.has(definition.name), `slot ${definition.name} must be declared before registration`);
+			const entry = { definition, options: definition, component, inject: definition.inject };
+			const list = registrations.get(definition.name) || [];
+			list.push(entry);
+			registrations.set(definition.name, list);
+			declare(definition.children);
+			notify(definition.name);
+			return () => {
+				const currentEntries = registrations.get(definition.name) || [];
+				registrations.set(definition.name, currentEntries.filter((candidate) => candidate !== entry));
+				notify(definition.name);
+			};
+		},
+		entries(name) { return [...(registrations.get(name) || [])]; },
+		getVersion(name) { return versions.get(name) || 0; },
+		subscribe(name, listener) {
+			const set = listeners.get(name) || new Set();
+			set.add(listener);
+			listeners.set(name, set);
+			return () => { set.delete(listener); };
 		},
 	};
 	const ctx = {
@@ -176,22 +223,39 @@ async function makeHarness(router, { current = '/project-a', workspaces = [] } =
 			React.createElement('footer', null, props.footer));
 	}
 	const primitives = new Proxy({ Button, Modal }, { get: (target, key) => target[key] || icon });
-	let loadedDefinition = null;
-	dom.window.__ModuleLoader__ = { load: (definition) => { loadedDefinition = definition; } };
-	const bundle = readFileSync(join(here, '..', 'lib', 'client.js'), 'utf8');
-	new Function(bundle)();
-	assert.ok(loadedDefinition, 'client bundle registered with the module loader');
-	const plugin = loadedDefinition.factory((id) => {
-		if (id === 'react') return React;
-		if (id === '@deepseek-ai/dsh-client-ui-primitives') return primitives;
-		throw new Error(`unexpected client require: ${id}`);
-	});
-	plugin.apply(ctx);
-	assert.ok(registration, 'sidebar registration captured');
+	function loadPlugin(kind) {
+		let loadedDefinition = null;
+		dom.window.__ModuleLoader__ = { load: (definition) => { loadedDefinition = definition; } };
+		const bundlePath = kind === 'skill'
+			? join(here, '..', 'lib', 'client.js')
+			: join(here, '..', '..', 'extension-manager', 'lib', 'client.js');
+		new Function(readFileSync(bundlePath, 'utf8'))();
+		assert.ok(loadedDefinition, `${kind} client bundle registered with the module loader`);
+		const plugin = loadedDefinition.factory((id) => {
+			if (id === 'react') return React;
+			if (id === '@deepseek-ai/dsh-client-ui-primitives') return primitives;
+			throw new Error(`unexpected client require: ${id}`);
+		});
+		plugin.apply(ctx);
+	}
+	for (const kind of pluginOrder) loadPlugin(kind);
+	const sidebarEntries = slots.entries('sidebar.footer.action');
+	assert.equal(sidebarEntries.length, 1, 'the Extensions shell is the only sidebar registration');
+	const registration = sidebarEntries[0];
+	function renderSlot(name, owner = {}, options = {}) {
+		const selected = slots.entries(name).filter((entry) => options.only === undefined || entry.definition.id === options.only);
+		return React.createElement(React.Fragment, null, selected.map((entry) => React.createElement(
+			entry.component,
+			Object.assign({ key: entry.definition.id || entry.definition.name }, owner, entry.definition.inject ? entry.definition.inject() : {}, entry.definition.children ? { renderSlot } : {})
+		)));
+	}
 	const rootNode = dom.window.document.getElementById('root');
 	const reactRoot = createRoot(rootNode);
 	await act(async () => {
-		reactRoot.render(React.createElement(registration.component, Object.assign({ wide: true }, registration.definition.inject())));
+		reactRoot.render(React.createElement(registration.component, Object.assign(
+			{ wide: true, renderSlot },
+			registration.definition.inject ? registration.definition.inject() : {}
+		)));
 	});
 
 	async function click(element) {
@@ -217,7 +281,7 @@ async function makeHarness(router, { current = '/project-a', workspaces = [] } =
 			else globalThis[key] = value;
 		}
 	}
-	return { dom, click, flush, button, open, cleanup };
+	return { dom, click, flush, button, open, cleanup, registrations, slots };
 }
 
 test('real client bundle renders a denoised project view, first-sentence rows, full drawer descriptions and actions', async (t) => {
@@ -370,7 +434,7 @@ test('extension type navigation collapses to icons and persists across reopen', 
 	assert.equal(collapse.getAttribute('aria-expanded'), 'true');
 	await h.click(collapse);
 	assert.ok(h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
-	assert.equal(h.dom.window.localStorage.getItem('smgr.ext.navCollapsed'), '1');
+	assert.equal(h.dom.window.localStorage.getItem('dsh.extensions.navCollapsed'), '1');
 	assert.deepEqual(
 		[...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.getAttribute('title')),
 		['SKILL', 'MCP（建设中）', 'Plugin（建设中）'],
@@ -384,7 +448,31 @@ test('extension type navigation collapses to icons and persists across reopen', 
 	assert.equal(expand.getAttribute('aria-expanded'), 'false');
 	await h.click(expand);
 	assert.ok(!h.dom.window.document.querySelector('.ext-nav').classList.contains('ext-navCollapsed'));
-	assert.equal(h.dom.window.localStorage.getItem('smgr.ext.navCollapsed'), '0');
+	assert.equal(h.dom.window.localStorage.getItem('dsh.extensions.navCollapsed'), '0');
+});
+
+test('extension shell owns the frame entry and composes Skill in either plugin load order', async (t) => {
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable'] };
+		if (body.op === 'catalog') return view('/project-a', [row('alpha-skill', 'alpha')]);
+		if (body.op === 'presets.list') return { presets: [] };
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router, { pluginOrder: ['extension', 'skill'] });
+	t.after(h.cleanup);
+	assert.equal(h.registrations.get('sidebar.footer.action').length, 1);
+	assert.equal(h.registrations.get('sidebar.footer.action')[0].definition.id, 'extensions-page');
+	assert.deepEqual(
+		h.registrations.get('extension.manager.section').map((entry) => entry.definition.id).sort(),
+		['mcp', 'plugin', 'skill'],
+	);
+	assert.equal(h.dom.window.document.querySelectorAll('style[data-plugin="dsh-extension-manager"]').length, 1);
+	assert.equal(h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent.includes('.ext-page'), false);
+	await h.open();
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'MCP建设中', 'Plugin建设中']);
+	assert.ok(h.dom.window.document.querySelector('.sk-root'), 'the Skill contribution renders through the shell-owned Slot');
+	await h.click(h.button('MCP建设中'));
+	assert.ok(h.dom.window.document.body.textContent.includes('MCP 管理（建设中）'));
 });
 
 test('Skill catalog loading uses the animated scan state with a reduced-motion fallback', async (t) => {
