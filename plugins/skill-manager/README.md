@@ -1,26 +1,23 @@
 # dsh-skill-manager
 
-DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增「扩展」一级入口，
-点开全页「扩展」视图，统一管理 DSH 的扩展能力（DSH-006；SKILL 管理中心 V1 重构 DSH-008）。
+DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
+`/api/skill-manager` Host API，并向 `dsh-extension-manager` 声明的
+`extension.manager.section` Slot 注册 SKILL 页面；不再拥有主页“扩展”入口或通用页面壳。
 
 - **SKILL 分区**（DSH-008 V1）：单一项目管理页面，按项目启用/禁用 Skill、批量启停、
   一键精简、保存/应用自定义预设（替换/合并预览）、全局标签和项目选择器；全部支持目录
   中的同名 Skill 仍合并为一个身份，详情列出全部来源并允许当前项目显式选择来源。
   - 运行中的 host 尚未加载 apiVersion 6（未重启 `dsh web`）时，自动降级为
     旧版单页界面（见下方「旧版功能」）并显示提示条。
-- **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
+- 通用“扩展”入口、左导航以及 MCP / Plugin 占位由独立的
+  [`dsh-extension-manager`](../extension-manager/README.md) 负责。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 21 / DSH-008 V1）
+## 页面结构（build 22 / DSH-008 V1）
 
-- **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
-  宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
-- **全页视图**：fixed 全屏覆盖（z-index 200，位于侧边浮动面板(30)之上、Modal(1000)/toast(1100)
-  之下，SKILL 分区内的导入/删除确认弹窗仍正常浮于其上）。顶栏标题 + 关闭按钮；
-  左导航 SKILL / MCP / Plugin（建设中带徽标）可在 156px 完整态与 64px 图标态间切换；
-  完整态只保留名称与必要状态，不重复解释每个分区，
-  收起状态保存在浏览器本地；右侧为内容区。Esc 或关闭按钮退出
-  （弹窗打开时 Esc 优先给弹窗；详情抽屉打开时 Esc 先关抽屉）。
+- **组合入口**：Client 只通过 `slots.inject('extension.manager.section', ...)` 注册
+  `id: skill` 的业务分区。`dsh-extension-manager` 独立注册 `sidebar.footer.action`，
+  声明分区 Slot，并拥有全页框架、导航收起状态、Esc/关闭行为和 MCP / Plugin 占位。
 - **SKILL 分区（V1）**：不再使用重复的子页签，直接进入项目管理单页。
   - 顶部项目控制栏压缩为单行，只展示当前项目名称、已启用/总数、「切换项目」和「预设」；
     完整路径只放在标题和详情的按需信息中，历史选择不会覆盖当前会话工作区，切换菜单仍包含
@@ -183,20 +180,24 @@ YAML frontmatter 必须含 `name`（kebab-case）与 `description`。
 
 ## 安装方式（本机已装）
 
-1. 插件源码：`C:\Users\chuansgu\.dsh\plugins\skill-manager\`
-2. 已用官方命令装入 web profile：`dsh plugin --profile web add <源码目录>`
-   （登记进 `~/.dsh/profiles/web/package.json` 依赖，包落在 `~/.dsh/profiles/node_modules/`）
-3. `~/.dsh/profiles/web/cordis.patch.yml`（profile 用户层，热监听）加了一行：
+1. 分别将 `plugins/extension-manager` 和 `plugins/skill-manager` 通过 junction/link
+   挂到 `~/.dsh/plugins/`。
+2. 用官方命令将 `dsh-extension-manager`、`dsh-skill-manager` 两个依赖装入 web profile。
+3. `~/.dsh/profiles/web/cordis.patch.yml`（profile 用户层，热监听）按顺序加入：
    ```yaml
-   - id: skill-manager
-     name: 'dsh-skill-manager'
+   - insert:
+     - id: extension-manager
+       name: 'dsh-extension-manager'
+   - insert:
+     - id: skill-manager
+       name: 'dsh-skill-manager'
    ```
    该层对 web profile 的所有会话、所有 preset 生效 —— 所以无需切换 preset，刷新页面即可见。
 
 ## 卸载
 
 ```powershell
-# 1) 从用户层移除插件行（编辑 ~/.dsh/profiles/web/cordis.patch.yml，删掉那一行）
+# 1) 从用户层移除 skill-manager 插件行；若没有其他分区再移除 extension-manager
 # 2) 移除 profile 依赖
 dsh plugin --profile web remove dsh-skill-manager
 # 3) 删除源码目录
@@ -235,7 +236,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
   多来源预设冲突，以及已全局关闭的用户 Skill / 其他 preset bundled Skill 在项目启用后
   物化为真实可调用副本；并验证单项快速路径、缓存失效安全回退、配置写入失败时文件与配置回滚。
-- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：7 用例直接执行
+- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：8 用例直接执行
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖单页信息架构、可收起导航、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
   丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚、扫描加载态和旧 Host 降级。
@@ -252,15 +253,18 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   同一设计语言的一体化编辑面板，build 17 移除默认列表的启用/未启用自动分组并以淡蓝底色标记
   保持原位的已启用行，build 18 移除重复资源库入口并加入可持久化的左导航收起态，build 19
   将项目上下文压为单行、低频动作收进菜单、列表 description 收为第一句并按需展开来源与技术信息，build 20
-  为单项启停加入乐观更新、安静保存态与失败回滚，build 21 为首次 catalog 加入居中的 Skill 扫描加载态；主题只用
+  为单项启停加入乐观更新、安静保存态与失败回滚，build 21 为首次 catalog 加入居中的 Skill 扫描加载态，
+  build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
-  入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
+  Skill 页面注册在 `extension.manager.section`；本插件中不再出现 `sidebar.footer.action` 或 `.ext-*` 壳样式。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，
   目标路径做包含性校验；内置根一律只读（save/delete 返回 403）；
   V1 派生产物只增删 marker 验证过的文件，外来同名文件永不触碰。
 
 ## 规划（二期待立项）
 
+- 分区壳与占位已归 `dsh-extension-manager`；后续 MCP / Plugin 业务应分别实现为新的
+  `extension.manager.section` 贡献插件，而不是继续写回 `skill-manager`。
 - **MCP 分区**：列出 web profile cordis 配置中的 `dsh-mcp-client` 服务器
   （serverName、stdio/HTTP 传输、命令/URL）与连接状态、工具清单；
   支持新增/编辑/删除（回写 profile 配置，利用 MCP 客户端原生 HMR 热加载，无需重启）。
