@@ -352,6 +352,22 @@ Fix: Completed. Re-scan the identity catalog after file-affecting mutation plann
 
 Verification: Pure-source transition now asserts HTTP 200, correct bytes, and correct persisted source selection.
 
+### AUDIT-021 | low | build reproducibility | confirmed during committed-diff review
+
+DP Bug: `BUG-98688E1C`
+
+Location: `.gitattributes` and generated `plugins/*/lib/*` outputs.
+
+Trigger: Build a clean checkout on Windows with the system Git configuration `core.autocrlf=true`.
+
+Impact: TypeScript rewrites generated JavaScript and declarations with LF. Their content hashes still match the index, but Git reports every generated file as modified because checkout filtering and compiler output disagree, making clean-build status checks noisy and unreliable.
+
+Evidence: The independent checkout passed all 115 tests, `git hash-object` matched the index for every reported file, and `git diff --quiet` returned clean while porcelain status reported 33 modified generated files.
+
+Fix: Completed. Declare generated JavaScript and declaration files as `text eol=lf`, matching TypeScript's deterministic output.
+
+Verification: A second independent clone/build must finish with both an empty `git status --short` and a clean content diff.
+
 ## Fix completion matrix
 
 All confirmed findings are implemented on the DSH-029 branch; final commit IDs are appended after the verified commit is created.
@@ -378,6 +394,7 @@ All confirmed findings are implemented on the DSH-029 branch; final commit IDs a
 | AUDIT-018 | BUG-EFE4534A | Fixed | manifest/dependency identity boundary regression |
 | AUDIT-019 | BUG-F61C8312 | Fixed | legacy/unmarked copy safety regression |
 | AUDIT-020 | BUG-D7644EBA | Fixed | refreshed post-source-mutation reconcile regression |
+| AUDIT-021 | BUG-98688E1C | Fixed | clean Windows clone/build leaves generated outputs clean |
 
 ## Fix batches and commits
 
@@ -421,6 +438,6 @@ Pending after all fixes and the TypeScript migration.
 
 ## Migration checkpoint summary
 
-- Confirmed findings after migration/re-review: 7 high, 9 medium, 4 actionable low (20 total).
-- Implemented fixes: 20; open confirmed defects at this checkpoint: 0.
+- Confirmed findings after migration/re-review: 7 high, 9 medium, 5 actionable low (21 total).
+- Implemented fixes: 21; open confirmed defects at this checkpoint: 0.
 - Hand-written JavaScript remaining: 0. `plugins/*/src/*.ts` and TypeScript tests/configuration are the source of truth; `plugins/*/lib/*.js` is generated runtime output.
