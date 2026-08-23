@@ -276,13 +276,36 @@ test('real client bundle renders both pages, full descriptions, guarded update b
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setSource' && call.cwd === '/project-a' && call.source === 'global-claude'));
 
-	const tagInput = h.dom.window.document.querySelector('input[placeholder="＋ 添加标签"]');
+	assert.ok(h.dom.window.document.querySelector('.sk-tagPanel'), 'tag editor is a single grouped control');
+	assert.equal(h.dom.window.document.querySelector('.sk-tagScope').textContent, '全局共享');
+	assert.equal(h.dom.window.document.querySelector('.sk-tagFoot').textContent, '按 Enter 添加0/20 · 每个最多 32 字符');
+	const emptyTagAdd = h.dom.window.document.querySelector('.sk-tagAdd');
+	assert.equal(emptyTagAdd.disabled, true, 'empty tag keeps the add action disabled');
+	const tagInput = h.dom.window.document.querySelector('input[aria-label="新标签"]');
+	assert.equal(tagInput.getAttribute('maxlength'), '32');
+	assert.equal(tagInput.getAttribute('placeholder'), '输入标签');
 	await act(async () => {
 		Simulate.change(tagInput, { target: { value: '测试' } });
 	});
-	await h.click(h.button('添加'));
+	assert.equal(h.dom.window.document.querySelector('.sk-tagAdd').disabled, false);
+	await h.click(h.dom.window.document.querySelector('.sk-tagAdd'));
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setTags' && call.tags.includes('测试')));
+	assert.ok(h.dom.window.document.querySelector('[aria-label="已有标签"]'));
+	assert.ok(h.dom.window.document.querySelector('button[aria-label="移除标签「测试」"]'));
+
+	const tagWrites = calls.filter((call) => call.op === 'setTags').length;
+	const duplicateInput = h.dom.window.document.querySelector('input[aria-label="新标签"]');
+	await act(async () => {
+		Simulate.change(duplicateInput, { target: { value: '测试' } });
+	});
+	assert.ok(h.dom.window.document.querySelector('.sk-tagIssue').textContent.includes('已经存在'));
+	assert.equal(h.dom.window.document.querySelector('.sk-tagAdd').disabled, true, 'duplicate tags cannot be submitted');
+	await act(async () => {
+		Simulate.keyDown(duplicateInput, { key: 'Enter' });
+	});
+	await h.flush();
+	assert.equal(calls.filter((call) => call.op === 'setTags').length, tagWrites);
 	await h.click([...h.dom.window.document.querySelectorAll('.sk-projBtn')].find((item) => item.textContent.includes('全部标签')));
 	assert.ok(h.button('测试'), 'new tag is immediately available in the global tag filter');
 	await h.click(h.button('测试'));

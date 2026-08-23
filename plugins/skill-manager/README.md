@@ -13,7 +13,7 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
 - **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 15 / DSH-008 V1）
+## 页面结构（build 16 / DSH-008 V1）
 
 - **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
   宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
@@ -36,8 +36,9 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
   - **统一资源库**：同名 Skill 合并为一行（「来源 ×N」徽标），搜索/标签筛选，
     点击行打开右侧详情抽屉切换来源；默认优先级 项目专属 > DSH 用户级 > 其他全局 > 内置。
   - **详情抽屉**：启用此 Skill 开关、完整描述、当前来源、可选来源（radio，
-    含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、标签编辑
-    （全局，跨项目共享）、更新状态（V1 不检测远端更新，不伪造数据）、
+    含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、一体化标签编辑器
+    （全局、跨项目共享；已有标签胶囊、回车添加、重复/20 个上限提示、请求期防重复提交）、
+    更新状态（V1 不检测远端更新，不伪造数据）、
     「为此项目特化」（V1.2 能力，只读展示 + 禁用按钮）、高级折叠（路径/格式/附属文件）。
     详情从最新 catalog 派生，不再与列表保存重复快照；窄窗口改为覆盖式抽屉。
 - **SKILL 分区（旧版降级）**：host 未加载 apiVersion 6 时渲染
@@ -222,7 +223,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   build 12 起 SKILL 分区为 V1 双子页 + 详情抽屉（`SkillCenterV1`），
   项目选择器复用 `ctx.get('sessions')` 当前工作区与 `ctx.get('workspaces')`
   （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时安全降级；
-  build 15 按 Product Design 方案 3 重构预设应用/保存弹窗；主题只用
+  build 15 按 Product Design 方案 3 重构预设应用/保存弹窗，build 16 将详情标签区重构为
+  同一设计语言的一体化编辑面板；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
   入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，

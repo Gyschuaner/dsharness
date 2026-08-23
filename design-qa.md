@@ -32,6 +32,73 @@
 
 final result: passed
 
+---
+
+# Skill Manager build 16 · Tag editor Design QA
+
+## Inputs
+
+- Problem-state source capture supplied by the user: `C:\Users\chuansgu\AppData\Local\Temp\codex-clipboard-3264d851-36be-460d-a208-58561bef31de.png`
+- Selected Product Design style truth: `C:\Users\chuansgu\.codex\generated_images\01a02d80-ab9f-7f10-ae90-23b61ac6563f\exec-fb66b855-a747-4e1a-ac0a-08707dc3f7cc.png`
+- Browser capture before the change: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-tag-editor-before-build16.png`
+- Browser capture, empty state: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-tag-editor-empty-build16.png`
+- Browser capture, typed state: `D:\Pythonproject\dsharness\artifacts\design-qa\skill-tag-editor-typed-build16.png`
+- Local implementation URL: `http://127.0.0.1:3080/`
+
+## State, viewport, and normalization
+
+- User crop: 588 × 354 px showing the original tag control and the adjacent update/specialization sections.
+- Style truth: 1487 × 1058 px concept board; it supplies the selected neutral border, compact spacing, persistent-label, and dark-primary-action language rather than an exact tag-editor layout.
+- Implementation captures: 1252 × 945 px from a 1253 × 945 CSS px in-app-browser viewport, DPR 1.5. The screenshot API normalizes output to CSS-pixel dimensions, so density resampling was not required.
+- State: `game`, 11/68 enabled, `developer-platform-cli` detail drawer, no existing tags. Empty and unsaved `研发` input states were captured; browser QA did not mutate the user's global tags.
+- Because the supplied source is a tight crop and the style truth is a concept board, comparison was normalized around the tag region's hierarchy, spacing, tokens, and interaction states rather than absolute page coordinates.
+
+## Full-view comparison evidence
+
+- The style truth, original user crop, and revised typed-state browser capture were opened together in one comparison input at original resolution.
+- The original showed two unrelated low-contrast pills with no container, count, keyboard hint, or clear active state. The revised screen groups input and add action inside one 330 px panel, keeps section spacing aligned with the source selector cards above, and preserves the surrounding update/specialization layout.
+- The typed state maps to the selected direction's dark primary action; the empty state intentionally returns the add action to a quiet disabled treatment.
+
+## Focused-region comparison evidence
+
+- The user crop is itself the focused region. At original size, labels, borders, button states, helper copy, focus outline, and neighboring-section spacing were readable without an additional crop.
+- DOM inspection confirmed `scrollWidth === clientWidth` for the tag panel and a stable 330 px drawer width at the tested viewport.
+
+## Findings
+
+- No actionable P0/P1/P2 issue remains. The editor now communicates one operation, a clear inactive/active primary state, global scope, keyboard behavior, and limits without increasing drawer density.
+- [P3] The focus ring is nearly black in this local theme because `--dsw-alias-brand-primary` resolves to the product's dark brand token. It remains visible and consistent with the selected preset controls, so no one-off color override was added.
+
+## Required fidelity surfaces
+
+- Fonts and typography: the native DSH stack, 11–12.5 px detail scale, uppercase section label, helper line, and button weight preserve the drawer's hierarchy without introducing a new font.
+- Spacing and layout rhythm: 10 px panel radius, 6–10 px internal spacing, aligned heading metadata, and a single 41 px empty composer replace the former disconnected pills.
+- Colors and visual tokens: panel, border, focus, disabled, primary, warning, and text colors use existing `--dsw-alias-*` tokens; there are no hard-coded theme surfaces.
+- Image quality and asset fidelity: this component contains no imagery. The remove action reuses the existing Cordis close icon component; no custom SVG, glyph, emoji, or CSS illustration was introduced.
+- Copy and content: `标签 / 全局共享`, `输入标签`, `按 Enter 添加`, `0/20`, and `每个最多 32 字符` explain scope, action, and constraints in place.
+
+## Primary interactions and accessibility checked
+
+- Empty input keeps the native add button disabled; typing activates the dark primary action and the panel focus state.
+- Input exposes `aria-label="新标签"`, `maxlength=32`, and a described live helper. Remove controls expose per-tag accessible labels and visible keyboard focus.
+- Client DOM regression verifies adding a tag, rendering/removing chips, duplicate detection, duplicate Enter suppression, live counters, and global-filter propagation.
+- Browser interaction checked focus, typed and cleared states without saving; the final empty state restored correctly, the page and panel had no horizontal overflow, and console inspection returned no entries.
+
+## Comparison history
+
+1. Initial user and browser evidence found a P2 hierarchy/affordance issue: the input and add action appeared as unrelated disabled pills, with no container or behavioral guidance. Fixed by introducing `.sk-tagPanel`, `.sk-tagComposer`, explicit heading metadata, helper/count text, and a token-backed active primary button.
+2. Post-fix comparison of the selected style truth, original crop, and revised browser capture found no remaining P0/P1/P2 difference. The near-black focus token remains a P3 theme-system characteristic.
+
+## Implementation checklist
+
+- [x] One grouped tag editor surface
+- [x] Existing-tag chips with accessible remove actions
+- [x] Empty, focus, typed, duplicate, limit, busy, and disabled states
+- [x] Enter-to-add and duplicate-write guard
+- [x] DOM regression and in-app-browser visual evidence
+
+final result: passed
+
 ## Build 14 interaction clarification
 
 - The default project list now exposes only the per-Skill enable/disable switch. Selection checkboxes and “select all” are absent, so the row has one clear state-changing control.

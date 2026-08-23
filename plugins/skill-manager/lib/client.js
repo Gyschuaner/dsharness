@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 15
+ * build: 16
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -275,11 +275,27 @@
 				'.sk-radio{width:13px;height:13px;flex:none;margin-top:2px;border-radius:50%;border:1.5px solid var(--dsw-alias-border-l2);position:relative;background:var(--dsw-alias-bg-module-platform)}',
 				'.sk-radioOn{border-color:var(--dsw-alias-brand-primary)}',
 				'.sk-radioOn:after{content:"";position:absolute;inset:2.5px;border-radius:50%;background:var(--dsw-alias-brand-primary)}',
-				'.sk-tagEdit{display:flex;flex-wrap:wrap;gap:5px;align-items:center}',
-				'.sk-tagX{appearance:none;border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;line-height:1;padding:0;display:inline-flex;align-items:center}',
-				'.sk-tagX:hover{color:var(--dsw-alias-state-error-primary)}',
-				'.sk-tagInput{font:inherit;font-size:12px;background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l2);border-radius:999px;color:inherit;padding:2px 9px;width:118px}',
-				'.sk-tagInput:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
+				'.sk-tagHeading{display:flex;align-items:center;justify-content:space-between;gap:10px}',
+				'.sk-tagScope{font-size:10.5px;color:var(--dsw-alias-label-quaternary)}',
+				'.sk-tagPanel{overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);transition:border-color .12s,box-shadow .12s}',
+				'.sk-tagPanel:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}',
+				'.sk-tagList{display:flex;flex-wrap:wrap;gap:6px;padding:9px 10px}',
+				'.sk-tagList .sk-tag{min-height:25px;padding:3px 6px 3px 9px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);font-size:11.5px;line-height:17px}',
+				'.sk-tagX{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-quaternary);cursor:pointer;line-height:1;padding:2px;border-radius:4px;display:inline-flex;align-items:center}',
+				'.sk-tagX:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-state-error-primary)}',
+				'.sk-tagX:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
+				'.sk-tagX:disabled{cursor:default;opacity:.45}',
+				'.sk-tagComposer{display:flex;align-items:center;gap:8px;padding:6px 7px 6px 10px}',
+				'.sk-tagList+.sk-tagComposer{border-top:1px solid var(--dsw-alias-border-l2)}',
+				'.sk-tagInput{min-width:0;flex:1;font:inherit;font-size:12.5px;line-height:1.5;background:transparent;border:0;color:var(--dsw-alias-label-primary);padding:4px 0}',
+				'.sk-tagInput::placeholder{color:var(--dsw-alias-label-quaternary)}',
+				'.sk-tagInput:focus{outline:0}',
+				'.sk-tagAdd{appearance:none;flex:none;min-width:54px;border:1px solid var(--dsw-alias-label-primary);border-radius:7px;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);cursor:pointer;font:inherit;font-size:11.5px;font-weight:600;line-height:1.4;padding:5px 10px}',
+				'.sk-tagAdd:hover:not(:disabled){opacity:.88}',
+				'.sk-tagAdd:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
+				'.sk-tagAdd:disabled{border-color:transparent;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-quaternary);cursor:default}',
+				'.sk-tagFoot{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:10.5px;line-height:1.4;color:var(--dsw-alias-label-quaternary)}',
+				'.sk-tagIssue{color:var(--dsw-alias-state-warn-primary)}',
 				'.sk-upd{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
 				'.sk-updDot{width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-label-quaternary);flex:none}',
 				'.sk-adv{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;overflow:hidden}',
@@ -1205,6 +1221,7 @@
 				var [saveName, setSaveName] = React.useState('');
 				var [saveDesc, setSaveDesc] = React.useState('');
 				var [tagDraft, setTagDraft] = React.useState('');
+				var [tagBusy, setTagBusy] = React.useState(false);
 				var [advOpen, setAdvOpen] = React.useState(false);
 				var genRef = React.useRef(0); // selected-project generation
 				var viewGenRef = React.useRef(0); // catalog request generation
@@ -1446,24 +1463,30 @@
 				}
 				function doTags(row, tags) {
 					var proj = project;
-					if (viewBusy === true) return;
+					if (viewBusy === true || tagBusy === true) return;
 					var gen = genRef.current;
+					setTagBusy(true);
 					setViewError(null);
 					apiCallAt('setTags', { cwd: proj ? proj.cwd : undefined, name: row.name, tags: tags }, ctx).then(
 						function (value) {
-							if (!isCurrentProject(gen, proj ? proj.cwd : '')) { return; }
+							if (!isCurrentProject(gen, proj ? proj.cwd : '')) { setTagBusy(false); return; }
 							if (value && value.view) { patchRow(value.view); }
 							setTagDraft('');
+							setTagBusy(false);
 						},
-						function (e) { if (isCurrentProject(gen, proj ? proj.cwd : '')) { setViewError(String((e && e.message) || e)); } }
+						function (e) {
+							setTagBusy(false);
+							if (isCurrentProject(gen, proj ? proj.cwd : '')) { setViewError(String((e && e.message) || e)); }
+						}
 					);
 				}
 				function commitTag() {
 					var row = drawerRow;
 					var v = tagDraft.trim();
-					if (row === null || v === '') return;
+					if (row === null || v === '' || tagBusy === true) return;
 					var tags = (row.tags || []).slice();
-					if (tags.indexOf(v) === -1) tags.push(v);
+					if (tags.length >= 20 || tags.indexOf(v) !== -1) return;
+					tags.push(v);
 					doTags(row, tags);
 				}
 
@@ -1740,6 +1763,17 @@
 					var canWrite = project !== null
 						&& viewBusy !== true
 						&& !(view && (view.configCorrupt === true || view.configFuture === true));
+					var tagValues = Array.isArray(row.tags) ? row.tags : [];
+					var normalizedTag = tagDraft.trim();
+					var tagAtLimit = tagValues.length >= 20;
+					var tagDuplicate = normalizedTag !== '' && tagValues.indexOf(normalizedTag) !== -1;
+					var tagCanAdd = canWrite && tagBusy !== true && normalizedTag !== '' && !tagAtLimit && !tagDuplicate;
+					var tagHelpId = 'sk-tag-help-' + row.name;
+					var tagIssue = tagAtLimit
+						? '已达到 20 个标签上限'
+						: tagDuplicate
+							? '这个标签已经存在'
+							: '按 Enter 添加';
 					return h(
 						'aside',
 						{ className: 'sk-drawer', role: 'dialog', 'aria-label': 'Skill 详情：' + row.name },
@@ -1851,40 +1885,56 @@
 							h(
 								'div',
 								{ className: 'sk-sec' },
-								h('div', { className: 'sk-secTitle' }, '标签（全局，跨项目共享）'),
+								h('div', { className: 'sk-tagHeading' },
+									h('div', { className: 'sk-secTitle' }, '标签'),
+									h('span', { className: 'sk-tagScope' }, '全局共享')),
 								h(
 									'div',
-									{ className: 'sk-tagEdit' },
-									(row.tags || []).map(function (t) {
-										return h('span', { key: t, className: 'sk-tag' },
-											t,
-											h('button', {
-												type: 'button',
-											className: 'sk-tagX',
-											title: '移除标签「' + t + '」',
-											disabled: !canWrite,
-												onClick: function () {
-													var rest = (row.tags || []).filter(function (x) { return x !== t; });
-													doTags(row, rest);
-												}
-											}, h(P.IconCloseOutline16, { size: 10 })));
-									}),
-									h('input', {
-										className: 'sk-tagInput',
-										placeholder: '＋ 添加标签',
-										value: tagDraft,
-										maxLength: 32,
-										disabled: !canWrite,
-										onChange: function (event) { setTagDraft(event.target.value); },
-										onKeyDown: function (event) { if (event.key === 'Enter') commitTag(); }
-									}),
-									h('button', {
-										type: 'button',
-										className: 'sk-chip',
-										disabled: !canWrite || tagDraft.trim() === '',
-										onClick: commitTag
-									}, '添加')
-								)
+									{ className: 'sk-tagPanel' },
+									tagValues.length > 0
+										? h('div', { className: 'sk-tagList', 'aria-label': '已有标签' }, tagValues.map(function (t) {
+											return h('span', { key: t, className: 'sk-tag' },
+												t,
+												h('button', {
+													type: 'button',
+													className: 'sk-tagX',
+													'aria-label': '移除标签「' + t + '」',
+													title: '移除标签「' + t + '」',
+													disabled: !canWrite || tagBusy === true,
+													onClick: function () {
+														var rest = tagValues.filter(function (x) { return x !== t; });
+														doTags(row, rest);
+													}
+												}, h(P.IconCloseOutline16, { size: 10 })));
+										}))
+										: null,
+									h('div', { className: 'sk-tagComposer' },
+										h('input', {
+											className: 'sk-tagInput',
+											'aria-label': '新标签',
+											'aria-describedby': tagHelpId,
+											placeholder: tagAtLimit ? '已达到标签上限' : '输入标签',
+											value: tagDraft,
+											maxLength: 32,
+											disabled: !canWrite || tagBusy === true || tagAtLimit,
+											onChange: function (event) { setTagDraft(event.target.value); },
+											onKeyDown: function (event) {
+												if (event.key === 'Enter') { event.preventDefault(); commitTag(); }
+											}
+										}),
+										h('button', {
+											type: 'button',
+											className: 'sk-tagAdd',
+											'aria-label': '添加标签',
+											disabled: !tagCanAdd,
+											onClick: commitTag
+										}, tagBusy ? '保存中…' : '添加'))
+								),
+								h('div', {
+									id: tagHelpId,
+									className: 'sk-tagFoot' + ((tagAtLimit || tagDuplicate) ? ' sk-tagIssue' : ''),
+									'aria-live': 'polite'
+								}, h('span', null, tagIssue), h('span', null, tagValues.length + '/20 · 每个最多 32 字符'))
 							),
 							h(
 								'div',
