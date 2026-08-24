@@ -313,8 +313,70 @@ interface MarketDrawerProps {
 				'.mm-toastError{color:var(--dsw-alias-status-error,#d33b3b)}',
 				'@media(min-width:981px){.mm-rootHasDrawer{padding-right:400px}}',
 				'@media(max-width:980px){.mm-tableHead,.mm-serverRow{grid-template-columns:minmax(220px,1fr) 118px 84px 58px}.mm-transportCol{display:none}}',
-				'@media(max-width:760px){.mm-tabs{padding-left:2px}.mm-content{padding-left:2px;padding-right:2px}.mm-summary{flex-wrap:wrap}.mm-summaryActions{width:100%;margin-left:0}.mm-tableHead,.mm-serverRow{grid-template-columns:minmax(180px,1fr) 108px 58px}.mm-toolCol{display:none}.mm-drawer{top:61px;width:calc(100vw - 12px);max-width:none}.mm-formGrid{grid-template-columns:1fr}.mm-fieldWide{grid-column:auto}}'
-			].join('');
+					'@media(max-width:760px){.mm-tabs{padding-left:2px}.mm-content{padding-left:2px;padding-right:2px}.mm-summary{flex-wrap:wrap}.mm-summaryActions{width:100%;margin-left:0}.mm-tableHead,.mm-serverRow{grid-template-columns:minmax(180px,1fr) 108px 58px}.mm-toolCol{display:none}.mm-drawer{top:61px;width:calc(100vw - 12px);max-width:none}.mm-formGrid{grid-template-columns:1fr}.mm-fieldWide{grid-column:auto}}',
+					/* Match Plugin Manager's page chrome while keeping MCP-specific data and actions. */
+					'.mm-root{max-width:980px;margin:0 auto}',
+					'.mm-head{flex:none;display:flex;align-items:baseline;gap:14px;padding:6px 8px 16px}',
+					'.mm-head h2{margin:0;font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.02em}',
+					'.mm-context{color:var(--dsw-alias-label-tertiary);font-size:13px}',
+					'.mm-tabs{height:40px;border-bottom:1px solid var(--dsw-alias-border-l2);align-items:flex-end;gap:28px;padding:0 8px}',
+					'.mm-tab{height:40px;padding:0 1px}',
+					'.mm-tabOn{border-bottom-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);font-weight:600}',
+					'.mm-toolbar{flex:none;display:flex;align-items:center;gap:10px;padding:16px 8px 8px}',
+					'.mm-search{height:38px;border-radius:8px;background:var(--dsw-alias-bg-module-platform)}',
+					'.mm-search:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}',
+					'.mm-btn{height:38px;border-radius:8px;padding:0 13px}',
+					'.mm-btnPrimary{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary)}',
+					'.mm-btnPrimary:hover:not(:disabled){background:var(--dsw-alias-brand-primary-hover,var(--dsw-alias-brand-primary))}',
+					'.mm-helper{flex:none;margin:0;padding:0 8px 10px;color:var(--dsw-alias-label-quaternary);font-size:12px}',
+					'.mm-helper.mm-summary{display:block;min-height:0;border:0;border-radius:0;background:transparent;box-sizing:border-box}',
+					'.mm-filters{padding:0 8px 10px;gap:4px}',
+					'.mm-filter{height:30px;border-radius:7px;padding:0 10px}',
+					'.mm-list{min-height:0;flex:1;overflow:auto;padding:0 8px 32px}',
+					'.mm-row{position:relative;box-sizing:border-box;width:100%;min-height:72px;border:0;border-top:1px solid var(--dsw-alias-border-l2);background:transparent;color:inherit;text-align:left;font:inherit;padding:13px 10px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;align-items:center}',
+					'.mm-row:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
+					'.mm-rowClick{cursor:pointer}',
+					'.mm-rowClick:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+					'.mm-rowSelected{background:color-mix(in srgb,var(--dsw-static-blue-500) 7%,var(--dsw-alias-bg-module-platform))}',
+					'.mm-rowSelected:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 9%,var(--dsw-alias-bg-module-platform))}',
+					'.mm-serverRow{grid-template-columns:minmax(0,1fr) auto;min-height:72px;padding:13px 10px}',
+					'.mm-serverOpen{appearance:none;width:100%;border:0;background:transparent;color:inherit;text-align:left;font:inherit;padding:0;min-width:0;cursor:pointer;display:flex;align-items:flex-start;gap:11px}',
+					'.mm-serverOpen:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:6px}',
+					'.mm-serverGlyph{flex:none;width:28px;height:28px;border-radius:8px;margin-top:1px}',
+					'.mm-rowCopy{min-width:0;display:flex;flex-direction:column}',
+					'.mm-rowTitle{font-size:13.5px;font-weight:600;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+					'.mm-rowDesc{margin-top:4px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45}',
+					'.mm-rowMeta{margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--dsw-alias-label-quaternary);font-size:11.5px}',
+					'.mm-rowSide{display:flex;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary)}',
+					'.mm-status{font-size:11.5px;gap:6px}',
+					'.mm-dot{width:6px;height:6px}',
+					'.mm-transport{border:0;border-radius:0;padding:0;color:var(--dsw-alias-label-quaternary);font-size:11.5px}',
+					'.mm-toolCount{color:var(--dsw-alias-label-quaternary);font-size:11.5px}',
+					'.mm-switch{width:36px;height:20px;background:var(--dsw-alias-fill-tsp-secondary)}',
+					'.mm-switch:after{width:16px;height:16px;left:2px;top:2px}',
+					'.mm-switchOn{background:var(--dsw-alias-brand-primary)}',
+					'.mm-switchOn:after{transform:translateX(16px)}',
+					'.mm-marketRow{min-height:72px;border-top:1px solid var(--dsw-alias-border-l2);padding:13px 10px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;align-items:center}',
+					'.mm-marketRow:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
+					'.mm-marketMain{min-width:0;display:flex;align-items:flex-start;gap:11px}',
+					'.mm-marketIcon,.mm-marketFallback{flex:none;width:28px;height:28px;border-radius:8px}',
+					'.mm-marketFallback{margin-top:1px}',
+					'.mm-marketCopy{min-width:0;display:flex;flex-direction:column}',
+					'.mm-marketTitle{font-size:13.5px;font-weight:600}',
+					'.mm-marketDesc{margin-top:4px;line-height:1.45}',
+					'.mm-marketSide{gap:12px}',
+					'.mm-empty,.mm-loading,.mm-error{margin:24px 8px;padding:20px 0}',
+					'.mm-loadError{margin:24px 8px;padding:20px 0}',
+					'.mm-rootHasDrawer{padding-right:0}',
+					'.mm-drawer{top:66px}',
+					'.mm-drawerHead{padding:24px 24px 16px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
+					'.mm-drawerTitle{font-size:19px;font-weight:650}',
+					'.mm-section{padding:18px 0}',
+					'.mm-sectionTitle{margin-bottom:13px;font-weight:600}',
+					'.mm-topic{border:0;border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);padding:3px 8px}',
+					'.mm-dialog{border-radius:16px}',
+					'@media(max-width:680px){.mm-root{margin:0}.mm-head{padding-left:0}.mm-tabs,.mm-toolbar,.mm-helper,.mm-filters,.mm-list{padding-left:0;padding-right:0}.mm-toolbar{flex-wrap:wrap}.mm-search{flex-basis:100%}.mm-drawer{top:61px;width:calc(100vw - 12px);max-width:none}.mm-row{padding-left:6px;padding-right:6px}.mm-rowMeta{gap:6px}.mm-formGrid{grid-template-columns:1fr}.mm-fieldWide{grid-column:auto}}'
+				].join('');
 			if (!existingStyle) document.head.appendChild(style);
 
 			function apiCall<T>(op: string, payload?: Record<string, unknown>): Promise<T> {
@@ -663,38 +725,54 @@ interface MarketDrawerProps {
 
 				var serverBody;
 				if (loading) serverBody = h(McpConnectingState);
-				else if (error) serverBody = h('div', { className: 'mm-loadError' }, h('p', { className: 'mm-error', role: 'alert' }, '加载 MCP Manager 失败：' + error), h(Button, { type: 'button', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, h(P.IconRefreshOutline16), '重试'));
-				else serverBody = h('div', { className: 'mm-table', 'data-testid': 'server-list' },
-					h('div', { className: 'mm-tableHead', role: 'row' }, h('span', null, '服务器'), h('span', null, '状态'), h('span', { className: 'mm-transportCol' }, '传输方式'), h('span', { className: 'mm-toolCol' }, '工具数'), h('span', null, '启用')),
-					visibleServers.length ? visibleServers.map(function (server) {
-						return h('div', { key: server.id, className: 'mm-serverRow' + (selectedServer && selectedServer.id === server.id ? ' mm-serverRowSelected' : '') },
-							h('button', { type: 'button', className: 'mm-serverOpen', onClick: function () { setSelectedMarket(null); setSelectedServer(server); } }, h(ServerGlyph, { transport: server.transport }), h('span', { className: 'mm-serverCopy' }, h('span', { className: 'mm-serverName' }, server.serverName), h('span', { className: 'mm-serverDesc' }, server.description || server.endpoint))),
-							h(Status, { status: server.status }),
-							h('span', { className: 'mm-transport mm-transportCol' }, server.transport === 'streamable-http' ? 'HTTP' : 'stdio'),
-							h('span', { className: 'mm-toolCount mm-toolCol' }, server.toolCount + ' 个工具'),
-							h(Switch, { checked: server.enabled, disabled: busy === server.id, label: (server.enabled ? '停用 ' : '启用 ') + server.serverName, onChange: function (enabled) { toggle(server, enabled); } })
-						);
-					}) : h('p', { className: 'mm-empty' }, '没有匹配的 MCP 服务器。')
-				);
-
-				var marketBody = h('div', { className: 'mm-marketList', 'data-testid': 'market-list' }, marketLoading && !marketLoaded ? h('p', { className: 'mm-loading', role: 'status' }, '正在读取 MCP 市场…') : visibleMarket.length ? visibleMarket.map(function (item) {
-					return h('button', { key: item.id, type: 'button', className: 'mm-marketRow' + (selectedMarket && selectedMarket.id === item.id ? ' mm-marketRowSelected' : ''), onClick: function () { openMarket(item); } },
-						h('span', { className: 'mm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('span', { className: 'mm-marketCopy' }, h('span', { className: 'mm-marketTitle' }, item.repository), h('span', { className: 'mm-marketDesc' }, item.description))),
-						h('span', { className: 'mm-marketSide' }, item.status === 'installed' ? h('span', { className: 'mm-installed' }, '已安装') : null, h(P.IconChevronRightOutline14))
+					else if (error) serverBody = h('div', { className: 'mm-loadError' }, h('p', { className: 'mm-error', role: 'alert' }, '加载 MCP Manager 失败：' + error), h(Button, { type: 'button', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, h(P.IconRefreshOutline16), '重试'));
+					else serverBody = h('div', { className: 'mm-list', 'data-testid': 'server-list' },
+						visibleServers.length ? visibleServers.map(function (server) {
+							return h('div', { key: server.id, className: 'mm-row mm-rowClick mm-serverRow' + (selectedServer && selectedServer.id === server.id ? ' mm-rowSelected mm-serverRowSelected' : '') },
+								h('button', { type: 'button', className: 'mm-serverOpen', onClick: function () { setSelectedMarket(null); setSelectedServer(server); } },
+									h(ServerGlyph, { transport: server.transport }),
+									h('span', { className: 'mm-rowCopy' },
+										h('span', { className: 'mm-rowTitle' }, server.serverName),
+										h('span', { className: 'mm-rowDesc' }, server.description || server.endpoint),
+										h('span', { className: 'mm-rowMeta' },
+											h(Status, { status: server.status }),
+											h('span', { className: 'mm-transport' }, server.transport === 'streamable-http' ? 'HTTP' : 'stdio'),
+											h('span', { className: 'mm-toolCount' }, server.toolCount + ' 个工具')
+									)
+								)
+								),
+								h('div', { className: 'mm-rowSide' }, h(Switch, { checked: server.enabled, disabled: busy === server.id, label: (server.enabled ? '停用 ' : '启用 ') + server.serverName, onChange: function (enabled) { toggle(server, enabled); } }))
+							);
+						}) : h('p', { className: 'mm-empty' }, '没有匹配的 MCP 服务器。')
 					);
-				}) : h('p', { className: 'mm-empty' }, '没有匹配的 MCP 仓库。'));
 
-				return h('section', { className: 'mm-root' + (selectedServer || selectedMarket ? ' mm-rootHasDrawer' : ''), 'aria-label': 'MCP Manager' },
-					h('div', { className: 'mm-tabs', role: 'tablist' },
-						h('button', { type: 'button', role: 'tab', className: 'mm-tab' + (tab === 'servers' ? ' mm-tabOn' : ''), 'aria-selected': tab === 'servers', onClick: function () { setTab('servers'); setQuery(''); setSelectedMarket(null); } }, '服务器', h('span', { className: 'mm-count' }, servers.length)),
-						h('button', { type: 'button', role: 'tab', className: 'mm-tab' + (tab === 'market' ? ' mm-tabOn' : ''), 'aria-selected': tab === 'market', onClick: function () { setTab('market'); setQuery(''); setSelectedServer(null); } }, '市场')
-					),
-					tab === 'servers' ? h('div', { className: 'mm-content' },
-						h('div', { className: 'mm-summary' }, h('span', { className: 'mm-summaryKey' }, '当前配置'), h('span', { className: 'mm-summaryValue' }, 'web'), h('div', { className: 'mm-summaryActions' }, h('span', { className: 'mm-connected' }, '已连接 ' + connected + ' / ' + servers.length), h(Button, { type: 'button', disabled: loading || refreshing, onClick: refreshServers }, h(P.IconRefreshOutline16), refreshing ? '检测中…' : '重新检测'), h(Button, { type: 'button', primary: true, onClick: function () { setEditor('new'); } }, h(P.IconPlusOutline16), '新增服务器'))),
-						h(Search, { value: query, onChange: setQuery, placeholder: '搜索服务器或工具' }),
-						h('div', { className: 'mm-filters' }, filters.map(function (item) { return h('button', { key: item[0], type: 'button', className: 'mm-filter' + (filter === item[0] ? ' mm-filterOn' : ''), onClick: function () { setFilter(item[0]); } }, item[1]); })),
-						serverBody
-					) : h('div', { className: 'mm-content' }, h(Search, { value: query, onChange: setQuery, placeholder: '搜索 GitHub 仓库' }), marketBody),
+					var marketBody = h('div', { className: 'mm-list', 'data-testid': 'market-list' }, marketLoading && !marketLoaded ? h('p', { className: 'mm-loading', role: 'status' }, '正在读取 MCP 市场…') : visibleMarket.length ? visibleMarket.map(function (item) {
+						return h('button', { key: item.id, type: 'button', className: 'mm-row mm-rowClick mm-marketRow' + (selectedMarket && selectedMarket.id === item.id ? ' mm-rowSelected mm-marketRowSelected' : ''), onClick: function () { openMarket(item); } },
+							h('span', { className: 'mm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('span', { className: 'mm-marketCopy' }, h('span', { className: 'mm-marketTitle' }, item.repository), h('span', { className: 'mm-marketDesc' }, item.description))),
+							h('span', { className: 'mm-rowSide mm-marketSide' }, item.status === 'installed' ? h('span', { className: 'mm-installed' }, '已安装') : null, h(P.IconChevronRightOutline14))
+						);
+					}) : h('p', { className: 'mm-empty' }, '没有匹配的 MCP 仓库。'));
+
+					return h('section', { className: 'mm-root' + (selectedServer || selectedMarket ? ' mm-rootHasDrawer' : ''), 'aria-label': 'MCP Manager' },
+						h('header', { className: 'mm-head' }, h('h2', null, 'MCP'), h('span', { className: 'mm-context' }, 'Web 配置')),
+						h('div', { className: 'mm-tabs', role: 'tablist' },
+							h('button', { type: 'button', role: 'tab', className: 'mm-tab' + (tab === 'servers' ? ' mm-tabOn' : ''), 'aria-selected': tab === 'servers', onClick: function () { setTab('servers'); setQuery(''); setSelectedMarket(null); } }, '服务器'),
+							h('button', { type: 'button', role: 'tab', className: 'mm-tab' + (tab === 'market' ? ' mm-tabOn' : ''), 'aria-selected': tab === 'market', onClick: function () { setTab('market'); setQuery(''); setSelectedServer(null); } }, '市场')
+						),
+						tab === 'servers' ? h(React.Fragment, null,
+							h('div', { className: 'mm-toolbar' },
+								h(Search, { value: query, onChange: setQuery, placeholder: '搜索服务器或工具' }),
+								h(Button, { type: 'button', disabled: loading || refreshing, onClick: refreshServers }, h(P.IconRefreshOutline16), refreshing ? '检测中…' : '重新检测'),
+								h(Button, { type: 'button', primary: true, onClick: function () { setEditor('new'); } }, h(P.IconPlusOutline16), '新增服务器')
+							),
+							h('p', { className: 'mm-helper mm-summary' }, '当前配置 web · 已连接 ' + connected + ' / ' + servers.length),
+							h('div', { className: 'mm-filters' }, filters.map(function (item) { return h('button', { key: item[0], type: 'button', className: 'mm-filter' + (filter === item[0] ? ' mm-filterOn' : ''), onClick: function () { setFilter(item[0]); } }, item[1]); })),
+							serverBody
+						) : h(React.Fragment, null,
+							h('div', { className: 'mm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: '搜索 GitHub 仓库' })),
+							h('p', { className: 'mm-helper' }, '精选自 GitHub · 安装前校验 DSH MCP 安装声明'),
+							marketBody
+						),
 					selectedServer ? h(ServerDrawer, { server: selectedServer, busy: busy === selectedServer.id, onClose: function () { setSelectedServer(null); }, onReconnect: function () { if (selectedServer) reconnect(selectedServer); }, onEdit: function () { if (selectedServer) setEditor(selectedServer); }, onDelete: function () { if (selectedServer) setDeleting(selectedServer); } }) : null,
 					selectedMarket ? h(MarketDrawer, { item: selectedMarket, detail: marketDetail, loading: detailLoading, busy: busy === selectedMarket.id, onClose: function () { setSelectedMarket(null); }, onInstall: function () { if (selectedMarket) installMarket(selectedMarket); } }) : null,
 					editor ? h(ServerDialog, { server: typeof editor === 'object' ? editor : null, busy: busy === 'save', onClose: function () { if (busy !== 'save') setEditor(null); }, onSubmit: saveServer }) : null,
