@@ -99,5 +99,5 @@ MCP client 当前没有暴露“最后检测”“重试次数”或结构化握
 ## 发布边界
 
 本次只在隔离 profile 的 3180 端口完成本地验证。未改动用户的 web profile，未合并 `sit`
-或 `main`，未部署生产。正式接入需安装 `dsh-mcp-manager` link 依赖、插入独立 Cordis 行并
-重启一次 web Host；之后服务器区块更新由 Cordis HMR 生效。
+或 `main`，未部署生产。Windows 本地 3080 已按本地 profile 接入 `dsh-mcp-manager` link
+依赖、独立 Cordis 行并完成重启；服务器区块更新继续由 Cordis HMR 生效。

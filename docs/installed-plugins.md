@@ -6,7 +6,7 @@
 
 宿主环境：
 
-- **Windows（主开发机，chuansgu，2026-08-22）**：`@deepseek-ai/dsh` 0.1.1-rc.2
+- **Windows（主开发机，chuansgu，2026-08-24）**：`@deepseek-ai/dsh` 0.1.1-rc.2
   （`D:\Pythonproject\deepseek-harness` 源码构建，`dsh` 全局命令链接到
   `apps/cli`），Node v24.11.1，源码构建使用 pnpm 11.7.0。当前源码与补丁由
   `upstream.lock.json` 锁定；`~/.dsh/profiles/web` 继续作为独立运行配置维护。
@@ -19,22 +19,23 @@
 
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
-| dsh-extension-manager | 0.2.0（build 2） | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
+| dsh-extension-manager | 0.3.0 | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
 | dsh-skill-manager | 0.2.0（build 25） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`，向 extension-manager 贡献页面；catalog 读取零副作用 |
+| dsh-mcp-manager | 0.1.0 | 本仓库 `plugins/mcp-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-026/028 | MCP 服务器管理、Loader 状态、工具清单与精选市场；通过 `/api/mcp-manager` 提供 Host API |
 | dsh-plugin-manager | 0.2.0（build 2） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030 | 独立 Plugin 分区；本地插件管理、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
-`@deepseek-ai/dsh-vision-bridge` 已进入 DSH-005 锁定源码和 base bundle，但 base 行默认
-`disabled: true`，不属于当前 3080 已启用插件。DP Gateway 暴露
-`Qwen3.6-35B-A3B` 并完成健康检查后，才按
-[`DSH-005-vision-bridge.md`](DSH-005-vision-bridge.md) 合入 profile 覆盖。
+`@deepseek-ai/dsh-vision-bridge` 已进入 DSH-005 锁定源码和 base bundle。base 行仍保持
+`disabled: true`，但 Windows web profile 的用户层 patch 将其覆盖为默认启用，并固定通过
+DP Gateway 调用 `Qwen3.6-35B-A3B`；不计入本地 `plugins/` 目录插件。
 
 ## 宿主差异（2026-08-17）
 
-- **Windows**：extension-manager、skill-manager、plugin-manager 与 better-sidebar 已安装；三个本仓库插件均以
-  junction 指向当前 checkout。better-sidebar-smooth
-  未安装（该胶囊动画撕裂在 Windows 宿主同样存在，需要时按 macOS 同法接入）。
+- **Windows**：extension-manager、skill-manager、mcp-manager、plugin-manager、
+  better-sidebar-smooth 与 better-sidebar 已安装；四个本仓库 Host 插件和一个 client-only
+  插件均以 junction 指向当前 checkout，vision-bridge 通过 profile patch 默认启用。
+- **Windows 清理**：`image-context-guard` 已从仓库、profile 依赖、Cordis 挂载和本机缓存移除。
 - **macOS**：历史上安装过 image-context-guard；同步 DSH-022 后应移除该依赖和挂载。
   skill-manager / better-sidebar-smooth 为 link 通道，`~/.dsh/plugins/<name>` 符号链接 →
   本仓库 `plugins/<name>`（macOS 下的 junction 等价物，

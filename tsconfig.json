@@ -3,7 +3,6 @@
   "references": [
     { "path": "./plugins/better-sidebar-smooth" },
     { "path": "./plugins/extension-manager" },
-    { "path": "./plugins/image-context-guard" },
     { "path": "./plugins/mcp-manager" },
     { "path": "./plugins/plugin-manager" },
     { "path": "./plugins/skill-manager" }

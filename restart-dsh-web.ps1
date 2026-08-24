@@ -4,7 +4,7 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
 
 用法：
   .\restart-dsh-web.ps1             重启并等待服务恢复，最后验证 skill-manager apiVersion
-  .\restart-dsh-web.ps1 -EnableVisionBridge 通过 DP Gateway 启用 vision_inspect
+  .\restart-dsh-web.ps1 -EnableVisionBridge 为旧 profile 临时应用 DP Gateway vision_inspect 覆盖（当前 web profile 默认已启用）
   .\restart-dsh-web.ps1 -NoLaunch   只停不启动（想自己手动起时用）
   .\restart-dsh-web.ps1 -Port 3080  端口可改（默认 3080）
 

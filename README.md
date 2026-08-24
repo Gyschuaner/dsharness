@@ -25,7 +25,7 @@ dsharness/
 │   │   ├── src/              # TypeScript Host、导入事务与 Client 源码
 │   │   ├── lib/              # tsc 生成的运行时产物
 │   │   └── test/             # TypeScript Host 事务与 Client DOM 回归
-│   └── image-context-guard/  # 已退役的 DSH-004 临时保护源码，仅供历史回溯
+│   └── better-sidebar-smooth/ # better-sidebar 会话头动画修复（仅 client）
 ├── dev/
 │   ├── install-dsh-source.ps1     # 拉取、打补丁、构建并注册 dsh
 │   ├── verify-dsh-source.ps1      # 校验工具链、源码 tree、补丁和 Web
@@ -54,13 +54,14 @@ Git 还原相同构建。`dsharness` 现在同时管理两类内容：仓库内�
 - 官方源码基线、Node/pnpm 版本、本地补丁和最终源码 tree 有明确校验值；
 - 新电脑可从空目录完成 frozen install、完整构建和 `dsh` 命令注册。
 
-`image-context-guard` 已由 DSH-022 退役，不再安装或加载。0.1.1 原生附件服务负责图片
-准入、持久存储和模型投影：默认单条消息最多 20 张、单图最多 20 MiB、单条消息合计
-最多 200 MiB；仓库保留旧插件源码只用于历史回溯，不应重新接入 profile。
+`image-context-guard` 已由 DSH-022 退役，并已从仓库与本机 web profile 清理。0.1.1
+原生附件服务负责图片准入、持久存储和模型投影：默认单条消息最多 20 张、单图最多
+20 MiB、单条消息合计最多 200 MiB。
 
-DSH-005 的视觉桥作为上游源码补丁交付，并保持默认关闭。纯文本主模型需要视觉辅助时，
-按 [`docs/DSH-005-vision-bridge.md`](docs/DSH-005-vision-bridge.md) 使用 DP Gateway
-覆盖；DSH 不直连视觉模型机。
+DSH-005 的视觉桥作为上游源码补丁交付，当前 Windows web profile 默认通过 DP Gateway
+启用；其余仓库插件也默认挂载。纯文本主模型的视觉调用按
+[`docs/DSH-005-vision-bridge.md`](docs/DSH-005-vision-bridge.md) 走 DP Gateway，
+DSH 不直连视觉模型机。
 
 ## 快速开始（构建 DSH）
 

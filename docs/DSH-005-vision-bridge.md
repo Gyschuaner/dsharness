@@ -22,7 +22,8 @@ DSH 不直连模型机，也不在会话、工具结果、日志或 Git 中保�
 
 可复用覆盖文件位于
 [`dev/vision-bridge.dp-gateway.patch.yml`](../dev/vision-bridge.dp-gateway.patch.yml)。
-管理员确认健康检查通过后，把该条目合并到目标 profile 的 `cordis.patch.yml`：
+管理员确认健康检查通过后，把该条目合并到目标 profile 的 `cordis.patch.yml`。当前 Windows
+3080 已完成该合并，因此普通 `restart-dsh-web.ps1` 启动即默认启用视觉桥：
 
 ```yaml
 - id: vision-bridge
