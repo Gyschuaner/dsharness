@@ -37,6 +37,10 @@ Plugin Manager 不直接编辑依赖 JSON；安装和更新调用 `dsh plugin --
 详情缓存 5 分钟。实时请求失败时返回旧缓存并标记 stale；没有缓存时给出可恢复错误，
 市场基础列表与本地页仍可使用。
 
+市场列表和详情抽屉沿用 MCP 的图标语义：受控仓库条目使用 GitHub owner 头像作为
+HTTPS 图标源；Host 会拒绝非 HTTPS 图标，Client 图片加载失败时显示通用 Plugin
+图标，且不改变安装、更新和详情缓存流程。
+
 ## Build 2：Plugin Loading
 
 - 初次读取本地配置或市场索引时保留标题、页签和搜索框，只替换内容区，避免页面跳动；

@@ -24,6 +24,8 @@ interface PluginMarketItem {
 	id: string;
 	repository: string;
 	description: string;
+	iconUrl?: string | null;
+	iconSource?: string;
 	status: string;
 	installedVersion: string | null;
 }
@@ -31,6 +33,8 @@ interface PluginMarketItem {
 interface PluginMarketDetail {
 	url?: string;
 	description?: string;
+	iconUrl?: string | null;
+	iconSource?: string;
 	status?: string;
 	installedVersion?: string | null;
 	latestVersion?: string | null;
@@ -104,6 +108,13 @@ interface PluginMarketDrawerProps {
 	onInstall(): void;
 }
 
+interface RemoteIconProps {
+	src?: string | null | undefined;
+	className?: string;
+	fallbackClass?: string;
+	size?: number;
+}
+
 (function () {
 	window.__ModuleLoader__.load({
 		id: 'dsh-plugin-manager',
@@ -145,6 +156,10 @@ interface PluginMarketDrawerProps {
 				'.pm-rowSelected:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 9%,var(--dsw-alias-bg-module-platform))}',
 				'.pm-rowMain{min-width:0;display:flex;align-items:flex-start;gap:11px}',
 				'.pm-pluginIcon{flex:none;width:28px;height:28px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-secondary);margin-top:1px}',
+				'.pm-marketMain{min-width:0;display:flex;align-items:center;gap:16px}',
+				'.pm-marketIcon{flex:none;width:42px;height:42px;border-radius:10px;object-fit:cover;background:var(--dsw-alias-fill-tsp-secondary)}',
+				'.pm-marketFallback{flex:none;width:42px;height:42px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-secondary)}',
+				'.pm-marketCopy{min-width:0;display:flex;flex-direction:column}',
 				'.pm-rowCopy{min-width:0}',
 				'.pm-rowTitle{font-size:13.5px;font-weight:600;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
 				'.pm-rowDesc{margin-top:4px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45}',
@@ -230,6 +245,29 @@ interface PluginMarketDrawerProps {
 				if (type === 'dots') return h('svg', common, h('circle', { cx: 3, cy: 8, r: 1, fill: 'currentColor' }), h('circle', { cx: 8, cy: 8, r: 1, fill: 'currentColor' }), h('circle', { cx: 13, cy: 8, r: 1, fill: 'currentColor' }));
 				if (type === 'github') return h('svg', common, h('path', { d: 'M8 1.5a6.5 6.5 0 0 0-2.05 12.67c.33.06.45-.14.45-.32v-1.26c-1.84.4-2.23-.78-2.23-.78-.3-.77-.74-.97-.74-.97-.6-.42.05-.41.05-.41.67.05 1.02.69 1.02.69.6 1.02 1.56.72 1.94.55.06-.43.23-.72.42-.89-1.47-.17-3.02-.74-3.02-3.28 0-.72.26-1.32.68-1.78-.07-.17-.3-.84.06-1.75 0 0 .56-.18 1.79.68A6.2 6.2 0 0 1 8 4.63c.55 0 1.1.08 1.62.22 1.24-.86 1.8-.68 1.8-.68.36.91.13 1.58.06 1.75.42.46.68 1.06.68 1.78 0 2.55-1.55 3.11-3.03 3.28.24.21.45.61.45 1.23v1.64c0 .18.12.38.46.32A6.5 6.5 0 0 0 8 1.5Z', fill: 'currentColor' }));
 				return h('svg', common, h('rect', { x: 2, y: 2, width: 5, height: 5, rx: 1.4, fill: 'currentColor' }), h('rect', { x: 9, y: 2, width: 5, height: 5, rx: 1.4, fill: 'currentColor', opacity: .45 }), h('rect', { x: 2, y: 9, width: 5, height: 5, rx: 1.4, fill: 'currentColor', opacity: .45 }), h('circle', { cx: 11.5, cy: 11.5, r: 2.5, stroke: 'currentColor', strokeWidth: 1.2, strokeDasharray: '1.5 1.3' }));
+			}
+
+			function safeIconSource(value: string | null | undefined): string | null {
+				if (!value) return null;
+				try {
+					var parsed = new URL(value);
+					return parsed.protocol === 'https:' ? parsed.toString() : null;
+				} catch { return null; }
+			}
+
+			function RemoteIcon(props: RemoteIconProps): React.ReactNode {
+				var [failed, setFailed] = React.useState(false);
+				var source = safeIconSource(props.src);
+				React.useEffect(function () { setFailed(false); }, [props.src]);
+				if (!source || failed) return h('span', { className: props.fallbackClass || 'pm-marketFallback', 'aria-hidden': true }, h(Icon, { type: 'plugin', size: props.size || 18 }));
+				return h('img', {
+					className: props.className || 'pm-marketIcon',
+					src: source,
+					alt: '',
+					loading: 'lazy',
+					referrerPolicy: 'no-referrer',
+					onError: function () { setFailed(true); }
+				});
 			}
 
 			function apiCall<T>(op: string, payload?: Record<string, unknown>): Promise<T> {
@@ -362,7 +400,7 @@ interface PluginMarketDrawerProps {
 				var actionText = status === 'update-available' && latest ? '更新到 ' + latest : status === 'installed' ? '已安装' : '安装插件';
 				return h('aside', { className: 'pm-drawer', role: 'dialog', 'aria-label': item.repository + ' 详情' },
 					h('header', { className: 'pm-drawerHead' },
-						h('div', { className: 'pm-drawerTitleRow' }, h('h3', { className: 'pm-drawerTitle' }, item.repository.split('/')[1]), h('button', { type: 'button', className: 'pm-close', 'aria-label': '关闭详情', onClick: props.onClose }, h(P.IconCloseOutline16))),
+						h('div', { className: 'pm-drawerTitleRow' }, h(RemoteIcon, { src: detail && detail.iconUrl || item.iconUrl }), h('h3', { className: 'pm-drawerTitle' }, item.repository.split('/')[1]), h('button', { type: 'button', className: 'pm-close', 'aria-label': '关闭详情', onClick: props.onClose }, h(P.IconCloseOutline16))),
 						h('a', { className: 'pm-repo', href: url, target: '_blank', rel: 'noreferrer' }, h(Icon, { type: 'github' }), 'github.com/' + item.repository, h(Icon, { type: 'external', size: 13 })),
 						h('p', { className: 'pm-drawerDesc' }, detail && detail.description || item.description)
 				),
@@ -508,7 +546,7 @@ interface PluginMarketDrawerProps {
 				else body = visibleMarket.length === 0 ? h('p', { className: 'pm-empty' }, '没有匹配的市场插件。') : h('div', { className: 'pm-list', 'data-testid': 'market-list' }, visibleMarket.map(function (item) {
 					var statusLabel = item.status === 'installed' ? '已安装' : item.status === 'update-available' ? '可更新' : '未安装';
 					return h('button', { key: item.id, type: 'button', className: 'pm-row pm-rowClick' + (selectedMarket && selectedMarket.id === item.id ? ' pm-rowSelected' : ''), onClick: function () { openMarket(item); } },
-						h('div', { className: 'pm-rowCopy' }, h('div', { className: 'pm-rowTitle' }, item.repository), h('div', { className: 'pm-rowDesc' }, item.description)),
+						h('div', { className: 'pm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('div', { className: 'pm-marketCopy' }, h('div', { className: 'pm-rowTitle' }, item.repository), h('div', { className: 'pm-rowDesc' }, item.description))),
 						h('div', { className: 'pm-rowSide' }, h('span', { className: 'pm-status' + (item.status === 'update-available' ? ' pm-statusUpdate' : '') }, statusLabel), h(P.IconChevronRightOutline14))
 					);
 				}));

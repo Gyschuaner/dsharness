@@ -19,6 +19,23 @@ export const PROTECTED_PACKAGES = new Set(['dsh-extension-manager', 'dsh-plugin-
 const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
 const PACKAGE_SPEC_RE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@(?:latest|next|beta|alpha|\d[^\s]*))?$/i;
 const REPOSITORY_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+function safeOptionalIconUrl(value) {
+    if (!value)
+        return null;
+    try {
+        const parsed = new URL(String(value));
+        return parsed.protocol === 'https:' ? parsed.toString() : null;
+    }
+    catch {
+        return null;
+    }
+}
+function githubAvatarUrl(repository) {
+    const owner = repository.split('/')[0] || '';
+    if (!/^[A-Za-z0-9_.-]+$/.test(owner))
+        return null;
+    return safeOptionalIconUrl(`https://github.com/${owner}.png?size=64`);
+}
 function isRecord(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -476,11 +493,15 @@ async function fetchGithubDetail(entry, deps) {
         }
     }
     const owner = isRecord(repo.owner) ? repo.owner : {};
+    const ownerIconUrl = safeOptionalIconUrl(owner.avatar_url);
+    const iconUrl = ownerIconUrl || githubAvatarUrl(entry.repository);
     const license = isRecord(repo.license) ? repo.license : {};
     const dshManifest = isDshPluginManifest(pkg) ? pkg : null;
     return {
         id: entry.id,
         repository: entry.repository,
+        iconUrl,
+        iconSource: ownerIconUrl ? 'github' : iconUrl ? 'github-avatar' : 'generic',
         url: typeof repo.html_url === 'string' ? repo.html_url : `https://github.com/${entry.repository}`,
         description: firstSentence(typeof repo.description === 'string' ? repo.description : entry.description),
         author: typeof owner.login === 'string' ? owner.login : entry.repository.split('/')[0] ?? null,
@@ -688,11 +709,16 @@ export function createPluginManager(options = {}) {
         const local = await listLocalPlugins(profileDir);
         return {
             apiVersion: API_VERSION,
-            items: MARKETPLACE.map((entry) => Object.assign({
-                id: entry.id,
-                repository: entry.repository,
-                description: entry.description,
-            }, marketplaceStatus(entry, local))),
+            items: MARKETPLACE.map((entry) => {
+                const iconUrl = githubAvatarUrl(entry.repository);
+                return Object.assign({
+                    id: entry.id,
+                    repository: entry.repository,
+                    description: entry.description,
+                    iconUrl,
+                    iconSource: iconUrl ? 'github-avatar' : 'generic',
+                }, marketplaceStatus(entry, local));
+            }),
         };
     }
     async function detail(id, force = false) {

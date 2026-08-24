@@ -27,12 +27,16 @@ interface PluginMarketItem {
     id: string;
     repository: string;
     description: string;
+    iconUrl?: string | null;
+    iconSource?: string;
     status: string;
     installedVersion: string | null;
 }
 interface PluginMarketDetail {
     url?: string;
     description?: string;
+    iconUrl?: string | null;
+    iconSource?: string;
     status?: string;
     installedVersion?: string | null;
     latestVersion?: string | null;
@@ -112,5 +116,11 @@ interface PluginMarketDrawerProps {
     busy: boolean;
     onClose(): void;
     onInstall(): void;
+}
+interface RemoteIconProps {
+    src?: string | null | undefined;
+    className?: string;
+    fallbackClass?: string;
+    size?: number;
 }
 //# sourceMappingURL=client.d.ts.map
