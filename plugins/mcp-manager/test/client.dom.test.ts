@@ -228,9 +228,13 @@ test('real MCP contribution renders without shell business placeholders and expo
 	assert.deepEqual(h.registrations.get('extension.manager.section').map((entry) => entry.definition.id).sort(), ['mcp', 'skill']);
 	await h.openMcp();
 	assert.ok(h.dom.window.document.querySelector('.mm-root'));
+	assert.equal(h.dom.window.document.querySelector('.mm-head h2').textContent, 'MCP');
+	assert.equal(h.dom.window.document.querySelector('.mm-context').textContent, 'Web 配置');
+	assert.ok(h.dom.window.document.querySelector('.mm-toolbar'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('MCP 管理（建设中）'));
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'MCP']);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="server-list"] .mm-serverRow').length, 2);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="server-list"] .mm-row').length, 2);
 	assert.ok(h.dom.window.document.body.textContent.includes('已连接 1 / 2'));
 
 	await h.click(h.dom.window.document.querySelector('.mm-serverOpen'));
