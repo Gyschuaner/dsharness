@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 25
+ * build: 26
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -9,38 +9,10 @@
  * page to the `extension.manager.section` Slot owned by
  * dsh-extension-manager.
  *
- * build 3: skill packages — skills sharing a prefix (first hyphen part)
- * with 3+ members collapse into one package row (default folded, per-root
- * state in localStorage), with editable display label, batch delete, and
- * batch export to a single ZIP (host op `exportZip`).
- * build 5: per-project enable/disable — a small switch on every skill row.
- * Toggling writes either the skill's own frontmatter flag (project-local
- * skills) or a project-level shadow switch file (user/bundled skills), so
- * only this project's sessions are affected (host op `setStatus`, needs a
- * dsh web restart until the running host loads apiVersion 4; switches are
- * greyed out with an explanation until then).
- * build 6: global default-off policy (host apiVersion 5) — a page-level
- * master switch that flags every user-root skill (bundled built-ins and
- * external global roots untouched); while on, enabling a user skill in a
- * project creates a project-local copy. Marker switch-file rows are hidden
- * by default, counted in the project section header, and revealed by
- * search. Toggling switches no longer flashes a toast.
- * build 7: state clarity — disabled rows are dimmed with a solid amber
- * 「已禁用」 badge; a 全部/已启用/已禁用 filter sits in the toolbar
- * (the 已禁用 filter also reveals marker switch files, which stay hidden
- * by default); marker switch files no longer leak into package groups.
- * build 8: in-place editing removed (detail view is read-only now; the
- * host `save` op stays available but has no UI entry) and the 只读 /
- * 被 … 遮蔽 badges are dropped — the dimmed state already tells the
- * story.
- * build 9: packages stand out — brand-tinted background (color-mix,
- * fallback for old engines), 3px brand accent bar on the left, a small
- * crate icon; and within each root section package rows are sorted to
- * the top (standalone rows follow, both keeping relative order).
- * build 10: the brand token in this theme is a near-black bluish gray,
- * so the tint read as plain gray — switch to the theme's real blue
- * scale (--dsw-static-blue-500), raise the tint to 10%, and redraw the
- * icon as an outlined box with a lid line.
+ * build 26: remove the obsolete apiVersion <6 fallback page and its package /
+ * legacy list UI. The current project center is the only Client page; an old
+ * Host now gets a clear upgrade state while the Host API keeps its legacy
+ * operations for wire compatibility.
  * build 13 (DSH-008): project-management UI adds a persistent project
  * context card, per-state counts/grouping, select-visible bulk actions,
  * current-workspace-safe defaults, derived drawer/tag state, responsive
@@ -50,8 +22,7 @@
  * slim.*): project selector over DSH workspaces, per-project enable
  * state, merged same-name identities with source selection, global tags,
  * presets with replace/merge preview, and 一键精简. When the running host
- * predates apiVersion 6 (unknown `catalog` op), the page degrades to the
- * legacy section above with a notice.
+ * predates apiVersion 6, the page shows an explicit upgrade state.
  * build 17: the project list no longer regroups rows by enabled state.
  * Catalog order and scroll context stay stable while a soft blue row tint,
  * the switch, and the optional state filters communicate enabled status.
@@ -84,11 +55,6 @@
 // untyped runtime boundaries; UI state narrows their values at use sites.
 type DynamicValue = any;
 type ApiPayload = Record<string, DynamicValue>;
-interface HostClientApi {
-	call(op: string, payload: ApiPayload): Promise<DynamicValue>;
-	zip(rootId: string, names: string[]): Promise<string>;
-}
-interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 
 (function () {
 	window.__ModuleLoader__.load({
@@ -105,61 +71,11 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 			var style = existingStyle || document.createElement('style');
 			style.setAttribute('data-plugin', 'dsh-skill-manager');
 			style.textContent = [
-				'.smgr{display:flex;flex-direction:column;gap:12px;max-width:780px;color:var(--dsw-alias-label-primary)}',
-				'.smgr h2{margin:0;font-size:18px;font-weight:600}',
-				'.smgr-intro{margin:0;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.6}',
-				'.smgr-cwd{margin:0;font-size:12px;color:var(--dsw-alias-label-caption)}',
-				'.smgr-cwd code{overflow-wrap:anywhere}',
-				'.smgr-toolbar{display:flex;gap:8px;align-items:center}',
-				'.smgr-search{flex:1;min-width:120px;background:var(--dsw-alias-bg-module-platform);color:inherit;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px}',
-				'.smgr-search:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
-				'.smgr-group{display:flex;flex-direction:column;gap:6px}',
-				'.smgr-group h3{margin:10px 0 0;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dsw-alias-label-tertiary);display:flex;gap:6px;align-items:center}',
-				'.smgr-count{white-space:nowrap;border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-secondary);padding:1px 8px;font-size:11px;font-weight:500}',
-				'.smgr-row{display:flex;align-items:center;gap:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;padding:8px 12px;cursor:pointer}',
-				'.smgr-row:hover{border-color:var(--dsw-alias-label-dimmed)}',
-				'.smgr-rowActive,.smgr-rowActive:hover{border-color:var(--dsw-alias-label-primary)}',
-				'.smgr-rowMain{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}',
-				'.smgr-name{font-size:13px;font-weight:600;display:flex;gap:6px;align-items:center;flex-wrap:wrap}',
-				'.smgr-desc{font-size:12px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-				'.smgr-badge{white-space:nowrap;border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-secondary);padding:1px 8px;font-size:11px;font-weight:500}',
-				'.smgr-badgeShadow{background:transparent;border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary)}',
-				'.smgr-badgeBad{background:var(--dsw-alias-state-error-primary);color:#fff}',
-				'.smgr-badgeOff{background:var(--dsw-alias-state-warn-primary);color:#fff}',
-				'.smgr-rowOff .smgr-title,.smgr-rowOff .smgr-desc{opacity:.55}',
-				'.smgr-pkgRowOff .smgr-title,.smgr-pkgRowOff .smgr-desc{opacity:.55}',
-				'.smgr-filter{display:inline-flex;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;overflow:hidden;flex:none}',
-				'.smgr-filterBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;padding:6px 10px;line-height:1;white-space:nowrap}',
-				'.smgr-filterBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.smgr-filterBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary);font-weight:600}',
-				'.smgr-rowActions{display:flex;gap:2px;flex:none;align-items:center}',
-				'.smgr-iconBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:6px;padding:4px 7px;font-size:13px;line-height:1}',
-				'.smgr-iconBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.smgr-iconBtnDanger:hover{color:var(--dsw-alias-state-error-primary)}',
-				'.smgr-empty{margin:0;font-size:12px;color:var(--dsw-alias-label-quaternary)}',
-				'.smgr-error{margin:0;font-size:13px;color:var(--dsw-alias-state-error-primary)}',
-				'.smgr-toast{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
-				'.smgr-pkgRow{display:flex;align-items:center;gap:8px;border:1px solid var(--dsw-alias-border-l2);border-left:3px solid var(--dsw-static-blue-500);background:var(--dsw-alias-bg-layer-3);background:color-mix(in srgb,var(--dsw-static-blue-500) 10%,var(--dsw-alias-bg-layer-3));border-radius:10px;padding:8px 12px;cursor:pointer}',
-				'.smgr-pkgIcon{flex:none;position:relative;width:13px;height:13px;border:1.5px solid var(--dsw-static-blue-500);border-radius:3px}',
-				'.smgr-pkgIcon:after{content:"";position:absolute;left:2px;right:2px;top:4px;height:1.5px;background:var(--dsw-static-blue-500)}',
-				'.smgr-pkgRow:hover{border-color:var(--dsw-alias-label-dimmed)}',
-				'.smgr-caret{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font-size:11px;line-height:1;padding:4px 5px;border-radius:6px;flex:none}',
-				'.smgr-caret:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.smgr-pkgLabel{cursor:default}',
-				'.smgr-pkgMembers{display:flex;flex-direction:column;gap:4px;margin:4px 0 2px 14px;padding-left:10px;border-left:1px solid var(--dsw-alias-border-l2)}',
-				'.smgr-labelInput{font:inherit;font-size:13px;font-weight:600;background:var(--dsw-alias-bg-module-platform);color:inherit;border:1px solid var(--dsw-alias-brand-primary);border-radius:6px;padding:2px 6px;width:160px}',
-				'.smgr-pkgList{font-size:11px;color:var(--dsw-alias-label-quaternary);line-height:1.6;max-height:72px;overflow:auto;white-space:pre-wrap}',
-				'.smgr-switch{position:relative;width:30px;height:17px;flex:none;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-fill-tsp-secondary);cursor:pointer;padding:0;transition:background .12s,border-color .12s}',
-				'.smgr-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
-				'.smgr-switchKnob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .12s,background .12s;pointer-events:none}',
-				'.smgr-switchOn .smgr-switchKnob{transform:translateX(13px);background:#fff}',
-				'.sk-root .smgr-switchOn{background:var(--dsw-static-blue-500);border-color:var(--dsw-static-blue-500)}',
-				'.smgr-switchDim{opacity:.5;cursor:not-allowed}',
-				'.smgr-bulkBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;border-radius:6px;padding:4px 7px;font-size:11px;line-height:1;white-space:nowrap}',
-				'.smgr-bulkBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.smgr-policy{display:flex;align-items:center;gap:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;padding:8px 12px}',
-				'.smgr-policyMain{flex:1;min-width:0}',
-				'.smgr-policyDesc{display:block;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
+				'.sk-switch{position:relative;width:30px;height:17px;flex:none;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-fill-tsp-secondary);cursor:pointer;padding:0;transition:background .12s,border-color .12s}',
+				'.sk-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
+				'.sk-switchKnob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .12s,background .12s;pointer-events:none}',
+				'.sk-switchOn .sk-switchKnob{transform:translateX(13px);background:#fff}',
+				'.sk-switchDim{opacity:.5;cursor:not-allowed}',
 				// ── DSH-008 V1: per-project SKILL management ─────────────────
 				'.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%;max-width:1180px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
 				'.sk-content{position:relative;isolation:isolate;display:flex;flex:1;min-height:0}',
@@ -448,10 +364,10 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 					'.sk-rowName{font-size:13.5px}',
 					'.sk-rowDesc{margin-top:4px;line-height:1.45}',
 					'.sk-rowSide{gap:12px}',
-					'.sk-root .smgr-switch{width:36px;height:20px;background:var(--dsw-alias-fill-tsp-secondary)}',
-					'.sk-root .smgr-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
-					'.sk-root .smgr-switchKnob{width:16px;height:16px;left:2px;top:2px}',
-					'.sk-root .smgr-switchOn .smgr-switchKnob{transform:translateX(16px)}',
+					'.sk-root .sk-switch{width:36px;height:20px;background:var(--dsw-alias-fill-tsp-secondary)}',
+					'.sk-root .sk-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
+					'.sk-root .sk-switchKnob{width:16px;height:16px;left:2px;top:2px}',
+					'.sk-root .sk-switchOn .sk-switchKnob{transform:translateX(16px)}',
 					'.sk-marketToolbar{padding:16px 8px 8px;gap:10px}',
 					'.sk-marketSearch{min-width:180px}',
 					'.sk-marketList{padding:0 8px 32px}',
@@ -478,47 +394,6 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 			}
 
 			// ── host API ──────────────────────────────────────────────────────
-			function apiCall(op: string, payload: ApiPayload | undefined, ctx: ClientContext): Promise<DynamicValue> {
-				var body = Object.assign({ op: op }, payload || {});
-				body.cwd = currentCwd(ctx);
-				return fetch('/api/skill-manager', {
-					method: 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify(body)
-				}).then(function (res) {
-					return res.json().then(function (data) {
-						if (!res.ok || !data || data.ok !== true) {
-							throw new Error((data && data.error && data.error.message) || ('HTTP ' + res.status));
-						}
-						return data.value;
-					});
-				});
-			}
-			/** Batch export: returns the downloaded file name. */
-			function zipDownload(rootId: string, names: string[], ctx: ClientContext): Promise<string> {
-				var body: ApiPayload = { op: 'exportZip', root: rootId, names: names };
-				body.cwd = currentCwd(ctx);
-				return fetch('/api/skill-manager', {
-					method: 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify(body)
-				}).then(function (res) {
-					if (!res.ok) {
-						return res.json().then(function (data) {
-							var msg = data && data.error && data.error.message;
-							if (msg && msg.indexOf('exportZip') !== -1) throw new Error('zip 导出需要重启 dsh web 后生效（host 端尚未加载新操作）');
-							throw new Error(msg || ('HTTP ' + res.status));
-						});
-					}
-					var cd = res.headers.get('content-disposition') || '';
-					var m = /filename="([^"]+)"/.exec(cd);
-					var fallback = (names.length === 1 ? names[0]! : names[0]!.split('-')[0] + '-' + names.length + '-skills') + '.zip';
-					return res.blob().then(function (blob) {
-						downloadBlob(m ? m[1]! : fallback, blob);
-						return m ? m[1]! : fallback;
-					});
-				});
-			}
 			/** The cwd of the session this page is showing, or undefined. */
 			function currentCwd(ctx: ClientContext): string | undefined {
 				try {
@@ -558,9 +433,9 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 			}
 
 			/**
-			 * V1 fetch helper: like apiCall, but only pins body.cwd from the
-			 * current session when the caller did not set it (project ops
-			 * pass the selected project's cwd explicitly).
+			 * V1 fetch helper. It only pins body.cwd from the current session when
+			 * the caller did not set it (project ops pass the selected project's cwd
+			 * explicitly).
 			 */
 			function apiCallAt(op: string, payload: ApiPayload | undefined, ctx: ClientContext): Promise<DynamicValue> {
 				var body: ApiPayload = Object.assign({ op: op }, payload || {});
@@ -584,699 +459,6 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 				var parts = p.replace(/\\/g, '/').split('/').filter(Boolean);
 				return parts.length === 0 ? p : parts[parts.length - 1]!;
 			}
-			function matches(skill: DynamicValue, q: string): boolean {
-				if (q === '') return true;
-				const needle = q.toLowerCase();
-				return (
-					(skill.name || '').toLowerCase().includes(needle) ||
-					(skill.title || '').toLowerCase().includes(needle) ||
-					(skill.description || '').toLowerCase().includes(needle)
-				);
-			}
-			function downloadBlob(filename: string, blob: Blob): void {
-				const url = URL.createObjectURL(blob);
-				const a = document.createElement('a');
-				a.href = url;
-				a.download = filename;
-				document.body.appendChild(a);
-				a.click();
-				a.remove();
-				setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-			}
-			/**
-			 * Skill packages: skills whose name prefix (text before the first
-			 * hyphen) groups 3+ members collapse into one package, emitted at
-			 * the position of the first member. 1-2 member prefixes stay
-			 * standalone so small name collisions never look packaged.
-			 */
-			function groupSkills(skills: DynamicValue[]): DynamicValue[] {
-				const byPrefix: Record<string, DynamicValue[]> = Object.create(null) as Record<string, DynamicValue[]>;
-				for (let i = 0; i < skills.length; i += 1) {
-					// Marker switch files are bookkeeping, never package members:
-					// they stay standalone (and hidden unless searched).
-					if (skills[i].isShadow) continue;
-					const dash = skills[i].name.indexOf('-');
-					const prefix = dash > 0 ? skills[i].name.slice(0, dash) : null;
-					if (prefix === null) continue;
-					if (byPrefix[prefix] === undefined) byPrefix[prefix] = [];
-					byPrefix[prefix].push(skills[i]);
-				}
-				const items: DynamicValue[] = [];
-				const emitted: Record<string, boolean> = Object.create(null) as Record<string, boolean>;
-				for (let i = 0; i < skills.length; i += 1) {
-					const skill = skills[i];
-					const dash = skill.name.indexOf('-');
-					const prefix = dash > 0 ? skill.name.slice(0, dash) : null;
-					if (prefix === null || skill.isShadow) { items.push({ kind: 'skill', skill: skill }); continue; }
-					if (emitted[prefix]) continue;
-					emitted[prefix] = true;
-					const members = byPrefix[prefix]!;
-					if (members.length >= 3) items.push({ kind: 'package', prefix: prefix, skills: members });
-					else for (let k = 0; k < members.length; k += 1) items.push({ kind: 'skill', skill: members[k] });
-				}
-				return items;
-			}
-			// Per-(root, prefix) package display state, browser-local only.
-			function readPkgMeta(rootId: string, prefix: string): DynamicValue {
-				try {
-					const raw = window.localStorage.getItem('smgr.pkg.' + rootId + '.' + prefix);
-					return raw ? JSON.parse(raw) : {};
-				} catch (error) {
-					return {};
-				}
-			}
-			function writePkgMeta(rootId: string, prefix: string, patch: DynamicValue): DynamicValue {
-				const cur = readPkgMeta(rootId, prefix);
-				const next = Object.assign({}, cur, patch);
-				try { window.localStorage.setItem('smgr.pkg.' + rootId + '.' + prefix, JSON.stringify(next)); } catch (error) {}
-				return next;
-			}
-
-			// ── the section component ─────────────────────────────────────────
-			function SkillManagerSection(props: SectionProps) {
-				const api = props.api;
-				const [data, setData] = React.useState<DynamicValue>(null);
-				const [error, setError] = React.useState<string | null>(null);
-				const [busy, setBusy] = React.useState(false);
-				const [toggling, setToggling] = React.useState<string | null>(null); // "root:name"
-				const [bulkBusy, setBulkBusy] = React.useState(false);
-				const [policyBusy, setPolicyBusy] = React.useState(false);
-				const [q, setQ] = React.useState('');
-				const [filter, setFilter] = React.useState('all'); // 'all' | 'off' | 'on'
-				const [sel, setSel] = React.useState<DynamicValue>(null); // {root, name}
-				const [detail, setDetail] = React.useState<DynamicValue>(null);
-				const [confirmDelete, setConfirmDelete] = React.useState(false);
-				const [confirmPkg, setConfirmPkg] = React.useState<DynamicValue>(null); // {rootId, prefix, label, names}
-				const [editingPkg, setEditingPkg] = React.useState<DynamicValue>(null); // {rootId, prefix}
-				const [labelDraft, setLabelDraft] = React.useState('');
-				const [importOpen, setImportOpen] = React.useState(false);
-				const [importText, setImportText] = React.useState('');
-				const [importRoot, setImportRoot] = React.useState('user-dsh');
-				const [notice, setNotice] = React.useState<string | null>(null);
-				const [, setUiTick] = React.useState(0);
-				function bump() { setUiTick((t) => t + 1); }
-
-				function flash(message: string): void {
-					setNotice(message);
-					setTimeout(function () { setNotice(null); }, 4000);
-				}
-
-				const load = React.useCallback(function () {
-					setBusy(true);
-					setError(null);
-					return api.call('list', {}).then(
-						function (value) { setData(value); setBusy(false); },
-						function (e) { setError(String((e && e.message) || e)); setBusy(false); }
-					);
-				}, [api]);
-
-				React.useEffect(function () {
-					void load();
-				}, [load]);
-
-				// Per-project switch availability: host op (apiVersion >= 4)
-				// plus a project root to scope it to.
-				const switchReady = data !== null && typeof data.apiVersion === 'number' && data.apiVersion >= 4;
-				const projectReady = data !== null && typeof data.projectRoot === 'string' && data.projectRoot.length > 0;
-				// Package-zip needs the host's exportZip op (apiVersion >= 3);
-				// the running process only has it after a dsh web restart.
-				const zipReady = data !== null && typeof data.apiVersion === 'number' && data.apiVersion >= 3;
-				// Global default-off policy needs host apiVersion >= 5.
-				const policyReady = data !== null && typeof data.apiVersion === 'number' && data.apiVersion >= 5;
-				const policyOn = policyReady && data.policy !== undefined && data.policy.globalDefaultOff === true;
-
-				function openDetail(root: string, name: string): void {
-					setSel({ root: root, name: name });
-					setDetail(null);
-					api.call('read', { root: root, name: name }).then(
-						function (value) { setDetail(value); },
-						function (e) { setError(String((e && e.message) || e)); setDetail(null); }
-					);
-				}
-				function doDelete() {
-					if (!sel) return;
-					setBusy(true);
-					setError(null);
-					api.call('delete', { root: sel.root, name: sel.name }).then(
-						function () {
-							setBusy(false);
-							setConfirmDelete(false);
-							setSel(null);
-							setDetail(null);
-							flash('已删除 ' + sel.name);
-							void load();
-						},
-						function (e) { setBusy(false); setConfirmDelete(false); setError(String((e && e.message) || e)); }
-					);
-				}
-				function exportSkill(skill: DynamicValue, content: string | undefined): void {
-					if (content === undefined) return;
-					const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-					downloadBlob(skill.name + '.md', blob);
-				}
-				function doImport() {
-					setBusy(true);
-					setError(null);
-					api.call('import', { root: importRoot, content: importText }).then(
-						function (value) {
-							setBusy(false);
-							setImportOpen(false);
-							setImportText('');
-							flash('已导入 ' + value.name);
-							void load();
-						},
-						function (e) { setBusy(false); setError(String((e && e.message) || e)); }
-					);
-				}
-				function onImportFile(event: React.ChangeEvent<HTMLInputElement>): void {
-					const file = event.target.files && event.target.files[0];
-					if (!file) return;
-					const reader = new FileReader();
-					reader.onload = function () { setImportText(String(reader.result)); };
-					reader.onerror = function () { setError('文件读取失败'); };
-					reader.readAsText(file, 'utf8');
-					event.target.value = '';
-				}
-
-				// ── global default-off policy ─────────────────────────────────
-				function togglePolicy() {
-					if (!policyReady || policyBusy) return;
-					setPolicyBusy(true);
-					setError(null);
-					api.call('setPolicy', { globalDefaultOff: !policyOn }).then(
-						function () {
-							setPolicyBusy(false);
-							void load();
-						},
-						function (e) { setPolicyBusy(false); setError(String((e && e.message) || e)); }
-					);
-				}
-
-				// ── per-project switch ────────────────────────────────────────
-				function toggleSkill(root: DynamicValue, skill: DynamicValue): void {
-					const key = root.id + ':' + skill.name;
-					if (!switchReady || !projectReady || toggling !== null) return;
-					setToggling(key);
-					setError(null);
-					const wantDisabled = skill.disabled !== true;
-					api.call('setStatus', { root: root.id, name: skill.name, disabled: wantDisabled }).then(
-						function () {
-							setToggling(null);
-							// The switch position itself is the feedback; no toast.
-							void load();
-						},
-						function (e) { setToggling(null); setError(String((e && e.message) || e)); }
-					);
-				}
-				function bulkToggle(root: DynamicValue, skills: DynamicValue[]): void {
-					if (!switchReady || !projectReady || bulkBusy) return;
-					const offCount = skills.filter(function (s) { return s.disabled === true; }).length;
-					const wantDisabled = offCount !== skills.length; // all off → enable all; else disable the rest
-					const targets = skills.filter(function (s) { return (s.disabled === true) !== wantDisabled; });
-					if (targets.length === 0) return;
-					setBulkBusy(true);
-					setError(null);
-					const failed: string[] = [];
-					let chain = Promise.resolve();
-					targets.forEach(function (s) {
-						chain = chain.then(function () {
-							return api.call('setStatus', { root: root.id, name: s.name, disabled: wantDisabled }).catch(function (e) {
-								failed.push(s.name + '：' + String((e && e.message) || e));
-							});
-						});
-					});
-					chain.then(function () {
-						setBulkBusy(false);
-						if (failed.length > 0) setError('批量开关有 ' + failed.length + ' 个失败：' + failed.slice(0, 3).join('；') + (failed.length > 3 ? ' …' : ''));
-						void load();
-					});
-				}
-
-				// ── package-level actions ─────────────────────────────────────
-				function togglePkg(rootId: string, prefix: string, expanded: boolean): void {
-					writePkgMeta(rootId, prefix, { expanded: !expanded });
-					bump();
-				}
-				function startLabelEdit(rootId: string, prefix: string, currentLabel: string): void {
-					setEditingPkg({ rootId: rootId, prefix: prefix });
-					setLabelDraft(currentLabel);
-				}
-				function commitLabelEdit() {
-					if (editingPkg === null) return;
-					const v = labelDraft.trim();
-					writePkgMeta(editingPkg.rootId, editingPkg.prefix, { label: v === '' ? null : v });
-					setEditingPkg(null);
-					setLabelDraft('');
-					bump();
-				}
-				function doExportPkgZip(rootId: string, skills: DynamicValue[]): void {
-					if (!zipReady) {
-						setError('整包 zip 导出需要重启 dsh web 后生效（运行中的 host 尚未加载 exportZip 操作）；单件导出与批量删除不受影响');
-						return;
-					}
-					setBusy(true);
-					setError(null);
-					api.zip(rootId, skills.map(function (s) { return s.name; })).then(
-						function (filename) { setBusy(false); flash('已导出 ' + filename); },
-						function (e) { setBusy(false); setError(String((e && e.message) || e)); }
-					);
-				}
-				function doPkgDelete() {
-					if (confirmPkg === null) return;
-					setBusy(true);
-					setError(null);
-					const target = confirmPkg;
-					const failed: string[] = [];
-					let chain = Promise.resolve();
-					target.names.forEach(function (n: string) {
-						chain = chain.then(function () {
-							return api.call('delete', { root: target.rootId, name: n }).catch(function (e) {
-								failed.push(n + '：' + String((e && e.message) || e));
-							});
-						});
-					});
-					chain.then(function () {
-						setBusy(false);
-						setConfirmPkg(null);
-						if (failed.length > 0) setError('批量删除有 ' + failed.length + ' 个失败：' + failed.slice(0, 3).join('；') + (failed.length > 3 ? ' …' : ''));
-						else flash('已删除技能包「' + target.label + '」（' + target.names.length + ' 个）');
-						void load();
-					});
-				}
-
-				// ── rendering ─────────────────────────────────────────────────
-				function switchEl(root: DynamicValue, skill: DynamicValue) {
-					const on = skill.disabled !== true;
-					const dim = !switchReady || !projectReady || toggling !== null;
-					const isUserRoot = root.id === 'user-dsh' || root.id === 'user-agents';
-					const title = !switchReady
-						? '开关需要重启 dsh web 加载新版 host 后启用'
-						: !projectReady
-							? '按项目开关需要项目工作区（当前页没有会话工作区）'
-							: skill.isShadow
-								? '这一行是项目级禁用开关文件：拨回即删除开关、恢复该 skill'
-								: (policyOn && isUserRoot && !on)
-									? '全局默认关闭中：在本项目启用（生成项目本地副本，其他项目仍关闭）'
-									: on
-										? '在本项目禁用（模型不再自动使用，仍可手动调用）'
-										: '在本项目恢复启用';
-					return h('button', {
-						type: 'button',
-						role: 'switch',
-						'aria-checked': on,
-						'aria-label': (on ? '停用 ' : '启用 ') + skill.name + '（仅当前项目）',
-						className: 'smgr-switch' + (on ? ' smgr-switchOn' : '') + (dim ? ' smgr-switchDim' : ''),
-						disabled: dim,
-						title: title,
-						onClick: function (event) { event.stopPropagation(); toggleSkill(root, skill); }
-					}, h('span', { className: 'smgr-switchKnob' }));
-				}
-
-				function skillRow(skill: DynamicValue, root: DynamicValue) {
-					const active = sel !== null && sel.root === root.id && sel.name === skill.name;
-					return h(
-						'div',
-						{ key: skill.name, className: 'smgr-row' + (active ? ' smgr-rowActive' : '') + (skill.disabled === true ? ' smgr-rowOff' : ''), onClick: function () { openDetail(root.id, skill.name); } },
-						h(
-							'div',
-							{ className: 'smgr-rowMain' },
-							h(
-								'span',
-								{ className: 'smgr-name' },
-								skill.title || skill.name,
-								skill.broken
-									? h('span', { className: 'smgr-badge smgr-badgeBad', title: skill.broken }, '格式损坏')
-									: null,
-								skill.isShadow ? h('span', { className: 'smgr-badge smgr-badgeShadow', title: '项目级禁用开关文件（由开关生成）' }, '禁用开关') : null,
-								skill.disabled === true && !skill.isShadow ? h('span', { className: 'smgr-badge smgr-badgeOff' }, '已禁用') : null
-							),
-							skill.description ? h('span', { className: 'smgr-desc' }, skill.description) : null
-						),
-						switchEl(root, skill),
-						h(
-							'div',
-							{
-								className: 'smgr-rowActions',
-								onClick: function (event: React.MouseEvent) { event.stopPropagation(); }
-							},
-							!skill.readOnly
-								? h('button', { className: 'smgr-iconBtn smgr-iconBtnDanger', title: skill.isShadow ? '删除开关文件（恢复 skill）' : '删除', onClick: function () { setSel({ root: root.id, name: skill.name }); setConfirmDelete(true); } }, '✕')
-								: null,
-							h('button', {
-								className: 'smgr-iconBtn',
-								title: '导出 .md',
-								onClick: function () {
-									api.call('read', { root: root.id, name: skill.name }).then(
-										function (value) { exportSkill(skill, value.content); },
-										function (e) { setError(String((e && e.message) || e)); }
-									);
-								}
-							}, '⇩')
-						)
-					);
-				}
-
-				function packageRow(root: DynamicValue, item: DynamicValue, expanded: boolean, meta: DynamicValue) {
-					const all = item.skills;
-					const isEditing = editingPkg !== null && editingPkg.rootId === root.id && editingPkg.prefix === item.prefix;
-					const label = (typeof meta.label === 'string' && meta.label.trim() !== '') ? meta.label.trim() : item.prefix;
-					const hasReadOnly = all.some(function (s: DynamicValue) { return s.readOnly; });
-					const offCount = all.filter(function (s: DynamicValue) { return s.disabled === true; }).length;
-					const sample = q === ''
-						? (all.slice(0, 3).map(function (s: DynamicValue) { return s.name; }).join('、') + (all.length > 3 ? ' 等' : ''))
-						: '匹配 ' + all.filter(function (s: DynamicValue) { return matches(s, q); }).length + ' / ' + all.length + ' 个';
-					return h(
-						'div',
-						{ className: 'smgr-pkgRow' + (offCount === all.length ? ' smgr-pkgRowOff' : '') },
-						h('button', {
-							className: 'smgr-caret',
-							title: expanded ? '折叠' : '展开',
-							onClick: function (event: React.MouseEvent) { event.stopPropagation(); togglePkg(root.id, item.prefix, expanded); }
-						}, expanded ? '▾' : '▸'),
-						h('span', { className: 'smgr-pkgIcon', 'aria-hidden': true }),
-						h(
-							'div',
-							{ className: 'smgr-rowMain', onClick: function () { togglePkg(root.id, item.prefix, expanded); } },
-							h(
-								'span',
-								{ className: 'smgr-name' },
-								isEditing
-									? h('input', {
-										className: 'smgr-labelInput',
-										value: labelDraft,
-										autoFocus: true,
-										onClick: function (event) { event.stopPropagation(); },
-										onChange: function (event) { setLabelDraft(event.target.value); },
-										onBlur: commitLabelEdit,
-										onKeyDown: function (event) {
-											if (event.key === 'Enter') commitLabelEdit();
-											else if (event.key === 'Escape') { setEditingPkg(null); setLabelDraft(''); bump(); }
-										}
-									})
-									: h('span', { className: 'smgr-pkgLabel' }, label),
-								h('span', { className: 'smgr-badge' }, '技能包 ×' + all.length),
-								offCount > 0 ? h('span', { className: 'smgr-badge smgr-badgeOff' }, offCount + ' 已禁用') : null,
-								h('button', {
-									className: 'smgr-iconBtn',
-									title: '修改显示名（仅保存在本机浏览器）',
-									onClick: function (event: React.MouseEvent) { event.stopPropagation(); startLabelEdit(root.id, item.prefix, label); }
-								}, '✎')
-							),
-							h('span', { className: 'smgr-desc' }, '前缀 ' + item.prefix + '- · ' + sample)
-						),
-						h(
-							'div',
-							{ className: 'smgr-rowActions', onClick: function (event: React.MouseEvent) { event.stopPropagation(); } },
-							(switchReady && projectReady)
-								? h('button', {
-									className: 'smgr-bulkBtn',
-									disabled: bulkBusy,
-									title: offCount === all.length ? '把整包恢复启用（仅本项目）' : '把整包在本项目禁用（模型不再自动使用）',
-									onClick: function () { bulkToggle(root, all); }
-								}, bulkBusy ? '处理中…' : (offCount === all.length ? '全部启用' : '全部禁用'))
-								: null,
-							h('button', {
-								className: 'smgr-iconBtn',
-								disabled: !zipReady,
-								title: zipReady
-									? '整包导出为 zip（含 references 等全部附属文件）'
-									: '整包导出为 zip（需重启 dsh web 加载新版 host 后启用）',
-								onClick: zipReady ? function () { doExportPkgZip(root.id, all); } : undefined
-							}, '⤓'),
-							!hasReadOnly
-								? h('button', {
-									className: 'smgr-iconBtn smgr-iconBtnDanger',
-									title: '整包删除',
-									onClick: function () { setConfirmPkg({ rootId: root.id, prefix: item.prefix, label: label, names: all.map(function (s: DynamicValue) { return s.name; }) }); }
-								}, '✕')
-								: null
-						)
-					);
-				}
-
-				// The state filter counts real skills only: a disabled skill's
-				// marker switch file would double-count the same name.
-				function passesFilter(s: DynamicValue): boolean {
-					if (s.isShadow) return false;
-					if (filter === 'off') return s.disabled === true;
-					if (filter === 'on') return s.disabled === false;
-					return true;
-				}
-				function renderItems(root: DynamicValue, skills: DynamicValue[]) {
-					const items = groupSkills(skills);
-					// Within a root, package rows sit on top; standalone
-					// rows follow. Both groups keep original relative order.
-					const pkgOut: React.ReactNode[] = [];
-					const rowOut: React.ReactNode[] = [];
-					for (const item of items) {
-						if (item.kind === 'skill') {
-							const skill = item.skill;
-							if (skill.isShadow) {
-								// Marker switch files: hidden by default, revealed by search only.
-								if (q === '' || !matches(skill, q)) continue;
-							} else {
-								if (!matches(skill, q) || !passesFilter(skill)) continue;
-							}
-							rowOut.push(h('div', { key: 's:' + skill.name }, skillRow(skill, root)));
-							continue;
-						}
-						const visible = item.skills.filter(function (s: DynamicValue) { return matches(s, q) && passesFilter(s); });
-						if (visible.length === 0) continue;
-						const meta = readPkgMeta(root.id, item.prefix);
-						const expanded = q !== '' || filter !== 'all' ? true : meta.expanded === true;
-						pkgOut.push(
-							h(
-								React.Fragment,
-								{ key: 'p:' + item.prefix },
-								packageRow(root, item, expanded, meta),
-								expanded
-									? h('div', { className: 'smgr-pkgMembers' }, visible.map(function (s: DynamicValue) { return h('div', { key: 'm:' + s.name }, skillRow(s, root)); }))
-									: null
-							)
-						);
-					}
-					return pkgOut.concat(rowOut);
-				}
-
-				const editableRoots = data ? data.roots : [];
-				const cwd = data ? data.cwd : null;
-				const projectRoot = data ? data.projectRoot : null;
-				// How many real skills are currently off in this project (marker
-				// switch files excluded — they are the mechanism, not the state).
-				const disabledTotal = data === null
-					? 0
-					: data.roots.reduce(function (n: number, r: DynamicValue) {
-						return n + r.skills.filter(function (s: DynamicValue) { return !s.isShadow && s.disabled === true; }).length;
-					}, 0)
-					+ (data.bundled || []).reduce(function (n: number, g: DynamicValue) {
-						return n + g.skills.filter(function (s: DynamicValue) { return !s.isShadow && s.disabled === true; }).length;
-					}, 0);
-
-				return h(
-					'div',
-					{ className: 'smgr' },
-					h('h2', null, 'Skills 技能管理'),
-					h('p', { className: 'smgr-intro' }, '浏览、导入导出 skill。项目级只影响本项目，用户级影响所有项目，内置只读。每行的小滑块按项目启用/禁用：关掉后模型在本项目不再自动调用它（手动调用不受影响）。导入/删除后自动热加载，无需重启。'),
-					h(
-						'div',
-						{ className: 'smgr-policy' },
-						h(
-							'div',
-							{ className: 'smgr-policyMain' },
-							h(
-								'span',
-								{ className: 'smgr-name' },
-								'全局默认关闭',
-								h('span', { className: 'smgr-badge' }, policyOn ? '已开启' : '已关闭')
-							),
-							h('span', { className: 'smgr-policyDesc' }, '开启后用户级 skill 默认禁用（内置不受影响）；某项目要用某个 skill，打开它的滑块即可（生成项目本地副本）。')
-						),
-						h('button', {
-							type: 'button',
-							className: 'smgr-switch' + (policyOn ? ' smgr-switchOn' : '') + (!policyReady || policyBusy ? ' smgr-switchDim' : ''),
-							disabled: !policyReady || policyBusy,
-							title: policyReady
-								? (policyOn
-									? '关闭全局默认关闭策略（不会移除已加的标志）'
-									: '开启全局默认关闭策略：用户级 skill 全部默认禁用')
-								: '需要重启 dsh web 加载新版 host 后启用',
-							onClick: function (event: React.MouseEvent) { event.stopPropagation(); togglePolicy(); }
-						}, h('span', { className: 'smgr-switchKnob' }))
-					),
-					cwd !== null && cwd !== undefined
-						? h('p', { className: 'smgr-cwd' }, '当前工作区：', h('code', null, cwd),
-							projectRoot !== null && projectRoot !== undefined
-								? h('span', null, '　开关生效的项目根：', h('code', null, projectRoot))
-								: null)
-						: h('p', { className: 'smgr-cwd' }, '当前页没有会话工作区：仅显示用户级与内置 skill，按项目开关不可用。'),
-					h(
-						'div',
-						{ className: 'smgr-toolbar' },
-						h('input', {
-							className: 'smgr-search',
-							placeholder: '搜索名称或描述…',
-							value: q,
-							onChange: function (event) { setQ(event.target.value); }
-						}),
-						h(
-							'div',
-							{ className: 'smgr-filter' },
-							[
-								['all', '全部'],
-								['off', disabledTotal > 0 ? '已禁用 ' + disabledTotal : '已禁用'],
-								['on', '已启用']
-							].map(function (f) {
-								return h('button', {
-									key: f[0],
-									type: 'button',
-									className: 'smgr-filterBtn' + (filter === f[0] ? ' smgr-filterBtnActive' : ''),
-									onClick: function () { setFilter(f[0]!); }
-								}, f[1]);
-							})
-						),
-						h(Button, { variant: 'outline', disabled: busy, onClick: function () { void load(); } }, busy ? '加载中…' : '刷新'),
-						h(Button, {
-							variant: 'outline',
-							onClick: function () {
-								setImportText('');
-								setImportRoot((data && data.roots.length >= 2 && data.roots[data.roots.length - 2].id) || 'user-dsh');
-								setImportOpen(true);
-							}
-						}, '导入 Skill')
-					),
-					notice !== null ? h('p', { className: 'smgr-toast', role: 'status' }, notice) : null,
-					error !== null ? h('p', { className: 'smgr-error', role: 'alert' }, error) : null,
-					data === null && !error ? h('p', { className: 'smgr-empty' }, '正在加载…') : null,
-					data
-						? data.roots.map(function (root: DynamicValue) {
-							const shadowCount = root.skills.filter(function (s: DynamicValue) { return s.isShadow; }).length;
-							const items = renderItems(root, root.skills);
-							return h(
-								'section',
-								{ key: root.id, className: 'smgr-group' },
-								h(
-									'h3',
-									null,
-									root.label,
-									h('span', { className: 'smgr-count' }, String(root.skills.length)),
-									shadowCount > 0
-										? h('span', { className: 'smgr-badge smgr-badgeShadow', title: '项目级禁用开关文件：默认隐藏，搜索可列出' }, '禁用开关 ×' + shadowCount)
-										: null,
-									!root.exists ? '（目录尚不存在，导入/编辑时自动创建）' : ''
-								),
-								items.length === 0 ? h('p', { className: 'smgr-empty' }, root.exists ? (q === '' && shadowCount > 0 ? '' : '（空）') : '') : null,
-								items
-							);
-						})
-						: null,
-					data
-						? (data.bundled || []).map(function (group: DynamicValue) {
-							const rootObj = { id: 'bundled:' + group.presetId, label: group.label };
-							const items = renderItems(rootObj, group.skills);
-							return h(
-								'section',
-								{ key: 'bundled:' + group.presetId, className: 'smgr-group' },
-								h('h3', null, group.label, h('span', { className: 'smgr-count' }, String(group.skills.length))),
-								items.length === 0 ? h('p', { className: 'smgr-empty' }, '（空）') : null,
-								items
-							);
-						})
-						: null,
-					sel !== null
-						? detail === null
-							? h('section', { className: 'smgr-detail' }, h('p', { className: 'smgr-empty' }, '正在读取…'))
-							: h(
-								'section',
-								{ className: 'smgr-detail' },
-								h(
-									'div',
-									{ className: 'smgr-detailHead' },
-									h('h3', null, detail.name),
-									h('code', { className: 'smgr-path' }, detail.path),
-									h(
-										'div',
-										{ className: 'smgr-detailActions' },
-										h(Button, { variant: 'outline', onClick: function () { exportSkill({ name: detail.name }, detail.content); } }, '导出'),
-										!detail.readOnly
-											? h(Button, { variant: 'outline', className: 'smgr-iconBtnDanger', onClick: function () { setConfirmDelete(true); } }, '删除')
-											: null
-									)
-								),
-								h('pre', { className: 'smgr-code' }, detail.content)
-							)
-						: null,
-					h(Modal, {
-						open: importOpen,
-						onClose: function () { setImportOpen(false); },
-						title: '导入 Skill',
-						closeLabel: '关闭',
-						description: '粘贴一个 skill 文件的全部内容（含 frontmatter），或选择一个 .md 文件。目标位置在 frontmatter 的 name 确定后写入所选根目录。',
-						footer: h(
-							React.Fragment,
-							null,
-							h(Button, { variant: 'outline', onClick: function () { setImportOpen(false); } }, '取消'),
-							h(Button, { disabled: busy || importText.trim() === '', onClick: doImport }, busy ? '导入中…' : '导入')
-						)
-					},
-						h(
-							'div',
-							{ className: 'smgr-modalBody' },
-							h(
-								'label',
-								{ className: 'smgr-file' },
-								'目标根目录：',
-								h(
-									'select',
-									{ className: 'smgr-select', value: importRoot, onChange: function (event: React.ChangeEvent<HTMLSelectElement>) { setImportRoot(event.target.value); } },
-									editableRoots.map(function (root: DynamicValue) {
-										return h('option', { key: root.id, value: root.id }, root.label);
-									})
-								)
-							),
-							h('input', { type: 'file', accept: '.md,.markdown', className: 'smgr-file', onChange: onImportFile }),
-						h('textarea', { className: 'smgr-editor', value: importText, spellCheck: false, placeholder: '---\nname: my-skill\ndescription: 一句话说明这个 skill 做什么\n---\n\n正文指令…', onChange: function (event: React.ChangeEvent<HTMLTextAreaElement>) { setImportText(event.target.value); } })
-						)
-					),
-					h(Modal, {
-						open: confirmDelete,
-						onClose: function () { setConfirmDelete(false); },
-						title: '删除 skill？',
-						closeLabel: '关闭',
-						description: '将从磁盘删除该 skill 文件（目录型 skill 连同整个目录），此操作不可撤销。',
-						footer: h(
-							React.Fragment,
-							null,
-							h(Button, { variant: 'outline', onClick: function () { setConfirmDelete(false); } }, '取消'),
-							h(Button, { className: 'smgr-iconBtnDanger', disabled: busy, onClick: doDelete }, busy ? '删除中…' : '确认删除')
-						)
-					},
-						sel !== null ? h('p', { style: { margin: 0, fontSize: 13 } }, '删除 ', h('strong', null, sel.name), '？') : null
-					),
-					h(Modal, {
-						open: confirmPkg !== null,
-						onClose: function () { setConfirmPkg(null); },
-						title: '删除整个技能包？',
-						closeLabel: '关闭',
-						description: '将逐个删除该技能包的全部成员（目录型 skill 连同整个目录），此操作不可撤销。',
-						footer: h(
-							React.Fragment,
-							null,
-							h(Button, { variant: 'outline', onClick: function () { setConfirmPkg(null); } }, '取消'),
-							h(Button, { className: 'smgr-iconBtnDanger', disabled: busy, onClick: doPkgDelete }, busy ? '删除中…' : '确认删除全部')
-						)
-					},
-						confirmPkg !== null
-							? h(
-								'div',
-								null,
-								h('p', { style: { margin: '0 0 6px', fontSize: 13 } }, '删除「', h('strong', null, confirmPkg.label), '」的全部 ', String(confirmPkg.names.length), ' 个 skill：'),
-								h('div', { className: 'smgr-pkgList' }, confirmPkg.names.join('\n'))
-							)
-							: null
-					)
-				);
-			}
-
 			// ── DSH-008 V1: per-project SKILL management ─────────────────
 			/** Build the project options: current session workspace + DSH workspaces. */
 			function buildProjectOptions(ctx: ClientContext): DynamicValue[] {
@@ -2067,11 +1249,11 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 						role: 'switch',
 						'aria-checked': on,
 						'aria-label': (on ? '停用 ' : '启用 ') + row.name + '（仅当前项目）',
-						className: 'smgr-switch' + (on ? ' smgr-switchOn' : '') + (dim ? ' smgr-switchDim' : ''),
+						className: 'sk-switch' + (on ? ' sk-switchOn' : '') + (dim ? ' sk-switchDim' : ''),
 						disabled: dim || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)),
 						title: title,
 						onClick: function (event) { event.stopPropagation(); doToggle(row); }
-					}, h('span', { className: 'smgr-switchKnob' }));
+					}, h('span', { className: 'sk-switchKnob' }));
 				}
 				function openDrawer(row: DynamicValue): void {
 					setDrawerName(row.name);
@@ -2787,13 +1969,12 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 			 * The SKILL tab: probes the host for the V1 (apiVersion 6)
 			 * with a lightweight `capabilities` op. Hosts from the first V1
 			 * release do not expose it, so an unknown op falls back to one
-			 * `catalog` request; an unknown catalog means the host predates
-			 * DSH-008 and the legacy section is shown instead.
+			 * `catalog` request; an unknown catalog produces an explicit upgrade
+			 * state instead of mounting an obsolete client page.
 			 */
-			function SkillCenterV1(props: { api: HostClientApi; ctx: ClientContext }) {
-				var api = props.api;
+			function SkillCenterV1(props: { ctx: ClientContext }) {
 				var ctx = props.ctx;
-				var [probe, setProbe] = React.useState('loading'); // loading | v1 | legacy | error
+				var [probe, setProbe] = React.useState('loading'); // loading | v1 | unavailable | error
 				var [probeError, setProbeError] = React.useState<string | null>(null);
 				var [attempt, setAttempt] = React.useState(0);
 				React.useEffect(function () {
@@ -2801,7 +1982,7 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 					setProbeError(null);
 					function accept(value: DynamicValue): void {
 						if (value && Number(value.apiVersion) >= 6) setProbe('v1');
-						else setProbe('legacy');
+						else setProbe('unavailable');
 					}
 					function reject(e: DynamicValue): void {
 						var msg = String((e && e.message) || e);
@@ -2810,7 +1991,7 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 							function (value) { accept(value); },
 							function (catalogError) {
 								var catalogMessage = String((catalogError && catalogError.message) || catalogError);
-								if (catalogMessage.indexOf('未知操作') === 0) setProbe('legacy');
+								if (catalogMessage.indexOf('未知操作') === 0) setProbe('unavailable');
 								else { setProbe('error'); setProbeError(catalogMessage); }
 							}
 						);
@@ -2825,13 +2006,12 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 				if (probe === 'loading') {
 					return h('div', { className: 'sk-root' }, h(SkillFindingState));
 				}
-				if (probe === 'legacy') {
+				if (probe === 'unavailable') {
 					return h(
 						'div',
-						{ className: 'smgr' },
-						h('p', { className: 'sk-banner' },
-							'当前 dsh web 尚未加载 DSH-008 的 host 接口（apiVersion 6）。重启 dsh web 后即可使用新版项目 SKILL 管理中心；现在显示旧版界面。'),
-						h(SkillManagerSection, { api: api })
+						{ className: 'sk-root' },
+						h('p', { className: 'sk-error' }, '当前 dsh web 未加载新版 Skill Host API（apiVersion 6），请重启 dsh web 后重试。'),
+						h(Button, { variant: 'outline', onClick: function () { setAttempt(function (n) { return n + 1; }); } }, '重试')
 					);
 				}
 				if (probe === 'error') {
@@ -2863,10 +2043,6 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 							label: function () { return 'SKILL'; },
 							inject: function () {
 								return {
-									api: {
-										call: function (op: string, payload: ApiPayload) { return apiCall(op, payload, ctx); },
-										zip: function (rootId: string, names: string[]) { return zipDownload(rootId, names, ctx); }
-									},
 									// V1 (DSH-008): the live client context so the
 									// skill center can read sessions/workspaces.
 									ctx: ctx

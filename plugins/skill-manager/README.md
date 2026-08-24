@@ -9,13 +9,13 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
   中的同名 Skill 仍合并为一个身份，详情列出全部来源并允许当前项目显式选择来源。
   顶部提供与 MCP / Plugin 一致的「本地 Skill / Skill 市场」页签；市场从 Host 侧读取受控
   GitHub 清单，支持真实仓库元数据、详情、安装前预览和安全安装。
-  - 运行中的 host 尚未加载 apiVersion 6（未重启 `dsh web`）时，自动降级为
-    旧版单页界面（见下方「旧版功能」）并显示提示条。
+  - 运行中的 host 尚未加载 apiVersion 6（未重启 `dsh web`）时，不再挂载旧版页面，
+    只显示明确的升级/重试状态。
 - 通用“扩展”入口、左导航以及 MCP / Plugin 占位由独立的
   [`dsh-extension-manager`](../extension-manager/README.md) 负责。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 25 / DSH-008 V1.1）
+## 页面结构（build 26 / DSH-008 V1.1）
 
 - **视觉规格（build 24）**：页面宽度、标题与一级页签节奏、项目摘要卡、38px 工具栏、72px
   扁平分隔列表行和 400px 固定详情抽屉与 MCP / Plugin 共用同一套页面骨架；Skill 独有的项目
@@ -57,8 +57,9 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
     不改变项目卡片、工具栏或列表的宽度与换行，窄窗口最多占满可用宽度。
 - **首次加载态**：首次进入 SKILL 页、catalog 尚未返回时，居中展示官方 Skill 图标、呼吸光环、
   扫描光和「正在扫描 Skill / 整理项目配置与可用来源」状态文案；`prefers-reduced-motion` 下退化为静态状态。
-- **SKILL 分区（旧版降级）**：host 未加载 apiVersion 6 时渲染
-  `SkillManagerSection`（build 11 功能，见下），顶部显示重启提示条。
+- **旧版页面清理**：apiVersion 6 以下的 host 只得到升级/重试状态；旧版页面、技能包列表
+  和旧版浏览器端辅助逻辑不再进入 client bundle。Host API 的旧操作仍保留为兼容接口，
+  不承担页面渲染。
 
 ## DSH-008 V1 核心机制
 
@@ -123,60 +124,13 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
 - **可更新**：`updateInfo` 恒为 `null`（V1 不做远端更新检测）；UI 只在存在
   真实更新数据时才显示浅红「可更新」标签。
 
-## 旧版功能（host < apiVersion 6 时的降级界面）
+## 兼容性说明
 
-- **浏览 / 搜索 / 详情**：列出全部 skill（项目级 2 个根 + 用户级 2 个根 + 各 preset 内置只读分组），
-  关键词搜索，点开看完整文件内容；同名 skill 显示「被 … 遮蔽」提示。
-- **编辑**：UI 入口已移除（build 8，详情页为只读查看）。host 的 `save` 操作
-  仍保留（frontmatter 校验 + 原子写入），可供直接调 API 使用，但页面上
-  不再有编辑按钮。
-- **删除**：二次确认后删除磁盘文件（目录型 skill 连同目录删除）。
-- **导入**：粘贴内容或选择 `.md` 文件，写入所选根目录（目录型 `<name>/SKILL.md`），重名报 409。
-- **导出**：下载当前 skill 为 `<name>.md`。
-- **全局默认关闭**（build 6+，host apiVersion 5）：页面顶部一个主开关。
-  - 开启后，所有**用户级** skill（`~/.dsh/skills`、`~/.agents/skills`）自动带上
-    `disable-model-invocation: true` 标志 —— 模型在任何项目里都不再自动调用它们；
-    内置（preset）skill 与外部工具根（Codex/Claude）文件一律不动（如 cordis 的内置
-    skill 保持启用）。每次 `list` 都会幂等地重新执行策略，所以之后新增的用户级 skill
-    也会自动默认关闭。
-  - 关闭策略**不会**移除已加的标志（防止误恢复），需要时用各行滑块逐个恢复。
-  - 策略开启时，某项目里想启用某个用户级 skill = 在该项目生成**本地副本**
-    `<项目根>/.dsh/skills/<name>`（去掉标志，rank 100 压过全局关闭的原文件；
-    目录型 skill 连同 `references/` 等附属文件一起复制，50MB 上限）；
-    再把副本关回去 = 副本原地加标志（内容永不删除）。副本可编辑、可删除。
-  - 策略状态存在 `~/.dsh/skill-manager.json`（`{ globalDefaultOff }`，原子写入）。
-  - 策略开启期间，为「全局已关闭的用户级 skill」生成的旧版开关文件是冗余的，
-    执行策略时自动清理（孤儿开关——原文件已不存在——保留不动）。
-- **按项目启用/禁用**（build 5+）：每行一个小滑块（拨动无 toast，滑块本身即反馈）。
-  关掉 = 该 skill 在**本项目**的会话中不再被模型自动调用（仍可手动调用），其他项目不受影响。
-  实现方式全部走 DSH 原生机制：
-  - 项目自己的 skill：原子改写其 frontmatter 标志 `disable-model-invocation`（CRLF/字节保真）。
-  - 用户级/内置 skill（策略关闭时）：在项目根生成一个**开关文件**
-    `<项目根>/.dsh/skills/<name>.md`（rank 100 压制用户 400/500 与内置 600；
-    带 `disable-model-invocation: true`；文件内带生成标记，UI 上显示「禁用开关」徽标）。
-    拨回或删除该文件即恢复。开关文件行在 UI 里默认隐藏，所在分区标题显示
-    「禁用开关 ×N」，搜索可列出。
-  - 用户级 skill（策略开启时）：见上方「全局默认关闭」的副本机制。
-  - 内置/外部根 skill 始终走开关文件机制（其文件不可修改）。
-  - 项目根按 DSH 的 `findProjectRoot` 语义解析（向上找 `.git`，找不到就取 cwd）。
-  - 安全：若项目里已有同名 skill（非本插件生成的开关），拒绝生成并提示 409。
-  - 包行支持「全部禁用/全部启用」批量开关。
-- **技能包**（build 3+）：同一前缀（第一个连字符之前的部分）≥3 个的 skill 自动折叠为一个包
-  （如 lark-* 27 个 → 1 行），默认折叠、状态记忆在浏览器 localStorage；
-  搜索命中成员时包自动展开；包行显示名可自定义（仅存本机浏览器）。
-  视觉上与普通 skill 行区分（build 9+）：淡品牌色底（color-mix 派生，旧引擎回退）
-  + 左侧 3px 品牌色强调条 + 行首包图标；各分区内包行排在最前面，散行随后。
-  - **整包导出 zip**：含每个成员的全部附属文件（`references/` 等），一次下载一个压缩包。
-  - **整包删除**：二次确认（列出全部成员）后逐个删除。
-  - 只读（内置）成员混在包里时，包级删除按钮自动隐藏，导出仍可用。
-  - 开关文件不参与技能包分组（只作独立行，默认隐藏、搜索可列出）。
-- **徽标精简**（build 8+）：「只读」「被 … 遮蔽」徽标已移除（置灰状态与
-  分区归属已表达同样信息）；保留「已禁用」（实心琥珀色）、「禁用开关」、
-  「格式损坏」。
-- **状态可见性**（build 7+）：工具栏「全部 / 已禁用 N / 已启用」筛选器（N 为实时统计，
-  只数真实 skill，不重复数开关文件）；被禁用的行标题与描述置灰、
-  「已禁用」徽标为实心琥珀色；技能包成员全部禁用时整行置灰；筛选器与搜索可叠加。
-- 导入/删除后 DSH 的 skill watcher 自动热加载，**无需重启**。
+- 当前 client 只挂载 apiVersion 6 的项目管理页。旧 Host 不再渲染历史 Skill Manager 页面，
+  而是显示升级/重试状态。
+- `/api/skill-manager` 的 `list / read / save / delete / import / exportZip / setStatus /
+  getPolicy / setPolicy` 仍保留，供旧客户端或外部调用兼容使用；它们不是当前页面的渲染路径。
+- 项目配置、来源合并、启停、标签、预设、精简和市场能力均走 V1 API。
 
 ## 管理的存储位置
 
@@ -271,16 +225,16 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖单页信息架构、可收起导航、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
   丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚、任意 GitHub
-  inspect/preview/install、扫描加载态和旧 Host 降级。
+  inspect/preview/install、扫描加载态和旧 Host 升级态。
 - **热更新边界**（实测）：client bundle 由进程按请求从磁盘读取 —— 改 client 刷新页面即生效；
   host 代码没有模块级 HMR（组合树中 hmr 服务 `disabled: true`）—— 改 host 需要重启 `dsh web`
   （会话持久化在磁盘，重启后原会话可恢复，仅进行中的轮次会中断）。
-  重启前：client 探测到 `catalog` 为未知操作，自动降级旧版界面并提示重启。
+  重启前：client 探测到 `catalog` 为未知操作，只显示升级/重试状态并提示重启，不再挂载旧版界面。
 - **Client 半**（`lib/client.js`）：classic-script bundle（`window.__ModuleLoader__.load`），
   只 require 壳内 seed 词（`react`、`@deepseek-ai/dsh-client-ui-primitives`），无 JSX/TS/构建；
   build 12 起 SKILL 分区使用 `SkillCenterV1`，build 18 收敛为项目管理单页 + 覆盖式详情抽屉，
   项目选择器复用 `ctx.get('sessions')` 当前工作区与 `ctx.get('workspaces')`
-  （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时安全降级；
+  （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时显示明确升级态；
   build 15 按 Product Design 方案 3 重构预设应用/保存弹窗，build 16 将详情标签区重构为
   同一设计语言的一体化编辑面板，build 17 移除默认列表的启用/未启用自动分组并以淡蓝底色标记
   保持原位的已启用行，build 18 移除重复资源库入口并加入可持久化的左导航收起态，build 19
@@ -289,6 +243,7 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区，build 23 加入与 MCP / Plugin 对齐的
   本地 / 市场一级页签和真实 Host 市场接口，build 24 统一 MCP / Plugin 的页面宽度、工具栏、
   扁平列表行和固定详情抽屉几何，build 25 加入任意公开 GitHub 仓库安装入口、目录发现和安全预览，
+  build 26 移除 apiVersion <6 的旧版页面、包列表与浏览器端辅助逻辑，
   加载态保持无底板的光学聚焦动画：
   三颗非对称粒子在首秒依次汇入官方 Skill 图标，`Skill Finding` 同步由雾灰聚焦为墨色并带短蓝色焦点游标，
   同时提供 `prefers-reduced-motion` 静态降级；主题只用

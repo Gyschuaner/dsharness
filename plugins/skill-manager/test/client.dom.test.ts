@@ -347,7 +347,7 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 	assert.ok(h.dom.window.document.querySelector('.sk-drawer'), 'Space opens the Skill drawer');
 	assert.equal(h.dom.window.document.querySelector('.sk-content').className, contentClassBeforeDrawer, 'drawer does not mutate the list layout class');
 	assert.equal(h.dom.window.document.querySelector('.sk-descFull').textContent, currentRow.description);
-	assert.equal(h.dom.window.document.querySelector('.smgr-switch').getAttribute('role'), 'switch');
+	assert.equal(h.dom.window.document.querySelector('.sk-switch').getAttribute('role'), 'switch');
 	assert.equal(h.dom.window.document.querySelector('.sk-srcList'), null, 'source choices stay collapsed until requested');
 	await h.click(h.button('更改来源'));
 	assert.equal(h.dom.window.document.querySelector('.sk-srcList').getAttribute('role'), 'radiogroup');
@@ -701,7 +701,7 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	assert.equal(h.button('已启用1').textContent, '已启用1');
 	assert.equal(h.button('未启用2').textContent, '未启用2');
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 0, 'default mode hides bulk checkboxes');
-	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3, 'default mode shows per-Skill switches');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-switch').length, 3, 'default mode shows per-Skill switches');
 	assert.equal(h.dom.window.document.querySelector('input[aria-label="全选当前结果"]'), null);
 	await h.click(h.button('已启用1'));
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['enabled-skill'], 'state filters remain user-invoked');
@@ -722,7 +722,7 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	await h.click(h.button('批量管理'));
 	assert.ok(h.dom.window.document.querySelector('.sk-batchHint').textContent.includes('右侧单项开关已暂时隐藏'));
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 3, 'bulk mode reveals row checkboxes');
-	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 0, 'bulk mode hides per-Skill switches');
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-switch').length, 0, 'bulk mode hides per-Skill switches');
 
 	const selectVisible = h.dom.window.document.querySelector('input[aria-label="全选当前结果"]');
 	await act(async () => { Simulate.change(selectVisible, { target: { checked: true } }); });
@@ -731,7 +731,7 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setMany' && call.cwd === '/project-b' && call.enabled === true && call.names.length === 3));
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-check').length, 0, 'successful bulk action exits bulk mode');
-	assert.equal(h.dom.window.document.querySelectorAll('.smgr-switch').length, 3);
+	assert.equal(h.dom.window.document.querySelectorAll('.sk-switch').length, 3);
 });
 
 test('single toggle updates optimistically, shows a quiet pending state and rolls back on failure', async (t) => {
@@ -787,7 +787,7 @@ test('project switch drops stale catalog, mutation and preset-preview responses'
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, 'A 项目内容');
 
 	// Start an A mutation, then switch to B before it resolves.
-	await h.click(h.dom.window.document.querySelector('.smgr-switch'));
+	await h.click(h.dom.window.document.querySelector('.sk-switch'));
 	await h.click(h.dom.window.document.querySelector('.sk-projBtn'));
 	await h.click(h.button('project-b'));
 	await h.flush();
@@ -824,7 +824,7 @@ test('project switch drops stale catalog, mutation and preset-preview responses'
 	}
 });
 
-test('unknown catalog op safely falls back to the legacy Skill Manager UI', async (t) => {
+test('unknown catalog op shows an upgrade state without mounting the legacy UI', async (t) => {
 	const error: any = new Error('未知操作：catalog');
 	error.status = 400;
 	const router = async (body) => {
@@ -834,11 +834,13 @@ test('unknown catalog op safely falls back to the legacy Skill Manager UI', asyn
 			throw capabilityError;
 		}
 		if (body.op === 'catalog') throw error;
-		if (body.op === 'list') return { apiVersion: 5, cwd: '/project-a', roots: [], bundled: [], policy: { globalDefaultOff: false } };
 		throw new Error(`unexpected op ${body.op}`);
 	};
 	const h = await makeHarness(router);
 	t.after(h.cleanup);
 	await h.open();
-	assert.ok(h.dom.window.document.body.textContent.includes('现在显示旧版界面'));
+	assert.ok(h.dom.window.document.body.textContent.includes('未加载新版 Skill Host API'));
+	assert.equal(h.dom.window.document.querySelector('.smgr-row'), null);
+	assert.equal(h.dom.window.document.querySelector('.smgr-toolbar'), null);
+	assert.ok(h.button('重试'));
 });
