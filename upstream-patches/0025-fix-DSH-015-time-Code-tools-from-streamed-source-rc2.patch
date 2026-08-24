@@ -1,0 +1,850 @@
+From fd686b2757a04288305075b046834ceab843ccc5 Mon Sep 17 00:00:00 2001
+From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
+Date: Mon, 24 Aug 2026 13:18:00 +0800
+Subject: [PATCH] fix(DSH-015): time Code tools from streamed source on rc2
+
+---
+ .../src/client/contract/chat-nodes.ts         |  6 +-
+ .../conversation-nodes/planned-tools.ts       | 36 +++-------
+ .../conversation-nodes/tool-activity.ts       | 70 +++++++++++++------
+ .../src/client/conversation-nodes/tool.ts     | 41 +++++++----
+ ...nversation-node-definitions.client.spec.ts | 32 ++++++---
+ .../tests/planned-tools.client.spec.ts        | 28 ++++----
+ .../src/client/tool/ToolActivityView.tsx      |  2 +-
+ .../ui-tool/src/client/tool/ToolCallTree.tsx  | 15 +++-
+ .../tests/tool-activity.client.spec.tsx       |  6 +-
+ .../tests/tool-call-tree.client.spec.tsx      | 24 +++++++
+ packages/core/tools/src/code-mode.ts          | 33 +++------
+ packages/core/tools/src/py-types.ts           |  2 +-
+ packages/core/tools/src/ts-types.ts           |  2 +-
+ packages/core/tools/tests/code-mode.spec.ts   | 12 ++--
+ packages/core/tools/tests/py-types.spec.ts    |  6 +-
+ packages/core/tools/tests/ts-types.spec.ts    |  6 +-
+ 16 files changed, 191 insertions(+), 130 deletions(-)
+
+diff --git a/packages/client/ui-conversation/src/client/contract/chat-nodes.ts b/packages/client/ui-conversation/src/client/contract/chat-nodes.ts
+index 8dd8dbd..a90ef8e 100644
+--- a/packages/client/ui-conversation/src/client/contract/chat-nodes.ts
++++ b/packages/client/ui-conversation/src/client/contract/chat-nodes.ts
+@@ -46,8 +46,10 @@ export interface ToolChatData {
+   readonly root: ToolCallBlock
+   /** First streamed Tool delta time, or the formal call time when no delta was loaded. */
+   readonly startedTime: number
+-  /** Model-declared Code children that have not reached runtime dispatch yet. */
++  /** Source-detected Code children that have not reached runtime dispatch yet. */
+   readonly plannedSubCalls: readonly PlannedToolCall[]
++  /** User-visible activity starts for detected Code children, including dispatched calls. */
++  readonly subCallStartedTimes?: Readonly<Record<string, number>>
+ }
+ 
+ /** One provisional Code child, replaced by its matching ordinal dispatch. */
+@@ -56,6 +58,8 @@ export interface PlannedToolCall {
+   readonly callId: string
+   readonly parentCallId: string
+   readonly name: string
++  /** Stream event time at which the direct source call first became recognizable. */
++  readonly startedTime: number
+ }
+ 
+ /** One streamed Tool call that has not reached its formal `tool/call` event. */
+diff --git a/packages/client/ui-conversation/src/client/conversation-nodes/planned-tools.ts b/packages/client/ui-conversation/src/client/conversation-nodes/planned-tools.ts
+index b9c0a63..e42da9f 100644
+--- a/packages/client/ui-conversation/src/client/conversation-nodes/planned-tools.ts
++++ b/packages/client/ui-conversation/src/client/conversation-nodes/planned-tools.ts
+@@ -1,6 +1,6 @@
+-/** Incremental run_code argument inspection for provisional child Tool rows. */
++/** Incremental run_code source inspection for provisional child Tool rows. */
+ 
+-const MAX_PLANNED_TOOL_ROWS = 64
++const MAX_DETECTED_TOOL_ROWS = 64
+ 
+ interface PartialString {
+   readonly value: string
+@@ -69,22 +69,6 @@ function topLevelPropertyValue(input: string, property: string, opening: '[' | '
+   return undefined
+ }
+ 
+-/** Read completed string members from a possibly incomplete JSON array. */
+-function partialStringArray(input: string, start: number): { values: string[]; complete: boolean } {
+-  const values: string[] = []
+-  let cursor = start + 1
+-  while (cursor < input.length && values.length < MAX_PLANNED_TOOL_ROWS) {
+-    while (/\s|,/.test(input[cursor] ?? '')) cursor++
+-    if (input[cursor] === ']') return { values, complete: true }
+-    if (input[cursor] !== '"') return { values, complete: false }
+-    const parsed = readJsonString(input, cursor)
+-    if (!parsed.complete) return { values, complete: false }
+-    if (parsed.value.length > 0) values.push(parsed.value)
+-    cursor = parsed.end
+-  }
+-  return { values, complete: false }
+-}
+-
+ /** Skip one quoted source literal; incomplete literals consume the available prefix. */
+ function skipSourceString(source: string, start: number): number {
+   const quote = source[start] ?? ''
+@@ -132,7 +116,7 @@ function identifierCharacter(character: string | undefined): boolean {
+ function staticToolCalls(source: string): string[] {
+   const names: string[] = []
+   let cursor = 0
+-  while (cursor < source.length && names.length < MAX_PLANNED_TOOL_ROWS) {
++  while (cursor < source.length && names.length < MAX_DETECTED_TOOL_ROWS) {
+     const character = source[cursor]
+     if (character === '"' || character === "'" || character === '`') {
+       cursor = skipSourceString(source, cursor)
+@@ -195,18 +179,14 @@ function staticToolCalls(source: string): string[] {
+ }
+ 
+ /**
+- * Extract ordered provisional child Tool names from streamed run_code JSON.
+- * A declared non-empty/incomplete `plannedTools` array is authoritative; old
+- * calls with no usable declaration fall back to conservative source scanning.
++ * Extract ordered provisional child Tool names from streamed run_code source.
++ * A child becomes visible only after its direct call syntax reaches the stream;
++ * legacy `plannedTools` metadata is deliberately ignored so presentation and
++ * timing reflect code the user can already inspect.
+  * @param argumentsRaw - complete or partial run_code JSON arguments.
+  * @returns ordered names, including repetitions, capped for bounded rendering.
+  */
+-export function extractPlannedToolNames(argumentsRaw: string): readonly string[] {
+-  const plannedStart = topLevelPropertyValue(argumentsRaw, 'plannedTools', '[')
+-  if (plannedStart !== undefined) {
+-    const planned = partialStringArray(argumentsRaw, plannedStart)
+-    if (planned.values.length > 0 || !planned.complete) return planned.values
+-  }
++export function extractCodeToolNames(argumentsRaw: string): readonly string[] {
+   const codeStart = topLevelPropertyValue(argumentsRaw, 'code', '"')
+   if (codeStart === undefined) return []
+   return staticToolCalls(readJsonString(argumentsRaw, codeStart).value)
+diff --git a/packages/client/ui-conversation/src/client/conversation-nodes/tool-activity.ts b/packages/client/ui-conversation/src/client/conversation-nodes/tool-activity.ts
+index d597ddb..782d180 100644
+--- a/packages/client/ui-conversation/src/client/conversation-nodes/tool-activity.ts
++++ b/packages/client/ui-conversation/src/client/conversation-nodes/tool-activity.ts
+@@ -5,7 +5,7 @@ import type {
+ import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
+ import type { PendingToolActivity, PlannedToolCall, ToolActivityChatData } from '../contract/chat-nodes.ts'
+ import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
+-import { extractPlannedToolNames } from './planned-tools.ts'
++import { extractCodeToolNames } from './planned-tools.ts'
+ 
+ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
+   interface ChatNodeDataMap {
+@@ -18,12 +18,18 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
+ export interface ToolActivityStart {
+   readonly seq: number
+   readonly time: number
+-  readonly plannedTools: readonly string[]
++  readonly detectedTools: readonly DetectedTool[]
++}
++
++/** One direct Code child discovered from the incrementally streamed source. */
++export interface DetectedTool {
++  readonly name: string
++  readonly startedTime: number
+ }
+ 
+ interface StreamingToolActivity extends Omit<PendingToolActivity, 'plannedSubCalls'> {
+   readonly argumentsRaw: string
+-  readonly plannedTools: readonly string[]
++  readonly detectedTools: readonly DetectedTool[]
+ }
+ 
+ /** Per-step streamed Tool state read by the later formal Tool Definition. */
+@@ -47,22 +53,36 @@ function rememberStart(
+ ): ReadonlyMap<string, ToolActivityStart> {
+   if (callId === '') return starts
+   const previous = starts.get(callId)
+-  if (previous !== undefined && previous.plannedTools === value.plannedTools) return starts
++  if (previous !== undefined && previous.detectedTools === value.detectedTools) return starts
+   const next = new Map(starts)
+-  next.set(callId, previous === undefined ? value : { ...previous, plannedTools: value.plannedTools })
++  next.set(callId, previous === undefined ? value : { ...previous, detectedTools: value.detectedTools })
+   return next
+ }
+ 
+-function plannedTools(name: string, argumentsRaw: string): readonly string[] {
+-  return name === 'run_code' ? extractPlannedToolNames(argumentsRaw) : []
++function codeTools(name: string, argumentsRaw: string): readonly string[] {
++  return name === 'run_code' ? extractCodeToolNames(argumentsRaw) : []
++}
++
++function detectedTools(
++  previous: readonly DetectedTool[],
++  names: readonly string[],
++  time: number,
++): readonly DetectedTool[] {
++  if (previous.length === names.length && previous.every((tool, index) => tool.name === names[index])) {
++    return previous
++  }
++  return names.map((name, index) => previous[index]?.name === name
++    ? previous[index]
++    : { name, startedTime: time })
+ }
+ 
+ function provisionalCalls(activity: StreamingToolActivity): readonly PlannedToolCall[] {
+-  return activity.plannedTools.map((name, index) => ({
++  return activity.detectedTools.map((tool, index) => ({
+     key: `${activity.key}:code:${index + 1}`,
+     callId: activity.callId === '' ? '' : `${activity.callId}:code:${index + 1}`,
+     parentCallId: activity.callId,
+-    name,
++    name: tool.name,
++    startedTime: tool.startedTime,
+   }))
+ }
+ 
+@@ -73,7 +93,7 @@ function updateDelta(state: ToolActivityState, match: ConversationMatch): ToolAc
+   const callId = previous?.callId || String(chunk.id)
+   const name = chunk.name ?? previous?.name ?? ''
+   const argumentsRaw = `${previous?.argumentsRaw ?? ''}${chunk.argumentsDelta}`
+-  const nextPlannedTools = plannedTools(name, argumentsRaw)
++  const nextDetectedTools = detectedTools(previous?.detectedTools ?? [], codeTools(name, argumentsRaw), match.event.time)
+   let activity = previous
+   if (activity === undefined) {
+     activity = {
+@@ -83,15 +103,15 @@ function updateDelta(state: ToolActivityState, match: ConversationMatch): ToolAc
+       seq: match.event.seq,
+       time: match.event.time,
+       argumentsRaw,
+-      plannedTools: nextPlannedTools,
++      detectedTools: nextDetectedTools,
+     }
+   } else if (activity.callId !== callId || activity.name !== name
+-    || activity.argumentsRaw !== argumentsRaw || activity.plannedTools !== nextPlannedTools) {
+-    activity = { ...activity, callId, name, argumentsRaw, plannedTools: nextPlannedTools }
++    || activity.argumentsRaw !== argumentsRaw || activity.detectedTools !== nextDetectedTools) {
++    activity = { ...activity, callId, name, argumentsRaw, detectedTools: nextDetectedTools }
+   }
+   const pending = previous === activity ? state.pending : new Map(state.pending).set(chunk.index, activity)
+   const starts = rememberStart(state.starts, callId, {
+-    seq: activity.seq, time: activity.time, plannedTools: activity.plannedTools,
++    seq: activity.seq, time: activity.time, detectedTools: activity.detectedTools,
+   })
+   return pending === state.pending && starts === state.starts ? state : { ...state, pending, starts }
+ }
+@@ -105,17 +125,23 @@ function updateFinalMessage(state: ToolActivityState, match: ConversationMatch):
+     if (block?.type !== 'tool-call') continue
+     const callId = String(block.id)
+     const name = block.name
+-    if (activity.callId !== callId || activity.name !== name) {
++    const argumentsRaw = block.arguments
++    const nextDetectedTools = detectedTools(
++      activity.detectedTools,
++      codeTools(name, argumentsRaw),
++      match.event.time,
++    )
++    if (activity.callId !== callId || activity.name !== name
++      || activity.argumentsRaw !== argumentsRaw || activity.detectedTools !== nextDetectedTools) {
+       const next = new Map(pending)
+-      const argumentsRaw = block.arguments
+       next.set(index, {
+-        ...activity, callId, name, argumentsRaw, plannedTools: plannedTools(name, argumentsRaw),
++        ...activity, callId, name, argumentsRaw, detectedTools: nextDetectedTools,
+       })
+       pending = next
+     }
+     const finalized = pending.get(index) ?? activity
+     starts = rememberStart(starts, callId, {
+-      seq: activity.seq, time: activity.time, plannedTools: finalized.plannedTools,
++      seq: activity.seq, time: activity.time, detectedTools: finalized.detectedTools,
+     })
+   }
+   return pending === state.pending && starts === state.starts
+@@ -140,11 +166,15 @@ function updateFormalCall(state: ToolActivityState, match: ConversationMatch): T
+   const [index, activity] = candidate
+   const pending = new Map(state.pending)
+   pending.delete(index)
+-  const formalPlans = plannedTools(name, match.event.data.arguments)
++  const formalTools = detectedTools(
++    activity.detectedTools,
++    codeTools(name, match.event.data.arguments),
++    match.event.time,
++  )
+   const starts = rememberStart(state.starts, callId, {
+     seq: activity.seq,
+     time: activity.time,
+-    plannedTools: formalPlans.length > 0 ? formalPlans : activity.plannedTools,
++    detectedTools: formalTools.length > 0 ? formalTools : activity.detectedTools,
+   })
+   return { ...state, pending, starts, placementSeq: match.event.seq }
+ }
+diff --git a/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts b/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts
+index 0a71a7e..1a1ecd1 100644
+--- a/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts
++++ b/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts
+@@ -7,8 +7,8 @@ import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
+ import type {} from '@deepseek-ai/dsh-tools/types'
+ import type { PlannedToolCall, ToolChatData } from '../contract/chat-nodes.ts'
+ import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
+-import { extractPlannedToolNames } from './planned-tools.ts'
+-import type { ToolActivityState } from './tool-activity.ts'
++import { extractCodeToolNames } from './planned-tools.ts'
++import type { DetectedTool, ToolActivityState } from './tool-activity.ts'
+ 
+ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
+   interface ChatNodeDataMap {
+@@ -24,7 +24,7 @@ interface ToolState {
+   readonly children: ReadonlyMap<string, readonly ToolCallBlock[]>
+   readonly parents: ReadonlyMap<string, string>
+   readonly activityStartTime: number
+-  readonly plans: ReadonlyMap<string, readonly string[]>
++  readonly plans: ReadonlyMap<string, readonly DetectedTool[]>
+ }
+ 
+ interface ProjectedBlockCache {
+@@ -54,8 +54,10 @@ function rootCall(match: ConversationMatch): RunningToolCall {
+   }
+ }
+ 
+-function codePlans(name: string, argumentsRaw: string): readonly string[] {
+-  return name === 'run_code' ? extractPlannedToolNames(argumentsRaw) : []
++function codePlans(name: string, argumentsRaw: string, startedTime: number): readonly DetectedTool[] {
++  return name === 'run_code'
++    ? extractCodeToolNames(argumentsRaw).map(toolName => ({ name: toolName, startedTime }))
++    : []
+ }
+ 
+ function rootResult(match: ConversationMatch, previous?: RunningToolCall): ToolResultNode | undefined {
+@@ -187,7 +189,7 @@ function updateDispatch(state: ToolState, match: ConversationMatch): ToolState {
+     const parents = new Map(state.parents)
+     parents.set(subCallId, parentCallId)
+     const plans = new Map(state.plans)
+-    plans.set(subCallId, codePlans(data.name, jsonArguments(data.arguments)))
++    plans.set(subCallId, codePlans(data.name, jsonArguments(data.arguments), match.event.time))
+     return { ...state, children, parents, plans }
+   }
+   if (index < 0 && !acceptsEdge(state, parentCallId, subCallId)) return state
+@@ -253,16 +255,17 @@ function projectPlannedCalls(root: ToolCallBlock, state: ToolState): readonly Pl
+   for (const { block, depth } of pending) {
+     if (depth > MAX_DEPTH) continue
+     if (!('kind' in block)) {
+-      const names = state.plans.get(block.callId) ?? []
+-      for (let index = block.subCalls.length; index < names.length; index++) {
+-        const name = names[index]
+-        if (name === undefined) continue
++      const tools = state.plans.get(block.callId) ?? []
++      for (let index = block.subCalls.length; index < tools.length; index++) {
++        const tool = tools[index]
++        if (tool === undefined) continue
+         const ordinal = index + 1
+         calls.push({
+           key: `${block.callId}:code:${ordinal}`,
+           callId: `${block.callId}:code:${ordinal}`,
+           parentCallId: block.callId,
+-          name,
++          name: tool.name,
++          startedTime: tool.startedTime,
+         })
+       }
+     }
+@@ -271,6 +274,16 @@ function projectPlannedCalls(root: ToolCallBlock, state: ToolState): readonly Pl
+   return calls
+ }
+ 
++function projectSubCallStartedTimes(state: ToolState): Readonly<Record<string, number>> {
++  const starts = Object.create(null) as Record<string, number>
++  for (const [parentCallId, tools] of state.plans) {
++    tools.forEach((tool, index) => {
++      starts[`${parentCallId}:code:${index + 1}`] = tool.startedTime
++    })
++  }
++  return starts
++}
++
+ function interruption(context: ConversationNodeContext<ToolState>): { seq: number; time: number } | undefined {
+   const location = context.start?.location
+   if (location?.kind === 'step' && location.step.status === 'closed') return location.step.end
+@@ -326,8 +339,8 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+       children: new Map(),
+       parents: new Map(),
+       activityStartTime: activity?.time ?? match.event.time,
+-      plans: new Map([[callId, activity?.plannedTools
+-        ?? codePlans(match.event.data.name, match.event.data.arguments)]]),
++      plans: new Map([[callId, activity?.detectedTools
++        ?? codePlans(match.event.data.name, match.event.data.arguments, match.event.time)]]),
+     }
+   },
+   update: (context, match) => {
+@@ -344,12 +357,14 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+     if (state === undefined) return null
+     const projected = projectBlock(state.root, state, interruption(context))
+     const plannedSubCalls = projectPlannedCalls(projected, state)
++    const subCallStartedTimes = projectSubCallStartedTimes(state)
+     const anchor = context.start?.event.seq
+       ?? ('kind' in state.root ? state.root.seq : context.matches[0]?.event.seq ?? 0)
+     return chatNode(context, 'tool-call', anchor, {
+       root: projected,
+       startedTime: state.activityStartTime,
+       plannedSubCalls,
++      subCallStartedTimes,
+     } satisfies ToolChatData)
+   },
+ }
+diff --git a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
+index 7e81b3f..7df2a50 100644
+--- a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
++++ b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
+@@ -667,9 +667,8 @@ describe('built-in conversation node Definitions', () => {
+     expect([...snapshot(value).nodes.values()].filter(candidate => candidate.kind === 'tool-call')).toHaveLength(1)
+   })
+ 
+-  it('previews planned Code children while arguments stream and consumes them by dispatch ordinal', () => {
++  it('detects Code children from streamed source and keeps their timers through dispatch', () => {
+     const args = JSON.stringify({
+-      plannedTools: ['write', 'edit'],
+       code: 'await tools.write({}); await tools.edit({})',
+       description: 'Update two files',
+     })
+@@ -681,23 +680,30 @@ describe('built-in conversation node Definitions', () => {
+         step: 1,
+         chunk: {
+           type: 'tool-call-delta', index: 0, id: 'code-1', name: 'run_code',
+-          argumentsDelta: '{"plannedTools":["write","ed',
++          argumentsDelta: '{"code":"await tools.write({}); await tools.ed',
+         },
+       }),
+     ])
+     const firstActivity = node(snapshot(value), 'tool-activity')?.data as ToolActivityChatData
+     expect(firstActivity.calls[0]?.plannedSubCalls).toEqual([{
+       key: '1:1:0:code:1', callId: 'code-1:code:1', parentCallId: 'code-1', name: 'write',
++      startedTime: 1_700_000_000_003,
+     }])
+ 
+     value.append(at(4, 'assistant/chunk', {
+       turn: 1,
+       step: 1,
+-      chunk: { type: 'tool-call-delta', index: 0, id: '', argumentsDelta: 'it"],"code":"' },
++      chunk: {
++        type: 'tool-call-delta', index: 0, id: '',
++        argumentsDelta: 'it({})","description":"Update two files"}',
++      },
+     }))
+     value.flush()
+     expect(((node(snapshot(value), 'tool-activity')?.data as ToolActivityChatData)
+-      .calls[0]?.plannedSubCalls.map(call => call.name))).toEqual(['write', 'edit'])
++      .calls[0]?.plannedSubCalls.map(call => [call.name, call.startedTime]))).toEqual([
++      ['write', 1_700_000_000_003],
++      ['edit', 1_700_000_000_004],
++    ])
+ 
+     value.append(at(5, 'assistant/message', {
+       turn: 1,
+@@ -715,6 +721,10 @@ describe('built-in conversation node Definitions', () => {
+     expect(running.plannedSubCalls.map(call => [call.callId, call.name])).toEqual([
+       ['code-1:code:1', 'write'], ['code-1:code:2', 'edit'],
+     ])
++    expect(running.subCallStartedTimes).toEqual({
++      'code-1:code:1': 1_700_000_000_003,
++      'code-1:code:2': 1_700_000_000_004,
++    })
+ 
+     value.append(at(7, 'tool/code-dispatch-start', {
+       rootCallId: 'code-1', parentCallId: 'code-1', subCallId: 'code-1:code:1',
+@@ -725,16 +735,18 @@ describe('built-in conversation node Definitions', () => {
+     expect(firstDispatch.root.subCalls.map(call => call.callId)).toEqual(['code-1:code:1'])
+     expect(firstDispatch.plannedSubCalls.map(call => [call.callId, call.name]))
+       .toEqual([['code-1:code:2', 'edit']])
++    expect(firstDispatch.subCallStartedTimes?.['code-1:code:1']).toBe(1_700_000_000_003)
+ 
+     value.append(at(8, 'tool/code-dispatch-start', {
+       rootCallId: 'code-1', parentCallId: 'code-1', subCallId: 'code-1:code:2',
+-      name: 'bash', arguments: { command: 'true' },
++      name: 'edit', arguments: { file_path: 'b.ts' },
+     }))
+     value.flush()
+-    const extraDispatch = node(snapshot(value), 'tool-call')?.data as ToolChatData
+-    expect(extraDispatch.root.subCalls.map(call => 'kind' in call ? call.call?.name ?? '' : call.name))
+-      .toEqual(['write', 'bash'])
+-    expect(extraDispatch.plannedSubCalls).toEqual([])
++    const secondDispatch = node(snapshot(value), 'tool-call')?.data as ToolChatData
++    expect(secondDispatch.root.subCalls.map(call => 'kind' in call ? call.call?.name ?? '' : call.name))
++      .toEqual(['write', 'edit'])
++    expect(secondDispatch.plannedSubCalls).toEqual([])
++    expect(secondDispatch.subCallStartedTimes?.['code-1:code:2']).toBe(1_700_000_000_004)
+   })
+ 
+   it('prepends an older turn without replacing already materialized nodes', () => {
+diff --git a/packages/client/ui-conversation/tests/planned-tools.client.spec.ts b/packages/client/ui-conversation/tests/planned-tools.client.spec.ts
+index 0092123..9c2b81f 100644
+--- a/packages/client/ui-conversation/tests/planned-tools.client.spec.ts
++++ b/packages/client/ui-conversation/tests/planned-tools.client.spec.ts
+@@ -1,27 +1,23 @@
+ import { describe, expect, it } from 'vitest'
+-import { extractPlannedToolNames } from '../src/client/conversation-nodes/planned-tools.ts'
++import { extractCodeToolNames } from '../src/client/conversation-nodes/planned-tools.ts'
+ 
+-describe('planned Code tools', () => {
+-  it('streams completed declared names before code and preserves repetitions', () => {
+-    expect(extractPlannedToolNames('{"plannedTools":["read","write","wri')).toEqual(['read', 'write'])
+-    expect(extractPlannedToolNames('{"plannedTools":["read","read"],"code":""}')).toEqual(['read', 'read'])
++describe('source-detected Code tools', () => {
++  it('ignores legacy plannedTools declarations and waits for a recognizable call', () => {
++    expect(extractCodeToolNames('{"plannedTools":["read","write"],"code":"await tools.write')).toEqual([])
++    expect(extractCodeToolNames('{"plannedTools":["read","write"],"code":"await tools.write(')).toEqual(['write'])
+   })
+ 
+-  it('treats a non-empty declaration as authoritative over source text', () => {
+-    expect(extractPlannedToolNames(JSON.stringify({
+-      plannedTools: ['write'],
++  it('uses source text even when a conflicting legacy declaration is present', () => {
++    expect(extractCodeToolNames(JSON.stringify({
++      plannedTools: ['bash'],
+       code: 'await tools.read({ path: "a" }); await tools.write({ path: "b" })',
+-    }))).toEqual(['write'])
++    }))).toEqual(['read', 'write'])
+   })
+ 
+-  it('falls back to direct dot and bracket calls for old or empty declarations', () => {
+-    expect(extractPlannedToolNames(JSON.stringify({
++  it('detects direct dot and bracket calls and preserves repetitions', () => {
++    expect(extractCodeToolNames(JSON.stringify({
+       code: 'await tools.read({}); await tools["my-tool"]({}); await tools.read({})',
+     }))).toEqual(['read', 'my-tool', 'read'])
+-    expect(extractPlannedToolNames(JSON.stringify({
+-      plannedTools: [],
+-      code: 'await tools.write({})',
+-    }))).toEqual(['write'])
+   })
+ 
+   it('ignores source examples, comments, and indirect references', () => {
+@@ -33,6 +29,6 @@ describe('planned Code tools', () => {
+       'const fn = tools.write',
+       'await tools.search({})',
+     ].join('\n')
+-    expect(extractPlannedToolNames(JSON.stringify({ code }))).toEqual(['search'])
++    expect(extractCodeToolNames(JSON.stringify({ code }))).toEqual(['search'])
+   })
+ })
+diff --git a/packages/client/ui-tool/src/client/tool/ToolActivityView.tsx b/packages/client/ui-tool/src/client/tool/ToolActivityView.tsx
+index e747fea..0c4830c 100644
+--- a/packages/client/ui-tool/src/client/tool/ToolActivityView.tsx
++++ b/packages/client/ui-tool/src/client/tool/ToolActivityView.tsx
+@@ -68,7 +68,7 @@ function PlannedToolRow({ call, t }: {
+         body={null}
+         state="running"
+       />
+-      <ToolActivityChrome state="running" />
++      <ToolActivityChrome startedTime={call.startedTime} state="running" />
+     </div>
+   )
+ }
+diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
+index ff5a313..f1df767 100644
+--- a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
++++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
+@@ -64,11 +64,13 @@ const ToolCall = memo(function ToolCall({
+ })
+ 
+ const ToolCallBranch = memo(function ToolCallBranch({
+-  renderSlot, block, startedTime, plannedSubCalls, selectedCallId, cwd, home, openFile, inspectCall, t,
++  renderSlot, block, startedTime, plannedSubCalls, subCallStartedTimes,
++  selectedCallId, cwd, home, openFile, inspectCall, t,
+ }: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 't'> & {
+   block: ToolCallBlock
+   startedTime: number
+   plannedSubCalls: readonly PlannedToolCall[]
++  subCallStartedTimes: Readonly<Record<string, number>>
+   home?: string | undefined
+ }) {
+   const ownPlans = plannedSubCalls.filter(call => call.parentCallId === block.callId)
+@@ -93,8 +95,10 @@ const ToolCallBranch = memo(function ToolCallBranch({
+               key={child.callId}
+               renderSlot={renderSlot}
+               block={child}
+-              startedTime={'kind' in child ? child.callTime ?? child.time : child.time}
++              startedTime={subCallStartedTimes[child.callId]
++                ?? ('kind' in child ? child.callTime ?? child.time : child.time)}
+               plannedSubCalls={plannedSubCalls}
++              subCallStartedTimes={subCallStartedTimes}
+               selectedCallId={selectedCallId}
+               cwd={cwd}
+               home={home}
+@@ -127,7 +131,7 @@ function PlannedToolRow({ call, t }: { call: PlannedToolCall; t: ToolTreeProps['
+           body={null}
+           state="running"
+         />
+-        <ToolActivityChrome state="running" />
++        <ToolActivityChrome startedTime={call.startedTime} state="running" />
+       </div>
+     </div>
+   )
+@@ -148,12 +152,17 @@ export function ToolCallTree({
+     /** Compatibility with Chat snapshots recorded before planned Code children existed. */
+     readonly plannedSubCalls?: readonly PlannedToolCall[] | undefined
+   }).plannedSubCalls ?? []
++  const subCallStartedTimes = (node.data as {
++    /** Compatibility with Chat snapshots recorded before perceptual child timing existed. */
++    readonly subCallStartedTimes?: Readonly<Record<string, number>> | undefined
++  }).subCallStartedTimes ?? {}
+   return (
+     <ToolCallBranch
+       renderSlot={renderSlot}
+       block={block}
+       startedTime={node.data.startedTime}
+       plannedSubCalls={plannedSubCalls}
++      subCallStartedTimes={subCallStartedTimes}
+       selectedCallId={selectedCallId}
+       cwd={cwd}
+       home={home}
+diff --git a/packages/client/ui-tool/tests/tool-activity.client.spec.tsx b/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
+index 4f2de90..845a66c 100644
+--- a/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-activity.client.spec.tsx
+@@ -76,12 +76,12 @@ describe('streamed Tool activity', () => {
+     expect(activity?.textContent).not.toContain('{')
+   })
+ 
+-  it('renders a planned Code child with ing and sweep but does not start its timer', () => {
++  it('starts a detected Code child timer while preserving ing and sweep', () => {
+     const value = props()
+     const call = value.node.data.calls[0]!
+     const planned = {
+       key: `${call.key}:code:1`, callId: `${call.callId}:code:1`,
+-      parentCallId: call.callId, name: 'write',
++      parentCallId: call.callId, name: 'write', startedTime: 9_000,
+     }
+     const node = {
+       ...value.node,
+@@ -92,7 +92,7 @@ describe('streamed Tool activity', () => {
+     expect(row).not.toBeNull()
+     expect(row?.querySelector('[data-tool-running-status]')?.textContent).toBe('ing')
+     expect(row?.querySelector('[data-tool-activity-status]')).toBeNull()
+-    expect(row?.querySelector('[data-tool-timer]')).toBeNull()
++    expect(row?.querySelector('[data-tool-timer]')?.textContent).toBe('1s')
+     expect(row?.getAttribute('data-state')).toBe('running')
+   })
+ 
+diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+index 70ea043..0170e0b 100644
+--- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+@@ -90,6 +90,30 @@ describe('ToolCallTree', () => {
+     expect(view.getByText('250ms')).toBeTruthy()
+   })
+ 
++  it('keeps a source-detected child start time after the runtime call settles', () => {
++    const child = {
++      ...root('parent:code:1', { name: 'edit', argsRaw: '{"file_path":"a.ts"}' }),
++      time: 9_000,
++      callTime: 8_950,
++    }
++    const block = {
++      ...root('parent', { name: 'run_code', argsRaw: '{"code":"await tools.edit({})"}' }),
++      subCalls: [child],
++    }
++    const value = props(block)
++    const node = {
++      ...value.node,
++      data: {
++        ...value.node.data,
++        subCallStartedTimes: { 'parent:code:1': 6_000 },
++      },
++    }
++    const view = render(<ToolCallTree {...value} node={node} />)
++    const childRow = view.container.querySelector('[data-chat-call-id="parent:code:1"]')
++    expect(childRow?.textContent).toContain('3s')
++    expect(childRow?.textContent).not.toContain('50ms')
++  })
++
+   it('abbreviates a POSIX home path in the generic tool summary', () => {
+     const block = root('w1', { name: 'read', argsRaw: '{"path":"/h/docs/a.ts"}' })
+     const view = render(<ToolCallTree {...props(block, 'w1', {
+diff --git a/packages/core/tools/src/code-mode.ts b/packages/core/tools/src/code-mode.ts
+index 6f48129..91fbfca 100644
+--- a/packages/core/tools/src/code-mode.ts
++++ b/packages/core/tools/src/code-mode.ts
+@@ -37,10 +37,6 @@ interface RunCodeFlavor {
+   readonly codeDescription: string
+ }
+ 
+-const RUN_CODE_PLANNED_TOOLS_PARAM_DESCRIPTION
+-  = 'Ordered wire names of every tool this program is expected to call. Put this argument '
+-    + 'before `code`; include repeated calls repeatedly. Use [] only when the program calls no tools.'
+-
+ /**
+  * The TypeScript flavor: the fallback for a schema read with no runtime
+  * mounted ({@link resolveFlavor} owns which readers reach that). A real
+@@ -49,9 +45,8 @@ const RUN_CODE_PLANNED_TOOLS_PARAM_DESCRIPTION
+  */
+ const TYPESCRIPT_FLAVOR: RunCodeFlavor = {
+   description:
+-    'Execute a TypeScript program against the available tools. Takes three required '
+-    + 'arguments: `plannedTools`, the ordered wire names of expected tool calls, `code`, '
+-    + 'the BODY of an async function (erasable syntax only; top-level '
++    'Execute a TypeScript program against the available tools. Takes two required '
++    + 'arguments: `code`, the BODY of an async function (erasable syntax only; top-level '
+     + '`await` and `return` work), and `description`, a short summary of what the program '
+     + 'does. Call tools as `await tools.name(args)` per the declarations in the system '
+     + 'prompt. Only what you print or return is program output — curate it. Image-bearing '
+@@ -66,9 +61,8 @@ const TYPESCRIPT_FLAVOR: RunCodeFlavor = {
+  */
+ const PYTHON_FLAVOR: RunCodeFlavor = {
+   description:
+-    'Execute a Python program against the available tools. Takes three required '
+-    + 'arguments: `plannedTools`, the ordered wire names of expected tool calls, `code`, '
+-    + 'the BODY of an async function (top-level `await` and `return` '
++    'Execute a Python program against the available tools. Takes two required '
++    + 'arguments: `code`, the BODY of an async function (top-level `await` and `return` '
+     + 'work), and `description`, a short summary of what the program does. Call tools as '
+     + '`await tools.name(args)` per the declarations in the system prompt. Use '
+     + '`print(...)` and/or `return <value>` for program output — curate it. Image-bearing '
+@@ -289,8 +283,8 @@ export interface RunCodeBridgeOptions {
+ }
+ 
+ /**
+- * Build the `run_code` {@link ToolDefinition}: required `plannedTools`, `code`,
+- * and `description` parameters, executed through the dispatch bridge described
++ * Build the `run_code` {@link ToolDefinition}: required `code` and
++ * `description` parameters, executed through the dispatch bridge described
+  * above. The
+  * registry reserves it as presentation infrastructure under non-native modes,
+  * outside the filterable global/scoped capability layers.
+@@ -308,15 +302,16 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
+     // loaded runtime's flavor at schema-emission time so the schema the MODEL
+     // sees matches the SDK section's language. Argument VALIDATION still keys
+     // off this static spec (defineTool closes over it), which is language-
+-    // independent. Validation keeps `plannedTools` optional for pre-DSH-015
+-    // recorded calls; the public getter below advertises it as required to all
+-    // new model requests.
++    // independent. Validation keeps the legacy `plannedTools` field optional
++    // so calls recorded while DSH-015 advertised it remain executable. The
++    // public getter below omits it from new model requests: streamed source
++    // inspection now discovers visible child activity directly from `code`.
+     description: TYPESCRIPT_FLAVOR.description,
+     parameters: {
+       plannedTools: {
+         type: 'array',
+         items: { type: 'string' },
+-        description: RUN_CODE_PLANNED_TOOLS_PARAM_DESCRIPTION,
++        description: 'Legacy optional child-tool hint retained for recorded-call compatibility.',
+       },
+       code: { type: 'string', required: true, description: TYPESCRIPT_FLAVOR.codeDescription },
+       description: {
+@@ -686,12 +681,6 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
+     // Recompile through the same spec→schema projection defineTool used, so
+     // the emitted schema always matches the validated specification.
+     get: () => parameterSchemaSpecToJsonSchema({
+-      plannedTools: {
+-        type: 'array',
+-        required: true,
+-        items: { type: 'string' },
+-        description: RUN_CODE_PLANNED_TOOLS_PARAM_DESCRIPTION,
+-      },
+       code: { type: 'string', required: true, description: resolveFlavor(peekRuntime).codeDescription },
+       description: { type: 'string', required: true, description: RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION },
+     }) as unknown as Record<string, unknown>,
+diff --git a/packages/core/tools/src/py-types.ts b/packages/core/tools/src/py-types.ts
+index 85efe37..c176b10 100644
+--- a/packages/core/tools/src/py-types.ts
++++ b/packages/core/tools/src/py-types.ts
+@@ -733,7 +733,7 @@ export function jsonSchemaToPy(schema: unknown): string {
+ /** The fixed model-facing usage contract rendered above the declarations. */
+ const SDK_INSTRUCTIONS = `## Writing code for run_code
+ 
+-\`run_code\` takes three required arguments in this order: \`plannedTools\` — every tool wire name the program is expected to call, in execution order and including repetitions — then \`code\`, the body of an async Python function (top-level \`await\` and \`return\` both work), and \`description\`, a short summary of what the program does. Always emit \`plannedTools\` before \`code\`; use \`[]\` only when the program calls no tools. At run time exactly two of the names declared below are bound: \`tools\` and \`ToolCallError\`. Everything else is a STATIC STUB describing argument and return types — in particular the \`TypedDict\` classes do NOT exist at run time, so build arguments as plain \`dict\`/\`list\` JSON values: \`await tools.name({"field": 1})\`, never \`FooArgs(field=1)\`, which raises \`NameError\`. Inside the program:
++\`run_code\` takes two required arguments: \`code\`, the body of an async Python function (top-level \`await\` and \`return\` both work), and \`description\`, a short summary of what the program does. At run time exactly two of the names declared below are bound: \`tools\` and \`ToolCallError\`. Everything else is a STATIC STUB describing argument and return types — in particular the \`TypedDict\` classes do NOT exist at run time, so build arguments as plain \`dict\`/\`list\` JSON values: \`await tools.name({"field": 1})\`, never \`FooArgs(field=1)\`, which raises \`NameError\`. Inside the program:
+ 
+ - Call tools as \`await tools.name(args)\` — subscript access for exotic, reserved, or underscore-leading names: \`await tools["my-tool"](args)\`. Every call resolves to the tool's typed canonical JSON value (each method's return type below). Tool arguments must be lossless JSON.
+ - A FAILED tool call raises \`ToolCallError\`, whose \`toolName\` identifies the failed tool and whose message is human-readable — wrap in \`try/except\` to handle and continue.
+diff --git a/packages/core/tools/src/ts-types.ts b/packages/core/tools/src/ts-types.ts
+index 0d65da5..7436c35 100644
+--- a/packages/core/tools/src/ts-types.ts
++++ b/packages/core/tools/src/ts-types.ts
+@@ -249,7 +249,7 @@ export function jsonSchemaToTs(schema: unknown, indent = 0): string {
+ /** The fixed model-facing usage contract rendered above the declarations (see the Code Mode Agent Note's "What the model sees"). */
+ const SDK_INSTRUCTIONS = `## Writing code for run_code
+ 
+-\`run_code\` takes three required arguments in this order: \`plannedTools\` — every tool wire name the program is expected to call, in execution order and including repetitions — then \`code\`, the body of an async TypeScript function (erasable syntax only — no \`enum\` or namespaces; type annotations are advisory, the code runs type-stripped), and \`description\`, a short summary of what the program does. Always emit \`plannedTools\` before \`code\`; use \`[]\` only when the program calls no tools. Inside the program:
++\`run_code\` takes two required arguments: \`code\`, the body of an async TypeScript function (erasable syntax only — no \`enum\` or namespaces; type annotations are advisory, the code runs type-stripped), and \`description\`, a short summary of what the program does. Inside the program:
+ 
+ - Call tools as \`await tools.name(args)\` — quoted access for exotic names: \`tools["my-tool"](args)\`. Every call resolves to the tool's typed canonical JSON value. Tool arguments must be lossless JSON.
+ - A FAILED tool call rejects with \`ToolCallError\`, whose \`toolName\` identifies the failed tool and whose \`message\` is human-readable — \`try/catch\` it to handle and continue.
+diff --git a/packages/core/tools/tests/code-mode.spec.ts b/packages/core/tools/tests/code-mode.spec.ts
+index 02017df..2eb7339 100644
+--- a/packages/core/tools/tests/code-mode.spec.ts
++++ b/packages/core/tools/tests/code-mode.spec.ts
+@@ -116,12 +116,14 @@ async function runCode(
+ }
+ 
+ describe('mode-aware wire contribution', () => {
+-  it('accepts a legacy call without plannedTools while advertising it as required', async () => {
++  it('accepts legacy calls with or without plannedTools while no longer advertising it', async () => {
+     const { ctx, systemPrompt, runtime } = await setup()
+     runtime.behavior = () => Promise.resolve({ logs: [], value: 'legacy-ok' })
+     const assembly = await systemPrompt.assemble()
+     const schema = assembly.tools.find(tool => tool.name === RUN_CODE_NAME)
+-    expect((schema?.parameters as { required: string[] }).required).toContain('plannedTools')
++    expect((schema?.parameters as { required: string[] }).required).toEqual(['code', 'description'])
++    expect((schema?.parameters as { properties: Record<string, unknown> }).properties)
++      .not.toHaveProperty('plannedTools')
+     const result = await ctx.tools.execute({
+       signal: testToolSignal,
+       callId: CallId('legacy-code'),
+@@ -419,9 +421,9 @@ describe('mode-aware wire contribution', () => {
+     // schema: prose that describes the call as "pass the program" is what
+     // leads a model to emit `{code}` alone and fail INVALID_ARGS.
+     expect(runCodeSchema?.description).toContain('`description`')
+-    expect(runCodeSchema?.description).toContain('`plannedTools`')
++    expect(runCodeSchema?.description).not.toContain('`plannedTools`')
+     expect((runCodeSchema?.parameters as { required: string[] }).required)
+-      .toEqual(['plannedTools', 'code', 'description'])
++      .toEqual(['code', 'description'])
+     const codeParam = (runCodeSchema?.parameters as { properties: { code: { description: string } } }).properties.code
+     expect(codeParam.description).toBe('The program: the body of an async TypeScript function.')
+   })
+@@ -434,7 +436,7 @@ describe('mode-aware wire contribution', () => {
+     expect(runCodeSchema?.description).toContain('Execute a Python program')
+     expect(runCodeSchema?.description).toContain('`return <value>`')
+     expect(runCodeSchema?.description).toContain('`description`')
+-    expect(runCodeSchema?.description).toContain('`plannedTools`')
++    expect(runCodeSchema?.description).not.toContain('`plannedTools`')
+     expect(runCodeSchema?.description).not.toContain('TypeScript')
+     const codeParam = (runCodeSchema?.parameters as { properties: { code: { description: string } } }).properties.code
+     expect(codeParam.description).toBe('The program: the body of an async Python function.')
+diff --git a/packages/core/tools/tests/py-types.spec.ts b/packages/core/tools/tests/py-types.spec.ts
+index 94a2a5f..726a9c1 100644
+--- a/packages/core/tools/tests/py-types.spec.ts
++++ b/packages/core/tools/tests/py-types.spec.ts
+@@ -166,14 +166,14 @@ describe('renderToolsSdkPy', () => {
+     expect(text).toContain('tools: Tools')
+   })
+ 
+-  it('names all required call arguments, including the ordered preview plan', () => {
++  it('names both required call arguments without a preview-plan field', () => {
+     // The schema requires `code` AND `description`; instructions that mention
+     // only the program let a model emit `{code}` alone and fail INVALID_ARGS.
+     const text = renderToolsSdkPy([bash])
+     expect(text).toContain('`code`')
+     expect(text).toContain('`description`')
+-    expect(text).toContain('`plannedTools`')
+-    expect(text).toContain('three required arguments')
++    expect(text).not.toContain('`plannedTools`')
++    expect(text).toContain('two required arguments')
+   })
+ 
+   it('renders required as plain fields and optional as NotRequired, with per-field description comments', () => {
+diff --git a/packages/core/tools/tests/ts-types.spec.ts b/packages/core/tools/tests/ts-types.spec.ts
+index 1c2381e..ab5e344 100644
+--- a/packages/core/tools/tests/ts-types.spec.ts
++++ b/packages/core/tools/tests/ts-types.spec.ts
+@@ -148,14 +148,14 @@ describe('renderToolsSdk', () => {
+     expect(text).toContain('lossless JSON')
+   })
+ 
+-  it('names all required call arguments, including the ordered preview plan', () => {
++  it('names both required call arguments without a preview-plan field', () => {
+     // The schema requires `code` AND `description`; instructions that mention
+     // only the program let a model emit `{code}` alone and fail INVALID_ARGS.
+     const text = renderToolsSdk([bash])
+     expect(text).toContain('`code`')
+     expect(text).toContain('`description`')
+-    expect(text).toContain('`plannedTools`')
+-    expect(text).toContain('three required arguments')
++    expect(text).not.toContain('`plannedTools`')
++    expect(text).toContain('two required arguments')
+   })
+ 
+   it('is deterministic: same tool set, byte-identical text regardless of input order', () => {
+-- 
+2.50.1 (Apple Git-155)
+

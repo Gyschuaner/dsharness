@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
   "baseTree": "53915efe4e2126cc7779b73dfc8a3bcec5318c44",
-  "resultTree": "00939824bca71da4be792e11369cf6641f637b71",
+  "resultTree": "56611cffc170612bc5defd0c6040f6beca8a14db",
   "dshVersion": "0.1.1-rc.2",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -104,6 +104,10 @@
     {
       "path": "upstream-patches/0024-feat-DSH-024-expose-session-image-paths-and-Markdown.patch",
       "sha256": "7066F3F120499AE5D3661F3504D13E0F081DE3ABD443D5DAB59EE9FE4A6B5808"
+    },
+    {
+      "path": "upstream-patches/0025-fix-DSH-015-time-Code-tools-from-streamed-source-rc2.patch",
+      "sha256": "AB9F1E8C256E6AA2533042D903A3BE4C7EBCA969A42E834F817D995D2BCADA5E"
     }
   ]
 }
