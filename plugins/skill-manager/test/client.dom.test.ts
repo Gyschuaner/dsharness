@@ -473,6 +473,40 @@ test('Skill market uses the shared page chrome and opens a safe repository detai
 	assert.ok(h.dom.window.document.body.textContent.includes('安装校验'));
 });
 
+test('Skill market installs an arbitrary GitHub Skill through inspect, preview, and confirm', async (t) => {
+	const calls = [];
+	const router = async (body) => {
+		calls.push(body);
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable', 'marketplace', 'github-install'] };
+		if (body.op === 'catalog') return view('/project-a', []);
+		if (body.op === 'presets.list') return { presets: [] };
+		if (body.op === 'marketplace') return { apiVersion: 1, source: 'curated-github', items: [] };
+		if (body.op === 'github.inspect') return { repository: 'acme/demo', ref: 'main', requestedPath: null, candidates: [{ path: 'skills/demo', suggestedName: 'demo' }] };
+		if (body.op === 'github.preview') return { canInstall: true, action: 'install', name: 'demo', repository: 'acme/demo', path: 'skills/demo', ref: 'main', projectRoot: '/project-a', message: '安全安装预览', incoming: { fileCount: 1, hash: 'sha256:1:abc', files: ['SKILL.md'] } };
+		if (body.op === 'github.install') return { changed: true, name: 'demo' };
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.open();
+	await h.click(h.button('Skill 市场'));
+	await h.flush();
+	await h.click(h.button('从 GitHub 安装'));
+	const dialog = h.dom.window.document.querySelector('[data-testid="github-install-dialog"]');
+	assert.ok(dialog);
+	const input = dialog.querySelector('input');
+	await act(async () => { Simulate.change(input, { target: { value: 'https://github.com/acme/demo' } }); });
+	await h.click(h.button('检查仓库'));
+	await h.flush();
+	assert.equal(dialog.querySelector('select').value, 'skills/demo');
+	await h.click(h.button('生成安装预览'));
+	await h.flush();
+	assert.ok(h.dom.window.document.body.textContent.includes('安装阶段不执行第三方代码'));
+	await h.click(h.button('确认安装'));
+	await h.flush();
+	assert.ok(calls.some((call) => call.op === 'github.install' && call.path === 'skills/demo'));
+});
+
 test('string-valued broken sources are disabled in the source selector', async (t) => {
 	const broken = Object.assign(source('global-claude', '损坏来源', 'broken'), { broken: 'frontmatter 无法解析' });
 	const currentRow = row('broken-source-skill', 'source validation', {

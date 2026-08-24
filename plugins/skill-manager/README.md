@@ -15,7 +15,7 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
   [`dsh-extension-manager`](../extension-manager/README.md) 负责。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 24 / DSH-008 V1.1）
+## 页面结构（build 25 / DSH-008 V1.1）
 
 - **视觉规格（build 24）**：页面宽度、标题与一级页签节奏、项目摘要卡、38px 工具栏、72px
   扁平分隔列表行和 400px 固定详情抽屉与 MCP / Plugin 共用同一套页面骨架；Skill 独有的项目
@@ -66,8 +66,13 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
   原子写入，由仓库 `.gitignore` 精确忽略）。记录本机的已启用 Skill 身份集合、
   显式来源选择、最近应用的预设，避免不同电脑的 Skill 集合和偏好相互覆盖。
   文件级开关（frontmatter 标志 / 派生开关文件）只是可重建的派生产物。
-- **新项目默认不暴露**：项目配置不存在时启用集合为空；`reconcile` 会为每个
-  「非项目来源且默认会被 DSH 自动选中」的 Skill 生成带稳定 marker 的派生开关文件
+- **读取零副作用（BUG-0AA85F45）**：`catalog`、`projectState` 和 `validate` 只扫描与报告，
+  不运行 reconcile、不写配置/frontmatter、不生成开关，也不删除孤儿。项目尚无 sidecar 时，
+  页面按磁盘的真实可调用状态展示；第一次明确写操作会先快照该真实基线，再应用目标变更，
+  避免操作一个 Skill 时误改其他 Skill。
+- **项目策略显式落盘**：项目配置存在后，未列入 enabled 的身份视为关闭；显式启停/来源/预设操作
+  才运行 reconcile。需要关闭「非项目来源且默认会被 DSH 自动选中」的 Skill 时，会生成带稳定 marker 的
+  派生开关文件
   `<项目根>/.dsh/skills/__smgr-shadow-<name>.md`（`disable-model-invocation: true` +
   描述前缀 `[skill-manager] 本项目禁用开关`），使模型自动候选为空；
   `user-invocable` 的 `/skill-name` 手动调用不受影响，下一轮对话生效、无需重启。
@@ -95,6 +100,11 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
   保留不动、来源切换报 409；`originHash` 不一致时行上显示「来源有更新」。
   来源选择到 rank 更高的来源 = 纯记录（删除冗余的已验证副本）；rank 更低的来源 =
   物化受管副本 + 删除被取代的 marker 开关。选择来源时开关状态同步进副本标志。
+- **哈希格式公开**：当前平面文件为 `sha256:<原始字节数>:<sha256hex>`；目录按相对路径排序，
+  将每个文件编码为 `rel:字节数:sha256hex` 行，拼接后再输出同格式哈希；忽略点文件，最大深度 8。
+  旧受管副本 `sha256:<64hex>` 只用于兼容验证，不再新写。远端安装包使用独立的
+  `originBundleHash`，格式为 `sha256:<64hex>`，按远端相对路径排序后拼接
+  `path=sha256(file)` 再哈希，不与受管副本 `originHash` 混用。`validate` 响应同步返回这些 schema。
 - **Windows 目录发布**：完整 Skill 目录先复制并校验到不受 watcher 监听的
   `<项目根>/.dsh/.skill-manager-swap/`；发布时先写 references/scripts/assets 等附属文件，
   最后写 `SKILL.md` 作为目录可见性提交点，再做整目录哈希校验。这样既规避 Windows 下
@@ -106,8 +116,9 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
   应用必须先预览 diff，可选 替换 / 合并。
 - **全局标签**：`~/.dsh/skill-manager.json` 的 `tags`（Skill 身份级，跨项目共享），
   单页列表可按标签筛选；单个 32 字符上限、每 Skill 20 个上限。
-- **旧开关文件识别**：带 marker 的派生开关文件被明确识别；孤儿开关
-  （同名 Skill 已不存在）自动清理，外来同名文件永不触碰；旧版
+- **旧开关文件识别**：带 marker 的派生开关文件被明确识别；孤儿清理默认关闭，只有显式维护流程
+  才可请求 marker/hash 验证后的清理；未知来源、缺失哈希、用户修改过的文件一律保留并报告。外来同名文件
+  永不触碰；旧版
   `globalDefaultOff` 策略保持可用并协同（策略已处理的用户级 Skill 不重复生成开关）。
 - **可更新**：`updateInfo` 恒为 `null`（V1 不做远端更新检测）；UI 只在存在
   真实更新数据时才显示浅红「可更新」标签。
@@ -224,10 +235,12 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     setStatus / getPolicy / setPolicy`。
   - V1 操作（apiVersion 6，DSH-008）：
     - `capabilities`：轻量返回 apiVersion 与功能清单，Client 进入 SKILL 时不再用完整 catalog 做能力探测。
-    - `catalog`：合并身份目录（同名来源合并、优先级排序、reconcile 后重扫），
+    - `catalog`：只读合并身份目录（同名来源合并、优先级排序，不 reconcile），
       返回 `identities`（每行含 `sources[]`、`defaultSourceKey`、`sourceKey`、
       `effectiveSourceKey`、`specialized`、`enabled`、`tags`、`updateInfo:null`）+ `allTags`。
-    - `projectState`：项目配置 + 最近 reconcile 报告。
+    - `projectState`：只读返回项目配置和状态报告。
+    - `validate`：只读 dry-run；返回配置/磁盘漂移、不可验证来源、保留动作及公开的哈希 schema，
+      明确声明 `willWrite:false / willDelete:false`。
     - `setEnabled` / `setMany`：单项/批量启停（返回更新后的 identity 行）。
     - `setSource`：显式来源选择 / 重置默认（必要时物化受管副本）。
     - `setTags`：全局标签（空数组 = 清除）。
@@ -237,24 +250,28 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     - `marketplace`：返回精选 GitHub 市场条目及当前项目安装状态。
     - `marketplace.detail`：读取仓库元数据和 Skill 文件树，并返回安全校验结果。
     - `marketplace.preview / marketplace.install`：安装前预览与受控项目安装。
+    - `github.inspect / github.preview / github.install`：输入任意公开 GitHub 仓库或 Skill 目录 URL，
+      发现一个或多个 `SKILL.md`，选择目录后复用市场的路径/大小/frontmatter/冲突/原子回滚校验；
+      GitHub REST 受限时回退到只读 codeload tarball（仍执行路径、大小、文件数和 symlink 限制）；
+      安装记录 `originType/repository/path/ref/revision/originBundleHash/url`，可安全识别、更新和追溯外部来源。
   - 响应信封统一 `{ ok:true, value }` / `{ ok:false, error:{ message } }`；
     业务错误用 `ApiError` 携带 4xx（400 参数 / 404 不存在 / 409 冲突）。
     `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
     `list` 幂等运行（旧版兼容）；配置文件用 tmp+rename 原子写入，目录副本使用受监控根外
     暂存、附属文件优先、`SKILL.md` 最后发布并整目录哈希复核。
-- **Host 测试**（`test/skill-manager.test.ts` + `test/skill-market.test.ts`，`tsx --test`）：
-  61 用例覆盖
-  状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
-  三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
+- **Host + Client 测试**（`test/*.test.ts`，`tsx --test`）：75 用例覆盖
+  状态模型（含损坏降级）、发现与合并、新项目只读基线与首次显式写入、
+  三机制启停回环、显式孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
   标签、预设 diff/应用、一键精简、旧版兼容与只读根 403；并覆盖并发写、
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
   多来源预设冲突，以及已全局关闭的用户 Skill / 其他 preset bundled Skill 在项目启用后
   物化为真实可调用副本；并验证单项快速路径、缓存失效安全回退、配置写入失败时文件与配置回滚。
-- **Client DOM 测试**（`test/client.dom.test.ts`，`tsx --test`）：11 用例直接执行
+- **Client DOM 测试**（`test/client.dom.test.ts`，`tsx --test`）：12 用例直接执行
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖单页信息架构、可收起导航、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
-  丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚、扫描加载态和旧 Host 降级。
+  丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚、任意 GitHub
+  inspect/preview/install、扫描加载态和旧 Host 降级。
 - **热更新边界**（实测）：client bundle 由进程按请求从磁盘读取 —— 改 client 刷新页面即生效；
   host 代码没有模块级 HMR（组合树中 hmr 服务 `disabled: true`）—— 改 host 需要重启 `dsh web`
   （会话持久化在磁盘，重启后原会话可恢复，仅进行中的轮次会中断）。
@@ -271,7 +288,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   为单项启停加入乐观更新、安静保存态与失败回滚，build 21 为首次 catalog 加入居中的 Skill 扫描加载态，
   build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区，build 23 加入与 MCP / Plugin 对齐的
   本地 / 市场一级页签和真实 Host 市场接口，build 24 统一 MCP / Plugin 的页面宽度、工具栏、
-  扁平列表行和固定详情抽屉几何，加载态保持无底板的光学聚焦动画：
+  扁平列表行和固定详情抽屉几何，build 25 加入任意公开 GitHub 仓库安装入口、目录发现和安全预览，
+  加载态保持无底板的光学聚焦动画：
   三颗非对称粒子在首秒依次汇入官方 Skill 图标，`Skill Finding` 同步由雾灰聚焦为墨色并带短蓝色焦点游标，
   同时提供 `prefers-reduced-motion` 静态降级；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。

@@ -45,6 +45,17 @@ export declare const MARKETPLACE: readonly (Readonly<{
     description: "Portable DeepSeek Harness plugin design, implementation and diagnostics workflow.";
     tags: readonly string[];
 }>)[];
+/** Parse a public GitHub repository or directory URL without accepting an
+ * arbitrary download host. Directory URLs use GitHub's /tree/<ref>/<path>
+ * shape; refs containing slashes can be supplied by using a repository URL
+ * and choosing a discovered Skill path in the preview UI. */
+export declare function parseGitHubSkillUrl(value: any): {
+    repository: string;
+    ref: string;
+    explicitRef: boolean;
+    path: string | null;
+    repositoryUrl: string;
+};
 /**
  * Create an isolated marketplace service.  `entries` and `fetch` are
  * injectable so Host tests never touch the network or a user's filesystem.
@@ -101,8 +112,8 @@ export declare function createMarketplace(options?: {}): {
             description: string;
             whenToUse: string | undefined;
         } | null;
-        fileCount: number | null;
-        files: any[];
+        fileCount: any;
+        files: any;
         contentHash: string | null;
         security: {
             trustedSource: boolean;
@@ -128,16 +139,10 @@ export declare function createMarketplace(options?: {}): {
             managed: boolean;
         } | null;
         incoming: {
-            hash: string;
-            fileCount: number;
-            files: any[];
-            manifest: {
-                name: string;
-                description: string;
-                whenToUse?: string;
-                disableModelInvocation?: boolean;
-                body: string;
-            };
+            hash: any;
+            fileCount: any;
+            files: any;
+            manifest: any;
         };
         checks: {
             remoteRepository: string;
@@ -157,7 +162,61 @@ export declare function createMarketplace(options?: {}): {
         name: any;
         projectRoot: string;
         path: string;
-        contentHash: string;
+        contentHash: any;
+    }>;
+    inspectGithub: (url: any) => Promise<{
+        apiVersion: number;
+        repository: string;
+        ref: string;
+        discoverySource: string;
+        repositoryUrl: string;
+        requestedPath: string | null;
+        candidates: any;
+    }>;
+    githubPreview: (url: any, path: any, cwd: any) => Promise<{
+        source: string;
+        repository: string;
+        path: any;
+        ref: string;
+        apiVersion: number;
+        id: any;
+        name: any;
+        projectRoot: string;
+        targetPath: string;
+        action: string;
+        canInstall: boolean;
+        message: string;
+        existing: {
+            format: string;
+            path: any;
+            hash: string | null;
+            managed: boolean;
+        } | null;
+        incoming: {
+            hash: any;
+            fileCount: any;
+            files: any;
+            manifest: any;
+        };
+        checks: {
+            remoteRepository: string;
+            trustedSource: boolean;
+            frontmatterValidated: boolean;
+            pathsValidated: boolean;
+            symlinksRejected: boolean;
+            thirdPartyCodeExecuted: boolean;
+        };
+    }>;
+    githubInstall: (url: any, path: any, cwd: any) => Promise<{
+        apiVersion: number;
+        changed: boolean;
+        updated: boolean;
+        installedDisabled: boolean;
+        id: any;
+        name: any;
+        projectRoot: string;
+        path: string;
+        contentHash: any;
     }>;
     findEntry: (id: any) => any;
 };

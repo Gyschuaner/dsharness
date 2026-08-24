@@ -295,7 +295,11 @@ export async function writeProjectConfig(projectRoot, config, opts, raw) {
                 next[k] = v;
         }
         if (isRecord(onDisk.sources)) {
-            const knownSourceFields = new Set(['source', 'contentHash', 'originHash', 'copyHash', 'generated']);
+            const knownSourceFields = new Set([
+                'source', 'contentHash', 'originHash', 'copyHash', 'generated',
+                'marketManaged', 'marketId', 'marketRepository', 'marketPath', 'marketRef', 'marketRevision', 'marketHash',
+                'originType', 'originRepository', 'originPath', 'originRef', 'originRevision', 'originBundleHash', 'originUrl',
+            ]);
             for (const [name, onEntry] of Object.entries(onDisk.sources)) {
                 if (!isRecord(onEntry))
                     continue;
@@ -368,9 +372,19 @@ export function normalizeProjectConfig(parsed, projectRoot) {
                 entry.generated = true;
             if (sel.marketManaged === true)
                 entry.marketManaged = true;
-            for (const key of ['marketId', 'marketRepository', 'marketPath', 'marketRef', 'marketRevision', 'marketHash']) {
+            for (const key of ['marketId', 'marketRepository', 'marketPath', 'marketRef', 'marketRevision', 'marketHash', 'originType', 'originRepository', 'originPath', 'originRef', 'originRevision', 'originBundleHash', 'originUrl']) {
                 if (typeof sel[key] === 'string' && sel[key].length > 0)
                     entry[key] = sel[key];
+            }
+            // build 25 briefly stored remote bundle hashes in originHash. Migrate
+            // that draft shape without confusing it with managed-copy origin hashes.
+            if (entry.originType === 'github'
+                && entry.generated !== true
+                && entry.originBundleHash === undefined
+                && typeof entry.originHash === 'string'
+                && /^sha256:[a-f0-9]{64}$/i.test(entry.originHash)) {
+                entry.originBundleHash = entry.originHash;
+                delete entry.originHash;
             }
             // A future schema may carry unknown-only source fields: keep
             // the raw entry so such fields survive the round-trip

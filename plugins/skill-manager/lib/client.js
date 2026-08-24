@@ -1112,6 +1112,13 @@
                 var [projectMenuOpen, setProjectMenuOpen] = React.useState(false);
                 var [message, setMessage] = React.useState(null);
                 var [attempt, setAttempt] = React.useState(0);
+                var [githubOpen, setGithubOpen] = React.useState(false);
+                var [githubUrl, setGithubUrl] = React.useState('');
+                var [githubInfo, setGithubInfo] = React.useState(null);
+                var [githubPath, setGithubPath] = React.useState('');
+                var [githubPreview, setGithubPreview] = React.useState(null);
+                var [githubBusy, setGithubBusy] = React.useState(false);
+                var [githubError, setGithubError] = React.useState(null);
                 function loadMarket(force) {
                     setLoading(true);
                     setError(null);
@@ -1171,6 +1178,47 @@
                             props.onInstalled();
                     }, function (reason) { setMessage(String((reason && reason.message) || reason)); }).finally(function () { setBusy(false); });
                 }
+                function inspectGithub() {
+                    if (githubUrl.trim() === '' || githubBusy)
+                        return;
+                    setGithubBusy(true);
+                    setGithubError(null);
+                    setGithubInfo(null);
+                    setGithubPreview(null);
+                    apiCallAt('github.inspect', { url: githubUrl.trim() }, ctx).then(function (value) {
+                        setGithubInfo(value);
+                        var candidates = Array.isArray(value && value.candidates) ? value.candidates : [];
+                        setGithubPath(value && value.requestedPath ? value.requestedPath : candidates.length === 1 ? candidates[0].path : '');
+                    }, function (reason) { setGithubError(String((reason && reason.message) || reason)); }).finally(function () { setGithubBusy(false); });
+                }
+                function previewGithub() {
+                    if (project === null) {
+                        setGithubError('请先选择安装目标项目');
+                        return;
+                    }
+                    if (githubPath === '' || githubBusy)
+                        return;
+                    setGithubBusy(true);
+                    setGithubError(null);
+                    apiCallAt('github.preview', { cwd: project.cwd, url: githubUrl.trim(), path: githubPath }, ctx).then(function (value) { setGithubPreview(value); }, function (reason) { setGithubError(String((reason && reason.message) || reason)); }).finally(function () { setGithubBusy(false); });
+                }
+                function installGithub() {
+                    if (project === null || githubPreview === null || !githubPreview.canInstall || githubBusy)
+                        return;
+                    setGithubBusy(true);
+                    setGithubError(null);
+                    apiCallAt('github.install', { cwd: project.cwd, url: githubUrl.trim(), path: githubPath }, ctx).then(function () {
+                        setGithubOpen(false);
+                        setGithubPreview(null);
+                        setGithubInfo(null);
+                        setGithubUrl('');
+                        setGithubPath('');
+                        setMessage('已从 GitHub 安装到当前项目并记录来源，默认停用；可在「本地 Skill」中启用。');
+                        void loadMarket(true);
+                        if (typeof props.onInstalled === 'function')
+                            props.onInstalled();
+                    }, function (reason) { setGithubError(String((reason && reason.message) || reason)); }).finally(function () { setGithubBusy(false); });
+                }
                 var needle = query.trim().toLowerCase();
                 var visible = items.filter(function (item) {
                     return needle === '' || String(item.name || '').toLowerCase().includes(needle) || String(item.repository || '').toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle);
@@ -1186,12 +1234,22 @@
                     ? h('div', { className: 'sk-menu' }, projects.map(function (p) {
                         return h('button', { type: 'button', key: p.cwd, className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''), onClick: function () { setProjectMenuOpen(false); props.onChooseProject(p); } }, project && project.cwd === p.cwd ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title));
                     }), h('div', { className: 'sk-menuSep' }), h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjectMenuOpen(false); props.onAddProject(); } }, h(P.IconPlusOutline16), '添加本地项目…'))
-                    : null), h('div', { className: 'sk-searchWrap sk-marketSearch' }, h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)), h('input', { className: 'sk-search', placeholder: '搜索 Skill 或 GitHub 仓库', value: query, onChange: function (event) { setQuery(event.target.value); } })), h('button', { type: 'button', className: 'sk-chip', disabled: loading, onClick: function () { setAttempt(function (value) { return value + 1; }); } }, h(P.IconRefreshOutline16), loading ? '刷新中…' : '刷新')), h('p', { className: 'sk-marketHelper' }, '精选自 GitHub · 安装前校验 SKILL.md、路径和来源；不会执行第三方脚本'), message ? h('p', { className: 'sk-marketNotice', role: 'status' }, message) : null, error ? h('div', { className: 'sk-marketLoadError', role: 'alert' }, h('p', { className: 'sk-error' }, '加载 Skill 市场失败：' + error), h(Button, { variant: 'outline', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, '重试')) : null, h('div', { className: 'sk-marketList', 'data-testid': 'skill-market-list' }, loading && !loaded ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 Skill 市场…') : null, !loading && visible.length === 0 ? h('p', { className: 'sk-empty' }, '没有匹配的 Skill。') : null, visible.map(function (item) {
+                    : null), h('div', { className: 'sk-searchWrap sk-marketSearch' }, h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)), h('input', { className: 'sk-search', placeholder: '搜索 Skill 或 GitHub 仓库', value: query, onChange: function (event) { setQuery(event.target.value); } })), h('button', { type: 'button', className: 'sk-chip', disabled: project === null, onClick: function () { setGithubOpen(true); setGithubError(null); } }, h(P.IconPlusOutline16), '从 GitHub 安装'), h('button', { type: 'button', className: 'sk-chip', disabled: loading, onClick: function () { setAttempt(function (value) { return value + 1; }); } }, h(P.IconRefreshOutline16), loading ? '刷新中…' : '刷新')), h('p', { className: 'sk-marketHelper' }, '精选或任意公开 GitHub 仓库 · 安装阶段不执行第三方代码；Skill 被调用后仍可能请求执行仓库脚本，并受 Agent 权限与审批约束'), message ? h('p', { className: 'sk-marketNotice', role: 'status' }, message) : null, error ? h('div', { className: 'sk-marketLoadError', role: 'alert' }, h('p', { className: 'sk-error' }, '加载 Skill 市场失败：' + error), h(Button, { variant: 'outline', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, '重试')) : null, h('div', { className: 'sk-marketList', 'data-testid': 'skill-market-list' }, loading && !loaded ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 Skill 市场…') : null, !loading && visible.length === 0 ? h('p', { className: 'sk-empty' }, '没有匹配的 Skill。') : null, visible.map(function (item) {
                     return h('button', { type: 'button', key: item.id, className: 'sk-marketRow' + (selected && selected.id === item.id ? ' sk-marketRowActive' : ''), onClick: function () { openItem(item); } }, h('span', { className: 'sk-marketMain' }, h(MarketIcon, { src: item.iconUrl }), h('span', { className: 'sk-marketCopy' }, h('span', { className: 'sk-marketTitle' }, item.name), h('span', { className: 'sk-marketDesc' }, item.description), h('span', { className: 'sk-marketMeta' }, item.repository, item.license ? ' · ' + item.license : ''))), h('span', { className: 'sk-marketSide' }, h('span', { className: 'sk-marketStatus sk-marketStatus-' + item.status }, marketStatusLabel(item.status)), h(P.IconChevronRightOutline14)));
                 }))), activeDetail
                     ? h('aside', { className: 'sk-drawer sk-marketDrawer', role: 'dialog', 'aria-label': activeDetail.name + ' 详情' }, h('div', { className: 'sk-drawerHead' }, h(MarketIcon, { src: activeDetail.iconUrl }), h('div', { className: 'sk-marketDrawerIdentity' }, h('div', { className: 'sk-drawerName' }, activeDetail.name), h('a', { className: 'sk-marketLink', href: activeDetail.url || ('https://github.com/' + activeDetail.repository), target: '_blank', rel: 'noreferrer' }, activeDetail.repository, h(P.IconRightUpOutline14))), h('button', { type: 'button', className: 'sk-icBtn', 'aria-label': '关闭详情', title: '关闭（Esc）', onClick: function () { setSelected(null); setDetail(null); } }, h(P.IconCloseOutline16))), h('div', { className: 'sk-drawerBody' }, detailLoading ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 GitHub Skill 信息…') : null, activeDetail.description ? h('p', { className: 'sk-descFull' }, activeDetail.description) : null, activeDetail.metadataError ? h('p', { className: 'sk-marketMetaNotice' }, '部分远程信息暂不可用：' + activeDetail.metadataError) : null, h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '仓库信息'), h('div', { className: 'sk-marketFacts' }, h('span', null, '作者：' + (activeDetail.author || '—')), h('span', null, '许可证：' + (activeDetail.license || '—')), h('span', null, 'Stars：' + (activeDetail.stars === null || activeDetail.stars === undefined ? '—' : activeDetail.stars)), h('span', null, '文件：' + (activeDetail.fileCount === null || activeDetail.fileCount === undefined ? '—' : activeDetail.fileCount)))), h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '当前状态'), h('div', { className: 'sk-marketState' }, marketStatusLabel(detailStatus), project ? ' · 安装到 ' + project.title : ' · 请选择安装目标项目')), activeDetail.files && activeDetail.files.length > 0 ? h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, 'Skill 文件'), h('div', { className: 'sk-marketFiles' }, activeDetail.files.map(function (file) { return h('code', { key: file }, file); }))) : null, h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '安装校验'), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ SKILL.md frontmatter'), h('span', null, '✓ 路径和文件大小'), h('span', null, '✓ 拒绝符号链接'), h('span', null, '✓ 不执行第三方脚本')))), h('div', { className: 'sk-marketFoot' }, h(Button, { variant: 'outline', onClick: function () { window.open(activeDetail.url || ('https://github.com/' + activeDetail.repository), '_blank', 'noopener,noreferrer'); } }, '在 GitHub 查看', h(P.IconRightUpOutline14)), h(Button, { disabled: !canInstall || previewLoading || busy, onClick: openPreview }, previewLoading ? '检查中…' : detailStatus === 'update-available' ? '更新到当前项目' : detailStatus === 'installed' ? '重新安装' : canInstall ? '安装到当前项目' : '需要人工处理')))
                     : null, h(Modal, { open: preview !== null, onClose: function () { if (!busy)
-                        setPreview(null); }, title: preview ? (preview.action === 'update' ? '更新 Skill「' + preview.name + '」' : '安装 Skill「' + preview.name + '」') : '安装预览', closeLabel: '关闭', description: preview ? preview.message : '', footer: preview ? h(React.Fragment, null, h(Button, { variant: 'outline', disabled: busy, onClick: function () { setPreview(null); } }, '取消'), h(Button, { disabled: busy || !preview.canInstall, onClick: installPreview }, busy ? '写入中…' : preview.canInstall ? '确认安装' : '无法安装')) : null }, preview ? h('div', { className: 'sk-marketPreview' }, h('div', { className: 'sk-marketPreviewSummary' }, h('strong', null, preview.action === 'update' ? '将更新受管 Skill' : '将安装到当前项目'), h('span', null, preview.projectRoot + '/.dsh/skills/' + preview.name)), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ 已校验远程 SKILL.md'), h('span', null, '✓ ' + preview.incoming.fileCount + ' 个文件，内容哈希 ' + preview.incoming.hash.slice(0, 18) + '…'), h('span', null, '✓ 不执行 scripts 或其他第三方代码')), preview.incoming.files && preview.incoming.files.length > 0 ? h('div', { className: 'sk-marketFiles' }, preview.incoming.files.map(function (file) { return h('code', { key: file }, file); })) : null) : null));
+                        setPreview(null); }, title: preview ? (preview.action === 'update' ? '更新 Skill「' + preview.name + '」' : '安装 Skill「' + preview.name + '」') : '安装预览', closeLabel: '关闭', description: preview ? preview.message : '', footer: preview ? h(React.Fragment, null, h(Button, { variant: 'outline', disabled: busy, onClick: function () { setPreview(null); } }, '取消'), h(Button, { disabled: busy || !preview.canInstall, onClick: installPreview }, busy ? '写入中…' : preview.canInstall ? '确认安装' : '无法安装')) : null }, preview ? h('div', { className: 'sk-marketPreview' }, h('div', { className: 'sk-marketPreviewSummary' }, h('strong', null, preview.action === 'update' ? '将更新受管 Skill' : '将安装到当前项目'), h('span', null, preview.projectRoot + '/.dsh/skills/' + preview.name)), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ 已校验远程 SKILL.md'), h('span', null, '✓ ' + preview.incoming.fileCount + ' 个文件，内容哈希 ' + preview.incoming.hash.slice(0, 18) + '…'), h('span', null, '✓ 安装阶段不执行第三方代码；调用后仍受 Agent 权限与审批约束')), preview.incoming.files && preview.incoming.files.length > 0 ? h('div', { className: 'sk-marketFiles' }, preview.incoming.files.map(function (file) { return h('code', { key: file }, file); })) : null) : null), h(Modal, {
+                    open: githubOpen,
+                    onClose: function () { if (!githubBusy) {
+                        setGithubOpen(false);
+                        setGithubPreview(null);
+                        setGithubError(null);
+                    } },
+                    title: '从 GitHub 安装 Skill',
+                    description: '输入公开仓库主页或具体 Skill 目录 URL。Host 会先读取文件树并给出只读预览。',
+                    footer: h(React.Fragment, null, h(Button, { variant: 'outline', disabled: githubBusy, onClick: function () { setGithubOpen(false); setGithubPreview(null); } }, '取消'), githubPreview ? h(Button, { disabled: githubBusy || !githubPreview.canInstall, onClick: installGithub }, githubBusy ? '写入中…' : githubPreview.canInstall ? '确认安装' : '无法安装') : h(Button, { disabled: githubBusy || githubPath === '', onClick: previewGithub }, githubBusy ? '校验中…' : '生成安装预览'))
+                }, h('div', { className: 'sk-marketPreview', 'data-testid': 'github-install-dialog' }, h('div', { className: 'sk-presetField' }, h('label', { className: 'sk-presetFieldHead' }, h('span', null, 'GitHub URL')), h('div', { className: 'sk-presetInputRow' }, h('input', { className: 'sk-presetInput', value: githubUrl, placeholder: 'https://github.com/owner/repo', disabled: githubBusy || githubPreview !== null, onChange: function (event) { setGithubUrl(event.target.value); setGithubInfo(null); setGithubPath(''); } }), h(Button, { variant: 'outline', disabled: githubBusy || githubUrl.trim() === '' || githubPreview !== null, onClick: inspectGithub }, githubBusy ? '读取中…' : '检查仓库'))), githubInfo ? h('div', { className: 'sk-presetField' }, h('label', { className: 'sk-presetFieldHead' }, h('span', null, 'Skill 目录')), h('select', { className: 'sk-presetInput', value: githubPath, disabled: githubBusy || githubPreview !== null, onChange: function (event) { setGithubPath(event.target.value); } }, h('option', { value: '' }, '请选择…'), (githubInfo.candidates || []).map(function (candidate) { return h('option', { key: candidate.path, value: candidate.path }, candidate.path); }))) : null, githubError ? h('p', { className: 'sk-error', role: 'alert' }, githubError) : null, githubPreview ? h('div', { className: 'sk-marketPreviewSummary' }, h('strong', null, githubPreview.action === 'update' ? '将更新受管 Skill' : '将安装 ' + githubPreview.name), h('span', null, githubPreview.repository + ' · ' + githubPreview.path + ' @ ' + githubPreview.ref), h('span', null, githubPreview.incoming.fileCount + ' 个文件 · ' + githubPreview.incoming.hash), h('span', null, githubPreview.message), h('span', null, '安装阶段不执行第三方代码；Skill 调用后的脚本行为仍受 Agent 权限与审批约束。')) : null)));
             }
             function SkillFindingState() {
                 var particles = [

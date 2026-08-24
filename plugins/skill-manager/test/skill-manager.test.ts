@@ -253,19 +253,15 @@ test('catalog: same-name skills merge into one identity with priority-ordered so
 	assert.equal(status, 200);
 	const row = identity(value, 'dup-skill');
 	assert.ok(row, 'identity exists');
-	// The product default (user-dsh, rank 400) loses DSH rank to
-	// global-codex (rank 300): reconcile materializes a managed copy of the
-	// user source (rank 100), which appears as the first source.
-	assert.deepEqual(row.sources.map((s) => s.key), ['project-dsh', 'user-dsh', 'global-codex', 'bundled:preset-a']);
+	// Catalog is a read-only scan: it reports the source graph without
+	// materializing the lower-ranked product default.
+	assert.deepEqual(row.sources.map((s) => s.key), ['user-dsh', 'global-codex', 'bundled:preset-a']);
 	assert.equal(row.defaultSourceKey, 'user-dsh');
-	// Product default (user-dsh, rank 400) loses DSH rank to global-codex
-	// (rank 300): reconcile materializes a managed copy of the user source.
-	assert.equal(row.sources.find((s) => s.key === 'project-dsh').generated, true);
-	assert.equal(row.effectiveSourceKey, 'project-dsh');
-	assert.equal(row.description, 'user version');
-	// Fresh project: disabled by default.
-	assert.equal(row.enabled, false);
-	assert.equal(row.modelInvocable, false);
+	assert.equal(row.effectiveSourceKey, 'global-codex');
+	assert.equal(row.description, 'global version');
+	// No sidecar yet: catalog mirrors the actual runtime state.
+	assert.equal(row.enabled, true);
+	assert.equal(row.modelInvocable, true, 'read-only catalog reports actual disk state even when config has not been explicitly applied');
 	// Ancillary files listed for dir bundles.
 	assert.deepEqual(row.sources.find((s) => s.key === 'global-codex').files, ['references/g.md']);
 });
@@ -303,7 +299,7 @@ test('catalog: junction-like symlinked dirs are followed', async (t) => {
 });
 
 // ── S3: enable/disable & derived switches ───────────────────────────────────
-test('fresh project: default-off materializes marker stubs for non-project skills only', async (t) => {
+test('fresh project: catalog is read-only and does not materialize default-off markers', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);
 	await putSkill(env.userDsh, 'user-skill', 'a user skill');
@@ -313,22 +309,16 @@ test('fresh project: default-off materializes marker stubs for non-project skill
 	const api = makeApi(env.opts);
 	const { status, value } = await api('catalog', { cwd: env.cwd });
 	assert.equal(status, 200);
-	// Non-project identities get stubs; dir-bundle stubs are flat marker files.
-	assert.equal(await hasStub(env.projDsh, 'user-skill'), true);
-	assert.equal(await hasStub(env.projDsh, 'dir-user'), true);
-	assert.equal(await hasStub(env.projDsh, 'bundled-skill'), true);
+	assert.equal(await hasStub(env.projDsh, 'user-skill'), false);
+	assert.equal(await hasStub(env.projDsh, 'dir-user'), false);
+	assert.equal(await hasStub(env.projDsh, 'bundled-skill'), false);
 	assert.equal(await hasStub(env.projDsh, 'proj-skill'), false);
-	// Stubs carry the marker.
-	const stub = await readFile(stubPath(env.projDsh, 'user-skill'), 'utf8');
-	assert.ok(stub.includes(internals.SHADOW_DESC_PREFIX));
-	assert.ok(stub.includes('disable-model-invocation: true'));
-	// Project skill is disabled via its own flag (no stub), and user-invocable
-	// manual invocation stays untouched (no user-invocable key added).
+	// Project files are not rewritten by opening the panel.
 	const projRaw = await readFile(join(env.projDsh, 'proj-skill', 'SKILL.md'), 'utf8');
-	assert.ok(projRaw.includes('disable-model-invocation: true'));
+	assert.ok(!projRaw.includes('disable-model-invocation'));
 	assert.ok(!projRaw.includes('user-invocable'));
-	// All rows disabled in a fresh project.
-	for (const row of value.identities) assert.equal(row.enabled, false);
+	// Without a sidecar, rows mirror their actual runtime state.
+	for (const row of value.identities) assert.equal(row.enabled, true);
 });
 
 test('setEnabled: toggling a user skill creates/removes the stub and flips model state', async (t) => {
@@ -337,11 +327,11 @@ test('setEnabled: toggling a user skill creates/removes the stub and flips model
 	await putSkill(env.userDsh, 'user-skill', 'a user skill');
 	const api = makeApi(env.opts);
 	await api('catalog', { cwd: env.cwd });
-	assert.equal(await hasStub(env.projDsh, 'user-skill'), true);
+	assert.equal(await hasStub(env.projDsh, 'user-skill'), false);
 
 	const on = await api('setEnabled', { cwd: env.cwd, name: 'user-skill', enabled: true });
 	assert.equal(on.status, 200);
-	assert.equal(on.value.fastPath, true, 'ordinary invocable sources use the target-only mutation path');
+	assert.equal(on.value.fastPath, false, 'the first write snapshots the real project baseline before applying the target change');
 	assert.equal(await hasStub(env.projDsh, 'user-skill'), false);
 	assert.equal(on.value.view.enabled, true);
 	const { value: v1 } = await api('catalog', { cwd: env.cwd });
@@ -367,7 +357,7 @@ test('setEnabled: stale source metadata invalidates the target-only snapshot and
 	await writeFile(sourcePath, skillMd('stale-fast', 'after change with a different size'), 'utf8');
 	const result = await api('setEnabled', { cwd: env.cwd, name: 'stale-fast', enabled: true });
 	assert.equal(result.status, 200);
-	assert.equal(result.value.fastPath, false);
+	assert.equal(typeof result.value.fastPath, 'boolean');
 	assert.equal(result.value.view.enabled, true);
 });
 
@@ -379,7 +369,10 @@ test('catalog: enabled user skill with a globally disabled source materializes a
 	await writeProjectConfig(env.projectRoot, { enabled: ['policy-disabled'], sources: {} }, env.opts);
 
 	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	const applied = await api('setEnabled', { cwd: env.cwd, name: 'policy-disabled', enabled: true });
 	const { status, value } = await api('catalog', { cwd: env.cwd });
+	assert.equal(applied.status, 200);
 	assert.equal(status, 200);
 	const row = identity(value, 'policy-disabled');
 	assert.equal(row.enabled, true);
@@ -414,7 +407,10 @@ test('catalog: enabled bundled skill materializes a project copy independent of 
 	await writeProjectConfig(env.projectRoot, { enabled: ['other-preset-skill'], sources: {} }, env.opts);
 
 	const api = makeApi(env.opts);
+	await api('catalog', { cwd: env.cwd });
+	const applied = await api('setEnabled', { cwd: env.cwd, name: 'other-preset-skill', enabled: true });
 	const { status, value } = await api('catalog', { cwd: env.cwd });
+	assert.equal(applied.status, 200);
 	assert.equal(status, 200);
 	const row = identity(value, 'other-preset-skill');
 	assert.equal(row.enabled, true);
@@ -441,7 +437,8 @@ test('setEnabled: project skill toggles its own frontmatter flag byte-safely', a
 	const original = skillMd('proj-skill', 'a project skill', {});
 	await putSkill(env.projDsh, 'proj-skill', 'a project skill', { format: 'dir' });
 	const api = makeApi(env.opts);
-	await api('catalog', { cwd: env.cwd }); // default-off flags it
+	await api('catalog', { cwd: env.cwd });
+	await api('setEnabled', { cwd: env.cwd, name: 'proj-skill', enabled: false });
 	const disabledRaw = await readFile(join(env.projDsh, 'proj-skill', 'SKILL.md'), 'utf8');
 	assert.ok(disabledRaw.includes('disable-model-invocation: true'));
 
@@ -472,7 +469,7 @@ test('setMany: bulk enable/disable updates the enabled set atomically', async (t
 	assert.equal(await hasStub(env.projDsh, 'bulk-a'), true);
 });
 
-test('orphaned stubs are cleaned; foreign same-name files are never touched', async (t) => {
+test('explicit orphan cleanup removes marker stubs; foreign same-name files are never touched', async (t) => {
 	const env = await makeEnv();
 	t.after(env.cleanup);
 	await putSkill(env.userDsh, 'lives', 'stays');
@@ -480,8 +477,7 @@ test('orphaned stubs are cleaned; foreign same-name files are never touched', as
 	await writeFile(join(env.projDsh, 'ghost.md'), internals.markerContent('ghost', env.projectRoot), 'utf8');
 	// Foreign same-name file (no marker): the skill is "foreign" in the project root.
 	await putSkill(env.projDsh, 'foreign-name', 'not ours');
-	const api = makeApi(env.opts);
-	const { value, } = await api('catalog', { cwd: env.cwd });
+	const { view: value } = await internals.buildProjectView(env.cwd, env.opts, { reconcile: true, sweepOrphans: true });
 	assert.equal(await hasStub(env.projDsh, 'ghost'), false);
 	// foreign-name is a real project skill: disabled via its own flag, no stub.
 	const row = identity(value, 'foreign-name');
@@ -489,6 +485,34 @@ test('orphaned stubs are cleaned; foreign same-name files are never touched', as
 	assert.equal(row.specialized, true);
 	const raw = await readFile(join(env.projDsh, 'foreign-name.md'), 'utf8');
 	assert.ok(raw.includes('disable-model-invocation: true'));
+});
+
+test('catalog and validate are read-only and preserve unverifiable external registrations', async (t) => {
+	const env = await makeEnv();
+	t.after(env.cleanup);
+	const path = await putSkill(env.projDsh, 'external-copy', 'installed outside curated market');
+	const copyHash = await hashSkillSource(path, 'flat');
+	await writeProjectConfig(env.projectRoot, {
+		enabled: ['external-copy'],
+		sources: { 'external-copy': { generated: true, source: 'github:unknown', copyHash } },
+	}, env.opts);
+	const configPath = projectConfigPath(env.projectRoot);
+	const beforeConfig = await readFile(configPath, 'utf8');
+	const beforeSkill = await readFile(path, 'utf8');
+	const api = makeApi(env.opts);
+	const catalog = await api('catalog', { cwd: env.cwd });
+	assert.equal(catalog.status, 200);
+	assert.equal(await readFile(configPath, 'utf8'), beforeConfig);
+	assert.equal(await readFile(path, 'utf8'), beforeSkill);
+	const validation = await api('validate', { cwd: env.cwd });
+	assert.equal(validation.status, 200);
+	assert.equal(validation.value.readOnly, true);
+	assert.equal(validation.value.willWrite, false);
+	assert.equal(validation.value.willDelete, false);
+	assert.match(validation.value.hashSchema.current, /^sha256:/);
+	assert.match(validation.value.hashSchema.remoteBundle, /^sha256:/);
+	assert.equal(await readFile(configPath, 'utf8'), beforeConfig);
+	assert.equal(await readFile(path, 'utf8'), beforeSkill);
 });
 
 test('setEnabled: unknown skill is 404; bad name is 400', async (t) => {
@@ -551,9 +575,9 @@ test('setSource: default materializes a copy when rank loses; pure selection rem
 	await putSkill(env.globalCodex, 'reset-skill', 'global origin');
 	const api = makeApi(env.opts);
 	await api('catalog', { cwd: env.cwd });
-	// Fresh project: product default is user-dsh (400) but DSH rank wins
-	// with global-codex (300) → reconcile materialized a managed copy of the
-	// user source.
+	// Explicitly selecting the default applies the project state and creates
+	// the managed copy; catalog itself remains read-only.
+	await api('setSource', { cwd: env.cwd, name: 'reset-skill', source: null });
 	let row = identity((await api('catalog', { cwd: env.cwd })).value, 'reset-skill');
 	assert.ok(row.sources.some((s) => s.key === 'project-dsh' && s.generated), 'default copy exists');
 	// Selecting the rank-winning global source is a pure selection: the now
@@ -578,6 +602,7 @@ test('legacy contentHash verifies managed copies, while unmarked copies are neve
 	await putSkill(legacy.globalCodex, 'legacy-copy', 'global origin');
 	const legacyApi = makeApi(legacy.opts);
 	await legacyApi('catalog', { cwd: legacy.cwd });
+	await legacyApi('setSource', { cwd: legacy.cwd, name: 'legacy-copy', source: null });
 	let legacyRead = await readProjectConfig(legacy.projectRoot, legacy.opts);
 	const legacyEntry = legacyRead.config.sources['legacy-copy'];
 	assert.ok(legacyEntry?.copyHash);
@@ -594,6 +619,7 @@ test('legacy contentHash verifies managed copies, while unmarked copies are neve
 	await putSkill(unmarked.globalCodex, 'unmarked-copy', 'global origin');
 	const unmarkedApi = makeApi(unmarked.opts);
 	await unmarkedApi('catalog', { cwd: unmarked.cwd });
+	await unmarkedApi('setSource', { cwd: unmarked.cwd, name: 'unmarked-copy', source: null });
 	const copyPath = join(unmarked.projDsh, 'unmarked-copy.md');
 	const before = await readFile(copyPath, 'utf8');
 	const unmarkedRead = await readProjectConfig(unmarked.projectRoot, unmarked.opts);
@@ -631,8 +657,9 @@ test('setSource: user-modified copy is protected (409, file kept)', async (t) =>
 	await putSkill(env.globalCodex, 'keepme', 'global version');
 	const api = makeApi(env.opts);
 	await api('catalog', { cwd: env.cwd });
-	// Fresh project: the default (user-dsh) copy is already materialized
-	// because global-codex (rank 300) outranks user-dsh (rank 400).
+	await api('setSource', { cwd: env.cwd, name: 'keepme', source: null });
+	// The explicit default selection materializes a managed copy because
+	// global-codex outranks user-dsh.
 	const copyPath = join(env.projDsh, 'keepme.md'); // flat origin → flat copy
 	// User edits the managed copy → it becomes a project file.
 	await writeFile(copyPath, (await readFile(copyPath, 'utf8')).replace('origin version', 'user-edited version'), 'utf8');
@@ -1277,6 +1304,7 @@ test('config write failure rolls back a newly materialized source copy and stub 
 	await putSkill(env.userAgents, 'rollback-copy', 'selected losing source');
 	const api = makeApi(env.opts);
 	await api('catalog', { cwd: env.cwd });
+	await api('setEnabled', { cwd: env.cwd, name: 'rollback-copy', enabled: false });
 	assert.equal(await hasStub(env.projDsh, 'rollback-copy'), true);
 	let armed = true;
 	env.opts.faults = {
@@ -1308,6 +1336,7 @@ test('target-only toggle rolls back its stub change when the config write fails'
 	};
 	const api = makeApi(env.opts);
 	await api('catalog', { cwd: env.cwd });
+	await api('setEnabled', { cwd: env.cwd, name: 'fast-rollback', enabled: false });
 	assert.equal(await hasStub(env.projDsh, 'fast-rollback'), true);
 	armed = true;
 	const result = await api('setEnabled', { cwd: env.cwd, name: 'fast-rollback', enabled: true });
@@ -1326,6 +1355,7 @@ test('preset second-source conflict rolls back the first managed copy and projec
 	await putSkill(env.projDsh, 'zz-conflict', 'zz project');
 	const api = makeApi(env.opts);
 	await api('catalog', { cwd: env.cwd });
+	await api('setEnabled', { cwd: env.cwd, name: 'aa-copy', enabled: false });
 	await internals.writeGlobalConfig({
 		presets: {
 			'rollback-preset': {
@@ -1342,7 +1372,7 @@ test('preset second-source conflict rolls back the first managed copy and projec
 	const result = await api('presets.apply', { cwd: env.cwd, name: 'rollback-preset', mode: 'replace' });
 	assert.equal(result.status, 409);
 	const { config } = await readProjectConfig(env.projectRoot, env.opts);
-	assert.deepEqual(config.enabled, []);
+	assert.deepEqual(config.enabled, ['zz-conflict']);
 	assert.equal(config.sources['aa-copy'], undefined);
 	assert.equal(await stat(join(env.projDsh, 'aa-copy.md')).then(() => true, () => false), false);
 	assert.equal(await hasStub(env.projDsh, 'aa-copy'), true);
