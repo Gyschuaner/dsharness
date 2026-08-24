@@ -12,6 +12,12 @@
 >
 > 结论：**暂不建议发布 V1**。现有 37 个 Host 测试全部通过，但仍有 5 个 P1 级并发、来源选择或数据安全问题未覆盖。
 
+> 修复复验（2026-08-18）：本文是修复前 Review 记录，结论保留用于追溯。`fix/DSH-008-v1-review-blockers`
+> 已完成本文 P1/P2 阻断项：48 个 Host 测试 + 3 个真实 Client bundle DOM 测试全部通过，
+> image-context-guard 8 个相邻回归通过；3080 已从该修复 worktree 重启并验证 apiVersion 6，
+> 实机可见项目管理 / 统一资源库、完整 description、Cordis 两个 Skill 与来源详情，未出现新的页面错误。
+> 仍需按项目流程完成 Git 推送、DP Bug 复测状态和后续 SIT 决策，不能把本条复验说明等同于生产发布。
+
 ## 1. 给 Qwen 的任务边界
 
 请只修复本文列出的 V1 Review 问题，不实现 V1.1、V1.2 或市场能力。
@@ -208,7 +214,7 @@ Host 把单文件失败放进 `report.failed` 后仍返回 200；Client 对 `set
 结论与要求：
 
 - 41 个 marker stub 是设计明确声明“可重建”的派生产物，应从仓库移除。
-- 项目配置可继续纳入 Git，但 `projectRoot` 不应存绝对路径；运行时从配置所在目录推导，或持久化 `.`。
+- 后续 `BUG-548E4FF4` 将项目配置定义为本机私有状态并从 Git 移除；持久化时仍不保存 `projectRoot`，避免本机移动项目后留下失效绝对路径。
 - **不要直接 `.gitignore /.dsh/skills/**`**，否则会误伤真正需要版本控制的项目专属 Skill。请先设计能精确区分 generated stub/managed copy 与真实项目 Skill 的策略，再改 ignore/目录布局。
 - 不要把当前工作区里用户的 `.dsh` 删除、新增或 Mac 配置顺手提交。
 

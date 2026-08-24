@@ -1,0 +1,26 @@
+{
+  "name": "dsh-extension-manager",
+  "version": "0.3.0",
+  "description": "DeepSeek Harness Extensions shell: sidebar entry, full-page navigation, and an extension section Slot.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "license": "MIT"
+}

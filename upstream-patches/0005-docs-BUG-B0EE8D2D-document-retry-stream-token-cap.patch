@@ -1,0 +1,24 @@
+From bce8ca554d2e6cff25bb794429ca42117c05d3d7 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Wed, 19 Aug 2026 01:52:34 +0800
+Subject: [PATCH 05/14] docs(BUG-B0EE8D2D): document retry stream token cap
+
+---
+ packages/llm/llm-pi-ai/src/stream.ts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/packages/llm/llm-pi-ai/src/stream.ts b/packages/llm/llm-pi-ai/src/stream.ts
+index 277c2e5bc9..3f39a31fb9 100644
+--- a/packages/llm/llm-pi-ai/src/stream.ts
++++ b/packages/llm/llm-pi-ai/src/stream.ts
+@@ -134,6 +134,7 @@ export function mapStopReason(
+  * `finish` chunks (the harness protocol's other error-delivery style).
+  * @param events - one assistant turn's pi-ai event stream.
+  * @param contextWindow - resolved catalog capacity for usage-based overflow detection.
++ * @param requestedMaxTokens - the output cap sent to the provider, when known.
+  * @returns the harness chunks, ending with `usage` then `finish`; throws
+  *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event.
+  */
+-- 
+2.51.2.windows.1
+

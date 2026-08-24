@@ -1,0 +1,1086 @@
+From 39205a5dd8ab0cd48353c167f0167dba503cec08 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 14:32:39 +0800
+Subject: [PATCH] feat(DSH-020): stream and persist vision progress
+
+Keep the BUG-46C2A7B5 Look row stable across the running-to-result handoff and preserve the intentional Look/ing spacing.
+---
+ docs/config-catalog.i18n.yaml                 |   4 +-
+ docs/config-catalog.md                        |   4 +-
+ docs/config-catalog.zh.md                     |   2 +-
+ docs/persistence-catalog.i18n.yaml            |   4 +-
+ docs/persistence-catalog.md                   |  20 +++-
+ docs/persistence-catalog.zh.md                |  20 +++-
+ docs/subsystems/tools.i18n.yaml               |   4 +-
+ docs/subsystems/tools.md                      |   7 +-
+ docs/subsystems/tools.zh.md                   |   7 +-
+ .../src/client/sessions/conversation.ts       |   4 +
+ .../src/client/conversation-nodes/tool.ts     |  31 +++++-
+ ...nversation-node-definitions.client.spec.ts |  62 +++++++++++
+ .../core/session/src/known-event-types.ts     |   1 +
+ packages/core/tools/README.i18n.yaml          |   4 +-
+ packages/core/tools/README.md                 |   2 +-
+ packages/core/tools/README.zh.md              |   2 +-
+ packages/core/tools/src/index.ts              |   9 ++
+ packages/core/tools/src/types.ts              |  17 +++
+ packages/core/tools/tests/tools.spec.ts       |  28 +++++
+ .../extensions/tool-cordis/src/api-catalog.ts |   2 +-
+ .../vision/vision-bridge/README.i18n.yaml     |   4 +-
+ packages/vision/vision-bridge/README.md       |   2 +-
+ packages/vision/vision-bridge/README.zh.md    |   2 +-
+ .../src/client/VisionInspectIcon.tsx          |  13 +--
+ .../src/client/VisionInspectRow.module.css    |  16 ++-
+ .../src/client/VisionInspectRow.tsx           |  77 +++++++++++--
+ packages/vision/vision-bridge/src/index.ts    | 102 ++++++++++++++++--
+ .../vision-bridge/tests/vision-bridge.spec.ts |  41 +++++++
+ .../tests/vision-inspect-row.client.spec.tsx  |  46 +++++---
+ 29 files changed, 471 insertions(+), 66 deletions(-)
+
+diff --git a/docs/config-catalog.i18n.yaml b/docs/config-catalog.i18n.yaml
+index 0e42f7e..1cf667f 100644
+--- a/docs/config-catalog.i18n.yaml
++++ b/docs/config-catalog.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/config-catalog.md
+-config-catalog.md: a03d5198780517469199317ed24343941adbb0c9
+-config-catalog.zh.md: 022d4da5d36375bf0407c923198ddf784c42cb14
++config-catalog.md: 3400b5a083e63868639eef8e6230c0afd7b15f80
++config-catalog.zh.md: 8cc232818db4d4c1c70a433fad1a574e665e1852
+diff --git a/docs/config-catalog.md b/docs/config-catalog.md
+index a03d519..3400b5a 100644
+--- a/docs/config-catalog.md
++++ b/docs/config-catalog.md
+@@ -2989,7 +2989,7 @@ export interface Config {
+ export type ToolPresentationMode = 'native' | 'code' | 'both'
+ ```
+ 
+-Source: [`packages/core/tools/src/index.ts:654`](../packages/core/tools/src/index.ts)
++Source: [`packages/core/tools/src/index.ts:659`](../packages/core/tools/src/index.ts)
+ 
+ <a id="deepseek-aidsh-typert-loader"></a>
+ 
+@@ -3064,7 +3064,7 @@ export interface Config {
+ }
+ ```
+ 
+-Source: [`packages/vision/vision-bridge/src/index.ts:44`](../packages/vision/vision-bridge/src/index.ts)
++Source: [`packages/vision/vision-bridge/src/index.ts:45`](../packages/vision/vision-bridge/src/index.ts)
+ 
+ <a id="deepseek-aidsh-web"></a>
+ 
+diff --git a/docs/config-catalog.zh.md b/docs/config-catalog.zh.md
+index 022d4da..8cc2328 100644
+--- a/docs/config-catalog.zh.md
++++ b/docs/config-catalog.zh.md
+@@ -3066,7 +3066,7 @@ export interface Config {
+ }
+ ```
+ 
+-来源：[`packages/vision/vision-bridge/src/index.ts:44`](../packages/vision/vision-bridge/src/index.ts)
++来源：[`packages/vision/vision-bridge/src/index.ts:45`](../packages/vision/vision-bridge/src/index.ts)
+ 
+ <a id="deepseek-aidsh-web"></a>
+ 
+diff --git a/docs/persistence-catalog.i18n.yaml b/docs/persistence-catalog.i18n.yaml
+index b48d644..f0a1053 100644
+--- a/docs/persistence-catalog.i18n.yaml
++++ b/docs/persistence-catalog.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
+-persistence-catalog.md: aaedabf93db497dc3e760ea5609497151569a3a4
+-persistence-catalog.zh.md: c2810adb5866dafeea4b092794f241c229cd3c9e
++persistence-catalog.md: 99997378ce58f6de76fc9a0ddc56d8766133a4a0
++persistence-catalog.zh.md: 589c8d7a5b99a181e19d0a13f13677f50f47df0f
+diff --git a/docs/persistence-catalog.md b/docs/persistence-catalog.md
+index aaedabf..9999737 100644
+--- a/docs/persistence-catalog.md
++++ b/docs/persistence-catalog.md
+@@ -826,7 +826,7 @@ Source: [`packages/core/session/src/types.ts:283`](../packages/core/session/src/
+ 'tool/code-dispatch': CodeDispatchEventData
+ ```
+ 
+-Source: [`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types.ts)
++Source: [`packages/core/tools/src/types.ts:73`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolcode-dispatch-start--log-only"></a>
+ 
+@@ -849,7 +849,23 @@ Source: [`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types
+ 'tool/code-dispatch-start': CodeDispatchStartEventData
+ ```
+ 
+-Source: [`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types.ts)
++Source: [`packages/core/tools/src/types.ts:57`](../packages/core/tools/src/types.ts)
++
++<a id="toolprogress--log-only"></a>
++
++#### `tool/progress` — log-only
++
++```ts persistence-catalog
++/**
++ * Replayable progress from a running Tool. This event is log-only:
++ * `deriveMessages()` ignores it, while clients concatenate `delta` by
++ * `callId` and update the already durable `tool/call` row. The final
++ * model-facing outcome remains the single paired `tool/result`.
++ */
++'tool/progress': ToolProgressEventData
++```
++
++Source: [`packages/core/tools/src/types.ts:43`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolresult--surface"></a>
+ 
+diff --git a/docs/persistence-catalog.zh.md b/docs/persistence-catalog.zh.md
+index c2810ad..589c8d7 100644
+--- a/docs/persistence-catalog.zh.md
++++ b/docs/persistence-catalog.zh.md
+@@ -828,7 +828,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
+ 'tool/code-dispatch': CodeDispatchEventData
+ ```
+ 
+-来源：[`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types.ts)
++来源：[`packages/core/tools/src/types.ts:73`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolcode-dispatch-start--log-only"></a>
+ 
+@@ -851,7 +851,23 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
+ 'tool/code-dispatch-start': CodeDispatchStartEventData
+ ```
+ 
+-来源：[`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types.ts)
++来源：[`packages/core/tools/src/types.ts:57`](../packages/core/tools/src/types.ts)
++
++<a id="toolprogress--log-only"></a>
++
++#### `tool/progress` — log-only
++
++```ts persistence-catalog
++/**
++ * Replayable progress from a running Tool. This event is log-only:
++ * `deriveMessages()` ignores it, while clients concatenate `delta` by
++ * `callId` and update the already durable `tool/call` row. The final
++ * model-facing outcome remains the single paired `tool/result`.
++ */
++'tool/progress': ToolProgressEventData
++```
++
++来源：[`packages/core/tools/src/types.ts:43`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolresult--surface"></a>
+ 
+diff --git a/docs/subsystems/tools.i18n.yaml b/docs/subsystems/tools.i18n.yaml
+index ed327e5..e54e7a0 100644
+--- a/docs/subsystems/tools.i18n.yaml
++++ b/docs/subsystems/tools.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/subsystems/tools.md
+-tools.md: dd89d40c1401732dd5e6d8dfb5ccb08a89c58405
+-tools.zh.md: 0d3e59bc222527e66dd5bd626203f4e1bb6aad9a
++tools.md: 67ddee7ca8085186c4aa3c5bf90f31dfaafb4c6d
++tools.zh.md: bf93559b1f00bd689f28dba64a620ea6857dda57
+diff --git a/docs/subsystems/tools.md b/docs/subsystems/tools.md
+index dd89d40..67ddee7 100644
+--- a/docs/subsystems/tools.md
++++ b/docs/subsystems/tools.md
+@@ -209,7 +209,7 @@ interface ToolExecutionInput {
+ }
+ ```
+ 
+-A tool body receives the runtime extension. `deferContext()` attaches context to the execution's own result — the composite-tool nested-dispatch channel, also usable by a leaf tool minting a plugin-sourced instruction — without injecting inside the still-open outer call.
++A tool body receives the runtime extension. `reportProgress()` appends replayable UI-only progress without adding a model-facing message; `deferContext()` attaches context to the execution's own result — the composite-tool nested-dispatch channel, also usable by a leaf tool minting a plugin-sourced instruction — without injecting inside the still-open outer call.
+ 
+ ```ts type-equiv
+ /**
+@@ -221,6 +221,11 @@ A tool body receives the runtime extension. `deferContext()` attaches context to
+  * `tool/result`.
+  */
+ interface ToolRunContext extends ToolExecution {
++  /**
++   * Append replayable UI progress for this call without adding a model-facing
++   * message. Empty fragments are ignored; the final result remains authoritative.
++   */
++  reportProgress(delta: string): void
+   /**
+    * Defer one context — typically a nested-dispatch context ferried by a
+    * composite tool, or a fresh plugin-sourced instruction — until this tool's
+diff --git a/docs/subsystems/tools.zh.md b/docs/subsystems/tools.zh.md
+index 0d3e59b..bf93559 100644
+--- a/docs/subsystems/tools.zh.md
++++ b/docs/subsystems/tools.zh.md
+@@ -209,7 +209,7 @@ interface ToolExecutionInput {
+ }
+ ```
+ 
+-工具函数体接收运行时扩展。`deferContext()` 把上下文附着到本次执行自己的结果上——既是组合工具转运嵌套分派上下文的通道，也可供叶子工具铸造插件来源指令——而不会在外层调用尚未结束时注入这些上下文。
++工具函数体接收运行时扩展。`reportProgress()` 追加可回放但仅供 UI 使用的进度，不增加面向模型的消息；`deferContext()` 把上下文附着到本次执行自己的结果上——既是组合工具转运嵌套分派上下文的通道，也可供叶子工具铸造插件来源指令——而不会在外层调用尚未结束时注入这些上下文。
+ 
+ ```ts type-equiv
+ /**
+@@ -221,6 +221,11 @@ interface ToolExecutionInput {
+  * `tool/result`.
+  */
+ interface ToolRunContext extends ToolExecution {
++  /**
++   * Append replayable UI progress for this call without adding a model-facing
++   * message. Empty fragments are ignored; the final result remains authoritative.
++   */
++  reportProgress(delta: string): void
+   /**
+    * Defer one context — typically a nested-dispatch context ferried by a
+    * composite tool, or a fresh plugin-sourced instruction — until this tool's
+diff --git a/packages/client/runtime/src/client/sessions/conversation.ts b/packages/client/runtime/src/client/sessions/conversation.ts
+index 90cad73..552d0c3 100644
+--- a/packages/client/runtime/src/client/sessions/conversation.ts
++++ b/packages/client/runtime/src/client/sessions/conversation.ts
+@@ -203,6 +203,8 @@ export interface ToolResultNode {
+   callView: ToolCallView | null
+   /** Host-computed render intent from this tool/result's wire view; null = same default. */
+   resultView: ToolResultView | null
++  /** Replayable model-invisible progress emitted before this result settled. */
++  progressText?: string
+   /** Child calls owned by this call, in dispatch order. */
+   subCalls: readonly ToolCallBlock[]
+ }
+@@ -306,6 +308,8 @@ export interface RunningToolCall {
+   time: number
+   /** Host-computed render intent riding the tool/call frame; null = generic JSON card. */
+   callView: ToolCallView | null
++  /** Replayable model-invisible progress accumulated for this call. */
++  progressText?: string
+   /** Child calls owned by this call, in dispatch order. */
+   subCalls: readonly ToolCallBlock[]
+ }
+diff --git a/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts b/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts
+index dd012f6..0a71a7e 100644
+--- a/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts
++++ b/packages/client/ui-conversation/src/client/conversation-nodes/tool.ts
+@@ -74,10 +74,33 @@ function rootResult(match: ConversationMatch, previous?: RunningToolCall): ToolR
+     meta: match.event.data.meta,
+     callView: previous?.callView ?? null,
+     resultView: match.view?.for === 'result' ? match.view.view : null,
++    ...previous?.progressText === undefined ? {} : { progressText: previous.progressText },
+     subCalls: [],
+   }
+ }
+ 
++function appendProgress(block: ToolCallBlock, callId: string, delta: string): ToolCallBlock {
++  if (block.callId !== callId) return block
++  return { ...block, progressText: `${block.progressText ?? ''}${delta}` }
++}
++
++function updateProgress(state: ToolState, match: ConversationMatch): ToolState {
++  const event = match.event
++  if (event.type !== 'tool/progress') return state
++  const callId = String(event.data.callId)
++  const root = appendProgress(state.root, callId, event.data.delta)
++  let changedChildren: Map<string, readonly ToolCallBlock[]> | undefined
++  for (const [parentCallId, siblings] of state.children) {
++    const next = siblings.map(child => appendProgress(child, callId, event.data.delta))
++    if (sameReferences(siblings, next)) continue
++    changedChildren ??= new Map(state.children)
++    changedChildren.set(parentCallId, next)
++  }
++  return root === state.root && changedChildren === undefined
++    ? state
++    : { ...state, root, children: changedChildren ?? state.children }
++}
++
+ interface DispatchData {
+   readonly parentCallId: string
+   readonly subCallId: string
+@@ -268,7 +291,11 @@ function fallbackState(context: ConversationNodeContext<ToolState>): ToolState |
+     activityStartTime: root.callTime ?? root.time,
+     plans: new Map(),
+   }
+-  for (const candidate of context.matches) state = updateDispatch(state, candidate)
++  for (const candidate of context.matches) {
++    state = candidate.event.type === 'tool/progress'
++      ? updateProgress(state, candidate)
++      : updateDispatch(state, candidate)
++  }
+   return state
+ }
+ 
+@@ -278,6 +305,7 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+   target: 'chat',
+   match: (event) => {
+     if (event.type === 'tool/call') return { id: String(event.data.callId), role: 'start' }
++    if (event.type === 'tool/progress') return { id: String(event.data.rootCallId), role: 'update' }
+     if (event.type === 'tool/result' && isAppendSurfaceEvent(event)) {
+       return { id: String(event.data.message.source.callId), role: 'update' }
+     }
+@@ -308,6 +336,7 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+       const result = rootResult(match, running)
+       return result === undefined ? context.state : { ...context.state, root: result }
+     }
++    if (match.event.type === 'tool/progress') return updateProgress(context.state, match)
+     return updateDispatch(context.state, match)
+   },
+   buildViewNode: (context) => {
+diff --git a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
+index ec83dcf..7e81b3f 100644
+--- a/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
++++ b/packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts
+@@ -605,6 +605,68 @@ describe('built-in conversation node Definitions', () => {
+     expect(node(snapshot(retried), 'tool-activity')?.visibility).toBe('hidden')
+   })
+ 
++  it('keeps one visible formal Tool row while replayable progress hands off to its result', () => {
++    const value = assembler([
++      at(1, 'turn/start', { turn: 1 }),
++      at(2, 'step/start', { turn: 1, step: 1 }),
++      at(3, 'assistant/chunk', {
++        turn: 1,
++        step: 1,
++        chunk: {
++          type: 'tool-call-delta', index: 0, id: 'vision-1', name: 'vision_inspect', argumentsDelta: '{',
++        },
++      }),
++      at(4, 'assistant/message', {
++        turn: 1,
++        step: 1,
++        message: {
++          ...assistantMessage('assistant-vision', ''),
++          content: [{
++            type: 'tool-call', id: 'vision-1', name: 'vision_inspect',
++            arguments: '{"attachmentIds":["sha256:a"],"prompt":"inspect"}',
++          }],
++        },
++      }, { surfaceOp: 'append' }),
++      at(5, 'tool/call', {
++        turn: 1,
++        step: 1,
++        callId: 'vision-1',
++        name: 'vision_inspect',
++        arguments: '{"attachmentIds":["sha256:a"],"prompt":"inspect"}',
++      }),
++    ])
++
++    const formal = node(snapshot(value), 'tool-call')
++    expect(formal?.visibility).toBe('visible')
++    expect(node(snapshot(value), 'tool-activity')?.visibility).toBe('hidden')
++
++    value.append(at(6, 'tool/progress', {
++      rootCallId: 'vision-1', callId: 'vision-1', delta: '{"summary":"请求进',
++    }))
++    value.append(at(7, 'tool/progress', {
++      rootCallId: 'vision-1', callId: 'vision-1', delta: '入"}',
++    }))
++    value.flush()
++    const progressing = node(snapshot(value), 'tool-call')
++    expect(progressing?.key).toBe(formal?.key)
++    expect(progressing?.visibility).toBe('visible')
++    expect((progressing?.data as ToolChatData).root.progressText).toBe('{"summary":"请求进入"}')
++
++    value.append(at(8, 'tool/result', {
++      turn: 1,
++      step: 1,
++      message: toolResult('vision-1', '{"summary":"请求进入"}'),
++    }, { surfaceOp: 'append', sourceEventSeqs: [5] }))
++    value.flush()
++    const settled = node(snapshot(value), 'tool-call')
++    expect(settled?.key).toBe(formal?.key)
++    expect(settled?.visibility).toBe('visible')
++    expect((settled?.data as ToolChatData).root).toMatchObject({
++      kind: 'tool-result', callId: 'vision-1', progressText: '{"summary":"请求进入"}',
++    })
++    expect([...snapshot(value).nodes.values()].filter(candidate => candidate.kind === 'tool-call')).toHaveLength(1)
++  })
++
+   it('previews planned Code children while arguments stream and consumes them by dispatch ordinal', () => {
+     const args = JSON.stringify({
+       plannedTools: ['write', 'edit'],
+diff --git a/packages/core/session/src/known-event-types.ts b/packages/core/session/src/known-event-types.ts
+index 098743d..abaab97 100644
+--- a/packages/core/session/src/known-event-types.ts
++++ b/packages/core/session/src/known-event-types.ts
+@@ -60,6 +60,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
+   'tool/call',
+   'tool/code-dispatch',
+   'tool/code-dispatch-start',
++  'tool/progress',
+   'tool/result',
+   'turn/end',
+   'turn/start',
+diff --git a/packages/core/tools/README.i18n.yaml b/packages/core/tools/README.i18n.yaml
+index 2ebd45d..ae84432 100644
+--- a/packages/core/tools/README.i18n.yaml
++++ b/packages/core/tools/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/core/tools/README.md
+-README.md: dd20b1b8fdc4ff57ff9850683d6070fdb219e25a
+-README.zh.md: 129bd8d0e3464985a0434f5456bf1c6f06ddc921
++README.md: 4bdf4e11240506b96a0ba5f73420f309cd830c35
++README.zh.md: 0dcaac35692ad93c099dbafd55d9c0b4ee0fc984
+diff --git a/packages/core/tools/README.md b/packages/core/tools/README.md
+index dd20b1b..4bdf4e1 100644
+--- a/packages/core/tools/README.md
++++ b/packages/core/tools/README.md
+@@ -44,7 +44,7 @@ The live registry pipeline has three transformable waterfalls, then the definiti
+ - `ToolExecutionInput` — the caller-supplied call description: `{ callId, name, arguments, signal, agent?, parent? }`; `signal` is required and readonly, callers may pass an enclosing execution's opaque token as `parent`, and callers never choose the new execution's own token.
+ - `ToolExecutionToken` — a fresh branded `Symbol` assigned by the registry. It supports equality correlation only and never crosses a model, log, or worker boundary.
+ - `ToolExecution` — the readonly pipeline view: immutable `{ token, callId, name, arguments, signal, agent?, parent? }`; the registry separately retains and re-fuses the original caller signal. `ToolDispatchExecution` is the `tools/execute`-only view whose required signal is mutable, so a wrapper may replace and restore it but cannot delete it. A nested call's `parent` is a `ToolExecutionToken`, not an execution object.
+-- `ToolRunContext` — the execution passed to a tool body, extending `ToolExecution` with `deferContext(context)`. It defers one context until the tool's final result reaches the loop — typically a nested-dispatch context ferried by a composite tool, or a fresh plugin-sourced instruction minted by a leaf tool (`tool-goal`'s wrap-up) — even when the tool later throws or cancellation wins; it never injects immediately.
++- `ToolRunContext` — the execution passed to a tool body, extending `ToolExecution` with `reportProgress(delta)`, `deferContext(context)`, and `concludeTurn()`. `reportProgress` appends a replayable, call-id-keyed `tool/progress` log event for UI activity without adding a model-facing message; the single final `tool/result` remains authoritative. `deferContext` holds one context until that final result reaches the loop — typically a nested-dispatch context ferried by a composite tool, or a fresh plugin-sourced instruction minted by a leaf tool (`tool-goal`'s wrap-up) — even when the tool later throws or cancellation wins; it never injects immediately.
+ - `ToolExecutionResult` — discriminated execution-local outcome. Success is `{ isError:false, value:JsonValue, content, meta?, additionalContexts? }`; failure is `{ isError:true, error:{ message, info? }, content, meta?, additionalContexts? }` and has no value. Call identity stays on the immutable `ToolExecution`. The registry snapshots, validates, and freezes the canonical value before rendering, then materializes the durable presentation fields before final observation. `ToolFailure.info` carries an internal `{ name, code }` for a `HarnessError`; `additionalContexts` preserves every deferred or post-execute identified `UserMessage` for the loop's post-result FIFO.
+ - `PreToolDecision` — `{kind:'allow'}` | `{kind:'deny', reason}` | `{kind:'ask', reason?}`. Input rewrite is deliberately not offered; `ask` is serviced by [`ctx.approval`](../../interaction/user-approval/README.md) when mounted and otherwise degrades to deny.
+ - `PostToolDecision` — accept may replace `content` or `value`, never both, and may attach `additionalContexts`; block turns feedback into a valueless failure. Content replacement preserves the canonical value and metadata. Value replacement is revalidated and rerenders content/metadata. Accept preserves tool-deferred contexts before decision contexts; block discards tool-deferred contexts and exposes only contexts explicitly supplied by the blocking decision.
+diff --git a/packages/core/tools/README.zh.md b/packages/core/tools/README.zh.md
+index 129bd8d..0dcaac3 100644
+--- a/packages/core/tools/README.zh.md
++++ b/packages/core/tools/README.zh.md
+@@ -44,7 +44,7 @@ tools:
+ - `ToolExecutionInput`：调用方提供的调用描述：`{ callId, name, arguments, signal, agent?, parent? }`；`signal` 必填且只读，调用方可以将外层执行的不透明 token 作为 `parent` 传入，但绝不能选择新执行自身的 token。
+ - `ToolExecutionToken`：注册表分配的全新带品牌 `Symbol`。它只支持通过相等性进行关联，绝不会跨越模型、日志或 worker 边界。
+ - `ToolExecution`：只读流水线视图：不可变的 `{ token, callId, name, arguments, signal, agent?, parent? }`；注册表会另行保留并重新融合调用方的原始信号。`ToolDispatchExecution` 是仅供 `tools/execute` 使用的视图，其必填信号可变，因此包装层可以替换并还原它，但不能删除它。嵌套调用的 `parent` 是 `ToolExecutionToken`，而不是执行对象。
+-- `ToolRunContext`：传给工具主体的执行上下文，在 `ToolExecution` 基础上增加 `deferContext(context)`。它把一条上下文推迟到该工具的最终结果抵达循环时——通常是组合工具转运的嵌套分发上下文，也可以是叶子工具创建的全新插件来源指令（如 `tool-goal` 的收尾注入）——即使工具后来抛出或取消胜出也不例外；该方法绝不会立即注入上下文。
++- `ToolRunContext`：传给工具主体的执行上下文，在 `ToolExecution` 基础上增加 `reportProgress(delta)`、`deferContext(context)` 与 `concludeTurn()`。`reportProgress` 会按 call id 追加一条可回放的 `tool/progress` 日志事件，供 UI 展示活动进度，但不会增加模型可见消息；唯一的最终 `tool/result` 仍是权威结果。`deferContext` 会把一条上下文推迟到最终结果抵达循环时——通常是组合工具转运的嵌套分发上下文，也可以是叶子工具创建的全新插件来源指令（如 `tool-goal` 的收尾注入）——即使工具后来抛出或取消胜出也不例外；该方法绝不会立即注入上下文。
+ - `ToolExecutionResult`：带判别标记的执行局部结果。成功形态为 `{ isError:false, value:JsonValue, content, meta?, additionalContexts? }`；失败形态为 `{ isError:true, error:{ message, info? }, content, meta?, additionalContexts? }`，且不含值。调用身份保留在不可变的 `ToolExecution` 上。注册表会在呈现前快照、验证并冻结规范值，随后在最终观测前实体化持久呈现字段。`ToolFailure.info` 携带内部的 `{ name, code }`，用于表示 `HarnessError`；`additionalContexts` 会保留每个通过延迟或 post-execute 加入且带标识的 `UserMessage`，供循环在结果后按 FIFO 顺序处理。
+ - `PreToolDecision`：`{kind:'allow'}` | `{kind:'deny', reason}` | `{kind:'ask', reason?}`。该类型有意不提供输入改写；`ask` 在挂载 [`ctx.approval`](../../interaction/user-approval/README.zh.md) 时由它处理，否则退化为拒绝。
+ - `PostToolDecision`：接受决定可以替换 `content` 或 `value`（不能同时替换），并可附加 `additionalContexts`；阻止决定会把反馈变成无值失败。替换内容会保留规范值和元数据。替换值会重新验证，并重新呈现内容／元数据。接受决定会先保留工具延迟的上下文，再附加决定上下文；阻止决定会丢弃工具延迟的上下文，只公开阻止决定显式提供的上下文。
+diff --git a/packages/core/tools/src/index.ts b/packages/core/tools/src/index.ts
+index 377015f..e942440 100644
+--- a/packages/core/tools/src/index.ts
++++ b/packages/core/tools/src/index.ts
+@@ -402,6 +402,11 @@ export interface ToolDispatchExecution extends Omit<ToolExecution, 'signal'> {
+  * `tool/result`.
+  */
+ export interface ToolRunContext extends ToolExecution {
++  /**
++   * Append replayable UI progress for this call without adding a model-facing
++   * message. Empty fragments are ignored; the final result remains authoritative.
++   */
++  reportProgress(delta: string): void
+   /**
+    * Defer one context — typically a nested-dispatch context ferried by a
+    * composite tool, or a fresh plugin-sourced instruction — until this tool's
+@@ -1388,6 +1393,10 @@ export class ToolRuntime extends Service {
+       signal,
+       ...agent !== undefined ? { agent } : {},
+       ...parent !== undefined ? { parent } : {},
++      reportProgress(delta: string): void {
++        if (delta === '' || agent === undefined) return
++        agent.session.append('tool/progress', { rootCallId, callId, delta })
++      },
+       deferContext(context: UserMessage): void {
+         deferredContexts.push(context)
+       },
+diff --git a/packages/core/tools/src/types.ts b/packages/core/tools/src/types.ts
+index 4dd6f7a..152a500 100644
+--- a/packages/core/tools/src/types.ts
++++ b/packages/core/tools/src/types.ts
+@@ -22,8 +22,25 @@ export interface CodeDispatchEventData extends CodeDispatchStartEventData {
+   content: ContentBlock[]
+ }
+ 
++/** One append-only, model-invisible progress fragment emitted by a running Tool. */
++export interface ToolProgressEventData {
++  /** Root model-requested call whose conversation row owns this progress. */
++  rootCallId: CallId
++  /** Exact root or nested call producing the fragment. */
++  callId: CallId
++  /** Verbatim non-empty text appended to the call's replayable progress buffer. */
++  delta: string
++}
++
+ declare module '@deepseek-ai/dsh-session/types' {
+   interface SessionEventMap {
++    /**
++     * Replayable progress from a running Tool. This event is log-only:
++     * `deriveMessages()` ignores it, while clients concatenate `delta` by
++     * `callId` and update the already durable `tool/call` row. The final
++     * model-facing outcome remains the single paired `tool/result`.
++     */
++    'tool/progress': ToolProgressEventData
+     /**
+      * One sub-dispatch STARTING inside a `run_code` program: the parent
+      * `run_code` call id, the deterministic sub-call id (`<parent>:code:<n>`,
+diff --git a/packages/core/tools/tests/tools.spec.ts b/packages/core/tools/tests/tools.spec.ts
+index ec77059..65b3ee8 100644
+--- a/packages/core/tools/tests/tools.spec.ts
++++ b/packages/core/tools/tests/tools.spec.ts
+@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
+ import { createUserMessage, CallId, HarnessError, type ContentBlock  } from '@deepseek-ai/dsh-llm'
+ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+ import type { Agent } from '@deepseek-ai/dsh-agent'
++import { Session, SessionId } from '@deepseek-ai/dsh-session'
+ import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
+ import ToolRuntime, {
+   defineContentToolFixture, defineTool, JsonSchemaError, parameterSchemaSpecToJsonSchema, validateArgs, ToolArgsError, ToolNotFoundError,
+@@ -93,6 +94,33 @@ describe('ToolRuntime', () => {
+     expect(observed).toEqual(result)
+   })
+ 
++  it('logs replayable progress by call id without adding model-visible messages', async () => {
++    const ctx = await setup()
++    ctx.tools.register(defineContentToolFixture({
++      name: 'progressing', description: 'reports progress', parameters: {},
++      async execute(_args, exec) {
++        exec.reportProgress('first')
++        exec.reportProgress('')
++        exec.reportProgress(' second')
++        return [{ type: 'text', text: 'done' }]
++      },
++    }))
++    const session = Session.create(SessionId('tool-progress'))
++    const agent = { session } as unknown as Agent
++    await expect(ctx.tools.execute({
++      signal: testToolSignal,
++      callId: CallId('progress-1'),
++      name: 'progressing',
++      arguments: {},
++      agent,
++    })).resolves.toMatchObject({ isError: false })
++    expect(session.events).toMatchObject([
++      { type: 'tool/progress', data: { rootCallId: 'progress-1', callId: 'progress-1', delta: 'first' } },
++      { type: 'tool/progress', data: { rootCallId: 'progress-1', callId: 'progress-1', delta: ' second' } },
++    ])
++    expect(session.deriveMessages()).toEqual([])
++  })
++
+   it('projects presentation metadata from the canonical value', async () => {
+     const ctx = await setup()
+     ctx.tools.register({
+diff --git a/packages/extensions/tool-cordis/src/api-catalog.ts b/packages/extensions/tool-cordis/src/api-catalog.ts
+index 0dd8443..234cb32 100644
+--- a/packages/extensions/tool-cordis/src/api-catalog.ts
++++ b/packages/extensions/tool-cordis/src/api-catalog.ts
+@@ -4856,7 +4856,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
+   },
+   {
+     name: 'ToolRunContext',
+-    declaration: 'export interface ToolRunContext extends ToolExecution {\n    deferContext(context: UserMessage): void;\n    concludeTurn(): void;\n}',
++    declaration: 'export interface ToolRunContext extends ToolExecution {\n    reportProgress(delta: string): void;\n    deferContext(context: UserMessage): void;\n    concludeTurn(): void;\n}',
+   },
+   {
+     name: 'ToolRuntime',
+diff --git a/packages/vision/vision-bridge/README.i18n.yaml b/packages/vision/vision-bridge/README.i18n.yaml
+index 22912fc..ecb6989 100644
+--- a/packages/vision/vision-bridge/README.i18n.yaml
++++ b/packages/vision/vision-bridge/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/vision/vision-bridge/README.md
+-README.md: 48279f07b530b034de48937bcc6b167aa2bd6800
+-README.zh.md: ba2722d2daf90126dd8d938890ccf1ac295a5e1b
++README.md: 8e8e5d4ab6730e37dd97599218dc39a46cd6a71f
++README.zh.md: 229ba48f1e2ea53db218da554a4211238e02bf6d
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+index 48279f0..8e8e5d4 100644
+--- a/packages/vision/vision-bridge/README.md
++++ b/packages/vision/vision-bridge/README.md
+@@ -26,7 +26,7 @@ Enable the existing base-bundle row in a later composition patch and restate its
+ 
+ Loading the row is the enablement decision. It supplies the optional `imageInputBridge` admission capability, registers `vision_inspect`, and installs the durable reminder hook. There is no model preset or global prompt mutation.
+ 
+-The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a viewfinder-eye icon and `Vision` title instead of the generic Tool call label. Its running `ing` suffix, elapsed-time counter, and sweep motion follow the Think row, while the disclosure retains the exact durable input and output. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
++The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a compact eye icon and `Look` title instead of the generic Tool call label. The running row deliberately reads `Look ing <elapsed>` with a small visual gap between the title and activity suffix; the settled row reads `Look <duration>`. The OpenAI-compatible request uses SSE and appends each visual-model text fragment as a replayable `tool/progress` event keyed by the durable call id. As soon as the structured `summary` begins, that visual observation replaces the delegated prompt after the separator. The final structured value still lands once in the paired `tool/result`, and the disclosure retains the exact durable input and output. Progress is log-only and never enters model history, so it does not duplicate the result or change the request prefix. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
+ 
+ ## Durable history and KV cache
+ 
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+index ba2722d..229ba48 100644
+--- a/packages/vision/vision-bridge/README.zh.md
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -26,7 +26,7 @@
+ 
+ 是否加载该配置行就是功能开关。插件会提供可选的 `imageInputBridge` 准入能力、注册 `vision_inspect`，并安装持久 reminder hook；不会修改模型 preset，也不会增加全局 system prompt。
+ 
+-该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用取景框眼睛图标与 `Vision` 标题，不再显示通用 Tool call 标识；运行中的 `ing` 后缀、计时器和扫光动效与 Think 行一致，同时 disclosure 仍保留完整持久输入与输出。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
++该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用简洁的眼睛图标与 `Look` 标题，不再显示通用 Tool call 标识；运行态有意显示为 `Look ing <耗时>`，在标题与活动后缀之间保留一小段视觉间距，完成态显示 `Look <耗时>`。OpenAI 兼容请求使用 SSE，并把视觉模型的每段文本按持久 call id 追加成可回放的 `tool/progress` 事件；结构化 `summary` 一开始生成，就会在分隔点后替换委托问题，实时展示视觉观察。最终结构化值仍只通过配对的 `tool/result` 落地一次，disclosure 保留完整持久输入与输出。progress 只是日志事件，不进入模型历史，因此不会重复结果或改变请求前缀。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
+ 
+ ## 持久历史与 KV cache
+ 
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx b/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+index a052600..15ee9f3 100644
+--- a/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
++++ b/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+@@ -1,4 +1,4 @@
+-/** Viewfinder-eye glyph for the visual sub-agent Tool row. */
++/** Compact eye glyph for the visual sub-agent Tool row. */
+ export function VisionInspectIcon({ size = 14, className }: {
+   readonly size?: number
+   readonly className?: string | undefined
+@@ -12,21 +12,16 @@ export function VisionInspectIcon({ size = 14, className }: {
+       fill="none"
+       xmlns="http://www.w3.org/2000/svg"
+       aria-hidden
+-      data-icon="vision-inspect"
++      data-icon="look"
+     >
+       <path
+-        d="M4.25 1.75H2.75a1 1 0 0 0-1 1v1.5m8-2.5h1.5a1 1 0 0 1 1 1v1.5m-8 8H2.75a1 1 0 0 1-1-1v-1.5m8 2.5h1.5a1 1 0 0 0 1-1v-1.5"
++        d="M1.4 7C2.75 4.75 4.64 3.6 7 3.6S11.25 4.75 12.6 7C11.25 9.25 9.36 10.4 7 10.4S2.75 9.25 1.4 7Z"
+         stroke="currentColor"
+         strokeWidth="1.15"
+         strokeLinecap="round"
+-      />
+-      <path
+-        d="M2.8 7s1.5-2.15 4.2-2.15S11.2 7 11.2 7 9.7 9.15 7 9.15 2.8 7 2.8 7Z"
+-        stroke="currentColor"
+-        strokeWidth="1.15"
+         strokeLinejoin="round"
+       />
+-      <circle cx="7" cy="7" r="0.9" fill="currentColor" />
++      <circle cx="7" cy="7" r="1.35" fill="currentColor" />
+     </svg>
+   )
+ }
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+index 2acd97f..e4056c4 100644
+--- a/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+@@ -5,6 +5,11 @@
+   flex-direction: column;
+ }
+ 
++/* This keyed row renders the activity counter beside Look, so the generic Tool counter is redundant. */
++.root + [data-tool-activity-state] {
++  display: none;
++}
++
+ .row {
+   position: relative;
+   overflow: hidden;
+@@ -43,12 +48,21 @@
+   font-weight: 400;
+ }
+ 
+-.runningStatus {
++.activity {
++  display: inline-flex;
+   flex: none;
++  align-items: center;
++  gap: 5px;
+   margin-left: 5px;
+   color: var(--dsw-alias-label-caption);
+   font-size: 14px;
+   line-height: 24px;
++  font-variant-numeric: tabular-nums;
++  white-space: nowrap;
++}
++
++.timer {
++  min-width: 20px;
+ }
+ 
+ .separator {
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+index da89b5f..521650e 100644
+--- a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+@@ -1,7 +1,7 @@
+ /** Dedicated `vision_inspect` presentation: visual identity plus replay-stable evidence disclosure. */
+ import { useState, type ReactNode } from 'react'
+ import {
+-  DisclosureRow, IconInspectOutline12, StateDot,
++  DisclosureRow, ElapsedTime, IconInspectOutline12, StateDot,
+ } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
+ import { VisionInspectIcon } from './VisionInspectIcon.tsx'
+@@ -16,6 +16,50 @@ interface VisionModel {
+   readonly state: VisionState
+ }
+ 
++function partialJsonString(text: string, start: number): string {
++  let value = ''
++  for (let index = start; index < text.length; index++) {
++    const char = text[index]
++    if (char === undefined) break
++    if (char === '"') return value
++    if (char !== '\\') {
++      value += char
++      continue
++    }
++    const escaped = text[++index]
++    if (escaped === undefined) break
++    if (escaped === 'b') value += '\b'
++    else if (escaped === 'f') value += '\f'
++    else if (escaped === 'n') value += '\n'
++    else if (escaped === 'r') value += '\r'
++    else if (escaped === 't') value += '\t'
++    else if (escaped === 'u') {
++      const hex = text.slice(index + 1, index + 5)
++      if (!/^[0-9a-f]{4}$/i.test(hex)) break
++      value += String.fromCharCode(Number.parseInt(hex, 16))
++      index += 4
++    } else value += escaped
++  }
++  return value
++}
++
++/** Extract the leading structured summary even while its JSON string is incomplete. */
++function visualSummary(text: string): string {
++  const trimmed = text.trimStart().replace(/^```(?:json)?\s*/i, '')
++  try {
++    const parsed = JSON.parse(trimmed) as unknown
++    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
++      const summary = (parsed as Record<string, unknown>).summary
++      if (typeof summary === 'string') return firstLine(summary.trim())
++    }
++  } catch {
++    // A streaming JSON prefix is expected until the final fragment arrives.
++  }
++  const match = /"summary"\s*:\s*"/.exec(trimmed)
++  if (match !== null) return firstLine(partialJsonString(trimmed, match.index + match[0].length).trim())
++  return trimmed.startsWith('{') ? '' : firstLine(trimmed.trim())
++}
++
+ function firstLine(text: string): string {
+   const newline = text.indexOf('\n')
+   return newline === -1 ? text : text.slice(0, newline)
+@@ -45,6 +89,7 @@ function visionModel(block: ToolCallViewProps['block']): VisionModel {
+   const settled = 'kind' in block
+   const argsRaw = (settled ? block.call?.argsRaw : block.argsRaw) ?? ''
+   const output = resultText(block)
++  const progress = block.progressText === undefined ? '' : visualSummary(block.progressText)
+   const state: VisionState = !settled
+     ? 'running'
+     : block.error?.code === 'interrupted'
+@@ -53,7 +98,11 @@ function visionModel(block: ToolCallViewProps['block']): VisionModel {
+   return {
+     argsRaw,
+     output,
+-    summary: state === 'error' && output !== null ? firstLine(output) : promptSummary(argsRaw, block.callId),
++    summary: state === 'error' && output !== null
++      ? firstLine(output)
++      : state === 'ok' && output !== null
++        ? visualSummary(output) || progress || promptSummary(argsRaw, block.callId)
++        : progress || promptSummary(argsRaw, block.callId),
+     state,
+   }
+ }
+@@ -79,6 +128,8 @@ function accessibleState(state: VisionState): string | null {
+ export function VisionInspectRow({ block, activityState, inspect }: ToolCallViewProps) {
+   const model = visionModel(block)
+   const [expanded, setExpanded] = useState(false)
++  const startedTime = 'kind' in block ? block.callTime : block.time
++  const finishedTime = 'kind' in block ? block.time : undefined
+   const presentingRunning = activityState === undefined
+     ? model.state === 'running'
+     : activityState === 'running'
+@@ -86,7 +137,12 @@ export function VisionInspectRow({ block, activityState, inspect }: ToolCallView
+   const open = expanded && expandable
+   const status = accessibleState(model.state)
+   return (
+-    <div className={css.root} data-tool="vision_inspect" data-state={model.state}>
++    <div
++      className={css.root}
++      data-tool="vision_inspect"
++      data-state={model.state}
++      data-tool-activity-placement="inline"
++    >
+       {status !== null && <span className={css.visuallyHidden}>{status}</span>}
+       <DisclosureRow
+         rowClassName={css.row}
+@@ -94,9 +150,18 @@ export function VisionInspectRow({ block, activityState, inspect }: ToolCallView
+         titleClassName={css.title}
+         chevronClassName={css.chevron}
+         icon={leadingFor(model.state)}
+-        title="Vision"
+-        titleSuffix={presentingRunning ? (
+-          <span className={css.runningStatus} data-tool-running-status aria-hidden>ing</span>
++        title="Look"
++        titleSuffix={presentingRunning || startedTime !== null ? (
++          <span className={css.activity} data-look-activity>
++            {presentingRunning && <span data-look-status aria-hidden>ing</span>}
++            {startedTime !== null && (
++              <ElapsedTime
++                className={css.timer}
++                startedTime={startedTime}
++                finishedTime={finishedTime}
++              />
++            )}
++          </span>
+         ) : undefined}
+         open={open}
+         expandable={expandable}
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+index 8251f58..ce35ba5 100644
+--- a/packages/vision/vision-bridge/src/index.ts
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -191,6 +191,96 @@ function responseText(payload: unknown): string | undefined {
+   return parts.length === 0 ? undefined : parts.join('')
+ }
+ 
++/** Extract one OpenAI-compatible streamed assistant text fragment. */
++function responseDeltaText(payload: unknown): string | undefined {
++  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return undefined
++  const choices = (payload as { choices?: unknown }).choices
++  if (!Array.isArray(choices) || choices.length === 0) return undefined
++  const first = (choices as unknown[])[0]
++  if (typeof first !== 'object' || first === null || Array.isArray(first)) return undefined
++  const delta = (first as { delta?: unknown }).delta
++  if (typeof delta !== 'object' || delta === null || Array.isArray(delta)) return undefined
++  const content = (delta as { content?: unknown }).content
++  if (typeof content === 'string') return content
++  if (!Array.isArray(content)) return undefined
++  const parts = content.flatMap((part) => {
++    if (typeof part !== 'object' || part === null || Array.isArray(part)) return []
++    const record = part as { type?: unknown; text?: unknown }
++    return record.type === 'text' && typeof record.text === 'string' ? [record.text] : []
++  })
++  return parts.length === 0 ? undefined : parts.join('')
++}
++
++/** Return the earliest complete SSE record and retain the unconsumed suffix. */
++function takeSseRecord(buffer: string): { record: string; rest: string } | undefined {
++  const boundaries = ['\r\n\r\n', '\n\n', '\r\r']
++    .map(marker => ({ marker, index: buffer.indexOf(marker) }))
++    .filter(candidate => candidate.index >= 0)
++    .sort((left, right) => left.index - right.index)
++  const boundary = boundaries[0]
++  if (boundary === undefined) return undefined
++  return {
++    record: buffer.slice(0, boundary.index),
++    rest: buffer.slice(boundary.index + boundary.marker.length),
++  }
++}
++
++/** Parse and publish one SSE record, returning its assistant text fragment. */
++function readSseRecord(record: string): string {
++  const data = record.split(/\r\n|\r|\n/)
++    .filter(line => line.startsWith('data:'))
++    .map(line => line.slice(5).replace(/^ /, ''))
++    .join('\n')
++  if (data === '' || data === '[DONE]') return ''
++  let payload: unknown
++  try {
++    payload = JSON.parse(data)
++  } catch (error: unknown) {
++    throw new Error('vision service returned invalid streaming JSON', { cause: error })
++  }
++  return responseDeltaText(payload) ?? ''
++}
++
++/** Consume either an SSE stream or a compatibility non-streaming JSON response. */
++async function readResponseText(response: Response, onDelta: (delta: string) => void): Promise<string> {
++  if (!response.headers.get('content-type')?.toLowerCase().includes('text/event-stream')) {
++    let payload: unknown
++    try {
++      payload = await response.json()
++    } catch (error: unknown) {
++      throw new Error('vision service returned invalid JSON', { cause: error })
++    }
++    const text = responseText(payload)
++    if (text === undefined) throw new Error('vision service response did not contain assistant text')
++    return text
++  }
++  if (response.body === null) throw new Error('vision service response did not contain assistant text')
++  const reader = response.body.getReader()
++  const decoder = new TextDecoder()
++  let buffer = ''
++  let text = ''
++  const accept = (record: string) => {
++    const delta = readSseRecord(record)
++    if (delta === '') return
++    text += delta
++    onDelta(delta)
++  }
++  while (true) {
++    const chunk = await reader.read()
++    buffer += decoder.decode(chunk.value, { stream: !chunk.done })
++    let next = takeSseRecord(buffer)
++    while (next !== undefined) {
++      accept(next.record)
++      buffer = next.rest
++      next = takeSseRecord(buffer)
++    }
++    if (chunk.done) break
++  }
++  if (buffer.trim() !== '') accept(buffer)
++  if (text === '') throw new Error('vision service response did not contain assistant text')
++  return text
++}
++
+ /** Remove one optional Markdown fence before strict JSON parsing. */
+ function unfence(text: string): string {
+   const trimmed = text.trim()
+@@ -302,6 +392,7 @@ async function inspect(
+       },
+       body: JSON.stringify({
+         model: options.model,
++        stream: true,
+         temperature: 0,
+         max_tokens: options.maxOutputTokens,
+         // vLLM's Qwen chat template accepts this OpenAI-compatible extension;
+@@ -332,14 +423,9 @@ async function inspect(
+     throw new Error('vision service request failed', { cause: error })
+   }
+   if (!response.ok) throw new Error(`vision service request failed with HTTP ${String(response.status)}`)
+-  let payload: unknown
+-  try {
+-    payload = await response.json()
+-  } catch (error: unknown) {
+-    throw new Error('vision service returned invalid JSON', { cause: error })
+-  }
+-  const text = responseText(payload)
+-  if (text === undefined) throw new Error('vision service response did not contain assistant text')
++  const text = await readResponseText(response, (delta) => {
++    exec.reportProgress(delta)
++  })
+   return parseVisionResult(text, attachmentIds)
+ }
+ 
+diff --git a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+index 6c16797..1561905 100644
+--- a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
++++ b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+@@ -199,6 +199,7 @@ describe('vision_inspect', () => {
+         messages: Array<{ content: unknown }>
+       }
+       expect(body.model).toBe('qwen-vision')
++      expect((parsed as { stream?: unknown }).stream).toBe(true)
+       expect(body.chat_template_kwargs).toEqual({ enable_thinking: false })
+       expect(JSON.stringify(body.messages[1]?.content)).toContain('data:image/png;base64,AQ==')
+       expect((init?.headers as Record<string, string>).authorization).toBe('Bearer secret')
+@@ -232,6 +233,46 @@ describe('vision_inspect', () => {
+     expect(fetchImpl).toHaveBeenCalledOnce()
+   })
+ 
++  it('streams SSE deltas into replayable Tool progress and returns one structured result', async () => {
++    const pieces = [
++      '{"sum',
++      'mary":"顶部节点是请求进入",',
++      '"observations":[],"limitations":[]}',
++    ]
++    const wire = pieces.map(content => `data: ${JSON.stringify({
++      choices: [{ delta: { content } }],
++    })}\r\n\r\n`).join('') + 'data: [DONE]\r\n\r\n'
++    const encoded = new TextEncoder().encode(wire)
++    const cuts = [7, 41, 93, encoded.length]
++    const stream = new ReadableStream<Uint8Array>({
++      start(controller) {
++        let start = 0
++        for (const end of cuts) {
++          controller.enqueue(encoded.slice(start, end))
++          start = end
++        }
++        controller.close()
++      },
++    })
++    const reportProgress = vi.fn<(delta: string) => void>()
++    const exec = {
++      signal: new AbortController().signal,
++      agent: { session: { events: [eventWithImage()] } },
++      reportProgress,
++    } as never
++    const tool = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn().mockResolvedValue(new Response(stream, {
++      status: 200,
++      headers: { 'content-type': 'text/event-stream; charset=utf-8' },
++    })))
++    await expect(tool.execute({ attachmentIds: [ID], prompt: '读取顶部节点' }, exec)).resolves.toEqual({
++      attachmentIds: [ID],
++      summary: '顶部节点是请求进入',
++      observations: [],
++      limitations: [],
++    })
++    expect(reportProgress.mock.calls.map(call => call[0])).toEqual(pieces)
++  })
++
+   it('falls back safely when the visual model returns unstructured text', () => {
+     expect(VisionBridge.parseVisionResult('plain observation', [ID])).toEqual({
+       attachmentIds: [ID],
+diff --git a/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+index 640bc3c..61aa2f0 100644
+--- a/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
++++ b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+@@ -7,7 +7,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+ import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
+-import { ToolActivityChrome } from '@deepseek-ai/dsh-client-ui-tool/src/client/tool/components/ToolActivityChrome.tsx'
+ import { apply, inject } from '../src/client/index.ts'
+ import { VisionInspectRow } from '../src/client/VisionInspectRow.tsx'
+ 
+@@ -50,41 +49,53 @@ function props(block: RowProps['block'], activityState?: RowProps['activityState
+ }
+ 
+ describe('VisionInspectRow', () => {
+-  it('replaces generic Tool call copy with the viewfinder-eye Vision identity', () => {
++  it('replaces generic Tool call copy with the compact eye and Look identity', () => {
++    vi.useFakeTimers()
++    vi.setSystemTime(9_300)
+     const view = render(<VisionInspectRow {...props(running())} />)
+-    expect(view.container.textContent).toContain('Visioning')
++    expect(view.container.textContent).toContain('Looking1s')
+     expect(view.container.textContent).toContain('Read the flowchart labels')
+     expect(view.container.textContent).not.toContain('Tool call')
+-    const icon = view.container.querySelector('[data-icon="vision-inspect"]')
++    const icon = view.container.querySelector('[data-icon="look"]')
+     expect(icon?.getAttribute('viewBox')).toBe('0 0 14 14')
+     expect(icon?.querySelector('circle')).not.toBeNull()
++    expect(view.container.querySelector('[data-tool-activity-placement="inline"]')).not.toBeNull()
++  })
++
++  it('places the same ElapsedTime countdown used by Think immediately after Looking', () => {
++    vi.useFakeTimers()
++    vi.setSystemTime(9_300)
++    const view = render(<VisionInspectRow {...props(running(), 'running')} />)
++    expect(view.container.textContent).toContain('Looking1s')
++    expect(view.container.querySelector('[data-look-activity] [data-elapsed-time]')).not.toBeNull()
++    expect(view.container.querySelector('[data-tool-timer]')).toBeNull()
+   })
+ 
+-  it('composes the same ElapsedTime countdown used by Think', () => {
++  it('streams the visual summary after Look ing and preserves the intentional title gap', () => {
+     vi.useFakeTimers()
+     vi.setSystemTime(9_300)
+-    const view = render(
+-      <div>
+-        <VisionInspectRow {...props(running(), 'running')} />
+-        <ToolActivityChrome startedTime={8_000} state="running" />
+-      </div>,
+-    )
+-    expect(view.container.textContent).toContain('Visioning')
+-    expect(view.container.textContent).toContain('1s')
+-    expect(view.container.querySelector('[data-tool-timer]')).not.toBeNull()
++    const block = {
++      ...running(),
++      progressText: '{"summary":"顶部节点是请求进',
++    }
++    const view = render(<VisionInspectRow {...props(block, 'running')} />)
++    expect(view.container.textContent).toContain('Looking1s')
++    expect(view.container.textContent).toContain('顶部节点是请求进')
++    expect(view.container.textContent).not.toContain('Read the flowchart labels')
++    expect(view.container.querySelector('[data-look-activity]')).not.toBeNull()
+   })
+ 
+   it('discloses exact durable input/output and preserves Inspect', () => {
+     const inspect = vi.fn()
+     render(<VisionInspectRow {...props(settled())} inspect={inspect} />)
+-    const row = screen.getByRole('button', { name: /VisionRead the flowchart labels/ })
++    const row = screen.getByRole('button', { name: /Look2sThe node says request enters/ })
+     expect(row.getAttribute('aria-expanded')).toBe('false')
+     fireEvent.click(row)
+     expect(row.getAttribute('aria-expanded')).toBe('true')
+     expect(screen.getByText('IN')).toBeTruthy()
+     expect(screen.getByText('OUT')).toBeTruthy()
+     expect(screen.getByText(/sha256:a/)).toBeTruthy()
+-    expect(screen.getByText(/request enters/)).toBeTruthy()
++    expect(screen.getAllByText(/request enters/)).toHaveLength(2)
+     fireEvent.click(screen.getByRole('button', { name: 'Inspect' }))
+     expect(inspect).toHaveBeenCalledTimes(1)
+   })
+@@ -112,8 +123,9 @@ describe('VisionInspectRow', () => {
+     const partial = render(<VisionInspectRow {...props(running('{"prompt":"Inspect\n'))} />)
+     expect(partial.container.textContent).toContain('{"prompt":"Inspect')
+     cleanup()
+-    const missing = render(<VisionInspectRow {...props(settled({ call: null, content: [] }))} />)
++    const missing = render(<VisionInspectRow {...props(settled({ call: null, callTime: null, content: [] }))} />)
+     expect(missing.container.textContent).toContain('call-vision')
++    expect(missing.container.querySelector('[data-look-activity]')).toBeNull()
+     cleanup()
+     const emptyPrompt = render(<VisionInspectRow {...props(running('{"prompt":""}'))} />)
+     expect(emptyPrompt.container.textContent).toContain('{"prompt":""}')
+-- 
+2.51.2.windows.1
+

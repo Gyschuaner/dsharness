@@ -1,6 +1,6 @@
 # 本地 DSH 开发链路说明
 
-> 适用：在本机开发 DSH Web GUI 的**插件**（如 skill-manager、image-context-guard）。
+> 适用：在本机开发 DSH Web GUI 的**插件**（如 skill-manager）。
 > 目标：让"仓库内开发"与"运行时加载"是同一份文件，保留 Git 历史，不破坏正在运行的 Web GUI。
 
 ## 1. 运行时的加载链
@@ -66,10 +66,17 @@ git push
 
 DSH-003 已把上游源码接入方式改为可复现构建：
 
-- `upstream.lock.json` 锁定官方 `master` 提交 `99f6f02`、DSH `0.1.0-rc.7`、
+- `upstream.lock.json` 锁定官方 `dsh-v0.1.1-rc.2` 提交 `b150a55`、DSH `0.1.1-rc.2`、
   Node `24.11.1`、pnpm `11.7.0`、本地补丁哈希和最终源码 tree；
 - `upstream-patches/` 保存需要叠加到官方源码的本地改动，当前包含 DSH-009
-  流式活动保活与截断工具调用保护；
+  流式活动保活、DSH-012 Qwen 原生 preset、BUG-B0EE8D2D 无效 Think 工具调用的
+  持久历史恢复与重试流 JSDoc、DSH-011 Compact 32K 摘要预算，以及 DSH-014
+  工具调用即时进度反馈、BUG-449804CF 工具耗时与行内状态布局修复，以及
+  BUG-5F3BF25D 快速工具运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015
+  Code 子工具计划提前展示、DSH-016 Think 独立计时和工具活动状态布局，以及
+  DSH-018 输出 token 上限自动持续续跑、DSH-019 的 0.1.1 兼容调整、
+  BUG-C393119A 静态门禁修复，以及默认关闭的 DSH-005 视觉桥、发布门禁和
+  `vision_inspect` 专属工具图标与 Think 同款计时；
 - `dev/install-dsh-source.ps1` 在空目录拉取源码、应用补丁、执行 frozen install、
   完整构建并注册 `dsh`；
 - `dev/verify-dsh-source.ps1` 独立校验工具链、源码 tree、补丁、CLI 版本和 Web
@@ -79,11 +86,13 @@ DSH-003 已把上游源码接入方式改为可复现构建：
 完整方法见 [`reproducible-build.md`](reproducible-build.md)。本仓库插件继续通过
 junction 接入运行时；是否安装和启用某个插件属于每台电脑的新运行配置。
 
-## 6. 图片上下文短期保护
+## 6. 原生图片策略
 
-`plugins/image-context-guard` 对应 DP `DSH-004` / `BUG-3E5CFD04`。它通过 `llm/stream` host 插件在模型适配器调用前生成安全副本，按“最新消息优先、消息内保持原顺序”保留最多 9 张图片。持久化会话、附件引用和前端历史不被改写。
-
-该插件是本地短期保护，不替代 DP `DSH-005` 中的长期方案（附件存储、视觉摘要、工具截图消费后退出上下文、按附件 ID 重注入）。接入步骤和 profile 配置见 `plugins/image-context-guard/README.md`。
+DSH-022 已取消 DSH-004 的 9 图临时裁剪，`plugins/image-context-guard` 不再安装或加载。
+图片由 0.1.1 原生附件服务准入和持久化：单条消息默认最多 20 张、单图 20 MiB、合计
+200 MiB。纯文本主模型启用视觉桥时，`vision_inspect` 同样默认最多读取当前会话内
+20 张唯一图片；未知或跨会话引用仍在读取字节前整批拒绝。完整迁移和回退边界见
+[`DSH-022-native-image-policy.md`](DSH-022-native-image-policy.md)。
 
 ## 7. 相关路径速查
 

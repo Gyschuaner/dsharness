@@ -1,0 +1,95 @@
+{
+  "requirement": "DSH-020",
+  "bug": "BUG-46C2A7B5",
+  "url": "http://127.0.0.1:3080/",
+  "capturedAt": "2026-08-22T14:30:45+08:00",
+  "handoffSampling": {
+    "intervalMs": 100,
+    "baselineVisionRowCount": 3,
+    "firstNewRowAtMs": 1200,
+    "samples": 246,
+    "minimumRowCountAfterFirstAppearance": 4,
+    "rowCountReturnedToBaseline": false,
+    "completedState": "ok",
+    "completedText": "Look 49s · 流程图最顶部节点的文字识别"
+  },
+  "reloadPersistence": {
+    "rowCountBeforeReload": 5,
+    "rowCountAfterReload": 5,
+    "stateAfterReload": "ok",
+    "textIdenticalAfterReload": true,
+    "completedText": "Look 1:27 · 该流程图描述了处理包含或不包含新图片的请求时的分支逻辑，涉及原生多模态支持、vision bridge 注册、历史图细节处理、调用 Qwen 等步骤，最终走向取决于各判断结果。"
+  },
+  "contextContract": {
+    "progressEvent": "tool/progress",
+    "progressIsModelFacing": false,
+    "finalModelFacingEvents": [
+      "tool/call",
+      "tool/result"
+    ],
+    "verifiedBy": [
+      "packages/core/tools/tests/tools.spec.ts",
+      "packages/client/ui-conversation/tests/conversation-node-definitions.client.spec.ts"
+    ]
+  },
+  "bug374ECAE5": {
+    "capturedAt": "2026-08-22T16:07:00+08:00",
+    "singleSweep": {
+      "count": 1,
+      "animationName": "dsh-tool-row-sweep",
+      "pluginOwnedSweepPresent": false
+    },
+    "tailFollowing": {
+      "viewportWidthPx": 589,
+      "samples": [
+        { "textSuffix": "这是一张名为", "scrollLeft": 0 },
+        { "textSuffix": "中间为会话列表", "scrollLeft": 218 },
+        { "textSuffix": "AI 正在执行视觉", "scrollLeft": 539 }
+      ],
+      "completedScrollLeft": 0,
+      "followMarkerAfterCompletion": false
+    },
+    "reloadPersistence": {
+      "visionRowCount": 8,
+      "latestState": "ok",
+      "latestTextRetained": true,
+      "newBrowserErrors": 0
+    }
+  },
+  "bug40D0E1BE": {
+    "capturedAt": "2026-08-22T16:33:34+08:00",
+    "streamProjection": {
+      "baselineVisionRowCount": 9,
+      "runningState": "running",
+      "runningElapsed": "47s",
+      "runningObservation": "第一张图片中间面板当前选中项为“这是 DSH-005 生产验收。...”",
+      "finalState": "ok",
+      "finalElapsed": "1:05",
+      "finalObservationCount": 9,
+      "settledToSummary": true
+    },
+    "duplicateActivity": {
+      "inlineElapsed": "1:05",
+      "outerActivityText": "1:10Done",
+      "outerComputedDisplay": "none",
+      "visibleOuterTimerCount": 0
+    },
+    "reloadPersistence": {
+      "visionRowCount": 10,
+      "latestState": "ok",
+      "summaryRetained": true,
+      "outerComputedDisplay": "none"
+    }
+  },
+  "reproducibleBuild": {
+    "officialBase": "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+    "patchCount": 21,
+    "sourceTree": "20b75d22dce990c0db43de5ea9ea03b7132e2e6e",
+    "frozenInstall": "passed",
+    "hostBuild": "passed",
+    "clientBuild": "passed",
+    "webBuild": "passed",
+    "registered": false,
+    "webStarted": false
+  }
+}

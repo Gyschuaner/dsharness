@@ -1,5 +1,15 @@
 # DSH-008 SKILL 管理中心 V1 — 设计符合性与浏览器验收（design-qa）
 
+## 2026-08-18 Review 阻断项复验补充
+
+- 分支：`fix/DSH-008-v1-review-blockers`（基线 `501ea34`）。
+- 自动化：Skill Manager **51/51**（Host 48 + 真实 Client bundle DOM 3）；image-context-guard 相邻回归 **8/8**；语法、`git diff --check`、插件 `npm pack --dry-run` 均通过。
+- 运行时：`~/.dsh/plugins/skill-manager` 临时指向该修复 worktree，使用源码构建版 DSH `0.1.0-rc.7` 重启 3080；`POST /api/skill-manager` 返回 apiVersion 6。
+- 内置浏览器：确认扩展入口和 Cordis Slot 实际挂载；项目管理 / 统一资源库双页、完整 description、`cordis-plugin-development`、`editing-cordis-compositions`、来源详情及 V1.2 特化占位均正常；只有重启瞬间的连接重试 warning，无新增页面 error。
+- 本轮实机只读验收未修改用户项目状态；启停、来源、标签、预设、失败回滚和跨项目乱序响应由新增自动化覆盖。
+
+以下内容是首轮 V1 验收记录，保留用于历史追溯。
+
 - 需求：DSH-008（DP 需求 `a98307cd-1b56-4a7d-92af-8930b80e04d1`）
 - 设计基线：`docs/DSH-008-v1-design.md`、`docs/DSH-008-skill-center-handoff.md`
 - 验收环境：`http://127.0.0.1:3081`（dsh web，源码树启动，apiVersion 6，68 个 Skill 身份），系统 Chrome headless，视口 1680×960
@@ -49,12 +59,12 @@
 - 行结构：勾选框、图标、名称、「未启用」「来源 ×N」「项目特化」「可更新」徽标、单行描述、右侧开关（截图 01；徽标逻辑见代码 `rowEl`）。
 - 详情抽屉：启用开关 + 手动调用说明、描述、当前来源、可选来源（默认项标注「当前解析为」）、标签（全局跨项目共享）、更新状态（V1 不检测远端更新）、为此项目特化（V1.2 说明 + 禁用按钮）、高级折叠（截图 06）。
 - 统一资源库：范围说明条 + 所选项目 chip、同名合并行、优先级说明 footer（截图 03、12）。
-- 项目状态 footer：「项目配置保存于 …/.dsh/skill-manager.json，可纳入 Git 版本管理；启停在下一轮对话生效」（截图 01）。
+- 项目状态 footer 当前口径：「项目配置保存于 …/.dsh/skill-manager.json，仅在本机使用且不提交 Git；启停在下一轮对话生效」。截图 01 为 `BUG-548E4FF4` 前的旧文案证据。
 
 ## 5. 磁盘副作用核验（验收结束后）
 
-- `.dsh/skill-manager.json`：`enabled=[]`、`sources={}`、`appliedPreset=null`（验收动作全部还原，回到新项目初始态）。
-- `.dsh/skills/`：41 个 marker stub（443–521 字节，frontmatter 含 `[skill-manager] 本项目禁用开关` 标记与 `disable-model-invocation: true`），逐文件校验 41/41 合规；**无**完整 Skill 副本、无 managed copy。
+- `.dsh/skill-manager.json`：本机私有配置，由 `.gitignore` 忽略；原始验收结束时为 `enabled=[]`、`sources={}`、`appliedPreset=null`。
+- `.dsh/skills/`：原始验收生成的 41 个 marker stub 已从 Git 移除；当前使用 `__smgr-shadow-<name>.md` 保留前缀并由 `.gitignore` 精确忽略，真实项目 Skill 仍可跟踪。
 - 来源选择（dpc: global-claude → global-codex → 默认）全程为纯选择路径，未产生任何受管副本。
 - lark-* 来源目录（`C:\Users\chuansgu\.agents\skills` 等）未被触碰。
 

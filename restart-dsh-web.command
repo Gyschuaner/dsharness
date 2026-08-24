@@ -102,10 +102,25 @@ listener_pids() {
 	lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true
 }
 
+is_dsh_web_pid() {
+	local pid="$1"
+	local command_line
+	command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+	case " $command_line " in
+		*"/apps/cli/lib/bin.js web "*|*" dsh web "*|*"/dsh web "*|*" @deepseek-ai/dsh"*" web "*) return 0 ;;
+		*) printf '%s' "$command_line"; return 1 ;;
+	esac
+}
+
 PIDS="$(listener_pids)"
 if [ -z "$PIDS" ]; then
 	step "端口 $PORT 没有现有 dsh web 进程，直接启动"
 else
+	for pid in $PIDS; do
+		if ! command_line="$(is_dsh_web_pid "$pid")"; then
+			fail "端口 $PORT 由非 dsh web 进程 PID $pid 占用，拒绝停止：${command_line:-<无法读取命令行>}"
+		fi
+	done
 	step "停止端口 $PORT 的监听进程：$(printf '%s' "$PIDS" | tr '\n' ' ')"
 	for pid in $PIDS; do
 		if kill "$pid" 2>/dev/null; then

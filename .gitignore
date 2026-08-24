@@ -1,5 +1,17 @@
 node_modules/
 *.log
 *.tar.gz
+__pycache__/
+*.pyc
+/.tmp/
 # junction 备份目录（位于 ~/.dsh/plugins，非仓库内；此行为防御性忽略）
 *.bak-*/
+
+# Skill Manager machine-local state and runtime artifacts (BUG-548E4FF4).
+# Keep real project Skills under .dsh/skills trackable.
+/.dsh/skill-manager.json
+/.dsh/skills/__smgr-shadow-*.md
+/.dsh/skills/.*
+
+# TypeScript incremental build metadata is local and non-runtime.
+plugins/*/lib/tsconfig.tsbuildinfo

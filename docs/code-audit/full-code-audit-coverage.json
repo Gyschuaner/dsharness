@@ -1,0 +1,1498 @@
+{
+  "schema_version": 1,
+  "repository": "D:\\Pythonproject\\dsharness-dsh-029",
+  "base_commit": "66fc05414723b3f4b6c9e8ff25314411d8b2b31c",
+  "branch": "fix/full-code-audit-20260824-DSH-029",
+  "created_at_utc": "2026-08-23T19:27:38.8519466Z",
+  "updated_at_utc": "2026-08-23T19:51:18.9018287Z",
+  "items": [
+    {
+      "path": ".agents/skills/cordis-plugin-development/SKILL.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7028612Z"
+    },
+    {
+      "path": ".agents/skills/editing-cordis-compositions/SKILL.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7058028Z"
+    },
+    {
+      "path": ".gitattributes",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1571951Z"
+    },
+    {
+      "path": ".gitignore",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1572854Z"
+    },
+    {
+      "path": ".node-version",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1572911Z"
+    },
+    {
+      "path": "AGENTS.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7060697Z"
+    },
+    {
+      "path": "README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7061119Z"
+    },
+    {
+      "path": "artifacts/design-qa/mcp-connecting-build1/comparison.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7061566Z"
+    },
+    {
+      "path": "artifacts/design-qa/mcp-connecting-build1/implementation-full.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7061953Z"
+    },
+    {
+      "path": "artifacts/design-qa/mcp-connecting-build1/implementation-loading.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.706232Z"
+    },
+    {
+      "path": "artifacts/design-qa/mcp-connecting-build1/reference-skill-finding-full.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7062745Z"
+    },
+    {
+      "path": "artifacts/design-qa/mcp-connecting-build1/reference-skill-finding.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.706349Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-finding-build24/comparison.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7063951Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-finding-build24/implementation-full.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7064361Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-finding-build24/reference.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7064761Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-manager-build18/01-overlay-drawer.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7065146Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-manager-build18/02-collapsed-nav.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7066511Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-manager-build19/01-list-denoised.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7066957Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-manager-build19/02-drawer-denoised.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7067329Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-manager-build19/03-nav-collapsed.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7067701Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-manager-build19/04-reference-vs-implementation.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7068096Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-preset-apply-build15.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7068455Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-preset-save-build15.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7068812Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-tag-editor-before-build16.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7069156Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-tag-editor-empty-build16.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7069654Z"
+    },
+    {
+      "path": "artifacts/design-qa/skill-tag-editor-typed-build16.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.70705Z"
+    },
+    {
+      "path": "design-qa.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7071164Z"
+    },
+    {
+      "path": "dev/install-dsh-source.ps1",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573553Z"
+    },
+    {
+      "path": "dev/provision-dp-vision-key.py",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573566Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/.gitignore",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573579Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7072795Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/benchmark_ttft_tps.py",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573628Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/ensure-server-ik-numa.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573642Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/ensure-server.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573658Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/install-autostart-ik-numa.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573674Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/install-autostart.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573689Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/launch-server-ik-numa.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573705Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/launch-server.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573723Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/public-relay-image-results.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573748Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/stage-model.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573767Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/start-server-ik-numa.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573784Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/start-server.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573805Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/status-server.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573823Z"
+    },
+    {
+      "path": "dev/qwen36-vision-ram/stop-server.sh",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573844Z"
+    },
+    {
+      "path": "dev/setup-plugin-junction.ps1",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573868Z"
+    },
+    {
+      "path": "dev/verify-dsh-source.ps1",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573886Z"
+    },
+    {
+      "path": "dev/vision-bridge.dp-gateway.patch.yml",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1573908Z"
+    },
+    {
+      "path": "docs/DSH-005-vision-bridge.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7080688Z"
+    },
+    {
+      "path": "docs/DSH-006-extension-shell.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7081443Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/01-project-page.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7082094Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/02-project-menu.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7082489Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/03-library-page.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7083321Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/04-preset-apply-modal.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7083896Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/05-arxiv-enabled.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7084259Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/06-drawer-arxiv.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7084771Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/06b-after-esc.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7085354Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/07-drawer-dpc-sources.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7085744Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/08-dpc-source-codex.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7086283Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/09-bulk-rows.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.708703Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/10-slim-preview.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7087867Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/11-slim-applied.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7088708Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/12-library-drawer.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7089314Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/13-final-project.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7089697Z"
+    },
+    {
+      "path": "docs/DSH-008-acceptance/evidence.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1574373Z"
+    },
+    {
+      "path": "docs/DSH-008-code-review-for-qwen.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7091037Z"
+    },
+    {
+      "path": "docs/DSH-008-skill-center-handoff.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7091683Z"
+    },
+    {
+      "path": "docs/DSH-008-v1-design.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.709247Z"
+    },
+    {
+      "path": "docs/DSH-021-vision-ram-tps.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7093038Z"
+    },
+    {
+      "path": "docs/DSH-022-native-image-policy.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7093405Z"
+    },
+    {
+      "path": "docs/DSH-023-vision-path-input.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7093939Z"
+    },
+    {
+      "path": "docs/DSH-026-mcp-manager.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7094513Z"
+    },
+    {
+      "path": "docs/DSH-027-plugin-manager.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7094873Z"
+    },
+    {
+      "path": "docs/code-audit/2026-08-24-full-code-audit.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7095224Z"
+    },
+    {
+      "path": "docs/code-audit/full-code-audit-coverage.json",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0868384Z"
+    },
+    {
+      "path": "docs/design-qa.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7096106Z"
+    },
+    {
+      "path": "docs/dev-setup.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7096664Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/01-new-session.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7097046Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/02-image-attached.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7097428Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/03-image-reminder.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7098132Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/04-vision-tool-call.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7098739Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/05-vision-result-and-answer.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7099394Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/06-final-visual-answer.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7101022Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/07-history-image-recall.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7101585Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/08-vision-dedicated-running.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7102025Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/09-vision-dedicated-settled.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7102467Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/10-cross-session-isolation.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7103074Z"
+    },
+    {
+      "path": "docs/evidence/DSH-005-2026-08-22/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.71039Z"
+    },
+    {
+      "path": "docs/evidence/DSH-020-2026-08-22/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7104615Z"
+    },
+    {
+      "path": "docs/evidence/DSH-020-2026-08-22/verification.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1575079Z"
+    },
+    {
+      "path": "docs/evidence/DSH-020-2026-08-22/vision-after-reload.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.710592Z"
+    },
+    {
+      "path": "docs/evidence/DSH-020-2026-08-22/vision-completed.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7106324Z"
+    },
+    {
+      "path": "docs/evidence/DSH-020-2026-08-22/vision-streaming.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.71067Z"
+    },
+    {
+      "path": "docs/evidence/DSH-021-2026-08-22/benchmark-summary.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1575187Z"
+    },
+    {
+      "path": "docs/evidence/DSH-022-2026-08-22/3080-production.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7107917Z"
+    },
+    {
+      "path": "docs/evidence/DSH-023-3080-production.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7108562Z"
+    },
+    {
+      "path": "docs/evidence/DSH-023-3082-look-persisted.png",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7108981Z"
+    },
+    {
+      "path": "docs/evidence/DSH-029-2026-08-24/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:51:18.9018287Z"
+    },
+    {
+      "path": "docs/installed-plugins.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7109339Z"
+    },
+    {
+      "path": "docs/reproducible-build.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7109739Z"
+    },
+    {
+      "path": "docs/upstream-dev-loop.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7110173Z"
+    },
+    {
+      "path": "package.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1575383Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7110912Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/client.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0892491Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/client.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7114638Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/client.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0892644Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/client.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7115808Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/index.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0892747Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/index.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7116533Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/index.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0892848Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/lib/index.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7117118Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/package.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1575684Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/src/client.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1575704Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/src/index.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1575725Z"
+    },
+    {
+      "path": "plugins/better-sidebar-smooth/tsconfig.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1575751Z"
+    },
+    {
+      "path": "plugins/extension-manager/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7119734Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/client.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.089305Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/client.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7120396Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/client.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.08931Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/client.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7121015Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/index.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893148Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/index.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7121589Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/index.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893196Z"
+    },
+    {
+      "path": "plugins/extension-manager/lib/index.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7122158Z"
+    },
+    {
+      "path": "plugins/extension-manager/package.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576055Z"
+    },
+    {
+      "path": "plugins/extension-manager/src/client.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576076Z"
+    },
+    {
+      "path": "plugins/extension-manager/src/index.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576101Z"
+    },
+    {
+      "path": "plugins/extension-manager/tsconfig.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576126Z"
+    },
+    {
+      "path": "plugins/image-context-guard/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7124108Z"
+    },
+    {
+      "path": "plugins/image-context-guard/lib/index.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893367Z"
+    },
+    {
+      "path": "plugins/image-context-guard/lib/index.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7124763Z"
+    },
+    {
+      "path": "plugins/image-context-guard/lib/index.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893417Z"
+    },
+    {
+      "path": "plugins/image-context-guard/lib/index.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7125334Z"
+    },
+    {
+      "path": "plugins/image-context-guard/package.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576316Z"
+    },
+    {
+      "path": "plugins/image-context-guard/src/index.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576343Z"
+    },
+    {
+      "path": "plugins/image-context-guard/test/image-context-guard.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576368Z"
+    },
+    {
+      "path": "plugins/image-context-guard/tsconfig.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576400Z"
+    },
+    {
+      "path": "plugins/mcp-manager/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7126821Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/client.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893592Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/client.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7127358Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/client.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.089367Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/client.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7127966Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/index.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.089372Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/index.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7128479Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/index.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893772Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/index.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7129555Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/marketplace.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893828Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/marketplace.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7130148Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/marketplace.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0893969Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/marketplace.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7131366Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/state.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894035Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/state.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7131974Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/state.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894088Z"
+    },
+    {
+      "path": "plugins/mcp-manager/lib/state.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7132485Z"
+    },
+    {
+      "path": "plugins/mcp-manager/package.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576966Z"
+    },
+    {
+      "path": "plugins/mcp-manager/src/client.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1576995Z"
+    },
+    {
+      "path": "plugins/mcp-manager/src/index.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577023Z"
+    },
+    {
+      "path": "plugins/mcp-manager/src/marketplace.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577062Z"
+    },
+    {
+      "path": "plugins/mcp-manager/src/state.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577090Z"
+    },
+    {
+      "path": "plugins/mcp-manager/test/client.dom.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577118Z"
+    },
+    {
+      "path": "plugins/mcp-manager/test/route.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577151Z"
+    },
+    {
+      "path": "plugins/mcp-manager/test/state.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577186Z"
+    },
+    {
+      "path": "plugins/mcp-manager/tsconfig.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577218Z"
+    },
+    {
+      "path": "plugins/plugin-manager/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7137006Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/client.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894397Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/client.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7137548Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/client.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894455Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/client.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7138049Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/index.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894519Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/index.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7138526Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/index.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894609Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/index.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7138978Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/marketplace.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894673Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/marketplace.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7139468Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/marketplace.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894729Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/marketplace.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7139919Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/state.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0894819Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/state.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7140418Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/state.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.089492Z"
+    },
+    {
+      "path": "plugins/plugin-manager/lib/state.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7140861Z"
+    },
+    {
+      "path": "plugins/plugin-manager/package.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577820Z"
+    },
+    {
+      "path": "plugins/plugin-manager/src/client.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577856Z"
+    },
+    {
+      "path": "plugins/plugin-manager/src/index.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577892Z"
+    },
+    {
+      "path": "plugins/plugin-manager/src/marketplace.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577928Z"
+    },
+    {
+      "path": "plugins/plugin-manager/src/state.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1577970Z"
+    },
+    {
+      "path": "plugins/plugin-manager/test/client.dom.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578004Z"
+    },
+    {
+      "path": "plugins/plugin-manager/test/plugin-manager.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578037Z"
+    },
+    {
+      "path": "plugins/plugin-manager/tsconfig.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578073Z"
+    },
+    {
+      "path": "plugins/skill-manager/README.md",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7143083Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/catalog.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.08952Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/catalog.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.714361Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/catalog.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0895285Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/catalog.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.714414Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/client.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0895341Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/client.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7144674Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/client.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.08954Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/client.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.714533Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/index.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0895483Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/index.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.714608Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/index.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0895543Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/index.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7146796Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/state.d.ts",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.08956Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/state.d.ts.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7148055Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/state.js",
+      "status": "skipped",
+      "reason": "generated build or audit coverage artifact; source/config reviewed and output verified by clean build",
+      "updated_at_utc": "2026-08-23T19:27:47.0895684Z"
+    },
+    {
+      "path": "plugins/skill-manager/lib/state.js.map",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.7149079Z"
+    },
+    {
+      "path": "plugins/skill-manager/package.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578628Z"
+    },
+    {
+      "path": "plugins/skill-manager/src/catalog.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578670Z"
+    },
+    {
+      "path": "plugins/skill-manager/src/client.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578708Z"
+    },
+    {
+      "path": "plugins/skill-manager/src/index.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578746Z"
+    },
+    {
+      "path": "plugins/skill-manager/src/state.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578782Z"
+    },
+    {
+      "path": "plugins/skill-manager/test/client.dom.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578824Z"
+    },
+    {
+      "path": "plugins/skill-manager/test/skill-manager.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578858Z"
+    },
+    {
+      "path": "plugins/skill-manager/tsconfig.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578894Z"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "status": "skipped",
+      "reason": "generated dependency or minified artifact",
+      "updated_at_utc": "2026-08-23T19:27:38.715302Z"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1578964Z"
+    },
+    {
+      "path": "restart-dsh-web.bat",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7153704Z"
+    },
+    {
+      "path": "restart-dsh-web.command",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7154002Z"
+    },
+    {
+      "path": "restart-dsh-web.ps1",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1579059Z"
+    },
+    {
+      "path": "scripts/verify-typescript.mts",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7154469Z"
+    },
+    {
+      "path": "test/operations.test.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1579125Z"
+    },
+    {
+      "path": "tsconfig.base.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1579161Z"
+    },
+    {
+      "path": "tsconfig.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1579200Z"
+    },
+    {
+      "path": "tsconfig.tests.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1579235Z"
+    },
+    {
+      "path": "types/client-runtime.d.ts",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1579271Z"
+    },
+    {
+      "path": "upstream-patches/0001-fix-DSH-009-refresh-idle-on-raw-stream-activity.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7155874Z"
+    },
+    {
+      "path": "upstream-patches/0002-feat-DSH-012-ship-Qwen-native-agent-preset.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7156156Z"
+    },
+    {
+      "path": "upstream-patches/0003-fix-BUG-B0EE8D2D-recover-malformed-reasoning-tool-ca.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7156429Z"
+    },
+    {
+      "path": "upstream-patches/0004-fix-BUG-B0EE8D2D-retain-malformed-retry-history.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7156719Z"
+    },
+    {
+      "path": "upstream-patches/0005-docs-BUG-B0EE8D2D-document-retry-stream-token-cap.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7157033Z"
+    },
+    {
+      "path": "upstream-patches/0006-feat-DSH-011-raise-compact-summary-budget-to-32K.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7157312Z"
+    },
+    {
+      "path": "upstream-patches/0007-feat-ui-show-streamed-tool-activity-immediately-DSH-.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7157606Z"
+    },
+    {
+      "path": "upstream-patches/0008-fix-ui-keep-tool-duration-meaningful-and-inline-BUG-.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7157921Z"
+    },
+    {
+      "path": "upstream-patches/0009-fix-ui-preserve-fast-tool-running-feedback-BUG-5F3BF.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7158195Z"
+    },
+    {
+      "path": "upstream-patches/0010-fix-ui-show-subsecond-tool-duration-in-milliseconds-.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7158468Z"
+    },
+    {
+      "path": "upstream-patches/0011-feat-ui-preview-planned-Code-subtools-DSH-015.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7158693Z"
+    },
+    {
+      "path": "upstream-patches/0012-feat-ui-align-Think-timing-and-tool-activity-status-.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7158972Z"
+    },
+    {
+      "path": "upstream-patches/0013-feat-DSH-018-continue-max-token-turns-automatically.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7159231Z"
+    },
+    {
+      "path": "upstream-patches/0014-fix-DSH-019-align-local-patches-with-0.1.1-rc.2.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7159505Z"
+    },
+    {
+      "path": "upstream-patches/0015-fix-BUG-C393119A-close-rc.2-static-gate-gaps.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7159748Z"
+    },
+    {
+      "path": "upstream-patches/0016-feat-DSH-005-add-opt-in-vision-sub-agent-bridge.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7160017Z"
+    },
+    {
+      "path": "upstream-patches/0017-test-DSH-005-close-vision-bridge-release-gates.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7160303Z"
+    },
+    {
+      "path": "upstream-patches/0018-feat-DSH-005-add-dedicated-vision-tool-presentation.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7160589Z"
+    },
+    {
+      "path": "upstream-patches/0019-feat-DSH-020-stream-and-persist-vision-progress.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7160823Z"
+    },
+    {
+      "path": "upstream-patches/0020-fix-BUG-374ECAE5-follow-the-vision-stream-tail.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7161077Z"
+    },
+    {
+      "path": "upstream-patches/0021-fix-BUG-40D0E1BE-stream-vision-observations.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7161384Z"
+    },
+    {
+      "path": "upstream-patches/0022-feat-DSH-022-restore-native-image-policy.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7161646Z"
+    },
+    {
+      "path": "upstream-patches/0023-feat-DSH-023-inspect-local-image-paths.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7161881Z"
+    },
+    {
+      "path": "upstream-patches/0024-feat-DSH-024-expose-session-image-paths-and-Markdown.patch",
+      "status": "skipped",
+      "reason": "non-code documentation or binary asset",
+      "updated_at_utc": "2026-08-23T19:27:38.7162145Z"
+    },
+    {
+      "path": "upstream.lock.json",
+      "status": "reviewed",
+      "reason": null,
+      "updated_at_utc": "2026-08-23T19:27:47.1579944Z"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 {
   "name": "dsh-skill-manager",
   "version": "0.2.0",
-  "description": "Skill manager and curated GitHub marketplace for DeepSeek Harness: manage project Skill state, inspect sources, preview safe installs and install project-local Skills without executing third-party scripts.",
+  "description": "DeepSeek Harness SKILL management center with per-project enablement, unified sources, tags, presets, a curated Skill marketplace, and an Extensions section contribution.",
   "type": "module",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
@@ -16,6 +17,11 @@
         "@deepseek-ai/dsh-client-runtime"
       ]
     }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts"
   },
   "license": "MIT"
 }

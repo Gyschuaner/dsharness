@@ -1,0 +1,14 @@
+# DSH-005 deployment overlay for a text-only main model.
+# Apply this row only after the DP Gateway /v1/models response exposes the
+# configured vision model. The credential is resolved by DSH at call time and
+# must never be replaced with a literal key in this file.
+- id: vision-bridge
+  name: '@deepseek-ai/dsh-vision-bridge'
+  disabled: false
+  config:
+    baseURL: 'https://ai.chuansgu.top/v1'
+    apiKeyEnv: DPGATEWAY_API_KEY
+    model: Qwen3.6-35B-A3B
+    timeoutMs: 900000
+    maxImagesPerCall: 20
+    maxOutputTokens: 4096

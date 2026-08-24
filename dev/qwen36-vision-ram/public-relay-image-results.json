@@ -1,0 +1,29 @@
+{
+  "base_url": "https://ai.chuansgu.top/v1",
+  "model": "Qwen3.6-35B-A3B",
+  "kind": "image",
+  "rounds": [
+    {
+      "ok": true,
+      "ttft_seconds": 1.0155914000060875,
+      "wall_seconds": 3.476188500004355,
+      "decode_seconds": 2.4605970999982674,
+      "completion_tokens": 40,
+      "prompt_tokens": 321,
+      "measured_tps": 15.84981141367169,
+      "output_preview": "我看到了1969年7月21日《纽约时报》的头版，报道了人类首次登月成功：“宇航员在月球平原着陆，采集岩石并插上旗帜”。"
+    },
+    {
+      "ok": true,
+      "ttft_seconds": 1.1221860999939963,
+      "wall_seconds": 3.3106912999937776,
+      "decode_seconds": 2.1885051999997813,
+      "completion_tokens": 40,
+      "prompt_tokens": 321,
+      "measured_tps": 17.820382606357935,
+      "output_preview": "我看到了1969年7月21日《纽约时报》的头版，报道了人类首次登月成功：“宇航员在月球平原着陆，采集岩石并插上旗帜”。"
+    }
+  ],
+  "ttft_median_seconds": 1.068888750000042,
+  "tps_median": 16.835097010014813
+}

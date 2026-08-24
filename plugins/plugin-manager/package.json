@@ -1,0 +1,27 @@
+{
+  "name": "dsh-plugin-manager",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness local plugin manager and curated GitHub plugin marketplace.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "license": "MIT"
+}

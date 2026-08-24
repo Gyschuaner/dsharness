@@ -35,23 +35,57 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($PluginName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or $PluginName -in @('.', '..')) {
+    throw "PluginName 必须是单个安全目录名：$PluginName"
+}
 if (-not $RepoRoot) {
     if (-not $PSScriptRoot) { throw "无法确定仓库根目录（$PSScriptRoot 为空），请显式传 -RepoRoot" }
     $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 }
 if (-not $DshPluginsDir) { $DshPluginsDir = Join-Path $env:USERPROFILE '.dsh\plugins' }
-$repoPlugin = Join-Path $RepoRoot "plugins\$PluginName"
-$livePlugin = Join-Path $DshPluginsDir $PluginName
+$RepoRoot = [IO.Path]::GetFullPath($RepoRoot)
+$DshPluginsDir = [IO.Path]::GetFullPath($DshPluginsDir)
+$repoPluginsRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot 'plugins'))
+$repoPlugin = [IO.Path]::GetFullPath((Join-Path $repoPluginsRoot $PluginName))
+$livePlugin = [IO.Path]::GetFullPath((Join-Path $DshPluginsDir $PluginName))
+
+function Assert-DirectChild([string]$Parent, [string]$Child, [string]$Label) {
+    $parentFull = [IO.Path]::GetFullPath($Parent).TrimEnd('\', '/')
+    $childFull = [IO.Path]::GetFullPath($Child)
+    $childParent = [IO.Path]::GetDirectoryName($childFull).TrimEnd('\', '/')
+    if (-not $childParent.Equals($parentFull, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "$Label 必须是 $parentFull 的直接子目录：$childFull"
+    }
+}
+
+Assert-DirectChild $repoPluginsRoot $repoPlugin '仓库插件目录'
+Assert-DirectChild $DshPluginsDir $livePlugin '运行时插件目录'
 
 function Step($m) { Write-Host "[junction] $m" -ForegroundColor Cyan }
 
+function Get-Sha256([string]$Path) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '')
+    } finally {
+        $stream.Dispose()
+        $algorithm.Dispose()
+    }
+}
+
 # ── 恢复模式（提供 -Restore 备份路径时）─────────────────────────────────────
 if ($Restore) {
-    if (-not (Test-Path $Restore)) { throw "备份不存在：$Restore" }
+    if (-not (Test-Path -LiteralPath $Restore -PathType Container)) { throw "备份不存在或不是目录：$Restore" }
+    $Restore = (Resolve-Path -LiteralPath $Restore).Path
+    Assert-DirectChild $DshPluginsDir $Restore '恢复备份'
+    if ([IO.Path]::GetFileName($Restore) -notmatch ('^' + [Regex]::Escape($PluginName) + '\.bak-[0-9]{14}$')) {
+        throw "恢复备份名称不符合约定：$Restore"
+    }
     if (Test-Path $livePlugin) {
         $item = Get-Item $livePlugin -Force
         if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-            cmd /c "rmdir `"$livePlugin`"" | Out-Null
+            [IO.Directory]::Delete($livePlugin)
             Step "已移除现有 junction"
         } else { throw "目标已存在普通目录，拒绝覆盖：$livePlugin" }
     }
@@ -87,8 +121,8 @@ if (Test-Path $livePlugin) {
         $rel = $lf.FullName.Substring($livePlugin.Length + 1)
         $rp = Join-Path $repoPlugin $rel
         if (-not (Test-Path $rp)) { $diff += "仅原件存在: $rel"; continue }
-        $h1 = (Get-FileHash $lf.FullName -Algorithm SHA256).Hash
-        $h2 = (Get-FileHash $rp -Algorithm SHA256).Hash
+        $h1 = Get-Sha256 $lf.FullName
+        $h2 = Get-Sha256 $rp
         if ($h1 -ne $h2) { $diff += "哈希不一致: $rel" }
     }
     foreach ($rf in $repoFiles) {
@@ -106,15 +140,23 @@ if (Test-Path $livePlugin) {
 
     $ts = Get-Date -Format 'yyyyMMddHHmmss'
     $backup = "$livePlugin.bak-$ts"
+    Assert-DirectChild $DshPluginsDir $backup '备份目录'
     Step "备份原件 -> $backup"
     Move-Item -LiteralPath $livePlugin -Destination $backup
     Step "创建 junction $livePlugin -> $repoPlugin"
-    cmd /c "mklink /J `"$livePlugin`" `"$repoPlugin`"" | Out-Null
+    try {
+        New-Item -ItemType Junction -Path $livePlugin -Target $repoPlugin | Out-Null
+    } catch {
+        if (-not (Test-Path -LiteralPath $livePlugin) -and (Test-Path -LiteralPath $backup)) {
+            Move-Item -LiteralPath $backup -Destination $livePlugin
+        }
+        throw
+    }
     Step "完成。备份保留在 $backup，确认无误后可删除。"
 } else {
     if ($DryRun) { Step "[DryRun] 将建 junction，未做任何修改。"; return }
     Step "运行时目录不存在，直接建 junction $livePlugin -> $repoPlugin"
-    cmd /c "mklink /J `"$livePlugin`" `"$repoPlugin`"" | Out-Null
+    New-Item -ItemType Junction -Path $livePlugin -Target $repoPlugin | Out-Null
     Step "完成。"
 }
 

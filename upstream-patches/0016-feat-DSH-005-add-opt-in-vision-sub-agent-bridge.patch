@@ -1,0 +1,1924 @@
+From 14f94fac829a79178e20f70014a4547fb066c11c Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 00:53:50 +0800
+Subject: [PATCH 16/16] feat(DSH-005): add opt-in vision sub-agent bridge
+
+---
+ apps/cli/composition.md                       |   3 +
+ docs/capability-seams.i18n.yaml               |   4 +-
+ docs/capability-seams.md                      |  11 +-
+ docs/capability-seams.zh.md                   |  11 +-
+ docs/config-catalog.i18n.yaml                 |   4 +-
+ docs/config-catalog.md                        |  30 +-
+ docs/config-catalog.zh.md                     |  30 +-
+ docs/event-producer-consumer.i18n.yaml        |   4 +-
+ docs/event-producer-consumer.md               |   2 +-
+ docs/event-producer-consumer.zh.md            |   2 +-
+ docs/module-graph.i18n.yaml                   |   4 +-
+ docs/module-graph.md                          |  12 +
+ docs/module-graph.zh.md                       |  12 +
+ docs/subsystems/attachment.i18n.yaml          |   4 +-
+ docs/subsystems/attachment.md                 |  21 +
+ docs/subsystems/attachment.zh.md              |  21 +
+ packages/acp/acp/src/content.ts               |  20 +-
+ packages/acp/acp/tests/content.spec.ts        |  16 +-
+ packages/attachment/attachment/src/index.ts   |  23 +
+ packages/bundle/base/cordis.patch.yml         |  14 +
+ packages/bundle/base/package.json             |   1 +
+ .../extensions/tool-cordis/src/api-catalog.ts |  17 +
+ packages/host/apiproxy/src/api-proxy.ts       |  17 +-
+ .../apiproxy/tests/api-proxy-models.spec.ts   |  49 ++
+ .../vision/vision-bridge/README.i18n.yaml     |   6 +
+ packages/vision/vision-bridge/README.md       |  87 ++++
+ packages/vision/vision-bridge/README.zh.md    |  87 ++++
+ packages/vision/vision-bridge/package.json    |  47 ++
+ packages/vision/vision-bridge/src/index.ts    | 443 ++++++++++++++++++
+ .../vision/vision-bridge/src/invariant.ts     |  22 +
+ .../vision-bridge/tests/vision-bridge.spec.ts | 210 +++++++++
+ packages/vision/vision-bridge/tsconfig.json   |  18 +
+ pnpm-lock.yaml                                |  43 ++
+ scripts/gen-cordis-catalog.ts                 |   2 +
+ scripts/gen-doc-graphs.ts                     |   9 +
+ tsconfig.base.json                            |   1 +
+ tsconfig.host.json                            |   1 +
+ 37 files changed, 1281 insertions(+), 27 deletions(-)
+ create mode 100644 packages/vision/vision-bridge/README.i18n.yaml
+ create mode 100644 packages/vision/vision-bridge/README.md
+ create mode 100644 packages/vision/vision-bridge/README.zh.md
+ create mode 100644 packages/vision/vision-bridge/package.json
+ create mode 100644 packages/vision/vision-bridge/src/index.ts
+ create mode 100644 packages/vision/vision-bridge/src/invariant.ts
+ create mode 100644 packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+ create mode 100644 packages/vision/vision-bridge/tsconfig.json
+
+diff --git a/apps/cli/composition.md b/apps/cli/composition.md
+index 739dbd9..e07f122 100644
+--- a/apps/cli/composition.md
++++ b/apps/cli/composition.md
+@@ -46,6 +46,8 @@ flowchart LR
+   cfg --> plugin_dsh_base_session_persistence_jsonl
+   plugin_dsh_base_attachment_local["attachment-local<br/>@deepseek-ai/dsh-attachment-local"]
+   cfg --> plugin_dsh_base_attachment_local
++  plugin_dsh_base_vision_bridge["vision-bridge<br/>@deepseek-ai/dsh-vision-bridge"]
++  cfg --> plugin_dsh_base_vision_bridge
+   plugin_dsh_base_session_query_sqlite["session-query-sqlite<br/>@deepseek-ai/dsh-session-query-sqlite"]
+   cfg --> plugin_dsh_base_session_query_sqlite
+   plugin_dsh_base_session_projection["session-projection<br/>@deepseek-ai/dsh-session-projection"]
+@@ -189,6 +191,7 @@ flowchart LR
+ | `llm-pi-ai` | `@deepseek-ai/dsh-llm-pi-ai` |
+ | `session-persistence-jsonl` | `@deepseek-ai/dsh-session-persistence-jsonl` |
+ | `attachment-local` | `@deepseek-ai/dsh-attachment-local` |
++| `vision-bridge` | `@deepseek-ai/dsh-vision-bridge` |
+ | `session-query-sqlite` | `@deepseek-ai/dsh-session-query-sqlite` |
+ | `session-projection` | `@deepseek-ai/dsh-session-projection` |
+ | `session-telemetry-otel` | `@deepseek-ai/dsh-session-telemetry-otel` |
+diff --git a/docs/capability-seams.i18n.yaml b/docs/capability-seams.i18n.yaml
+index dbafe8c..6365c04 100644
+--- a/docs/capability-seams.i18n.yaml
++++ b/docs/capability-seams.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/capability-seams.md
+-capability-seams.md: 9e99ebbdc0e3af22f9939c690ead479d4d20b00c
+-capability-seams.zh.md: 611902310e3472e05eaa92985011eb852bbeee6d
++capability-seams.md: 1f46a6b488c0abcad4bf56317c75e391dc5ac740
++capability-seams.zh.md: dccfd43ed4f91d3c17acd769f5424cea14582171
+diff --git a/docs/capability-seams.md b/docs/capability-seams.md
+index 9e99ebb..1f46a6b 100644
+--- a/docs/capability-seams.md
++++ b/docs/capability-seams.md
+@@ -12,6 +12,10 @@ flowchart LR
+   pkg_attachment_local["attachment-local"]
+   pkg_host_runtime["host-runtime"]
+   pkg_llm_pi_ai["llm-pi-ai"]
++  svc_imageInputBridge["ctx.imageInputBridge<br/>Optional text-only image admission bridge"]
++  pkg_vision_bridge["vision-bridge"]
++  pkg_apiproxy["apiproxy"]
++  pkg_acp["acp"]
+   pkg_llm["llm"]
+   svc_llm["ctx.llm<br/>LLM adapter registry"]
+   pkg_llm_deepseek["llm-deepseek"]
+@@ -47,7 +51,6 @@ flowchart LR
+   pkg_settings["settings"]
+   svc_settings["ctx.settings<br/>User-settings seam"]
+   pkg_settings_file["settings-file"]
+-  pkg_apiproxy["apiproxy"]
+   pkg_credentials["credentials"]
+   svc_credentials["ctx.credentials<br/>Credential seam"]
+   pkg_credentials_local["credentials-local"]
+@@ -106,7 +109,6 @@ flowchart LR
+   pkg_skill_badge["skill-badge"]
+   pkg_skill_filesystem["skill-filesystem"]
+   svc_agents["ctx.agents<br/>Agent service"]
+-  pkg_acp["acp"]
+   pkg_agent_default_model["agent-default-model"]
+   svc_agentDefaultModel["ctx.agentDefaultModel<br/>Default Agent model selection"]
+   pkg_headless["headless"]
+@@ -211,6 +213,7 @@ flowchart LR
+   pkg_apiproxy --> svc_apiProxy
+   pkg_approval --> svc_approval
+   pkg_attachment --> svc_attachments
++  pkg_attachment --> svc_imageInputBridge
+   pkg_attachment_local --> svc_attachments
+   pkg_authorization --> svc_authorization
+   pkg_bash_local --> svc_shell
+@@ -297,6 +300,7 @@ flowchart LR
+   pkg_tools --> svc_tools
+   pkg_typert_registry --> svc_typert
+   pkg_user_questions --> svc_userQuestions
++  pkg_vision_bridge --> svc_imageInputBridge
+   pkg_web --> svc_web
+   pkg_web_fetch_http --> svc_web
+   pkg_web_search_deepseek --> svc_web
+@@ -331,6 +335,8 @@ flowchart LR
+   svc_e2b --> pkg_fs_e2b
+   svc_e2b --> pkg_subprocess_e2b
+   svc_fs --> pkg_tool_fs
++  svc_imageInputBridge --> pkg_acp
++  svc_imageInputBridge --> pkg_apiproxy
+   svc_invariants --> pkg_agent
+   svc_invariants --> pkg_agent_loop
+   svc_invariants --> pkg_scope
+@@ -426,6 +432,7 @@ flowchart LR
+ | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
+ | --- | --- | --- | --- | --- | --- | --- |
+ | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content. |
++| `ctx.imageInputBridge` | `seam` | [`attachment`](../packages/attachment/attachment) | [`vision-bridge`](../packages/vision/vision-bridge) | `apiproxy`, [`acp`](../packages/acp/acp) | - | When explicitly mounted, the bridge lets text-only routes persist image references for tool-mediated visual inspection without projecting pixels into the main model request. |
+ | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |
+ | `ctx.tokenMeter` | `core` | [`token-meter`](../packages/llm/token-meter) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements. |
+ | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction. |
+diff --git a/docs/capability-seams.zh.md b/docs/capability-seams.zh.md
+index 6119023..dccfd43 100644
+--- a/docs/capability-seams.zh.md
++++ b/docs/capability-seams.zh.md
+@@ -14,6 +14,10 @@ flowchart LR
+   pkg_attachment_local["attachment-local"]
+   pkg_host_runtime["host-runtime"]
+   pkg_llm_pi_ai["llm-pi-ai"]
++  svc_imageInputBridge["ctx.imageInputBridge<br/>Optional text-only image admission bridge"]
++  pkg_vision_bridge["vision-bridge"]
++  pkg_apiproxy["apiproxy"]
++  pkg_acp["acp"]
+   pkg_llm["llm"]
+   svc_llm["ctx.llm<br/>LLM adapter registry"]
+   pkg_llm_deepseek["llm-deepseek"]
+@@ -49,7 +53,6 @@ flowchart LR
+   pkg_settings["settings"]
+   svc_settings["ctx.settings<br/>User-settings seam"]
+   pkg_settings_file["settings-file"]
+-  pkg_apiproxy["apiproxy"]
+   pkg_credentials["credentials"]
+   svc_credentials["ctx.credentials<br/>Credential seam"]
+   pkg_credentials_local["credentials-local"]
+@@ -108,7 +111,6 @@ flowchart LR
+   pkg_skill_badge["skill-badge"]
+   pkg_skill_filesystem["skill-filesystem"]
+   svc_agents["ctx.agents<br/>Agent service"]
+-  pkg_acp["acp"]
+   pkg_agent_default_model["agent-default-model"]
+   svc_agentDefaultModel["ctx.agentDefaultModel<br/>Default Agent model selection"]
+   pkg_headless["headless"]
+@@ -213,6 +215,7 @@ flowchart LR
+   pkg_apiproxy --> svc_apiProxy
+   pkg_approval --> svc_approval
+   pkg_attachment --> svc_attachments
++  pkg_attachment --> svc_imageInputBridge
+   pkg_attachment_local --> svc_attachments
+   pkg_authorization --> svc_authorization
+   pkg_bash_local --> svc_shell
+@@ -299,6 +302,7 @@ flowchart LR
+   pkg_tools --> svc_tools
+   pkg_typert_registry --> svc_typert
+   pkg_user_questions --> svc_userQuestions
++  pkg_vision_bridge --> svc_imageInputBridge
+   pkg_web --> svc_web
+   pkg_web_fetch_http --> svc_web
+   pkg_web_search_deepseek --> svc_web
+@@ -333,6 +337,8 @@ flowchart LR
+   svc_e2b --> pkg_fs_e2b
+   svc_e2b --> pkg_subprocess_e2b
+   svc_fs --> pkg_tool_fs
++  svc_imageInputBridge --> pkg_acp
++  svc_imageInputBridge --> pkg_apiproxy
+   svc_invariants --> pkg_agent
+   svc_invariants --> pkg_agent_loop
+   svc_invariants --> pkg_scope
+@@ -428,6 +434,7 @@ flowchart LR
+ | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
+ | --- | --- | --- | --- | --- | --- | --- |
+ | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | `host-runtime`, [`llm-pi-ai`](../packages/llm/llm-pi-ai) | - | 宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。 |
++| `ctx.imageInputBridge` | `seam` | [`attachment`](../packages/attachment/attachment) | [`vision-bridge`](../packages/vision/vision-bridge) | `apiproxy`, [`acp`](../packages/acp/acp) | - | 显式挂载后，该桥允许纯文本路由持久化图片引用，以便通过工具执行视觉检查，而不会把像素投影进主模型请求。 |
+ | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | 适配器注册提供方实现；agent loop（智能体循环）与压缩功能调用提供方无关的流服务。 |
+ | `ctx.tokenMeter` | `core` | [`token-meter`](../packages/llm/token-meter) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | 拥有按会话隔离的回放折叠区；压力消费方共享不可变且带修订版本的测量结果。 |
+ | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | 在摘要压缩前，通过可回放的单节点表层替换来改写过大的当前工具结果。 |
+diff --git a/docs/config-catalog.i18n.yaml b/docs/config-catalog.i18n.yaml
+index 3f71b54..0e42f7e 100644
+--- a/docs/config-catalog.i18n.yaml
++++ b/docs/config-catalog.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/config-catalog.md
+-config-catalog.md: d9f9d7a1bc5c3670dded75a5ef6bf26e754e6de4
+-config-catalog.zh.md: 29d6b989416f5a476ed9d95e7fb950c31cc90138
++config-catalog.md: a03d5198780517469199317ed24343941adbb0c9
++config-catalog.zh.md: 022d4da5d36375bf0407c923198ddf784c42cb14
+diff --git a/docs/config-catalog.md b/docs/config-catalog.md
+index d9f9d7a..a03d519 100644
+--- a/docs/config-catalog.md
++++ b/docs/config-catalog.md
+@@ -500,7 +500,7 @@ export interface CompactionPolicyConfig {
+   summarizationProvider?: string
+   /** Summary model; set together with `summarizationProvider`, or inherit the conversation target. */
+   summarizationModel?: string
+-  /** Provider generation cap for summarization. Defaults to `8192`. */
++  /** Provider generation cap for summarization. Defaults to `32768`. */
+   maxTokens?: number
+   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
+   compactionRetries?: number
+@@ -3038,6 +3038,34 @@ export type ApprovalPolicy = 'ask' | 'never'
+ 
+ Source: [`packages/interaction/user-approval/src/index.ts:177`](../packages/interaction/user-approval/src/index.ts)
+ 
++<a id="deepseek-aidsh-vision-bridge"></a>
++
++## `@deepseek-ai/dsh-vision-bridge`
++
++Requires: `attachments` · `tools`
++
++```ts config-catalog
++/** Deployment configuration. Loading this plugin is the explicit bridge enablement switch. */
++export interface Config {
++  /** OpenAI-compatible endpoint base; `/chat/completions` is appended when absent. */
++  baseURL?: string
++  /** Literal gateway key; prefer {@link apiKeyEnv}. */
++  apiKey?: string
++  /** Credential reference resolved once per call. */
++  apiKeyEnv?: string
++  /** Visual sub-agent model id. */
++  model?: string
++  /** Cooperative timeout budget for `vision_inspect`. */
++  timeoutMs?: number
++  /** Maximum number of current-session images accepted by one call. */
++  maxImagesPerCall?: number
++  /** Maximum output tokens requested from the visual sub-agent. */
++  maxOutputTokens?: number
++}
++```
++
++Source: [`packages/vision/vision-bridge/src/index.ts:44`](../packages/vision/vision-bridge/src/index.ts)
++
+ <a id="deepseek-aidsh-web"></a>
+ 
+ ## `@deepseek-ai/dsh-web`
+diff --git a/docs/config-catalog.zh.md b/docs/config-catalog.zh.md
+index 29d6b98..022d4da 100644
+--- a/docs/config-catalog.zh.md
++++ b/docs/config-catalog.zh.md
+@@ -502,7 +502,7 @@ export interface CompactionPolicyConfig {
+   summarizationProvider?: string
+   /** Summary model; set together with `summarizationProvider`, or inherit the conversation target. */
+   summarizationModel?: string
+-  /** Provider generation cap for summarization. Defaults to `8192`. */
++  /** Provider generation cap for summarization. Defaults to `32768`. */
+   maxTokens?: number
+   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
+   compactionRetries?: number
+@@ -3040,6 +3040,34 @@ export type ApprovalPolicy = 'ask' | 'never'
+ 
+ 来源：[`packages/interaction/user-approval/src/index.ts:177`](../packages/interaction/user-approval/src/index.ts)
+ 
++<a id="deepseek-aidsh-vision-bridge"></a>
++
++## `@deepseek-ai/dsh-vision-bridge`
++
++需要：`attachments` · `tools`
++
++```ts config-catalog
++/** Deployment configuration. Loading this plugin is the explicit bridge enablement switch. */
++export interface Config {
++  /** OpenAI-compatible endpoint base; `/chat/completions` is appended when absent. */
++  baseURL?: string
++  /** Literal gateway key; prefer {@link apiKeyEnv}. */
++  apiKey?: string
++  /** Credential reference resolved once per call. */
++  apiKeyEnv?: string
++  /** Visual sub-agent model id. */
++  model?: string
++  /** Cooperative timeout budget for `vision_inspect`. */
++  timeoutMs?: number
++  /** Maximum number of current-session images accepted by one call. */
++  maxImagesPerCall?: number
++  /** Maximum output tokens requested from the visual sub-agent. */
++  maxOutputTokens?: number
++}
++```
++
++来源：[`packages/vision/vision-bridge/src/index.ts:44`](../packages/vision/vision-bridge/src/index.ts)
++
+ <a id="deepseek-aidsh-web"></a>
+ 
+ ## `@deepseek-ai/dsh-web`
+diff --git a/docs/event-producer-consumer.i18n.yaml b/docs/event-producer-consumer.i18n.yaml
+index b9a339b..116a029 100644
+--- a/docs/event-producer-consumer.i18n.yaml
++++ b/docs/event-producer-consumer.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/event-producer-consumer.md
+-event-producer-consumer.md: 9732d4ee90c4d57fd0333e2450986972116a1212
+-event-producer-consumer.zh.md: 4f7d06db960fe1b54a2ca333dac3097660f6387e
++event-producer-consumer.md: d3b2184ef163264c07d809cb55cd76495f5c8253
++event-producer-consumer.zh.md: 4415249b61155a82bb958eba7a91d611c6514f82
+diff --git a/docs/event-producer-consumer.md b/docs/event-producer-consumer.md
+index 9732d4e..d3b2184 100644
+--- a/docs/event-producer-consumer.md
++++ b/docs/event-producer-consumer.md
+@@ -15,7 +15,7 @@ This matrix shows which packages dispatch each harness-owned event and which pac
+ | `agent/inbox/claimed` | `emit` | [`packages/core/agent/src/runtime-types.ts:197`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`acp`](../packages/acp/acp), [`goal-round-driver`](../packages/goal/goal-round-driver), [`subagent`](../packages/subagent/subagent), [`tool-jobs`](../packages/jobs/tool-jobs) |
+ | `agent/inbox/discarded` | `emit` | [`packages/core/agent/src/runtime-types.ts:205`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`goal-round-driver`](../packages/goal/goal-round-driver), [`subagent`](../packages/subagent/subagent) |
+ | `agent/inbox/inserted` | `emit` | [`packages/core/agent/src/runtime-types.ts:186`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`goal-round-driver`](../packages/goal/goal-round-driver) |
+-| `agent/pre-step` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:231`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent-instructions`](../packages/context/agent-instructions), [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`plan-mode`](../packages/plan/plan-mode), [`repeat-tool-reminder`](../packages/guard/repeat-tool-reminder), [`session-checkpoint-policy`](../packages/session/session-checkpoint-policy), [`session-reference`](../packages/context/session-reference), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`time-context`](../packages/context/time-context), [`tmux-context`](../packages/context/tmux-context), [`tool-cordis`](../packages/extensions/tool-cordis), [`tool-skill`](../packages/skill/tool-skill) |
++| `agent/pre-step` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:231`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent-instructions`](../packages/context/agent-instructions), [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`plan-mode`](../packages/plan/plan-mode), [`repeat-tool-reminder`](../packages/guard/repeat-tool-reminder), [`session-checkpoint-policy`](../packages/session/session-checkpoint-policy), [`session-reference`](../packages/context/session-reference), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`time-context`](../packages/context/time-context), [`tmux-context`](../packages/context/tmux-context), [`tool-cordis`](../packages/extensions/tool-cordis), [`tool-skill`](../packages/skill/tool-skill), [`vision-bridge`](../packages/vision/vision-bridge) |
+ | `agent/request` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:244`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent`](../packages/core/agent) |
+ | `agent/request-error` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:260`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`compaction-basic`](../packages/compaction/compaction-basic), [`llm-retry`](../packages/llm/llm-retry) |
+ | `agent/session-start` | `emit` | [`packages/core/agent/src/runtime-types.ts:217`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emitAgentEvent`) | `agent-team`, [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) |
+diff --git a/docs/event-producer-consumer.zh.md b/docs/event-producer-consumer.zh.md
+index 4f7d06d..4415249 100644
+--- a/docs/event-producer-consumer.zh.md
++++ b/docs/event-producer-consumer.zh.md
+@@ -17,7 +17,7 @@
+ | `agent/inbox/claimed` | `emit` | [`packages/core/agent/src/runtime-types.ts:197`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`acp`](../packages/acp/acp), [`goal-round-driver`](../packages/goal/goal-round-driver), [`subagent`](../packages/subagent/subagent), [`tool-jobs`](../packages/jobs/tool-jobs) |
+ | `agent/inbox/discarded` | `emit` | [`packages/core/agent/src/runtime-types.ts:205`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`goal-round-driver`](../packages/goal/goal-round-driver), [`subagent`](../packages/subagent/subagent) |
+ | `agent/inbox/inserted` | `emit` | [`packages/core/agent/src/runtime-types.ts:186`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emit`) | [`goal-round-driver`](../packages/goal/goal-round-driver) |
+-| `agent/pre-step` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:231`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent-instructions`](../packages/context/agent-instructions), [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`plan-mode`](../packages/plan/plan-mode), [`repeat-tool-reminder`](../packages/guard/repeat-tool-reminder), [`session-checkpoint-policy`](../packages/session/session-checkpoint-policy), [`session-reference`](../packages/context/session-reference), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`time-context`](../packages/context/time-context), [`tmux-context`](../packages/context/tmux-context), [`tool-cordis`](../packages/extensions/tool-cordis), [`tool-skill`](../packages/skill/tool-skill) |
++| `agent/pre-step` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:231`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent-instructions`](../packages/context/agent-instructions), [`compaction-basic`](../packages/compaction/compaction-basic), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`plan-mode`](../packages/plan/plan-mode), [`repeat-tool-reminder`](../packages/guard/repeat-tool-reminder), [`session-checkpoint-policy`](../packages/session/session-checkpoint-policy), [`session-reference`](../packages/context/session-reference), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`time-context`](../packages/context/time-context), [`tmux-context`](../packages/context/tmux-context), [`tool-cordis`](../packages/extensions/tool-cordis), [`tool-skill`](../packages/skill/tool-skill), [`vision-bridge`](../packages/vision/vision-bridge) |
+ | `agent/request` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:244`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`agent`](../packages/core/agent) |
+ | `agent/request-error` | `waterfall` | [`packages/core/agent/src/runtime-types.ts:260`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`waterfall`) | [`compaction-basic`](../packages/compaction/compaction-basic), [`llm-retry`](../packages/llm/llm-retry) |
+ | `agent/session-start` | `emit` | [`packages/core/agent/src/runtime-types.ts:217`](../packages/core/agent/src/runtime-types.ts) | [`agent-loop`](../packages/core/agent-loop) (`emitAgentEvent`) | `agent-team`, [`goal`](../packages/goal/goal), [`goal-round-driver`](../packages/goal/goal-round-driver), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex) |
+diff --git a/docs/module-graph.i18n.yaml b/docs/module-graph.i18n.yaml
+index a7c5c03..4afee84 100644
+--- a/docs/module-graph.i18n.yaml
++++ b/docs/module-graph.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/module-graph.md
+-module-graph.md: 3a056b2ef0540833108b545cda8e6b5b444f0948
+-module-graph.zh.md: 6ac8764fae0b524d9fb7115a98faff48ba5294aa
++module-graph.md: af9b09ee22bf942bc99f14de4edb13d174554ca5
++module-graph.zh.md: c3635f76d96fde479510b5b0c32d28fccdd1cc1c
+diff --git a/docs/module-graph.md b/docs/module-graph.md
+index 3a056b2..af9b09e 100644
+--- a/docs/module-graph.md
++++ b/docs/module-graph.md
+@@ -326,6 +326,9 @@ flowchart TD
+     pkg_typert_protocol["typert-protocol"]
+     pkg_typert_registry["typert-registry"]
+   end
++  subgraph group_vision["packages/vision"]
++    pkg_vision_bridge["vision-bridge"]
++  end
+   subgraph group_workflow["packages/workflow"]
+     pkg_tool_ralph["tool-ralph"]
+     pkg_tool_workflow["tool-workflow"]
+@@ -979,6 +982,14 @@ flowchart TD
+   pkg_llm_replay --> pkg_invariants
+   pkg_llm_replay --> pkg_llm
+   pkg_llm_replay --> pkg_session
++  pkg_vision_bridge --> pkg_agent
++  pkg_vision_bridge --> pkg_attachment
++  pkg_vision_bridge --> pkg_credentials
++  pkg_vision_bridge --> pkg_invariants
++  pkg_vision_bridge --> pkg_launch_environment
++  pkg_vision_bridge --> pkg_llm
++  pkg_vision_bridge --> pkg_session
++  pkg_vision_bridge --> pkg_tools
+   pkg_tool_workflow --> pkg_agent
+   pkg_tool_workflow --> pkg_invariants
+   pkg_tool_workflow --> pkg_llm
+@@ -1625,6 +1636,7 @@ flowchart TD
+ | [`tool-terminal`](../packages/terminal/tool-terminal) | `terminal` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`output-retention`](../packages/util/output-retention), [`system-prompt`](../packages/core/system-prompt), [`terminal`](../packages/terminal/terminal), [`tools`](../packages/core/tools) |
+ | [`agent-loop-testkit`](../packages/test-support/agent-loop-testkit) | `test-support` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
+ | [`llm-replay`](../packages/test-support/llm-replay) | `test-support` | [`compaction`](../packages/compaction/compaction), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
++| [`vision-bridge`](../packages/vision/vision-bridge) | `vision` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
+ | [`tool-workflow`](../packages/workflow/tool-workflow) | `workflow` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`workflow`](../packages/workflow/workflow) |
+ | [`subagent-acp`](../packages/subagent/subagent-acp) | `subagent` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+ | [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | `subagent` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+diff --git a/docs/module-graph.zh.md b/docs/module-graph.zh.md
+index 6ac8764..c3635f7 100644
+--- a/docs/module-graph.zh.md
++++ b/docs/module-graph.zh.md
+@@ -328,6 +328,9 @@ flowchart TD
+     pkg_typert_protocol["typert-protocol"]
+     pkg_typert_registry["typert-registry"]
+   end
++  subgraph group_vision["packages/vision"]
++    pkg_vision_bridge["vision-bridge"]
++  end
+   subgraph group_workflow["packages/workflow"]
+     pkg_tool_ralph["tool-ralph"]
+     pkg_tool_workflow["tool-workflow"]
+@@ -981,6 +984,14 @@ flowchart TD
+   pkg_llm_replay --> pkg_invariants
+   pkg_llm_replay --> pkg_llm
+   pkg_llm_replay --> pkg_session
++  pkg_vision_bridge --> pkg_agent
++  pkg_vision_bridge --> pkg_attachment
++  pkg_vision_bridge --> pkg_credentials
++  pkg_vision_bridge --> pkg_invariants
++  pkg_vision_bridge --> pkg_launch_environment
++  pkg_vision_bridge --> pkg_llm
++  pkg_vision_bridge --> pkg_session
++  pkg_vision_bridge --> pkg_tools
+   pkg_tool_workflow --> pkg_agent
+   pkg_tool_workflow --> pkg_invariants
+   pkg_tool_workflow --> pkg_llm
+@@ -1627,6 +1638,7 @@ flowchart TD
+ | [`tool-terminal`](../packages/terminal/tool-terminal) | `terminal` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`output-retention`](../packages/util/output-retention), [`system-prompt`](../packages/core/system-prompt), [`terminal`](../packages/terminal/terminal), [`tools`](../packages/core/tools) |
+ | [`agent-loop-testkit`](../packages/test-support/agent-loop-testkit) | `test-support` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
+ | [`llm-replay`](../packages/test-support/llm-replay) | `test-support` | [`compaction`](../packages/compaction/compaction), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
++| [`vision-bridge`](../packages/vision/vision-bridge) | `vision` | [`agent`](../packages/core/agent), [`attachment`](../packages/attachment/attachment), [`credentials`](../packages/credentials/credentials), [`invariants`](../packages/runtime-diagnostics/invariants), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
+ | [`tool-workflow`](../packages/workflow/tool-workflow) | `workflow` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`workflow`](../packages/workflow/workflow) |
+ | [`subagent-acp`](../packages/subagent/subagent-acp) | `subagent` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+ | [`subagent-claude-code`](../packages/subagent/subagent-claude-code) | `subagent` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`subagent`](../packages/subagent/subagent), [`subprocess`](../packages/subprocess/subprocess), [`timeout`](../packages/util/timeout) |
+diff --git a/docs/subsystems/attachment.i18n.yaml b/docs/subsystems/attachment.i18n.yaml
+index b93c9ef..9c98f17 100644
+--- a/docs/subsystems/attachment.i18n.yaml
++++ b/docs/subsystems/attachment.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/subsystems/attachment.md
+-attachment.md: e6d0a53db2827a38a1535380319b6220aa37f0a4
+-attachment.zh.md: 8328ec610d4d68624f75f00d6a397b13fdf31c4e
++attachment.md: 19c2bfcac1f8868c5b860cdbca41e14193681308
++attachment.zh.md: 19dd423b599fb33d001db990442a92c7a9d234a1
+diff --git a/docs/subsystems/attachment.md b/docs/subsystems/attachment.md
+index e6d0a53..19c2bfc 100644
+--- a/docs/subsystems/attachment.md
++++ b/docs/subsystems/attachment.md
+@@ -127,6 +127,10 @@ interface RequestImageAttachment {
+ 
+ `saveImage()` prepares and atomically commits a provider-independent normalized attachment before returning its `ImageAttachmentRef`. `saveImages()` prepares every validated attachment once before publishing the batch, so validation rejection leaves no partial objects and publication does not repeat decoding or quality selection. `admitEncodedImages()` is the wire entry for base64 uploads and delegates count, aggregate-byte, and ordered batch admission to `saveImages()`. `readImage()` verifies a normalized attachment from an authorized session path. `readImageRequest()` derives and caches one request version under an exact route pixel and byte budget; new entries are fully decoded before publication, while cache hits use a bounded metadata probe. Callers use `Promise.all` over the singular method when they need an ordered batch. The local implementation lazily encodes preferred candidates, singleflights equal request identities, lets each waiter cancel independently, stops shared work when no waiter remains, and bounds all transforms with its instance-level limiter, which defaults to two simultaneous transformations. The service is retention-neutral: resumed and forked sessions may share objects, so reference-aware garbage collection is deferred rather than tied to one session's deletion.
+ 
++## Optional text-only image bridge
++
++`ctx.imageInputBridge` is an optional admission capability supplied by a deployment plugin. When a caller has selected an explicit text-only main-model route, the host and ACP adapters ask this capability whether durable image references may enter the session for later inspection. The capability never converts images into main-model tokens and never selects a visual provider; those responsibilities remain inside the mounted bridge plugin. If the service is absent or rejects the exact provider/model route, the existing unsupported-image error remains unchanged. Native multimodal routes do not require this seam.
++
+ <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
+ 
+ <a id="cordis-surface"></a>
+@@ -186,5 +190,22 @@ abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<Store
+ readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>
+ ```
+ 
++Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
++
++<a id="ctximageinputbridge--imageinputbridge"></a>
++
++### `ctx.imageInputBridge` — `ImageInputBridge`
++
++Optional image-admission capability supplied by a visual bridge plugin. The seam decides only whether durable image references may enter a text-only route; it never projects pixels into that main model's request.
++
++```ts cordis-catalog
++/**
++ * Decide whether the mounted bridge can serve one explicit text-only route.
++ * @param route - exact provider/model selection and optional caller cancellation.
++ * @returns whether image references may be admitted for bridge-mediated inspection.
++ */
++canHandle(route: ImageInputBridgeRoute): boolean | Promise<boolean>
++```
++
+ Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
+ <!-- END GENERATED cordis-surface -->
+diff --git a/docs/subsystems/attachment.zh.md b/docs/subsystems/attachment.zh.md
+index 8328ec6..19dd423 100644
+--- a/docs/subsystems/attachment.zh.md
++++ b/docs/subsystems/attachment.zh.md
+@@ -127,6 +127,10 @@ interface RequestImageAttachment {
+ 
+ `saveImage()` 准备并原子提交提供方无关的规范化附件，然后直接返回 `ImageAttachmentRef`。`saveImages()` 在发布批次前为每个成员各准备一次经过验证的附件，因此校验拒绝不会留下部分对象，发布也不会重复解码或选择质量。`admitEncodedImages()` 是面向 base64 上传的 wire 入口，把张数、聚合字节和有序批量准入交给 `saveImages()`。`readImage()` 校验来自已授权会话路径的规范化附件。`readImageRequest()` 按确切路由的像素和字节预算派生并缓存请求版本；新条目在发布前完整解码，缓存命中只做有界元数据探测。调用方需要有序批次时，对单数方法使用 `Promise.all`。本地实现按需编码首选候选、合并相同请求身份的并发任务、允许每个等待方单独取消、没有等待方时停止共享任务，并通过实例级限流器限制全部变换，默认同时执行两项。该服务不规定保留策略：恢复和 fork 后的会话可能共享对象，因此基于引用的垃圾回收会延期实现，不与单个会话的删除绑定。
+ 
++## 可选的纯文本图片桥
++
++`ctx.imageInputBridge` 是由部署插件提供的可选准入能力。当调用方明确选择了纯文本主模型路由时，宿主与 ACP 适配器会询问该能力，判断是否允许把持久图片引用写入会话，以便后续检查。该能力不会把图片转换成主模型 token，也不负责选择视觉提供方；这些职责都留在已挂载的视觉桥插件内部。如果服务未提供，或拒绝了确切的提供方/模型路由，原有“不支持图片”错误保持不变。原生多模态路由不需要此 seam。
++
+ <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
+ 
+ <a id="cordis-surface"></a>
+@@ -186,5 +190,22 @@ abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<Store
+ readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>
+ ```
+ 
++Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
++
++<a id="ctximageinputbridge--imageinputbridge"></a>
++
++### `ctx.imageInputBridge` — `ImageInputBridge`
++
++Optional image-admission capability supplied by a visual bridge plugin. The seam decides only whether durable image references may enter a text-only route; it never projects pixels into that main model's request.
++
++```ts cordis-catalog
++/**
++ * Decide whether the mounted bridge can serve one explicit text-only route.
++ * @param route - exact provider/model selection and optional caller cancellation.
++ * @returns whether image references may be admitted for bridge-mediated inspection.
++ */
++canHandle(route: ImageInputBridgeRoute): boolean | Promise<boolean>
++```
++
+ Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
+ <!-- END GENERATED cordis-surface -->
+diff --git a/packages/acp/acp/src/content.ts b/packages/acp/acp/src/content.ts
+index 66ac7ea..54f5fd0 100644
+--- a/packages/acp/acp/src/content.ts
++++ b/packages/acp/acp/src/content.ts
+@@ -59,7 +59,7 @@ function decodeImage(block: Extract<AcpContentBlock, { type: 'image' }>): SaveIm
+   return { data, mediaType }
+ }
+ 
+-/** Resolve the exact current route and require explicit image input support. */
++/** Resolve the exact current route and require native or explicitly bridged image input support. */
+ async function assertImageRoute(ctx: Context, agent: Agent, signal: AbortSignal): Promise<void> {
+   const routed = agent.session.requestHeader()?.config
+   const provider = routed?.provider ?? agent.options.provider
+@@ -74,7 +74,17 @@ async function assertImageRoute(ctx: Context, agent: Agent, signal: AbortSignal)
+   } catch (error: unknown) {
+     throw new AcpContentError('the current model route could not be verified for image input', 'internal', { cause: error })
+   }
+-  if (info.inputModalities === undefined || !info.inputModalities.includes('image')) {
++  if (info.inputModalities?.includes('image') === true) return
++  const bridge = ctx.get('imageInputBridge')
++  let bridged = false
++  if (info.inputModalities !== undefined && bridge !== undefined) {
++    try {
++      bridged = await bridge.canHandle({ provider, model, signal })
++    } catch (error: unknown) {
++      throw new AcpContentError('the configured image bridge could not verify this route', 'internal', { cause: error })
++    }
++  }
++  if (!bridged) {
+     throw new AcpContentError(`model "${model}" does not declare image input`, 'invalid')
+   }
+ }
+@@ -98,7 +108,11 @@ export async function supportsAcpImagePrompts(
+   if (!attachments.imageLimits.mediaTypes.some(mediaType => IMAGE_MEDIA_TYPES.includes(mediaType))) return false
+   try {
+     const info = await llm.resolveModelInfo(provider, model)
+-    return info.inputModalities?.includes('image') === true
++    if (info.inputModalities?.includes('image') === true) return true
++    const bridge = ctx.get('imageInputBridge')
++    return info.inputModalities !== undefined && bridge !== undefined
++      ? await bridge.canHandle({ provider, model })
++      : false
+   } catch {
+     return false
+   }
+diff --git a/packages/acp/acp/tests/content.spec.ts b/packages/acp/acp/tests/content.spec.ts
+index a22dbe9..289a227 100644
+--- a/packages/acp/acp/tests/content.spec.ts
++++ b/packages/acp/acp/tests/content.spec.ts
+@@ -28,6 +28,8 @@ interface AdmissionFixture {
+ function admissionFixture(options: {
+   attachments?: boolean
+   llm?: boolean
++  bridge?: boolean
++  inputModalities?: readonly ('text' | 'image')[] | undefined
+   provider?: string | undefined
+   model?: string | undefined
+   header?: { provider?: string; model?: string }
+@@ -42,7 +44,7 @@ function admissionFixture(options: {
+     provider,
+     id: model,
+     name: model,
+-    inputModalities: ['text', 'image'] as const,
++    inputModalities: 'inputModalities' in options ? options.inputModalities : ['text', 'image'] as const,
+   }))
+   const attachments = options.attachments === false ? undefined : { saveImages }
+   const llm = options.llm === false ? undefined : { resolveModelInfo }
+@@ -50,6 +52,7 @@ function admissionFixture(options: {
+     get(name: string) {
+       if (name === 'attachments') return attachments
+       if (name === 'llm') return llm
++      if (name === 'imageInputBridge' && options.bridge === true) return { canHandle: () => true }
+       return undefined
+     },
+   } as unknown as Context
+@@ -87,6 +90,13 @@ describe('ACP rich content codec', () => {
+     await expect(supportsAcpImagePrompts(absent(store, unknownLlm), 'p', 'm')).resolves.toBe(false)
+     await expect(supportsAcpImagePrompts(absent(store, textLlm), 'p', 'm')).resolves.toBe(false)
+     await expect(supportsAcpImagePrompts(absent(store, imageLlm), 'p', 'm')).resolves.toBe(true)
++    const bridged = {
++      get: (name: string) => name === 'attachments' ? store
++        : name === 'llm' ? textLlm
++          : name === 'imageInputBridge' ? { canHandle: () => true }
++            : undefined,
++    } as unknown as Context
++    await expect(supportsAcpImagePrompts(bridged, 'p', 'm')).resolves.toBe(true)
+   })
+ 
+   it('validates every rich wire block before any image write', async () => {
+@@ -147,6 +157,10 @@ describe('ACP rich content codec', () => {
+     await expect(admitAcpPrompt(textOnly.ctx, textOnly.agent, prompt, true, new AbortController().signal))
+       .rejects.toThrow(/does not declare image input/)
+ 
++    const bridgedText = admissionFixture({ bridge: true, inputModalities: ['text'] })
++    await expect(admitAcpPrompt(bridgedText.ctx, bridgedText.agent, prompt, true, new AbortController().signal))
++      .resolves.toHaveLength(1)
++
+     const routed = admissionFixture({ provider: 'fallback', model: 'fallback', header: { provider: 'live', model: 'vision-2' } })
+     await expect(admitAcpPrompt(routed.ctx, routed.agent, prompt, true, new AbortController().signal)).resolves.toHaveLength(1)
+     expect(routed.resolveModelInfo).toHaveBeenCalledWith('live', 'vision-2', expect.any(AbortSignal))
+diff --git a/packages/attachment/attachment/src/index.ts b/packages/attachment/attachment/src/index.ts
+index 8b54926..ae38ff1 100644
+--- a/packages/attachment/attachment/src/index.ts
++++ b/packages/attachment/attachment/src/index.ts
+@@ -30,9 +30,32 @@ export type {
+ declare module '@deepseek-ai/cordis' {
+   interface Context {
+     attachments: AttachmentStore
++    /** Optional deployment bridge that lets a text-only route accept durable images through a visual sub-agent. */
++    imageInputBridge: ImageInputBridge
+   }
+ }
+ 
++/** Exact main-model route considered for bridged image admission. */
++export interface ImageInputBridgeRoute {
++  readonly provider: string
++  readonly model: string
++  readonly signal?: AbortSignal
++}
++
++/**
++ * Optional image-admission capability supplied by a visual bridge plugin.
++ * The seam decides only whether durable image references may enter a text-only
++ * route; it never projects pixels into that main model's request.
++ */
++export interface ImageInputBridge {
++  /**
++   * Decide whether the mounted bridge can serve one explicit text-only route.
++   * @param route - exact provider/model selection and optional caller cancellation.
++   * @returns whether image references may be admitted for bridge-mediated inspection.
++   */
++  canHandle(route: ImageInputBridgeRoute): boolean | Promise<boolean>
++}
++
+ /** Immutable binary attachment service. Implementations validate bytes before publishing a reference. */
+ export abstract class AttachmentStore extends Service {
+   constructor(ctx: Context) {
+diff --git a/packages/bundle/base/cordis.patch.yml b/packages/bundle/base/cordis.patch.yml
+index f76a5d2..73b4006 100644
+--- a/packages/bundle/base/cordis.patch.yml
++++ b/packages/bundle/base/cordis.patch.yml
+@@ -106,6 +106,20 @@
+     - id: attachment-local
+       name: '@deepseek-ai/dsh-attachment-local'
+ 
++    # Optional visual sub-agent for text-only main models. Disabled keeps the
++    # native multimodal path unchanged; deployments enable this row only when
++    # the operator config or immutable launch environment points at an
++    # OpenAI-compatible vision gateway.
++    - id: vision-bridge
++      name: '@deepseek-ai/dsh-vision-bridge'
++      disabled: true
++      config:
++        apiKeyEnv: QWEN_VISION_API_KEY
++        model: Qwen3.6-35B-A3B
++        timeoutMs: 120000
++        maxImagesPerCall: 9
++        maxOutputTokens: 4096
++
+     # Full-text session search is opt-in. `openAt: never` keeps
+     # ctx.sessionQuery mounted — exact reads, titles, and lineage traces
+     # (session export, subagent-fork Workspace inheritance) stay available —
+diff --git a/packages/bundle/base/package.json b/packages/bundle/base/package.json
+index f43dd00..70c5ec2 100644
+--- a/packages/bundle/base/package.json
++++ b/packages/bundle/base/package.json
+@@ -45,6 +45,7 @@
+     "@deepseek-ai/dsh-agent-default-model": "workspace:^",
+     "@deepseek-ai/dsh-agent-loop": "workspace:^",
+     "@deepseek-ai/dsh-attachment-local": "workspace:^",
++    "@deepseek-ai/dsh-vision-bridge": "workspace:^",
+     "@deepseek-ai/dsh-shell-env": "workspace:^",
+     "@deepseek-ai/dsh-bash-sandbox": "workspace:^",
+     "@deepseek-ai/dsh-command-compact": "workspace:^",
+diff --git a/packages/extensions/tool-cordis/src/api-catalog.ts b/packages/extensions/tool-cordis/src/api-catalog.ts
+index 32e9ccb..0dd8443 100644
+--- a/packages/extensions/tool-cordis/src/api-catalog.ts
++++ b/packages/extensions/tool-cordis/src/api-catalog.ts
+@@ -880,6 +880,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
+       },
+     ],
+   },
++  {
++    key: 'imageInputBridge',
++    summary: 'Optional image-admission capability supplied by a visual bridge plugin.',
++    description: 'Optional image-admission capability supplied by a visual bridge plugin. The seam decides only whether durable image references may enter a text-only route; it never projects pixels into that main model\'s request.',
++    methods: [
++      {
++        signature: 'canHandle(route: ImageInputBridgeRoute): boolean | Promise<boolean>',
++        description: 'Decide whether the mounted bridge can serve one explicit text-only route.',
++        parameters: [{ name: 'route', description: 'exact provider/model selection and optional caller cancellation.' }],
++        returns: 'whether image references may be admitted for bridge-mediated inspection.',
++      },
++    ],
++  },
+   {
+     key: 'invariants',
+     summary: 'Package-owned invariant registry with global and regex-based selection.',
+@@ -3457,6 +3470,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
+     name: 'ImageBlock',
+     declaration: 'export interface ImageBlock {\n    type: \'image\';\n    attachment: ImageAttachmentRef;\n}',
+   },
++  {
++    name: 'ImageInputBridgeRoute',
++    declaration: 'export interface ImageInputBridgeRoute {\n    readonly provider: string;\n    readonly model: string;\n    readonly signal?: AbortSignal;\n}',
++  },
+   {
+     name: 'ImageMediaType',
+     declaration: 'export type ImageMediaType = \'image/png\' | \'image/jpeg\' | \'image/webp\' | \'image/gif\';',
+diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
+index ba354e1..0898896 100644
+--- a/packages/host/apiproxy/src/api-proxy.ts
++++ b/packages/host/apiproxy/src/api-proxy.ts
+@@ -2386,11 +2386,18 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+               const current = selectionFor(agent).current
+               const modelInfo = await ctx.llm.resolveModelInfo(current.provider, current.model)
+               if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
+-                return err(request, {
+-                  code: 'attachment-error',
+-                  message: `Model "${current.model}" does not support image input.`,
+-                  details: { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
+-                })
++                const bridge = ctx.get('imageInputBridge')
++                const bridged = bridge === undefined
++                  ? false
++                  : await Promise.resolve(bridge.canHandle({ provider: current.provider, model: current.model }))
++                    .catch(() => false)
++                if (!bridged) {
++                  return err(request, {
++                    code: 'attachment-error',
++                    message: `Model "${current.model}" does not support image input.`,
++                    details: { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
++                  })
++                }
+               }
+             }
+             const durable = await durablePromptContent(ctx, content)
+diff --git a/packages/host/apiproxy/tests/api-proxy-models.spec.ts b/packages/host/apiproxy/tests/api-proxy-models.spec.ts
+index 1317220..a81c3d2 100644
+--- a/packages/host/apiproxy/tests/api-proxy-models.spec.ts
++++ b/packages/host/apiproxy/tests/api-proxy-models.spec.ts
+@@ -130,6 +130,55 @@ function registerTextOnly(ctx: Context): void {
+ }
+ 
+ describe('Web session model selection', () => {
++  it('admits images to an explicit text-only route only through the optional image bridge', async () => {
++    const { ctx, agent, sessionId } = await harness()
++    registerTextOnly(ctx)
++    const ref = {
++      attachmentId: 'att-bridged', mediaType: 'image/png' as const, bytes: 1, width: 1, height: 1,
++    }
++    const validateImage = vi.fn(() => Promise.resolve())
++    const saveImage = vi.fn(() => Promise.resolve(ref))
++    ctx.provide('attachments', Object.setPrototypeOf({
++      imageLimits: {
++        maxImageBytes: 4,
++        maxImagesPerMessage: 2,
++        maxMessageImageBytes: 4,
++        maxImagePixels: 4,
++        maxImageDimension: 2000,
++        mediaTypes: ['image/png'],
++      },
++      validateImage,
++      saveImage,
++    }, AttachmentStore.prototype) as never)
++    const followup = vi.fn()
++    Object.assign(agent, { followup })
++    const api = createApiProxy(ctx, {
++      defaultModelSelection: () => ({ provider: 'text-only', model: 'plain' }),
++      cwd: '/tmp',
++    })
++    const payload = {
++      sessionId,
++      mode: 'queue' as const,
++      content: [{ type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==' }],
++    }
++
++    const denied = await api.sessions.prompt(request(payload))
++    expect(denied.result).toMatchObject({
++      ok: false,
++      error: { code: 'attachment-error', details: { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' } },
++    })
++    expect(saveImage).not.toHaveBeenCalled()
++
++    const canHandle = vi.fn(() => true)
++    ctx.provide('imageInputBridge', { canHandle })
++    const accepted = await api.sessions.prompt(request(payload))
++    expect(accepted.result).toEqual({ ok: true, value: { accepted: true } })
++    expect(canHandle).toHaveBeenCalledWith({ provider: 'text-only', model: 'plain' })
++    expect(saveImage).toHaveBeenCalledOnce()
++    expect((followup.mock.calls[0]?.[0] as UserMessage).content).toEqual([{ type: 'image', attachment: ref }])
++    await ctx.fiber.dispose()
++  })
++
+   it('validates an ordered image batch before persisting any member', async () => {
+     const { ctx, agent, sessionId } = await harness()
+     const validateImage = vi.fn((_input: { data: Uint8Array }) => Promise.resolve())
+diff --git a/packages/vision/vision-bridge/README.i18n.yaml b/packages/vision/vision-bridge/README.i18n.yaml
+new file mode 100644
+index 0000000..0ac7c9a
+--- /dev/null
++++ b/packages/vision/vision-bridge/README.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write packages/vision/vision-bridge/README.md
++README.md: 4cdddad2c38bd5dd0f175cbab53d3a1047308e0a
++README.zh.md: 1884c3e0c99ace82b5f4e59b4a8ae40826fb64c2
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+new file mode 100644
+index 0000000..4cdddad
+--- /dev/null
++++ b/packages/vision/vision-bridge/README.md
+@@ -0,0 +1,87 @@
++# @deepseek-ai/dsh-vision-bridge
++
++English | [中文](README.zh.md)
++
++An opt-in visual sub-agent bridge for text-only main models. DSH stores each uploaded image through the existing attachment service, persists one adjacent `<system-reminder>` for every new image-bearing human message, and exposes `vision_inspect` so the main model can delegate a complete visual question to an administrator-configured OpenAI-compatible vision model. The main model never receives image tokens: DSH's text-only projection replaces every image block with a stable text handle, while the durable reminder carries the full current-session `attachment_id`.
++
++The bridge is disabled in the base bundle. Leave it disabled for native multimodal routes; those routes continue using DSH's native image path without this reminder or tool.
++
++## Configuration
++
++Enable the existing base-bundle row in a later composition patch and restate its complete config:
++
++```yaml
++- id: vision-bridge
++  disabled: false
++  config:
++    baseURL: !!js process.env.DSH_VISION_BASE_URL
++    apiKeyEnv: QWEN_VISION_API_KEY
++    model: Qwen3.6-35B-A3B
++    timeoutMs: 120000
++    maxImagesPerCall: 9
++    maxOutputTokens: 4096
++```
++
++`baseURL` is required when the row is enabled; `/chat/completions` is appended unless it is already present. `apiKeyEnv` is a credential reference, resolved per call through `ctx.credentials` or the immutable launch environment. A literal `apiKey` is supported for controlled embedding but should not be committed. The numeric bounds fail loud unless they are positive integers.
++
++Loading the row is the enablement decision. It supplies the optional `imageInputBridge` admission capability, registers `vision_inspect`, and installs the durable reminder hook. There is no model preset or global prompt mutation.
++
++## Durable history and KV cache
++
++The reminder is generated only while a newly claimed human message contains image blocks. It is inserted immediately after that message and appended by the ordinary agent loop as another durable `user/message`. Later turns replay that exact event; the plugin does not remove, regenerate, move, or re-inject old reminders. Thus the prior conversation remains an append-only request prefix and can reuse the same KV-cache entries as ordinary text history.
++
++Compaction may replace an old visible range with a summary according to the deployment's normal policy. The attachment authorization check still examines the complete session event log, including shadowed events, but the summary must preserve any `attachment_id` the main model may need later.
++
++## Session isolation and gateway contract
++
++Before reading bytes, `vision_inspect` resolves every requested id from uploaded image blocks in the calling agent's own session event stream. An unknown or cross-session id rejects the complete batch before any attachment read or gateway request. Duplicate ids and over-limit batches also fail before dispatch.
++
++The gateway receives one OpenAI-compatible chat-completions request containing the main model's complete delegated prompt plus data URLs for the authorized images. Model-visible results contain only `attachmentIds`, `summary`, `observations` (`text`, optional `region`, optional `confidence`), and `limitations`; endpoint, credential, remote model, timing, and internal error bodies are excluded.
++
++## Model Experience
++
++### Upload reminder
++
++#### What the model sees
++
++Each newly uploaded image message is followed by one durable notice containing full current-session `attachment_id` values. No notice is added after a tool result.
++
++##### Reminder template
++
++```markdown
++<system-reminder>
++本条用户消息包含图片，已保存到当前对话：
++- attachment_id: <full attachment id>，name: <optional escaped name>
++主模型不能直接读取图片像素。需要视觉信息时调用 vision_inspect；不需要时继续处理用户请求。
++</system-reminder>
++```
++
++#### Token effect
++
++One bounded text notice is added for each image-bearing human message; each image contributes one id line. Old notices remain ordinary durable history and are not generated again.
++
++#### KV Cache effect
++
++Append-only: the new user message and notice extend the reusable request prefix. Subsequent turns replay the exact stored events without mutation or reordering.
++
++### vision_inspect tool
++
++#### What the model sees
++
++The model sees the `vision_inspect` tool with `attachmentIds` and a complete delegated `prompt`; its description says to reuse recent tool results unless a new visual question, region, comparison, or missing observation requires another call.
++
++#### Token effect
++
++The stable tool definition is present whenever the plugin is loaded. Each successful call adds one structured textual tool result; image bytes and data URLs exist only in the separate vision-gateway request.
++
++#### KV Cache effect
++
++The stable tool definition is part of the reusable request prefix. Each new tool call and result is appended normally, without rewriting earlier reminders or observations.
++
++## Known Limitations and Deferred Work
++
++- **Compaction depends on identifier-preserving summaries** — the attachment remains authorized from the full event log, but the main model cannot choose a shadowed image if its compact summary drops the full `attachment_id`.
++- **One configured visual backend** — routing among multiple vision models, health-based failover, and per-workspace overrides are deferred.
++- **OpenAI-compatible transport only** — provider-native upload APIs and server-side image caches are not implemented.
++- **No automatic visual call** — the main model decides whether the user's task needs pixels; the bridge does not invoke the vision backend merely because an image was uploaded.
++- **Explicit enablement is deployment-wide** — do not enable the bridge row for a process intended to rely on native multimodal input.
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+new file mode 100644
+index 0000000..1884c3e
+--- /dev/null
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -0,0 +1,87 @@
++# @deepseek-ai/dsh-vision-bridge
++
++[English](README.md) | 中文
++
++这是一个面向纯文本主模型、默认关闭的视觉子智能体桥。DSH 仍通过现有 attachment 服务保存用户上传的图片；每条新出现且包含图片的人类消息后，系统会持久化一条相邻的 `<system-reminder>`；主模型需要视觉证据时，再通过 `vision_inspect` 把完整视觉问题委托给管理员配置的 OpenAI 兼容视觉模型。主模型不会收到图片 token：DSH 的纯文本投影会把所有图片块替换为稳定文本句柄，而持久 reminder 会提供当前对话内完整的 `attachment_id`。
++
++基础 bundle 中该桥默认禁用。原生多模态路由应继续保持禁用，沿用 DSH 原生图片路径，不需要本插件的 reminder 和工具。
++
++## 配置
++
++在后续 composition patch 中启用基础 bundle 已有的配置行，并完整重述 config：
++
++```yaml
++- id: vision-bridge
++  disabled: false
++  config:
++    baseURL: !!js process.env.DSH_VISION_BASE_URL
++    apiKeyEnv: QWEN_VISION_API_KEY
++    model: Qwen3.6-35B-A3B
++    timeoutMs: 120000
++    maxImagesPerCall: 9
++    maxOutputTokens: 4096
++```
++
++配置行启用后，`baseURL` 为必填；若结尾不是 `/chat/completions`，插件会自动追加。`apiKeyEnv` 是 credential reference，每次调用时通过 `ctx.credentials` 或不可变启动环境解析。受控嵌入场景可以使用字面量 `apiKey`，但不应提交到仓库。所有数值上限必须是正整数，否则加载时直接失败。
++
++是否加载该配置行就是功能开关。插件会提供可选的 `imageInputBridge` 准入能力、注册 `vision_inspect`，并安装持久 reminder hook；不会修改模型 preset，也不会增加全局 system prompt。
++
++## 持久历史与 KV cache
++
++只有新领取的人类消息中确实存在图片块时，插件才生成 reminder。它紧跟原用户消息，并由普通 agent loop 作为另一条持久化 `user/message` 追加。后续轮次只重放这条既有事件；插件不会删除、重新生成、移动或再次注入旧 reminder。因而既有对话仍是仅追加的请求前缀，可以像普通文本历史一样复用 KV cache。
++
++压缩可能按照部署的通用策略，用摘要替换旧的可见区间。attachment 鉴权仍会检查完整 session event log，包括已被遮蔽的事件；但摘要必须保留未来仍可能使用的完整 `attachment_id`，主模型才能主动选择那张历史图片。
++
++## 对话隔离与网关契约
++
++读取任何图片字节前，`vision_inspect` 会先从调用 agent 自己的 session event stream 中解析全部请求 id。未知 id 或其他对话中的 id 会让整批请求在 attachment 读取和网关调用之前失败；重复 id 和超过上限的批次同样会在派发前失败。
++
++网关收到一条 OpenAI 兼容 chat-completions 请求，其中包含主模型给出的完整委托 prompt，以及已授权图片的 data URL。主模型可见结果只包含 `attachmentIds`、`summary`、`observations`（`text`、可选 `region`、可选 `confidence`）和 `limitations`；endpoint、credential、远端 model、耗时和内部错误正文都不会进入结果。
++
++## Model Experience
++
++### Upload reminder
++
++#### What the model sees
++
++每条新上传图片的消息之后，模型会看到一条持久 notice，其中包含当前对话内完整的 `attachment_id`。工具结果之后不会再增加 notice。
++
++##### Reminder template
++
++```markdown
++<system-reminder>
++本条用户消息包含图片，已保存到当前对话：
++- attachment_id: <full attachment id>，name: <optional escaped name>
++主模型不能直接读取图片像素。需要视觉信息时调用 vision_inspect；不需要时继续处理用户请求。
++</system-reminder>
++```
++
++#### Token effect
++
++每条包含图片的人类消息只增加一条有界文本 notice；每张图片增加一行 id。旧 notice 会保留为普通持久历史，不会再次生成。
++
++#### KV Cache effect
++
++仅追加：新用户消息和 notice 只扩展可复用请求前缀。后续轮次原样重放已存事件，不修改也不重排。
++
++### vision_inspect tool
++
++#### What the model sees
++
++模型会看到 `vision_inspect` 工具，参数为 `attachmentIds` 和完整委托 `prompt`。工具描述要求：最近的 tool result 已经足够时直接使用；只有新的视觉问题、其他区域、图片比较或证据缺失时才再次调用。
++
++#### Token effect
++
++插件加载期间，稳定工具定义始终存在。每次成功调用只增加一条结构化文本工具结果；图片字节和 data URL 只存在于独立的视觉网关请求中。
++
++#### KV Cache effect
++
++稳定工具定义属于可复用请求前缀。新的工具调用与结果按普通方式追加，不会改写之前的 reminder 或 observation。
++
++## Known Limitations and Deferred Work
++
++- **压缩依赖摘要保留标识符**：attachment 仍可通过完整事件日志鉴权，但如果 compact summary 丢失了完整 `attachment_id`，主模型就无法主动选择已被遮蔽的历史图片。
++- **只支持一个已配置视觉后端**：多视觉模型路由、基于健康状态的 failover，以及工作区级覆盖暂缓实现。
++- **只支持 OpenAI 兼容传输**：尚未实现 provider 原生上传 API 和服务端图片缓存。
++- **不会自动调用视觉模型**：是否需要像素证据由主模型判断；插件不会仅因用户上传了图片就调用视觉后端。
++- **显式开关作用于整个部署**：对于依赖原生多模态输入的进程，不应启用视觉桥配置行。
+diff --git a/packages/vision/vision-bridge/package.json b/packages/vision/vision-bridge/package.json
+new file mode 100644
+index 0000000..754d1f2
+--- /dev/null
++++ b/packages/vision/vision-bridge/package.json
+@@ -0,0 +1,47 @@
++{
++  "name": "@deepseek-ai/dsh-vision-bridge",
++  "description": "Opt-in visual sub-agent bridge for text-only DeepSeek Harness routes",
++  "version": "0.1.1-rc.2",
++  "publishConfig": { "access": "public" },
++  "repository": {
++    "type": "git",
++    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
++    "directory": "packages/vision/vision-bridge"
++  },
++  "type": "module",
++  "main": "lib/index.js",
++  "types": "lib/types/index.d.ts",
++  "exports": {
++    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
++    "./invariant": { "types": "./lib/types/invariant.d.ts", "default": "./lib/invariant.js" },
++    "./src/*": "./src/*",
++    "./package.json": "./package.json"
++  },
++  "files": ["lib/index.js", "lib/invariant.js", "lib/types/**/*.d.ts"],
++  "license": "MIT",
++  "dependencies": { "@deepseek-ai/schemastery": "workspace:^" },
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-agent": "workspace:^",
++    "@deepseek-ai/dsh-attachment": "workspace:^",
++    "@deepseek-ai/dsh-credentials": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^",
++    "@deepseek-ai/dsh-launch-environment": "workspace:^",
++    "@deepseek-ai/dsh-llm": "workspace:^",
++    "@deepseek-ai/dsh-session": "workspace:^",
++    "@deepseek-ai/dsh-tools": "workspace:^"
++  },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-agent": "workspace:^",
++    "@deepseek-ai/dsh-agent-loop": "workspace:^",
++    "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
++    "@deepseek-ai/dsh-attachment": "workspace:^",
++    "@deepseek-ai/dsh-credentials": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^",
++    "@deepseek-ai/dsh-launch-environment": "workspace:^",
++    "@deepseek-ai/dsh-llm": "workspace:^",
++    "@deepseek-ai/dsh-session": "workspace:^",
++    "@deepseek-ai/dsh-tools": "workspace:^"
++  }
++}
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+new file mode 100644
+index 0000000..09a4ce7
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -0,0 +1,443 @@
++/**
++ * Opt-in visual sub-agent bridge for text-only main-model routes.
++ *
++ * New image-bearing user messages receive one durable adjacent reminder. The
++ * bridge tool resolves only images referenced by the current session and sends
++ * their bytes to an administrator-configured OpenAI-compatible vision model.
++ * @module @deepseek-ai/dsh-vision-bridge
++ */
++
++import type { Context } from '@deepseek-ai/cordis'
++import z from '@deepseek-ai/schemastery'
++import type { ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
++import { credentialRef } from '@deepseek-ai/dsh-credentials'
++import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
++import { createUserMessage } from '@deepseek-ai/dsh-llm'
++import type { UserMessage } from '@deepseek-ai/dsh-llm'
++import type { SessionEvent } from '@deepseek-ai/dsh-session'
++import { defineTool } from '@deepseek-ai/dsh-tools'
++import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
++import type {} from '@deepseek-ai/dsh-agent'
++
++/** Cordis plugin name used in durable reminder provenance. */
++export const name = 'vision-bridge'
++
++/** Services required for durable image resolution and tool registration. */
++export const inject = ['attachments', 'tools']
++
++/** Stable model-facing tool name. */
++export const VISION_INSPECT_TOOL_NAME = 'vision_inspect'
++/** Default environment reference for the vision gateway credential. */
++export const DEFAULT_VISION_API_KEY_ENV = 'QWEN_VISION_API_KEY'
++/** Default environment variable carrying the OpenAI-compatible endpoint base. */
++export const DEFAULT_VISION_BASE_URL_ENV = 'DSH_VISION_BASE_URL'
++/** Default remote visual sub-agent model. */
++export const DEFAULT_VISION_MODEL = 'Qwen3.6-35B-A3B'
++/** Default cooperative call timeout. */
++export const DEFAULT_VISION_TIMEOUT_MS = 120_000
++/** Default image-count bound for one visual inspection. */
++export const DEFAULT_VISION_MAX_IMAGES = 9
++/** Default generated-token bound for one visual inspection. */
++export const DEFAULT_VISION_MAX_OUTPUT_TOKENS = 4096
++
++/** Deployment configuration. Loading this plugin is the explicit bridge enablement switch. */
++export interface Config {
++  /** OpenAI-compatible endpoint base; `/chat/completions` is appended when absent. */
++  baseURL?: string
++  /** Literal gateway key; prefer {@link apiKeyEnv}. */
++  apiKey?: string
++  /** Credential reference resolved once per call. */
++  apiKeyEnv?: string
++  /** Visual sub-agent model id. */
++  model?: string
++  /** Cooperative timeout budget for `vision_inspect`. */
++  timeoutMs?: number
++  /** Maximum number of current-session images accepted by one call. */
++  maxImagesPerCall?: number
++  /** Maximum output tokens requested from the visual sub-agent. */
++  maxOutputTokens?: number
++}
++
++export const Config: z<Config> = z.object({
++  baseURL: z.string(),
++  apiKey: z.string().role('secret'),
++  apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_VISION_API_KEY_ENV),
++  model: z.string().default(DEFAULT_VISION_MODEL),
++  timeoutMs: z.number().step(1).min(1).default(DEFAULT_VISION_TIMEOUT_MS),
++  maxImagesPerCall: z.number().step(1).min(1).default(DEFAULT_VISION_MAX_IMAGES),
++  maxOutputTokens: z.number().step(1).min(1).default(DEFAULT_VISION_MAX_OUTPUT_TOKENS),
++})
++
++/** Fully resolved, secret-bearing runtime options. */
++export interface VisionBridgeOptions {
++  readonly baseURL: string
++  readonly apiKey?: string
++  readonly apiKeyEnv: string
++  readonly model: string
++  readonly timeoutMs: number
++  readonly maxImagesPerCall: number
++  readonly maxOutputTokens: number
++}
++
++/** Model-visible structured observation. */
++export interface VisionObservation {
++  readonly text: string
++  readonly region?: string
++  readonly confidence?: number
++}
++
++/** Model-visible result; endpoint identity and timing deliberately stay out. */
++export interface VisionInspectResult {
++  readonly attachmentIds: string[]
++  readonly summary: string
++  readonly observations: VisionObservation[]
++  readonly limitations: string[]
++}
++
++type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
++
++/** Escape untrusted attachment metadata embedded in the XML-shaped reminder. */
++function escapeXml(value: string): string {
++  return value
++    .replaceAll('&', '&amp;')
++    .replaceAll('<', '&lt;')
++    .replaceAll('>', '&gt;')
++    .replaceAll('"', '&quot;')
++    .replaceAll("'", '&apos;')
++}
++
++/**
++ * Render the one durable reminder paired with an image-bearing user message.
++ * @param refs - durable image references from that one human message.
++ * @returns the XML-shaped reminder text stored in the adjacent user event.
++ */
++export function renderImageReminder(refs: readonly ImageAttachmentRef[]): string {
++  const items = refs.map((ref) => {
++    const displayName = ref.name === undefined ? '' : `，name: ${escapeXml(ref.name)}`
++    return `- attachment_id: ${escapeXml(String(ref.attachmentId))}${displayName}`
++  }).join('\n')
++  return `<system-reminder>\n本条用户消息包含图片，已保存到当前对话：\n${items}\n主模型不能直接读取图片像素。需要视觉信息时调用 ${VISION_INSPECT_TOOL_NAME}；不需要时继续处理用户请求。\n</system-reminder>`
++}
++
++/** Collect only top-level durable image references from one uploaded user message. */
++function imageRefs(message: UserMessage): ImageAttachmentRef[] {
++  return message.content.flatMap(block => block.type === 'image' ? [block.attachment] : [])
++}
++
++/**
++ * Insert a reminder immediately after each newly claimed human image message.
++ * Existing history is not inspected or regenerated: once the returned pair is
++ * appended by the agent loop, future requests replay the exact durable prefix.
++ * @param messages - newly claimed messages returned by downstream pre-step hooks.
++ * @returns the messages with one notice adjacent to each human image message.
++ */
++export function addImageReminders(messages: readonly UserMessage[]): UserMessage[] {
++  const expanded: UserMessage[] = []
++  for (const message of messages) {
++    expanded.push(message)
++    if (message.source.kind !== 'user') continue
++    const refs = imageRefs(message)
++    if (refs.length === 0) continue
++    expanded.push(createUserMessage({
++      content: [{ type: 'text', text: renderImageReminder(refs) }],
++      source: {
++        kind: 'plugin',
++        plugin: name,
++        form: 'notice',
++        summary: `用户上传了 ${String(refs.length)} 张图片`,
++      },
++    }))
++  }
++  return expanded
++}
++
++/** Find an uploaded image reference in the complete current-session event log. */
++function findSessionImage(events: readonly SessionEvent[], attachmentId: string): ImageAttachmentRef | undefined {
++  for (const event of events) {
++    if (event.type !== 'user/message') continue
++    for (const block of event.data.content) {
++      if (block.type === 'image' && String(block.attachment.attachmentId) === attachmentId) {
++        return block.attachment
++      }
++    }
++  }
++  return undefined
++}
++
++/** Normalize an endpoint base without leaking it into model-visible errors. */
++function chatCompletionsURL(baseURL: string): string {
++  const trimmed = baseURL.replace(/\/+$/, '')
++  return trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`
++}
++
++/** Extract text from OpenAI-compatible string or text-part response content. */
++function responseText(payload: unknown): string | undefined {
++  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return undefined
++  const choices = (payload as { choices?: unknown }).choices
++  if (!Array.isArray(choices) || choices.length === 0) return undefined
++  const first = (choices as unknown[])[0]
++  if (typeof first !== 'object' || first === null || Array.isArray(first)) return undefined
++  const message = (first as { message?: unknown }).message
++  if (typeof message !== 'object' || message === null || Array.isArray(message)) return undefined
++  const content = (message as { content?: unknown }).content
++  if (typeof content === 'string') return content
++  if (!Array.isArray(content)) return undefined
++  const parts = content.flatMap((part) => {
++    if (typeof part !== 'object' || part === null || Array.isArray(part)) return []
++    const record = part as { type?: unknown; text?: unknown }
++    return record.type === 'text' && typeof record.text === 'string' ? [record.text] : []
++  })
++  return parts.length === 0 ? undefined : parts.join('')
++}
++
++/** Remove one optional Markdown fence before strict JSON parsing. */
++function unfence(text: string): string {
++  const trimmed = text.trim()
++  const matched = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed)
++  return matched?.[1]?.trim() ?? trimmed
++}
++
++/**
++ * Sanitize untrusted visual-model JSON into the public result vocabulary.
++ * @param text - assistant text returned by the configured visual model.
++ * @param attachmentIds - authorized current-session ids included in the request.
++ * @returns a model-visible result without provider, endpoint, or timing metadata.
++ */
++export function parseVisionResult(text: string, attachmentIds: readonly string[]): VisionInspectResult {
++  let value: unknown
++  try {
++    value = JSON.parse(unfence(text))
++  } catch {
++    return {
++      attachmentIds: [...attachmentIds],
++      summary: text.trim() || '视觉模型未返回可用描述。',
++      observations: [],
++      limitations: ['视觉模型未返回约定的结构化 JSON；summary 保留了原始文本。'],
++    }
++  }
++  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
++    return {
++      attachmentIds: [...attachmentIds],
++      summary: text.trim() || '视觉模型未返回可用描述。',
++      observations: [],
++      limitations: ['视觉模型返回的 JSON 根节点不是对象。'],
++    }
++  }
++  const record = value as { summary?: unknown; observations?: unknown; limitations?: unknown }
++  const observations: VisionObservation[] = Array.isArray(record.observations)
++    ? record.observations.flatMap((item) => {
++      if (typeof item !== 'object' || item === null || Array.isArray(item)) return []
++      const observation = item as { text?: unknown; region?: unknown; confidence?: unknown }
++      if (typeof observation.text !== 'string' || observation.text.trim().length === 0) return []
++      const confidence = typeof observation.confidence === 'number'
++        && Number.isFinite(observation.confidence)
++        && observation.confidence >= 0
++        && observation.confidence <= 1
++        ? observation.confidence
++        : undefined
++      return [{
++        text: observation.text,
++        ...typeof observation.region === 'string' && observation.region.length > 0
++          ? { region: observation.region }
++          : {},
++        ...confidence === undefined ? {} : { confidence },
++      }]
++    })
++    : []
++  const limitations = Array.isArray(record.limitations)
++    ? record.limitations.filter((item): item is string => typeof item === 'string' && item.length > 0)
++    : []
++  const summary = typeof record.summary === 'string' && record.summary.trim().length > 0
++    ? record.summary
++    : observations.map(item => item.text).join('\n') || '视觉模型未返回可用描述。'
++  return { attachmentIds: [...attachmentIds], summary, observations, limitations }
++}
++
++/** Resolve the configured credential for one request. */
++async function resolveApiKey(ctx: Context, options: VisionBridgeOptions): Promise<string | undefined> {
++  if (options.apiKey !== undefined && options.apiKey.length > 0) return options.apiKey
++  const ref = credentialRef(options.apiKeyEnv)
++  const credentials = ctx.get('credentials')
++  if (credentials !== undefined) return (await credentials.resolve(ref))?.value
++  const ambient = launchEnvironmentOf(ctx).get(ref)?.value
++  return ambient !== undefined && ambient.length > 0 ? ambient : undefined
++}
++
++/** Run one authorized inspection against the configured OpenAI-compatible visual sub-agent. */
++async function inspect(
++  ctx: Context,
++  options: VisionBridgeOptions,
++  attachmentIds: readonly string[],
++  prompt: string,
++  exec: ToolRunContext,
++  fetchImpl: FetchLike,
++): Promise<VisionInspectResult> {
++  if (exec.agent === undefined) throw new Error('vision_inspect requires an active agent session')
++  if (attachmentIds.length === 0) throw new Error('vision_inspect requires at least one attachmentId')
++  if (attachmentIds.length > options.maxImagesPerCall) {
++    throw new Error(`vision_inspect accepts at most ${String(options.maxImagesPerCall)} images per call`)
++  }
++  const unique = new Set(attachmentIds)
++  if (unique.size !== attachmentIds.length) throw new Error('vision_inspect attachmentIds must be unique')
++
++  // Authorize the entire batch before reading any bytes or contacting the gateway.
++  const refs = attachmentIds.map((attachmentId) => {
++    const ref = findSessionImage(exec.agent?.session.events ?? [], attachmentId)
++    if (ref === undefined) throw new Error(`attachment "${attachmentId}" is not available in the current session`)
++    return ref
++  })
++  const stored: StoredImageAttachment[] = []
++  for (const ref of refs) stored.push(await ctx.attachments.readImage(ref, exec.signal))
++  const apiKey = await resolveApiKey(ctx, options)
++  exec.signal.throwIfAborted()
++  let response: Response
++  try {
++    response = await fetchImpl(chatCompletionsURL(options.baseURL), {
++      method: 'POST',
++      headers: {
++        'content-type': 'application/json',
++        ...apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` },
++      },
++      body: JSON.stringify({
++        model: options.model,
++        temperature: 0,
++        max_tokens: options.maxOutputTokens,
++        // vLLM's Qwen chat template accepts this OpenAI-compatible extension;
++        // visual observation should spend tokens on evidence, not a hidden CoT.
++        chat_template_kwargs: { enable_thinking: false },
++        messages: [{
++          role: 'system',
++          content: '你是视觉子智能体。根据用户给出的完整任务检查所有图片，只返回 JSON 对象：'
++            + '{"summary":string,"observations":[{"text":string,"region"?:string,"confidence"?:number}],'
++            + '"limitations":string[]}。不要使用 Markdown 代码围栏。confidence 取 0 到 1。不要猜测不可见内容。',
++        }, {
++          role: 'user',
++          content: [
++            { type: 'text', text: prompt },
++            ...stored.map(image => ({
++              type: 'image_url',
++              image_url: {
++                url: `data:${image.ref.mediaType};base64,${Buffer.from(image.data).toString('base64')}`,
++              },
++            })),
++          ],
++        }],
++      }),
++      signal: exec.signal,
++    })
++  } catch (error: unknown) {
++    if (exec.signal.aborted) throw exec.signal.reason
++    throw new Error('vision service request failed', { cause: error })
++  }
++  if (!response.ok) throw new Error(`vision service request failed with HTTP ${String(response.status)}`)
++  let payload: unknown
++  try {
++    payload = await response.json()
++  } catch (error: unknown) {
++    throw new Error('vision service returned invalid JSON', { cause: error })
++  }
++  const text = responseText(payload)
++  if (text === undefined) throw new Error('vision service response did not contain assistant text')
++  return parseVisionResult(text, attachmentIds)
++}
++
++/**
++ * Build the model-facing tool; injectable fetch keeps gateway tests network-free.
++ * @param ctx - Cordis context used to resolve attachments and credentials.
++ * @param options - validated deployment route and request limits.
++ * @param fetchImpl - OpenAI-compatible transport implementation.
++ * @returns the registered `vision_inspect` definition.
++ */
++export function createVisionInspectTool(
++  ctx: Context,
++  options: VisionBridgeOptions,
++  fetchImpl: FetchLike = globalThis.fetch,
++): ToolDefinition {
++  return defineTool({
++    name: VISION_INSPECT_TOOL_NAME,
++    description: 'Inspect one or more images previously uploaded in the current conversation by delegating a complete visual task to the configured vision sub-agent. Pass only attachment_id values from this conversation and write a self-contained prompt that includes the user question, the exact visual evidence needed, regions to inspect, comparisons, and desired answer detail. Results already returned by this tool remain in recent tool results; call it again only when a new question, another region, a comparison, or missing evidence requires another visual observation.',
++    parameters: {
++      attachmentIds: {
++        type: 'array',
++        items: { type: 'string' },
++        required: true,
++        description: 'Unique attachment_id values from durable reminders in the current conversation.',
++      },
++      prompt: {
++        type: 'string',
++        required: true,
++        description: 'Complete visual sub-agent task, including the user request and what must be inspected or compared.',
++      },
++    },
++    output: {
++      schema: {
++        type: 'object',
++        additionalProperties: false,
++        properties: {
++          attachmentIds: { type: 'array', items: { type: 'string' }, required: true },
++          summary: { type: 'string', required: true },
++          observations: {
++            type: 'array',
++            required: true,
++            items: {
++              type: 'object',
++              additionalProperties: false,
++              properties: {
++                text: { type: 'string', required: true },
++                region: { type: 'string' },
++                confidence: { type: 'number' },
++              },
++            },
++          },
++          limitations: { type: 'array', items: { type: 'string' }, required: true },
++        },
++      },
++      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
++    },
++    timeoutMs: options.timeoutMs,
++    isConcurrencySafe: () => true,
++    execute: (args, exec) => inspect(ctx, options, args.attachmentIds, args.prompt, exec, fetchImpl),
++  })
++}
++
++/** Resolve and validate deployment options without exposing secrets. */
++function resolveOptions(ctx: Context, config: Config): VisionBridgeOptions {
++  const resolved = Config(config) as Required<Omit<Config, 'baseURL' | 'apiKey'>> & Pick<Config, 'baseURL' | 'apiKey'>
++  // A workspace-controlled project .env must never redirect a managed gateway
++  // credential. Composition config is operator-owned; the environment fallback
++  // therefore accepts only the inherited process and Harness-user layers.
++  const baseURL = resolved.baseURL
++    ?? launchEnvironmentOf(ctx).getFrom(DEFAULT_VISION_BASE_URL_ENV, ['process', 'user-env'])?.value
++  if (baseURL === undefined || baseURL.trim().length === 0) {
++    throw new Error(`vision-bridge: baseURL or ${DEFAULT_VISION_BASE_URL_ENV} is required when the plugin is enabled`)
++  }
++  for (const [key, value] of [
++    ['timeoutMs', resolved.timeoutMs],
++    ['maxImagesPerCall', resolved.maxImagesPerCall],
++    ['maxOutputTokens', resolved.maxOutputTokens],
++  ] as const) {
++    if (!Number.isInteger(value) || value < 1) throw new Error(`vision-bridge: ${key} must be a positive integer`)
++  }
++  credentialRef(resolved.apiKeyEnv)
++  return {
++    baseURL: baseURL.trim(),
++    ...resolved.apiKey === undefined ? {} : { apiKey: resolved.apiKey },
++    apiKeyEnv: resolved.apiKeyEnv,
++    model: resolved.model,
++    timeoutMs: resolved.timeoutMs,
++    maxImagesPerCall: resolved.maxImagesPerCall,
++    maxOutputTokens: resolved.maxOutputTokens,
++  }
++}
++
++/** Enable bridged admission, durable reminders, and the visual inspection tool. */
++export function apply(ctx: Context, config: Config): void {
++  const options = resolveOptions(ctx, config)
++  ctx.provide('imageInputBridge', { canHandle: () => true })
++  ctx.tools.register(createVisionInspectTool(ctx, options))
++  ctx.on('agent/pre-step', async (_payload, next) => {
++    const downstream = await next()
++    if (downstream.kind === 'reject') return downstream
++    return { kind: 'enter' as const, messages: addImageReminders(downstream.messages) }
++  })
++}
+diff --git a/packages/vision/vision-bridge/src/invariant.ts b/packages/vision/vision-bridge/src/invariant.ts
+new file mode 100644
+index 0000000..9b3d8d8
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/invariant.ts
+@@ -0,0 +1,22 @@
++/** Package-owned invariant companion for `@deepseek-ai/dsh-vision-bridge`. @module */
++
++/* jscpd:ignore-start */
++import type { Context } from '@deepseek-ai/cordis'
++import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
++
++const PACKAGE_NAME = '@deepseek-ai/dsh-vision-bridge'
++
++/** Cordis companion plugin name. */
++export const name = 'vision-bridge-invariant'
++/** Service required before the companion can reserve package ownership. */
++export const inject = ['invariants']
++
++/** Runtime behavior is covered at the admission, durable-event, and tool boundaries. */
++const install: InvariantInstaller = () => {
++  // No runtime invariant: the package owns no durable event or mutable service state.
++}
++
++/** Register this package's invariant companion. */
++export const apply = (ctx: Context): Promise<() => void> =>
++  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
++/* jscpd:ignore-end */
+diff --git a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+new file mode 100644
+index 0000000..df7a2a9
+--- /dev/null
++++ b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+@@ -0,0 +1,210 @@
++import { describe, expect, it, vi } from 'vitest'
++import { Context } from '@deepseek-ai/cordis'
++import type { Agent } from '@deepseek-ai/dsh-agent'
++import AgentLoop from '@deepseek-ai/dsh-agent-loop'
++import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
++import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
++import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import { createUserMessage } from '@deepseek-ai/dsh-llm'
++import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
++import { SessionId } from '@deepseek-ai/dsh-session'
++import type { SessionEvent } from '@deepseek-ai/dsh-session'
++import * as VisionBridge from '@deepseek-ai/dsh-vision-bridge'
++import type { VisionBridgeOptions } from '@deepseek-ai/dsh-vision-bridge'
++import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
++
++const ID = `sha256:${'1'.repeat(64)}`
++const REF: ImageAttachmentRef = {
++  attachmentId: AttachmentId(ID),
++  mediaType: 'image/png',
++  bytes: 1,
++  width: 1,
++  height: 1,
++  name: 'screen<&>.png',
++}
++
++const OPTIONS: VisionBridgeOptions = {
++  baseURL: 'http://vision.test/v1',
++  apiKey: 'secret',
++  apiKeyEnv: 'QWEN_VISION_API_KEY',
++  model: 'qwen-vision',
++  timeoutMs: 30_000,
++  maxImagesPerCall: 3,
++  maxOutputTokens: 1024,
++}
++
++function waitForIdle(ctx: Context, agent: Agent): Promise<void> {
++  return new Promise((resolve) => {
++    const dispose = ctx.on('agent/status', ({ agent: current, status }) => {
++      if (current !== agent || status !== 'idle') return
++      dispose()
++      resolve()
++    })
++  })
++}
++
++class TextOnlyAdapter extends MockAdapter {
++  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
++    return Promise.resolve({ provider, id: model, name: model, inputModalities: ['text'] })
++  }
++}
++
++describe('durable image reminder', () => {
++  it('renders full attachment ids and escapes untrusted names', () => {
++    const reminder = VisionBridge.renderImageReminder([REF])
++    expect(reminder).toContain('<system-reminder>\n本条用户消息包含图片，已保存到当前对话：')
++    expect(reminder).toContain(`attachment_id: ${ID}`)
++    expect(reminder).toContain('name: screen&lt;&amp;&gt;.png')
++    expect(reminder).toContain('需要视觉信息时调用 vision_inspect；不需要时继续处理用户请求。')
++  })
++
++  it('adds exactly one adjacent reminder for each newly claimed human image message', () => {
++    const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
++    const oldReminder = createUserMessage({
++      content: [{ type: 'text', text: '<system-reminder>old</system-reminder>' }],
++      source: { kind: 'plugin', plugin: VisionBridge.name, form: 'notice', summary: 'old' },
++    })
++    const expanded = VisionBridge.addImageReminders([image, oldReminder])
++    expect(expanded).toHaveLength(3)
++    expect(expanded[0]).toBe(image)
++    expect(expanded[1]?.source).toMatchObject({ kind: 'plugin', plugin: VisionBridge.name, form: 'notice' })
++    expect(expanded[2]).toBe(oldReminder)
++  })
++
++  it('persists the reminder once and replays a stable text-only prefix on later turns', async () => {
++    const ctx = new Context()
++    await mountAgentLoopTestDependencies(ctx, { systemPrompt: { persona: '' } })
++    const readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })
++    ctx.provide('attachments', Object.setPrototypeOf({
++      imageLimits: {
++        maxImageBytes: 4,
++        maxImagesPerMessage: 2,
++        maxMessageImageBytes: 4,
++        maxImagePixels: 4,
++        maxImageDimension: 2000,
++        mediaTypes: ['image/png'],
++      },
++      readImage,
++    }, AttachmentStore.prototype) as never)
++    await ctx.plugin(AgentLoop, { agents: [] })
++    await ctx.plugin(VisionBridge, { baseURL: OPTIONS.baseURL, apiKey: 'secret' })
++    const adapter = new TextOnlyAdapter([textResponse('first'), textResponse('second')])
++    ctx.llm.registerAdapter(['text-only'], adapter)
++    const agent = ctx.agentLoop.create(SessionId('vision-reminder'), { provider: 'text-only', model: 'plain' })
++
++    agent.followup(createUserMessage({
++      content: [{ type: 'text', text: '看看这张图' }, { type: 'image', attachment: REF }],
++      source: { kind: 'user' },
++    }))
++    await waitForIdle(ctx, agent)
++    agent.followup(createUserMessage({ content: [{ type: 'text', text: '继续' }], source: { kind: 'user' } }))
++    await waitForIdle(ctx, agent)
++
++    const reminders = agent.session.events.filter((event): event is SessionEvent<'user/message'> =>
++      event.type === 'user/message'
++      && event.data.source.kind === 'plugin'
++      && event.data.source.plugin === VisionBridge.name)
++    expect(reminders).toHaveLength(1)
++    const reminderBlock = reminders[0]?.data.content[0]
++    expect(reminderBlock?.type).toBe('text')
++    expect(reminderBlock?.type === 'text' ? reminderBlock.text : '').toContain(ID)
++    expect(adapter.requests).toHaveLength(2)
++    for (const request of adapter.requests) {
++      expect(request.messages.flatMap(message => message.content).some(block => block.type === 'image')).toBe(false)
++    }
++    const firstText = adapter.requests[0]?.messages
++      .flatMap(message => message.content)
++      .map(block => block.type === 'text' ? block.text : '')
++      .join('\n') ?? ''
++    const secondText = adapter.requests[1]?.messages
++      .flatMap(message => message.content)
++      .map(block => block.type === 'text' ? block.text : '')
++      .join('\n') ?? ''
++    expect(firstText).toContain(ID)
++    expect(secondText.indexOf(firstText)).toBe(0)
++    await ctx.fiber.dispose()
++  })
++})
++
++describe('vision_inspect', () => {
++  function eventWithImage(): SessionEvent {
++    return {
++      type: 'user/message',
++      seq: 1,
++      at: 1,
++      data: createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } }),
++      meta: { surfaceOp: 'append' },
++    } as unknown as SessionEvent
++  }
++
++  function execution(events: readonly SessionEvent[]) {
++    return {
++      signal: new AbortController().signal,
++      agent: { session: { events } },
++    } as never
++  }
++
++  it('authorizes the complete batch from the current session before sending image bytes', async () => {
++    const readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })
++    const ctx = { attachments: { readImage }, get: () => undefined } as unknown as Context
++    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
++      expect(input).toBe('http://vision.test/v1/chat/completions')
++      if (typeof init?.body !== 'string') throw new Error('expected a JSON string body')
++      const parsed = JSON.parse(init.body) as unknown
++      const body = parsed as {
++        model: string
++        chat_template_kwargs: { enable_thinking: boolean }
++        messages: Array<{ content: unknown }>
++      }
++      expect(body.model).toBe('qwen-vision')
++      expect(body.chat_template_kwargs).toEqual({ enable_thinking: false })
++      expect(JSON.stringify(body.messages[1]?.content)).toContain('data:image/png;base64,AQ==')
++      expect((init?.headers as Record<string, string>).authorization).toBe('Bearer secret')
++      return new Response(JSON.stringify({
++        choices: [{ message: { content: JSON.stringify({
++          summary: '一张界面截图',
++          observations: [{ text: '右上角有关闭按钮', region: '右上角', confidence: 0.9 }],
++          limitations: [],
++          model: 'must-not-leak',
++          createdAt: 'must-not-leak',
++        }) } }],
++      }), { status: 200, headers: { 'content-type': 'application/json' } })
++    })
++    const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, fetchImpl)
++    const result = await tool.execute({ attachmentIds: [ID], prompt: '检查按钮' }, execution([eventWithImage()]))
++    expect(result).toEqual({
++      attachmentIds: [ID],
++      summary: '一张界面截图',
++      observations: [{ text: '右上角有关闭按钮', region: '右上角', confidence: 0.9 }],
++      limitations: [],
++    })
++    expect(readImage).toHaveBeenCalledOnce()
++    expect(fetchImpl).toHaveBeenCalledOnce()
++
++    await expect(tool.execute(
++      { attachmentIds: [`sha256:${'2'.repeat(64)}`], prompt: '偷看其他会话' },
++      execution([eventWithImage()]),
++    )).rejects.toThrow(/not available in the current session/)
++    expect(readImage).toHaveBeenCalledOnce()
++    expect(fetchImpl).toHaveBeenCalledOnce()
++  })
++
++  it('falls back safely when the visual model returns unstructured text', () => {
++    expect(VisionBridge.parseVisionResult('plain observation', [ID])).toEqual({
++      attachmentIds: [ID],
++      summary: 'plain observation',
++      observations: [],
++      limitations: ['视觉模型未返回约定的结构化 JSON；summary 保留了原始文本。'],
++    })
++  })
++
++  it('does not expose endpoint configuration in the output contract', () => {
++    const ctx = { attachments: {}, get: () => undefined } as unknown as Context
++    const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, vi.fn())
++    const schema = JSON.stringify(tool.output.schema)
++    expect(schema).not.toContain('model')
++    expect(schema).not.toContain('createdAt')
++    expect(schema).not.toContain('baseURL')
++    expect(schema).not.toContain('apiKey')
++  })
++})
+diff --git a/packages/vision/vision-bridge/tsconfig.json b/packages/vision/vision-bridge/tsconfig.json
+new file mode 100644
+index 0000000..eb57e4a
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsconfig.json
+@@ -0,0 +1,18 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
++  "include": ["src"],
++  "references": [
++    { "path": "../../../vendor/cosmokit" },
++    { "path": "../../../vendor/cordis" },
++    { "path": "../../../vendor/schemastery" },
++    { "path": "../../attachment/attachment" },
++    { "path": "../../credentials/credentials" },
++    { "path": "../../util/launch-environment" },
++    { "path": "../../llm/llm" },
++    { "path": "../../core/session" },
++    { "path": "../../core/agent" },
++    { "path": "../../core/tools" },
++    { "path": "../../runtime-diagnostics/invariants" }
++  ]
++}
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 8826b05..474f8dd 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -1223,6 +1223,9 @@ importers:
+       '@deepseek-ai/dsh-user-questions':
+         specifier: workspace:^
+         version: link:../../interaction/user-questions
++      '@deepseek-ai/dsh-vision-bridge':
++        specifier: workspace:^
++        version: link:../../vision/vision-bridge
+       '@deepseek-ai/dsh-web':
+         specifier: workspace:^
+         version: link:../../web/web
+@@ -8361,6 +8364,46 @@ importers:
+         specifier: workspace:^
+         version: link:../../runtime-diagnostics/invariants
+ 
++  packages/vision/vision-bridge:
++    dependencies:
++      '@deepseek-ai/schemastery':
++        specifier: link:../../../vendor/schemastery
++        version: link:../../../vendor/schemastery
++    devDependencies:
++      '@deepseek-ai/cordis':
++        specifier: workspace:^
++        version: link:../../../vendor/cordis
++      '@deepseek-ai/dsh-agent':
++        specifier: workspace:^
++        version: link:../../core/agent
++      '@deepseek-ai/dsh-agent-loop':
++        specifier: workspace:^
++        version: link:../../core/agent-loop
++      '@deepseek-ai/dsh-agent-loop-testkit':
++        specifier: workspace:^
++        version: link:../../test-support/agent-loop-testkit
++      '@deepseek-ai/dsh-attachment':
++        specifier: workspace:^
++        version: link:../../attachment/attachment
++      '@deepseek-ai/dsh-credentials':
++        specifier: workspace:^
++        version: link:../../credentials/credentials
++      '@deepseek-ai/dsh-invariants':
++        specifier: workspace:^
++        version: link:../../runtime-diagnostics/invariants
++      '@deepseek-ai/dsh-launch-environment':
++        specifier: workspace:^
++        version: link:../../util/launch-environment
++      '@deepseek-ai/dsh-llm':
++        specifier: workspace:^
++        version: link:../../llm/llm
++      '@deepseek-ai/dsh-session':
++        specifier: workspace:^
++        version: link:../../core/session
++      '@deepseek-ai/dsh-tools':
++        specifier: workspace:^
++        version: link:../../core/tools
++
+   packages/web/tool-web:
+     dependencies:
+       '@deepseek-ai/schemastery':
+diff --git a/scripts/gen-cordis-catalog.ts b/scripts/gen-cordis-catalog.ts
+index 522e98d..3c08010 100644
+--- a/scripts/gen-cordis-catalog.ts
++++ b/scripts/gen-cordis-catalog.ts
+@@ -61,6 +61,7 @@ export const SERVICE_PAGE: Record<string, string> = {
+   apiProxy: 'typert.md',
+   approval: 'approval.md',
+   attachments: 'attachment.md',
++  imageInputBridge: 'attachment.md',
+   shell: 'shell.md',
+   shellEnv: 'shell.md',
+   clientModules: 'client-modules.md',
+@@ -293,6 +294,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
+   ApprovalService: 'approval.md',
+   EncodedImageAttachment: 'attachment.md',
+   ImageAttachmentRef: 'attachment.md',
++  ImageInputBridgeRoute: 'attachment.md',
+   ImageRequestPolicy: 'attachment.md',
+   RequestImageAttachment: 'attachment.md',
+   SaveImageAttachment: 'attachment.md',
+diff --git a/scripts/gen-doc-graphs.ts b/scripts/gen-doc-graphs.ts
+index 5e19c20..bbc9b37 100644
+--- a/scripts/gen-doc-graphs.ts
++++ b/scripts/gen-doc-graphs.ts
+@@ -106,6 +106,15 @@ const SERVICE_ROLES: ServiceRole[] = [
+     consumers: ['host-runtime', 'llm-pi-ai'],
+     note: 'The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content.',
+   },
++  {
++    key: 'imageInputBridge',
++    pkg: 'attachment',
++    title: 'Optional text-only image admission bridge',
++    mode: 'seam',
++    implementations: ['vision-bridge'],
++    consumers: ['apiproxy', 'acp'],
++    note: 'When explicitly mounted, the bridge lets text-only routes persist image references for tool-mediated visual inspection without projecting pixels into the main model request.',
++  },
+   {
+     key: 'llm',
+     pkg: 'llm',
+diff --git a/tsconfig.base.json b/tsconfig.base.json
+index 8d8d5e1..480a989 100644
+--- a/tsconfig.base.json
++++ b/tsconfig.base.json
+@@ -255,6 +255,7 @@
+         "./packages/feedback/*/src",
+         "./packages/schedule/*/src",
+         "./packages/guard/*/src",
++        "./packages/vision/*/src",
+         "./packages/plan/*/src",
+         "./packages/preset/*/src",
+         "./packages/subagent/*/src",
+diff --git a/tsconfig.host.json b/tsconfig.host.json
+index 36923e2..19630d6 100644
+--- a/tsconfig.host.json
++++ b/tsconfig.host.json
+@@ -289,6 +289,7 @@
+     { "path": "./packages/preset/persona" },
+     { "path": "./packages/guard/max-token-continuation" },
+     { "path": "./packages/guard/repeat-tool-reminder" },
++    { "path": "./packages/vision/vision-bridge" },
+     { "path": "./packages/extensions/cordis-host-runner" },
+     { "path": "./packages/extensions/tool-cordis" },
+     { "path": "./packages/hooks/hook-protocol" },

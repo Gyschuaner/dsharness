@@ -1,3 +1,4 @@
+"use strict";
 /**
  * dsh-better-sidebar-smooth — client half (browser bundle).
  * build: 1
@@ -22,28 +23,30 @@
  * the same duration and easing makes the two drivers sum into one
  * smooth monotonic motion (closing direction included).
  *
- * Plain JavaScript only — no JSX, no TypeScript, no imports.
+ * TypeScript source compiled to a classic browser script — no JSX or imports.
  */
 (function () {
-	window.__ModuleLoader__.load({
-		id: 'dsh-better-sidebar-smooth',
-		factory: function (require) {
-			var module = { exports: {} };
-
-			module.exports.apply = function (ctx) {
-				if (document.getElementById('bsr-smooth-style')) return;
-				var style = document.createElement('style');
-				style.id = 'bsr-smooth-style';
-				style.setAttribute('data-plugin', 'dsh-better-sidebar-smooth');
-				style.textContent = [
-					/* session header: animate the 78px<->28px padding flip on the
-					same clock as the layout shift (shell tokens, with fallbacks
-					for older themes). */
-					'[data-slot="conversation.session.header"] > header{transition:padding-right var(--ds-transition-duration-slow,300ms) var(--ds-ease-in-out,cubic-bezier(.4,0,.2,1))}',
-				].join('');
-				document.head.appendChild(style);
-			};
-			return module.exports;
-		}
-	});
+    window.__ModuleLoader__.load({
+        id: 'dsh-better-sidebar-smooth',
+        factory: function (_require) {
+            var module = { exports: {} };
+            module.exports.apply = function (_ctx) {
+                var style = document.getElementById('bsr-smooth-style');
+                if (!style)
+                    style = document.createElement('style');
+                style.id = 'bsr-smooth-style';
+                style.setAttribute('data-plugin', 'dsh-better-sidebar-smooth');
+                style.textContent = [
+                    /* session header: animate the 78px<->28px padding flip on the
+                    same clock as the layout shift (shell tokens, with fallbacks
+                    for older themes). */
+                    '[data-slot="conversation.session.header"] > header{transition:padding-right var(--ds-transition-duration-slow,300ms) var(--ds-ease-in-out,cubic-bezier(.4,0,.2,1))}',
+                ].join('');
+                if (!style.parentNode)
+                    document.head.appendChild(style);
+            };
+            return module.exports;
+        }
+    });
 })();
+//# sourceMappingURL=client.js.map

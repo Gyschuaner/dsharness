@@ -1,0 +1,1571 @@
+From f3ca0f7e78feedff9eb51074da4eaccf15244a65 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sun, 23 Aug 2026 11:53:10 +0800
+Subject: [PATCH] feat(DSH-024): expose session image paths and Markdown vision
+ results
+
+---
+ docs/subsystems/attachment.i18n.yaml          |   4 +-
+ docs/subsystems/attachment.md                 |  11 +
+ docs/subsystems/attachment.zh.md              |  11 +
+ .../attachment-local/README.i18n.yaml         |   4 +-
+ .../attachment/attachment-local/README.md     |   2 +
+ .../attachment/attachment-local/README.zh.md  |   2 +
+ .../attachment/attachment-local/src/index.ts  |  11 +
+ .../attachment-local/src/session-view.ts      |  98 +++++++++
+ .../attachment/attachment-local/src/store.ts  |   6 +-
+ .../attachment-local/tests/store.spec.ts      |  77 ++++++-
+ .../attachment/attachment/README.i18n.yaml    |   4 +-
+ packages/attachment/attachment/README.md      |   2 +-
+ packages/attachment/attachment/README.zh.md   |   2 +-
+ packages/attachment/attachment/src/index.ts   |  22 ++
+ packages/attachment/attachment/src/types.ts   |   6 +
+ .../extensions/tool-cordis/src/api-catalog.ts |  10 +
+ .../vision/vision-bridge/README.i18n.yaml     |   4 +-
+ packages/vision/vision-bridge/README.md       |  30 +--
+ packages/vision/vision-bridge/README.zh.md    |  30 +--
+ .../src/client/VisionInspectRow.tsx           | 101 ++-------
+ packages/vision/vision-bridge/src/index.ts    | 162 ++++-----------
+ .../vision-bridge/tests/vision-bridge.spec.ts | 195 ++++++++----------
+ .../tests/vision-inspect-row.client.spec.tsx  |  22 +-
+ scripts/client-tsconfig.spec.ts               |   2 +-
+ scripts/gen-cordis-catalog.ts                 |   1 +
+ 25 files changed, 452 insertions(+), 367 deletions(-)
+ create mode 100644 packages/attachment/attachment-local/src/session-view.ts
+
+diff --git a/docs/subsystems/attachment.i18n.yaml b/docs/subsystems/attachment.i18n.yaml
+index 9c98f17..df67dfe 100644
+--- a/docs/subsystems/attachment.i18n.yaml
++++ b/docs/subsystems/attachment.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/subsystems/attachment.md
+-attachment.md: 19c2bfcac1f8868c5b860cdbca41e14193681308
+-attachment.zh.md: 19dd423b599fb33d001db990442a92c7a9d234a1
++attachment.md: 5933582cf9070cc53f5064da6fa38f26f8125814
++attachment.zh.md: 48b1410cb9fe2fd9ac04880e9d629a82d6a0b8f4
+diff --git a/docs/subsystems/attachment.md b/docs/subsystems/attachment.md
+index 19c2bfc..5933582 100644
+--- a/docs/subsystems/attachment.md
++++ b/docs/subsystems/attachment.md
+@@ -180,6 +180,17 @@ abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>
+  */
+ abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
+ 
++/**
++ * Optionally expose one immutable image through a stable local path scoped to
++ * an owning session. Backends that cannot provide a local view return
++ * `undefined`; callers must retain their ordinary attachment-id path.
++ * @param ref - authorized durable image reference.
++ * @param sessionScope - stable opaque identifier for the owning session.
++ * @param signal - optional cancellation for verification and publication.
++ * @returns a stable session-scoped path, or `undefined` when unsupported.
++ */
++materializeImageForSession( ref: ImageAttachmentRef, sessionScope: string, signal?: AbortSignal, ): Promise<MaterializedImageAttachment | undefined>
++
+ /**
+  * Generate or read one deterministic model-request version from the stored normalized image.
+  * @param ref - durable provider-independent normalized attachment reference.
+diff --git a/docs/subsystems/attachment.zh.md b/docs/subsystems/attachment.zh.md
+index 19dd423..48b1410 100644
+--- a/docs/subsystems/attachment.zh.md
++++ b/docs/subsystems/attachment.zh.md
+@@ -180,6 +180,17 @@ abstract saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef>
+  */
+ abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
+ 
++/**
++ * Optionally expose one immutable image through a stable local path scoped to
++ * an owning session. Backends that cannot provide a local view return
++ * `undefined`; callers must retain their ordinary attachment-id path.
++ * @param ref - authorized durable image reference.
++ * @param sessionScope - stable opaque identifier for the owning session.
++ * @param signal - optional cancellation for verification and publication.
++ * @returns a stable session-scoped path, or `undefined` when unsupported.
++ */
++materializeImageForSession( ref: ImageAttachmentRef, sessionScope: string, signal?: AbortSignal, ): Promise<MaterializedImageAttachment | undefined>
++
+ /**
+  * Generate or read one deterministic model-request version from the stored normalized image.
+  * @param ref - durable provider-independent normalized attachment reference.
+diff --git a/packages/attachment/attachment-local/README.i18n.yaml b/packages/attachment/attachment-local/README.i18n.yaml
+index 3698abd..1f1908d 100644
+--- a/packages/attachment/attachment-local/README.i18n.yaml
++++ b/packages/attachment/attachment-local/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/attachment/attachment-local/README.md
+-README.md: 3ed4ab3251b0a609807c76930226bec63f0164cd
+-README.zh.md: 85abd10389acc46c2d89dd85628f5d201b089710
++README.md: acd38e319f822907753506ec51c55f82359cda1c
++README.zh.md: 0503a212e59195b760466aa91875870be30103ef
+diff --git a/packages/attachment/attachment-local/README.md b/packages/attachment/attachment-local/README.md
+index 3ed4ab3..acd38e3 100644
+--- a/packages/attachment/attachment-local/README.md
++++ b/packages/attachment/attachment-local/README.md
+@@ -8,6 +8,8 @@ Admission accepts at most 20 images and 200MiB of encoded source bytes per messa
+ 
+ Request versions live below `<DSH_HOME>/attachments/v1/request-images/`. `readImageRequest` scales the stored normalized attachment under a total-pixel budget without enlargement, then enforces a separate encoded-byte cap. The request encoder uses the same color branches, with PNG (palette only without alpha) before WebP 85 and 80 for low-color images, WebP 85 then 80 for other alpha images, and JPEG 85 then 80 for other opaque images. It executes candidates lazily and reduces dimensions only after both quality attempts exceed the request cap. Its cache identity includes the attachment id, transform version, pixel and byte budgets, and fixed encoder settings. Cached bytes are fully decoded and checked as 8-bit sRGB/sRGBA before use. Concurrent calls for one identity share one transform and cache write; cancelling one waiter does not cancel the shared work. Callers compose ordered batches from singular reads, while the service's FIFO limiter applies `imageCompressionConcurrency` to simultaneous normalization and request transforms. The setting ranges from 1 through 8 and defaults to 2; file publication remains ordered after preparation.
+ 
++Session views live below `<DSH_HOME>/attachments/v1/session-view/<sha256(session-scope)>/`. `materializeImageForSession` verifies the canonical object first, copies it to `<attachment-sha>.<png|jpg|webp|gif>` through an exclusive durable publication, and marks the copy read-only. The user-supplied name never participates in the path. Equal attachments in one session reuse the same path; another session receives a different directory. The copy is not linked to the canonical object, so changing a view cannot mutate durable attachment history. Views are retained with their source objects so a replayed durable reminder never points at a path removed merely because a live session stopped.
++
+ `DSH_HOME` resolves through the shared path policy: explicit config, `$DSH_HOME`, then `~/.dsh`. Session logs contain only the reference and verified metadata, never this host path. `readImage` forwards optional cancellation into the filesystem read, observes it around verification, and preserves it instead of wrapping it as `ATTACHMENT_READ_FAILED`.
+ 
+ ## Model Experience
+diff --git a/packages/attachment/attachment-local/README.zh.md b/packages/attachment/attachment-local/README.zh.md
+index 85abd10..0503a21 100644
+--- a/packages/attachment/attachment-local/README.zh.md
++++ b/packages/attachment/attachment-local/README.zh.md
+@@ -8,6 +8,8 @@
+ 
+ 请求版本保存在 `<DSH_HOME>/attachments/v1/request-images/`。`readImageRequest` 在不放大小图的前提下，把存储的规范化附件缩放到总像素预算内，再执行独立的编码字节上限。请求编码器使用同一分类分支：低色数图片先尝试 PNG，只有不带 alpha 通道时才使用 palette，再尝试质量 85 和 80 的 WebP；其他透明图片依次尝试质量 85 和 80 的 WebP；其他非透明图片依次尝试质量 85 和 80 的 JPEG。候选按需执行，两个质量档均超限后才缩小尺寸。缓存身份包含附件 ID、变换策略版本、像素和字节预算及固定编码参数。缓存字节在使用前会完整解码并校验为 8-bit sRGB/sRGBA。同一身份的并发调用共享一次变换和缓存写入；取消一个等待方不会取消共享任务。调用方组合单数读取得到有序批次，服务的 FIFO 限流器通过 `imageCompressionConcurrency` 限制同时执行的规范化和请求变换。该配置范围为 1 至 8，默认值为 2；文件发布仍在准备结束后按顺序执行。
+ 
++会话视图保存在 `<DSH_HOME>/attachments/v1/session-view/<sha256(session-scope)>/`。`materializeImageForSession` 会先校验全局对象，再通过排他且持久的发布流程把副本写成 `<attachment-sha>.<png|jpg|webp|gif>`，最后设为只读。用户提供的文件名不会参与路径拼接。同一会话中的相同附件复用同一路径，不同会话使用不同目录。副本不与全局对象建立链接，因此即使视图后来被改写，也不会污染持久附件历史。会话视图与源对象一起保留，避免仅因实时会话停止而让已持久 reminder 中的路径失效。
++
+ `DSH_HOME` 按共享路径策略解析：显式配置、`$DSH_HOME`，最后是 `~/.dsh`。会话日志只包含引用和经过校验的元数据，绝不包含这个宿主路径。`readImage` 会把可选取消信号传入文件系统读取、在校验前后观察该信号，并保留取消语义，而不会将其包装成 `ATTACHMENT_READ_FAILED`。
+ 
+ ## 模型体验
+diff --git a/packages/attachment/attachment-local/src/index.ts b/packages/attachment/attachment-local/src/index.ts
+index e9a1145..7621ef3 100644
+--- a/packages/attachment/attachment-local/src/index.ts
++++ b/packages/attachment/attachment-local/src/index.ts
+@@ -8,6 +8,7 @@ import type {
+   ImageAttachmentLimits,
+   ImageAttachmentRef,
+   ImageRequestPolicy,
++  MaterializedImageAttachment,
+   RequestImageAttachment,
+   SaveImageAttachment,
+   StoredImageAttachment,
+@@ -17,12 +18,14 @@ import type { NormalizationPolicy } from './normalization.ts'
+ import { CompressionLimiter } from './compression-limiter.ts'
+ import { commitPreparedImageFile, prepareImageFile, readImageFile, validateImageFile } from './store.ts'
+ import { readRequestImageFile, requestImageVariantId } from './request-image.ts'
++import { materializeImageForSession } from './session-view.ts'
+ 
+ export { canPassThroughNormalization, normalizeImage } from './normalization.ts'
+ export type { NormalizedImage, NormalizationPolicy } from './normalization.ts'
+ export { commitPreparedImageFile, prepareImageFile, readImageFile, saveImageFile, validateImageFile } from './store.ts'
+ export type { PreparedImageFile } from './store.ts'
+ export { readRequestImageFile, requestImageDimensions, requestImageVariantId } from './request-image.ts'
++export { materializeImageForSession } from './session-view.ts'
+ 
+ /** Default maximum encoded bytes for one submitted image; oversized sources are refused, not shrunk. */
+ export const DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+@@ -207,6 +210,14 @@ export class LocalAttachmentStore extends AttachmentStore {
+     return readImageFile(this.root, ref, signal)
+   }
+ 
++  override async materializeImageForSession(
++    ref: ImageAttachmentRef,
++    sessionScope: string,
++    signal?: AbortSignal,
++  ): Promise<MaterializedImageAttachment> {
++    return materializeImageForSession(this.root, ref, sessionScope, signal)
++  }
++
+   override async readImageRequest(
+     ref: ImageAttachmentRef,
+     policy: ImageRequestPolicy,
+diff --git a/packages/attachment/attachment-local/src/session-view.ts b/packages/attachment/attachment-local/src/session-view.ts
+new file mode 100644
+index 0000000..d5050bc
+--- /dev/null
++++ b/packages/attachment/attachment-local/src/session-view.ts
+@@ -0,0 +1,98 @@
++/** Stable, session-scoped local views over immutable attachment objects. */
++
++import { createHash, randomUUID } from 'node:crypto'
++import { constants } from 'node:fs'
++import { chmod, link, lstat, open, unlink } from 'node:fs/promises'
++import { dirname, join, resolve } from 'node:path'
++import { AttachmentError } from '@deepseek-ai/dsh-attachment'
++import type { ImageAttachmentRef, MaterializedImageAttachment } from '@deepseek-ai/dsh-attachment'
++import { ensureDurableDirectory, ensureDurableHome, readImageFile, syncDirectory } from './store.ts'
++
++const EXTENSIONS = {
++  'image/png': 'png',
++  'image/jpeg': 'jpg',
++  'image/webp': 'webp',
++  'image/gif': 'gif',
++} as const
++
++function digest(data: Uint8Array | string): string {
++  return createHash('sha256').update(data).digest('hex')
++}
++
++function attachmentDigest(ref: ImageAttachmentRef): string {
++  const match = /^sha256:([a-f0-9]{64})$/.exec(String(ref.attachmentId))
++  if (match?.[1] === undefined) {
++    throw new AttachmentError('Attachment reference is not a valid content address.', 'INVALID_ATTACHMENT_REF')
++  }
++  return match[1]
++}
++
++async function verifyExistingView(target: string, expected: Uint8Array, sha256: string): Promise<void> {
++  let handle: Awaited<ReturnType<typeof open>> | undefined
++  try {
++    const noFollow = 'O_NOFOLLOW' in constants ? constants.O_NOFOLLOW : 0
++    handle = await open(target, constants.O_RDONLY | noFollow)
++    const before = await handle.stat()
++    if (!before.isFile()) throw new Error('session view is not a regular file')
++    const existing = new Uint8Array(await handle.readFile())
++    if (existing.byteLength !== expected.byteLength || digest(existing) !== sha256) {
++      throw new Error('session view content does not match the attachment')
++    }
++    await handle.chmod(0o400)
++    const after = await lstat(target)
++    if (!after.isFile() || after.isSymbolicLink() || after.dev !== before.dev || after.ino !== before.ino) {
++      throw new Error('session view changed during verification')
++    }
++  } catch (error) {
++    throw new AttachmentError('Materialized attachment failed integrity verification.', 'ATTACHMENT_CORRUPT', { cause: error })
++  } finally {
++    await handle?.close().catch(() => {})
++  }
++}
++
++/**
++ * Copy one verified normalized image into a stable, extension-bearing session view.
++ * The copy intentionally does not link to the canonical object: even a caller
++ * that later makes the view writable cannot mutate durable attachment history.
++ */
++export async function materializeImageForSession(
++  root: string,
++  ref: ImageAttachmentRef,
++  sessionScope: string,
++  signal?: AbortSignal,
++): Promise<MaterializedImageAttachment> {
++  signal?.throwIfAborted()
++  const stored = await readImageFile(root, ref, signal)
++  signal?.throwIfAborted()
++  const sha256 = attachmentDigest(stored.ref)
++  const scope = digest(sessionScope)
++  const boundary = await ensureDurableHome(dirname(dirname(resolve(root))))
++  const directory = join(root, 'session-view', scope)
++  await ensureDurableDirectory(directory, boundary)
++  const target = join(directory, `${sha256}.${EXTENSIONS[stored.ref.mediaType]}`)
++  const temporary = join(directory, `.tmp-${randomUUID()}`)
++  let handle: Awaited<ReturnType<typeof open>> | undefined
++  try {
++    handle = await open(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600)
++    await handle.writeFile(stored.data)
++    await handle.sync()
++    await handle.close()
++    handle = undefined
++    try {
++      await link(temporary, target)
++    } catch (error) {
++      if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
++      await verifyExistingView(target, stored.data, sha256)
++    }
++    await chmod(target, 0o400)
++    await syncDirectory(directory)
++    return { path: resolve(target) }
++  } catch (error) {
++    if (signal?.aborted === true) throw signal.reason
++    if (error instanceof AttachmentError) throw error
++    throw new AttachmentError('Could not publish the session attachment view.', 'ATTACHMENT_WRITE_FAILED', { cause: error })
++  } finally {
++    if (handle !== undefined) await handle.close().catch(() => {})
++    await unlink(temporary).catch(() => {})
++  }
++}
+diff --git a/packages/attachment/attachment-local/src/store.ts b/packages/attachment/attachment-local/src/store.ts
+index 5fbb8e9..4d0de34 100644
+--- a/packages/attachment/attachment-local/src/store.ts
++++ b/packages/attachment/attachment-local/src/store.ts
+@@ -122,7 +122,7 @@ export async function prepareImageFile(
+  * reached storage, so the publication directory is synced before a durable
+  * reference is reported.
+  */
+-async function syncDirectory(path: string): Promise<void> {
++export async function syncDirectory(path: string): Promise<void> {
+   /* v8 ignore next -- Windows cannot open directory handles; NTFS metadata journaling owns entry durability there. */
+   if (process.platform === 'win32') return
+   /* v8 ignore start -- Windows cannot exercise directory fsync; POSIX behavior tests enforce this peer. */
+@@ -146,7 +146,7 @@ async function syncDirectory(path: string): Promise<void> {
+  * @param path - absolute directory to create.
+  * @param boundary - absolute ancestor the caller vouches is already durable.
+  */
+-async function ensureDurableDirectory(path: string, boundary: string): Promise<void> {
++export async function ensureDurableDirectory(path: string, boundary: string): Promise<void> {
+   const target = resolve(path)
+   const stop = resolve(boundary)
+   await mkdir(target, { recursive: true, mode: 0o700 })
+@@ -166,7 +166,7 @@ async function ensureDurableDirectory(path: string, boundary: string): Promise<v
+  * below the filesystem root are durable. Mere existence is insufficient: a
+  * concurrent process may have created the directory but not synced its parent.
+  */
+-async function ensureDurableHome(path: string): Promise<string> {
++export async function ensureDurableHome(path: string): Promise<string> {
+   const home = resolve(path)
+   if (!durableHomes.has(home)) {
+     await ensureDurableDirectory(home, parse(home).root)
+diff --git a/packages/attachment/attachment-local/tests/store.spec.ts b/packages/attachment/attachment-local/tests/store.spec.ts
+index ad29f85..9676613 100644
+--- a/packages/attachment/attachment-local/tests/store.spec.ts
++++ b/packages/attachment/attachment-local/tests/store.spec.ts
+@@ -1,14 +1,14 @@
+ import { createHash } from 'node:crypto'
+ import { constants } from 'node:fs'
+-import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
++import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+ import { tmpdir } from 'node:os'
+ import { dirname, join, parse, resolve } from 'node:path'
+-import { mkdtemp, rm } from 'node:fs/promises'
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import sharp from 'sharp'
+ import type { ImageAttachmentLimits } from '@deepseek-ai/dsh-attachment'
+ import type { NormalizationPolicy } from '../src/normalization.ts'
+ import { commitPreparedImageFile, prepareImageFile, readImageFile, saveImageFile } from '../src/store.ts'
++import { materializeImageForSession } from '../src/session-view.ts'
+ 
+ const fsControl = vi.hoisted(() => ({
+   readSignals: [] as AbortSignal[],
+@@ -74,6 +74,79 @@ afterEach(async () => {
+ })
+ 
+ describe('local attachment store', () => {
++  it('publishes stable extension-bearing copies isolated by session scope', async () => {
++    const storageRoot = await root()
++    const ref = await saveImageFile(storageRoot, {
++      data: PNG,
++      mediaType: 'image/png',
++      name: '../../escape.jpeg',
++    }, LIMITS, POLICY)
++    const sha256 = String(ref.attachmentId).slice('sha256:'.length)
++    const first = await materializeImageForSession(storageRoot, ref, 'session-a')
++    const replay = await materializeImageForSession(storageRoot, ref, 'session-a')
++    const other = await materializeImageForSession(storageRoot, ref, 'session-b')
++    const sessionHash = createHash('sha256').update('session-a').digest('hex')
++    const object = join(storageRoot, 'objects', sha256.slice(0, 2), sha256)
++
++    expect(first.path).toBe(resolve(storageRoot, 'session-view', sessionHash, `${sha256}.png`))
++    expect(replay).toEqual(first)
++    expect(other.path).not.toBe(first.path)
++    expect(first.path).not.toBe(object)
++    expect(first.path).not.toContain('escape')
++    expect(new Uint8Array(await readFile(first.path))).toEqual(PNG)
++    if (process.platform !== 'win32') expect((await stat(first.path)).mode & 0o777).toBe(0o400)
++
++    // A view is a copy, not a link to the canonical content-addressed object.
++    await chmod(first.path, 0o600)
++    await writeFile(first.path, Uint8Array.of(1, 2, 3))
++    expect(new Uint8Array(await readFile(object))).toEqual(PNG)
++  })
++
++  it('rejects corrupt existing session views without changing the canonical object', async () => {
++    const storageRoot = await root()
++    const ref = await saveImageFile(storageRoot, { data: PNG, mediaType: 'image/png' }, LIMITS, POLICY)
++    const materialized = await materializeImageForSession(storageRoot, ref, 'session-corrupt')
++    await chmod(materialized.path, 0o600)
++    await writeFile(materialized.path, Uint8Array.of(1, 2, 3))
++
++    await expect(materializeImageForSession(storageRoot, ref, 'session-corrupt'))
++      .rejects.toMatchObject({ code: 'ATTACHMENT_CORRUPT' })
++    await expect(readImageFile(storageRoot, ref)).resolves.toEqual({ ref, data: PNG })
++  })
++
++  it.skipIf(process.platform === 'win32')('never follows a planted session-view symbolic link', async () => {
++    const storageRoot = await root()
++    const ref = await saveImageFile(storageRoot, { data: PNG, mediaType: 'image/png' }, LIMITS, POLICY)
++    const materialized = await materializeImageForSession(storageRoot, ref, 'session-link')
++    const victim = join(storageRoot, 'victim.png')
++    await writeFile(victim, PNG)
++    await chmod(materialized.path, 0o600)
++    await rm(materialized.path)
++    await symlink(victim, materialized.path)
++
++    await expect(materializeImageForSession(storageRoot, ref, 'session-link'))
++      .rejects.toMatchObject({ code: 'ATTACHMENT_CORRUPT' })
++    expect(new Uint8Array(await readFile(victim))).toEqual(PNG)
++  })
++
++  it('uses the verified media type for every supported session-view extension', async () => {
++    const storageRoot = await root()
++    const fixtures = [
++      ['image/png', 'png', PNG],
++      ['image/jpeg', 'jpg', new Uint8Array(await sharp(PNG).jpeg().toBuffer())],
++      ['image/webp', 'webp', new Uint8Array(await sharp(PNG).webp().toBuffer())],
++      // GIF is normalized to its first-frame PNG in the version-one store.
++      ['image/gif', 'png', new Uint8Array(await sharp(PNG).gif().toBuffer())],
++    ] as const
++
++    for (const [mediaType, extension, data] of fixtures) {
++      const ref = await saveImageFile(storageRoot, { data, mediaType }, LIMITS, POLICY)
++      const view = await materializeImageForSession(storageRoot, ref, `session-${extension}`)
++      expect(view.path).toMatch(new RegExp(`\\.${extension}$`))
++      expect(new Uint8Array(await readFile(view.path))).toEqual((await readImageFile(storageRoot, ref)).data)
++    }
++  })
++
+   it.skipIf(process.platform === 'win32')('syncs every object ancestor up to the durable boundary before returning', async () => {
+     const storageRoot = await root()
+     const base = join(storageRoot, '..', '..')
+diff --git a/packages/attachment/attachment/README.i18n.yaml b/packages/attachment/attachment/README.i18n.yaml
+index e27f25e..c97f12a 100644
+--- a/packages/attachment/attachment/README.i18n.yaml
++++ b/packages/attachment/attachment/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/attachment/attachment/README.md
+-README.md: 3ad568c7308f1ab85cb4af3fcc2afd3cba9a611a
+-README.zh.md: fadbb1c5bbf097c599da651055d63a1ed64cd579
++README.md: a765f910dce8a4de731acea823af760c573baecd
++README.zh.md: feea0c80da40304686faf7f57eca0fffb89e254c
+diff --git a/packages/attachment/attachment/README.md b/packages/attachment/attachment/README.md
+index 3ad568c..a765f91 100644
+--- a/packages/attachment/attachment/README.md
++++ b/packages/attachment/attachment/README.md
+@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
+ 
+ The durable attachment seam. `ctx.attachments` validates and durably commits a provider-independent normalized image, then returns a serializable `ImageAttachmentRef`; consumers never persist browser paths, object URLs, provider URLs, or base64 in session events.
+ 
+-Unsent composer images remain browser-owned temporary drafts. `validateImage` runs the complete admission policy without persisting. `saveImages` owns batch count and aggregate-byte limits, prepares every normalized attachment before publishing any member, then commits in order and returns references only after the complete batch succeeds. A later storage failure returns no partial references, although an earlier immutable content-addressed object may remain unreachable until reference-aware garbage collection exists. `AttachmentError.code` uses the closed `AttachmentErrorCode` string union. Its `ImageAdmissionErrorCode` subset marks caller-correctable image-input failures; `isImageAdmissionError` recognizes that subset at runtime so each protocol adapter can map its own error vocabulary. `saveImage` commits one accepted image before any model-visible session event is published and returns its `ImageAttachmentRef`. When normalization reduces the raster, the reference records the orientation-applied input size in `originalDimensions`. `readImage` verifies the normalized attachment against its logged metadata. `readImageRequest` deterministically derives a route-sized request version whose identity covers the attachment id, transform version, pixel and byte budgets, and encoder settings. Callers compose ordered batches with `Promise.all(refs.map(...))`; the local implementation still bounds compression through its instance limiter, cache, and singleflight. Callers may cancel reads and projections; implementations preserve cancellation instead of translating it into a storage failure.
++Unsent composer images remain browser-owned temporary drafts. `validateImage` runs the complete admission policy without persisting. `saveImages` owns batch count and aggregate-byte limits, prepares every normalized attachment before publishing any member, then commits in order and returns references only after the complete batch succeeds. A later storage failure returns no partial references, although an earlier immutable content-addressed object may remain unreachable until reference-aware garbage collection exists. `AttachmentError.code` uses the closed `AttachmentErrorCode` string union. Its `ImageAdmissionErrorCode` subset marks caller-correctable image-input failures; `isImageAdmissionError` recognizes that subset at runtime so each protocol adapter can map its own error vocabulary. `saveImage` commits one accepted image before any model-visible session event is published and returns its `ImageAttachmentRef`. When normalization reduces the raster, the reference records the orientation-applied input size in `originalDimensions`. `readImage` verifies the normalized attachment against its logged metadata. `materializeImageForSession` is an optional backend capability that returns a stable extension-bearing local view for one opaque session scope; the default implementation returns `undefined`. `readImageRequest` deterministically derives a route-sized request version whose identity covers the attachment id, transform version, pixel and byte budgets, and encoder settings. Callers compose ordered batches with `Promise.all(refs.map(...))`; the local implementation still bounds compression through its instance limiter, cache, and singleflight. Callers may cancel reads and projections; implementations preserve cancellation instead of translating it into a storage failure.
+ 
+ `admitEncodedImages(attachments, images)` is the shared wire entry used by every RPC endpoint that accepts browser uploads (the session prompt endpoint and the command executor): it enforces canonical base64 on every member, then delegates batch admission — limits, validation, ordered commit — to `saveImages`. The base64 upload form is `EncodedImageAttachment`, exported from `@deepseek-ai/dsh-attachment/types` so wire contracts can reference it.
+ 
+diff --git a/packages/attachment/attachment/README.zh.md b/packages/attachment/attachment/README.zh.md
+index fadbb1c..feea0c8 100644
+--- a/packages/attachment/attachment/README.zh.md
++++ b/packages/attachment/attachment/README.zh.md
+@@ -4,7 +4,7 @@
+ 
+ 持久附件服务边界。`ctx.attachments` 校验并持久提交提供方无关的规范化图片，随后返回可序列化的 `ImageAttachmentRef`；消费方绝不会在会话事件中持久保存浏览器路径、对象 URL、提供方 URL 或 base64。
+ 
+-未发送的输入区图片仍是由浏览器持有的临时草稿。`validateImage` 运行完整准入策略但不执行持久化。`saveImages` 负责批次图片数量和总字节限制，在发布任何成员前准备全部规范化附件，然后按顺序提交，并且只在完整批次成功后返回引用。后续存储失败不会返回部分引用，但较早写入的不可变内容寻址对象可能保持不可达，直至具备按引用感知的垃圾回收。`AttachmentError.code` 使用封闭的 `AttachmentErrorCode` 字符串联合类型。其 `ImageAdmissionErrorCode` 子集标记可由调用方修正的图片输入失败；`isImageAdmissionError` 在运行时识别该子集，使每个协议适配器可以映射自己的错误词汇。`saveImage` 会在发布任何模型可见的会话事件前提交一张已接受的图片，并直接返回 `ImageAttachmentRef`。规范化过程缩小图片时，引用会通过 `originalDimensions` 记录应用方向后的输入尺寸。`readImage` 根据已记录的元数据校验规范化附件。`readImageRequest` 确定性派生路由所需的请求版本，其身份覆盖附件 ID、变换策略版本、像素和字节预算及编码参数。调用方通过 `Promise.all(refs.map(...))` 组合有序批次，本地实现仍通过实例级限流器、缓存和 singleflight 限制压缩并发。调用方可以取消读取和投影；实现保留取消结果，不把它转换为存储失败。
++未发送的输入区图片仍是由浏览器持有的临时草稿。`validateImage` 运行完整准入策略但不执行持久化。`saveImages` 负责批次图片数量和总字节限制，在发布任何成员前准备全部规范化附件，然后按顺序提交，并且只在完整批次成功后返回引用。后续存储失败不会返回部分引用，但较早写入的不可变内容寻址对象可能保持不可达，直至具备按引用感知的垃圾回收。`AttachmentError.code` 使用封闭的 `AttachmentErrorCode` 字符串联合类型。其 `ImageAdmissionErrorCode` 子集标记可由调用方修正的图片输入失败；`isImageAdmissionError` 在运行时识别该子集，使每个协议适配器可以映射自己的错误词汇。`saveImage` 会在发布任何模型可见的会话事件前提交一张已接受的图片，并直接返回 `ImageAttachmentRef`。规范化过程缩小图片时，引用会通过 `originalDimensions` 记录应用方向后的输入尺寸。`readImage` 根据已记录的元数据校验规范化附件。`materializeImageForSession` 是可选的后端能力，为一个不透明会话 scope 返回稳定、带扩展名的本地视图；默认实现返回 `undefined`。`readImageRequest` 确定性派生路由所需的请求版本，其身份覆盖附件 ID、变换策略版本、像素和字节预算及编码参数。调用方通过 `Promise.all(refs.map(...))` 组合有序批次，本地实现仍通过实例级限流器、缓存和 singleflight 限制压缩并发。调用方可以取消读取和投影；实现保留取消结果，不把它转换为存储失败。
+ 
+ `admitEncodedImages(attachments, images)` 是每个接受浏览器上传的 RPC 端点（会话 prompt 端点与命令执行器）共用的 wire 入口：它对每个成员强制执行规范 base64，随后把批量准入——限额、校验、有序提交——委托给 `saveImages`。base64 上传形式为 `EncodedImageAttachment`，从 `@deepseek-ai/dsh-attachment/types` 导出，供 wire 契约引用。
+ 
+diff --git a/packages/attachment/attachment/src/index.ts b/packages/attachment/attachment/src/index.ts
+index ae38ff1..4b5763b 100644
+--- a/packages/attachment/attachment/src/index.ts
++++ b/packages/attachment/attachment/src/index.ts
+@@ -6,6 +6,7 @@ import type {
+   ImageAttachmentLimits,
+   ImageAttachmentRef,
+   ImageRequestPolicy,
++  MaterializedImageAttachment,
+   RequestImageAttachment,
+   SaveImageAttachment,
+   StoredImageAttachment,
+@@ -22,6 +23,7 @@ export type {
+   ImageAttachmentRef,
+   ImageRequestPolicy,
+   ImageMediaType,
++  MaterializedImageAttachment,
+   RequestImageAttachment,
+   SaveImageAttachment,
+   StoredImageAttachment,
+@@ -130,6 +132,26 @@ export abstract class AttachmentStore extends Service {
+    */
+   abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
+ 
++  /**
++   * Optionally expose one immutable image through a stable local path scoped to
++   * an owning session. Backends that cannot provide a local view return
++   * `undefined`; callers must retain their ordinary attachment-id path.
++   * @param ref - authorized durable image reference.
++   * @param sessionScope - stable opaque identifier for the owning session.
++   * @param signal - optional cancellation for verification and publication.
++   * @returns a stable session-scoped path, or `undefined` when unsupported.
++   */
++  materializeImageForSession(
++    ref: ImageAttachmentRef,
++    sessionScope: string,
++    signal?: AbortSignal,
++  ): Promise<MaterializedImageAttachment | undefined> {
++    signal?.throwIfAborted()
++    void ref
++    void sessionScope
++    return Promise.resolve(undefined)
++  }
++
+   /**
+    * Generate or read one deterministic model-request version from the stored normalized image.
+    * @param ref - durable provider-independent normalized attachment reference.
+diff --git a/packages/attachment/attachment/src/types.ts b/packages/attachment/attachment/src/types.ts
+index e23a7a7..2c145b4 100644
+--- a/packages/attachment/attachment/src/types.ts
++++ b/packages/attachment/attachment/src/types.ts
+@@ -67,6 +67,12 @@ export interface StoredImageAttachment {
+   data: Uint8Array
+ }
+ 
++/** Session-scoped local view of one immutable stored image. */
++export interface MaterializedImageAttachment {
++  /** Absolute, extension-bearing path safe to disclose only to the owning session. */
++  readonly path: string
++}
++
+ /** Deterministic request-image policy selected by one exact model route. */
+ export interface ImageRequestPolicy {
+   /** Maximum width multiplied by height after aspect-preserving projection. */
+diff --git a/packages/extensions/tool-cordis/src/api-catalog.ts b/packages/extensions/tool-cordis/src/api-catalog.ts
+index 234cb32..0227393 100644
+--- a/packages/extensions/tool-cordis/src/api-catalog.ts
++++ b/packages/extensions/tool-cordis/src/api-catalog.ts
+@@ -455,6 +455,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
+         returns: 'the verified bytes and normalized attachment reference.',
+         throws: ['the signal reason when aborted, or a storage error when verification fails.'],
+       },
++      {
++        signature: 'materializeImageForSession( ref: ImageAttachmentRef, sessionScope: string, signal?: AbortSignal, ): Promise<MaterializedImageAttachment | undefined>',
++        description: 'Optionally expose one immutable image through a stable local path scoped to an owning session. Backends that cannot provide a local view return `undefined`; callers must retain their ordinary attachment-id path.',
++        parameters: [{ name: 'ref', description: 'authorized durable image reference.' }, { name: 'sessionScope', description: 'stable opaque identifier for the owning session.' }, { name: 'signal', description: 'optional cancellation for verification and publication.' }],
++        returns: 'a stable session-scoped path, or `undefined` when unsupported.',
++      },
+       {
+         signature: 'readImageRequest( ref: ImageAttachmentRef, policy: ImageRequestPolicy, signal?: AbortSignal, ): Promise<RequestImageAttachment>',
+         description: 'Generate or read one deterministic model-request version from the stored normalized image.',
+@@ -3710,6 +3716,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
+     name: 'ManualCompactAgentContext',
+     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
+   },
++  {
++    name: 'MaterializedImageAttachment',
++    declaration: 'export interface MaterializedImageAttachment {\n    readonly path: string;\n}',
++  },
+   {
+     name: 'Message',
+     declaration: 'export interface Message {\n    readonly id: MessageId;\n    readonly role: \'system\' | \'user\' | \'assistant\';\n    readonly content: ContentBlock[];\n    readonly source: MessageSource;\n}',
+diff --git a/packages/vision/vision-bridge/README.i18n.yaml b/packages/vision/vision-bridge/README.i18n.yaml
+index 2651a6f..7fcc95f 100644
+--- a/packages/vision/vision-bridge/README.i18n.yaml
++++ b/packages/vision/vision-bridge/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/vision/vision-bridge/README.md
+-README.md: 9f5ab00d82e42250132de777da570154e8f6a8f0
+-README.zh.md: 329bed27b6442feedb67120c6014dc8ae07dd4aa
++README.md: e4996de8eee4f0660f53fe7200644101de02b9da
++README.zh.md: f0326d39d8adfe89127d1377edc967d094ca2c66
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+index e3e7c3f..e4996de 100644
+--- a/packages/vision/vision-bridge/README.md
++++ b/packages/vision/vision-bridge/README.md
+@@ -2,7 +2,7 @@
+ 
+ English | [中文](README.zh.md)
+ 
+-An opt-in visual sub-agent bridge for text-only main models. DSH stores each uploaded image through the existing attachment service, persists one adjacent `<system-reminder>` for every new image-bearing human message, and exposes `vision_inspect` so the main model can delegate a complete visual question to an administrator-configured OpenAI-compatible vision model. The main model never receives image tokens: DSH's text-only projection replaces every image block with a stable text handle, while the durable reminder carries the full current-session `attachment_id`.
++An opt-in visual sub-agent bridge for text-only main models. DSH stores each uploaded image through the existing attachment service, materializes a stable extension-bearing read-only view scoped to the owning session, persists one adjacent `<system-reminder>` for every new image-bearing human message, and exposes `vision_inspect` so the main model can delegate a complete visual question to an administrator-configured OpenAI-compatible vision model. The main model never receives image tokens: DSH's text-only projection replaces every image block with a stable text handle, while the durable reminder carries the full current-session `attachment_id` and `local_path`.
+ 
+ The bridge is disabled in the base bundle. Leave it disabled for native multimodal routes; those routes continue using DSH's native image path without this reminder or tool.
+ 
+@@ -26,11 +26,11 @@ Enable the existing base-bundle row in a later composition patch and restate its
+ 
+ Loading the row is the enablement decision. It supplies the optional `imageInputBridge` admission capability, registers `vision_inspect`, and installs the durable reminder hook. There is no model preset or global prompt mutation.
+ 
+-The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a compact eye icon and `Look` title instead of the generic Tool call label. The running row deliberately reads `Look ing <elapsed>` with a small visual gap between the title and activity suffix; the settled row reads `Look <duration>`. Because this keyed view owns its Think-shaped inline duration, it suppresses the generic trailing Tool duration. The row defines no private sweep and receives the one native in-flight sweep owned by the surrounding Tool call seat. The OpenAI-compatible request uses SSE and appends each visual-model text fragment as a replayable `tool/progress` event keyed by the durable call id. As soon as the structured `summary` begins, that visual observation replaces the delegated prompt after the separator; when generation advances into `observations`, the row follows the newest observation text. While streaming, the one-line viewport follows the latest line and its newest text, then returns to the summary's first line when settled. The final structured value still lands once in the paired `tool/result`, and the disclosure retains the exact durable input and output. Progress is log-only and never enters model history, so it does not duplicate the result or change the request prefix. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
++The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a compact eye icon and `Look` title instead of the generic Tool call label. The running row deliberately reads `Look ing <elapsed>` with a small visual gap between the title and activity suffix; the settled row reads `Look <duration>`. Because this keyed view owns its Think-shaped inline duration, it suppresses the generic trailing Tool duration. The row defines no private sweep and receives the one native in-flight sweep owned by the surrounding Tool call seat. The OpenAI-compatible request uses SSE and appends each visual-model Markdown fragment as a replayable `tool/progress` event keyed by the durable call id. While streaming, the one-line viewport follows the latest non-empty Markdown line and its newest text, then returns to the result's first line when settled. The final Markdown value lands once in the paired `tool/result`, and the disclosure retains the exact durable input and output. Progress is log-only and never enters model history, so it does not duplicate the result or change the request prefix. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
+ 
+ ## Durable history and KV cache
+ 
+-The reminder is generated only while a newly claimed human message contains image blocks. It is inserted immediately after that message and appended by the ordinary agent loop as another durable `user/message`. Later turns replay that exact event; the plugin does not remove, regenerate, move, or re-inject old reminders. Thus the prior conversation remains an append-only request prefix and can reuse the same KV-cache entries as ordinary text history.
++The reminder is generated only while a newly claimed human message contains image blocks. Before insertion, the attachment backend may publish a verified copy below `attachments/v1/session-view/<session-hash>/<content-id>.<ext>`. The copy never links to the canonical object, its path does not contain the user-supplied filename, and the local backend publishes it read-only. The reminder is then inserted immediately after the message and appended by the ordinary agent loop as another durable `user/message`. Later turns replay that exact event; the plugin does not remove, regenerate, move, or re-inject old reminders. Thus the prior conversation remains an append-only request prefix and can reuse the same KV-cache entries as ordinary text history. A backend that cannot materialize a path, or a failed publication, records `local_path: unavailable` without blocking the image turn; attachment-id inspection remains available.
+ 
+ Compaction may replace an old visible range with a summary according to the deployment's normal policy. The attachment authorization check still examines the complete session event log, including shadowed events, but the summary must preserve any `attachment_id` the main model may need later.
+ 
+@@ -40,7 +40,7 @@ Compaction may replace an old visible range with a summary according to the depl
+ 
+ Local paths resolve relative to the session workspace through the mounted `ctx.fs` backend; absolute paths use the same backend rules. The bridge accepts PNG/JPEG/WebP/GIF regular files, admits the complete path batch through the native attachment service, and appends only the resulting normalized references as one log-only `vision/image-import` event. It never stores source paths or image bytes in the session log. The combined references are content-id deduplicated and bounded by `maxImagesPerCall`, so later calls in this session may use the returned attachment ids without rereading the source files.
+ 
+-The gateway receives one OpenAI-compatible chat-completions request containing the main model's complete delegated prompt plus data URLs for the authorized images. Model-visible results contain only `attachmentIds`, `summary`, `observations` (`text`, optional `region`, optional `confidence`), and `limitations`; endpoint, credential, remote model, timing, and internal error bodies are excluded.
++The gateway receives one OpenAI-compatible chat-completions request containing the main model's complete delegated prompt, a stable label for each authorized attachment, and its data URL. The visual model is instructed to return concise task-directed Markdown: answer first, then visible evidence and necessary limitations. DSH preserves that Markdown without JSON parsing or field rewriting. Endpoint, credential, remote model, timing, and internal error bodies remain outside the result.
+ 
+ ## Model Experience
+ 
+@@ -48,21 +48,21 @@ The gateway receives one OpenAI-compatible chat-completions request containing t
+ 
+ #### What the model sees
+ 
+-Each newly uploaded image message is followed by one durable notice containing full current-session `attachment_id` values. No notice is added after a tool result.
++Each newly uploaded image message is followed by one durable notice containing full current-session `attachment_id`, media type, and session-scoped `local_path` values. No notice is added after a tool result.
+ 
+ ##### Reminder template
+ 
+ ```markdown
+ <system-reminder>
+ 本条用户消息包含图片，已保存到当前对话：
+-- attachment_id: <full attachment id>，name: <optional escaped name>
+-主模型不能直接读取图片像素。需要视觉信息时调用 vision_inspect；不需要时继续处理用户请求。
++- attachment_id: <full attachment id>，name: <optional escaped name>，media_type: <image media type>，local_path: <session path or unavailable>
++可使用 local_path 配合现有工具做确定性文件或像素分析；需要视觉理解时调用 vision_inspect。
+ </system-reminder>
+ ```
+ 
+ #### Token effect
+ 
+-One bounded text notice is added for each image-bearing human message; each image contributes one id line. Old notices remain ordinary durable history and are not generated again.
++One bounded text notice is added for each image-bearing human message; each image contributes one identifier/path line. Image bytes do not enter main-model history. Old notices remain ordinary durable history and are not generated again.
+ 
+ #### KV Cache effect
+ 
+@@ -74,14 +74,18 @@ Append-only: the new user message and notice extend the reusable request prefix.
+ 
+ The model sees the `vision_inspect` tool with optional `attachmentIds`, optional `paths`, and a required complete delegated `prompt`. At least one image source is required. The concise descriptions are:
+ 
+-- Tool: `Inspect conversation attachments or local image files with the configured vision model.`
+-- `attachmentIds`: `Current-conversation attachment IDs to inspect.`
+-- `paths`: `Image file paths to import into this conversation and inspect.`
+-- `prompt`: `The complete visual question or inspection task.`
++##### Tool definition
++
++```markdown
++Tool: Inspect conversation attachments or local image files with the configured vision model.
++attachmentIds: Current-conversation attachment IDs to inspect.
++paths: Image file paths to import into this conversation and inspect.
++prompt: The complete visual question or inspection task.
++```
+ 
+ #### Token effect
+ 
+-The stable tool definition is present whenever the plugin is loaded. A path call additionally adds one model-invisible import record containing normalized attachment references. Each successful call adds one structured textual tool result; source paths, image bytes, and data URLs never enter model history and the latter exist only in the separate vision-gateway request.
++The stable tool definition is present whenever the plugin is loaded. A path call additionally adds one model-invisible import record containing normalized attachment references. Each successful call adds one Markdown tool result; source image bytes and data URLs never enter model history and exist only in the separate vision-gateway request.
+ 
+ #### KV Cache effect
+ 
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+index b728545..f0326d3 100644
+--- a/packages/vision/vision-bridge/README.zh.md
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -2,7 +2,7 @@
+ 
+ [English](README.md) | 中文
+ 
+-这是一个面向纯文本主模型、默认关闭的视觉子智能体桥。DSH 仍通过现有 attachment 服务保存用户上传的图片；每条新出现且包含图片的人类消息后，系统会持久化一条相邻的 `<system-reminder>`；主模型需要视觉证据时，再通过 `vision_inspect` 把完整视觉问题委托给管理员配置的 OpenAI 兼容视觉模型。主模型不会收到图片 token：DSH 的纯文本投影会把所有图片块替换为稳定文本句柄，而持久 reminder 会提供当前对话内完整的 `attachment_id`。
++这是一个面向纯文本主模型、默认关闭的视觉子智能体桥。DSH 仍通过现有 attachment 服务保存用户上传的图片，并生成当前会话专属、带正确扩展名的稳定只读副本；每条新出现且包含图片的人类消息后，系统会持久化一条相邻的 `<system-reminder>`；主模型需要视觉证据时，再通过 `vision_inspect` 把完整视觉问题委托给管理员配置的 OpenAI 兼容视觉模型。主模型不会收到图片 token：DSH 的纯文本投影会把所有图片块替换为稳定文本句柄，而持久 reminder 会提供当前对话内完整的 `attachment_id` 和 `local_path`。
+ 
+ 基础 bundle 中该桥默认禁用。原生多模态路由应继续保持禁用，沿用 DSH 原生图片路径，不需要本插件的 reminder 和工具。
+ 
+@@ -26,11 +26,11 @@
+ 
+ 是否加载该配置行就是功能开关。插件会提供可选的 `imageInputBridge` 准入能力、注册 `vision_inspect`，并安装持久 reminder hook；不会修改模型 preset，也不会增加全局 system prompt。
+ 
+-该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用简洁的眼睛图标与 `Look` 标题，不再显示通用 Tool call 标识；运行态有意显示为 `Look ing <耗时>`，在标题与活动后缀之间保留一小段视觉间距，完成态显示 `Look <耗时>`。该 keyed 视图已经自行提供 Think 形态的内联计时，因此会抑制通用工具行末尾的重复计时。视觉行本身不再定义私有扫光，只接收外层工具调用容器统一提供的一层原生运行态扫光。OpenAI 兼容请求使用 SSE，并把视觉模型的每段文本按持久 call id 追加成可回放的 `tool/progress` 事件；结构化 `summary` 一开始生成，就会在分隔点后替换委托问题，生成进入 `observations` 后继续跟随最新一条 observation。流式期间单行视口跟随最新一行及其最新文字，完成后回到摘要第一行。最终结构化值仍只通过配对的 `tool/result` 落地一次，disclosure 保留完整持久输入与输出。progress 只是日志事件，不进入模型历史，因此不会重复结果或改变请求前缀。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
++该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用简洁的眼睛图标与 `Look` 标题，不再显示通用 Tool call 标识；运行态有意显示为 `Look ing <耗时>`，在标题与活动后缀之间保留一小段视觉间距，完成态显示 `Look <耗时>`。该 keyed 视图已经自行提供 Think 形态的内联计时，因此会抑制通用工具行末尾的重复计时。视觉行本身不再定义私有扫光，只接收外层工具调用容器统一提供的一层原生运行态扫光。OpenAI 兼容请求使用 SSE，并把视觉模型的每段 Markdown 按持久 call id 追加成可回放的 `tool/progress` 事件。流式期间单行视口跟随最新一条非空 Markdown 行及其最新文字，完成后回到结果第一行。最终 Markdown 只通过配对的 `tool/result` 落地一次，disclosure 保留完整持久输入与输出。progress 只是日志事件，不进入模型历史，因此不会重复结果或改变请求前缀。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
+ 
+ ## 持久历史与 KV cache
+ 
+-只有新领取的人类消息中确实存在图片块时，插件才生成 reminder。它紧跟原用户消息，并由普通 agent loop 作为另一条持久化 `user/message` 追加。后续轮次只重放这条既有事件；插件不会删除、重新生成、移动或再次注入旧 reminder。因而既有对话仍是仅追加的请求前缀，可以像普通文本历史一样复用 KV cache。
++只有新领取的人类消息中确实存在图片块时，插件才生成 reminder。生成前，附件后端可以把已经校验的图片副本发布到 `attachments/v1/session-view/<session-hash>/<content-id>.<ext>`；副本不与全局内容对象建立链接，路径不拼接用户文件名，本地实现按只读权限发布。随后 reminder 紧跟原用户消息，并由普通 agent loop 作为另一条持久化 `user/message` 追加。后续轮次只重放这条既有事件；插件不会删除、重新生成、移动或再次注入旧 reminder。因而既有对话仍是仅追加的请求前缀，可以像普通文本历史一样复用 KV cache。后端不支持物化或发布失败时写入 `local_path: unavailable`，不会阻断图片消息，仍可按 attachment id 调用视觉工具。
+ 
+ 压缩可能按照部署的通用策略，用摘要替换旧的可见区间。attachment 鉴权仍会检查完整 session event log，包括已被遮蔽的事件；但摘要必须保留未来仍可能使用的完整 `attachment_id`，主模型才能主动选择那张历史图片。
+ 
+@@ -40,7 +40,7 @@
+ 
+ 本地相对路径通过挂载的 `ctx.fs` 后端按 session workspace 解析，绝对路径也遵循同一后端规则。插件只接受 PNG/JPEG/WebP/GIF 普通文件，整批图片通过原生 attachment 服务准入，并且只把规范化后的引用作为一条仅日志的 `vision/image-import` 事件追加到会话；源路径与图片字节都不会写入 session log。合并后的引用按内容 id 去重并受 `maxImagesPerCall` 限制，之后同一会话可以直接使用工具返回的 attachment id，不必重新读取源文件。
+ 
+-网关收到一条 OpenAI 兼容 chat-completions 请求，其中包含主模型给出的完整委托 prompt，以及已授权图片的 data URL。主模型可见结果只包含 `attachmentIds`、`summary`、`observations`（`text`、可选 `region`、可选 `confidence`）和 `limitations`；endpoint、credential、远端 model、耗时和内部错误正文都不会进入结果。
++网关收到一条 OpenAI 兼容 chat-completions 请求，其中包含主模型给出的完整委托 prompt、每张已授权图片的稳定标识和 data URL。视觉模型被要求直接输出简洁、面向任务的 Markdown：先回答问题，再按需列出可见证据和必要限制。DSH 不再解析 JSON 或重组字段。endpoint、credential、远端 model、耗时和内部错误正文仍不会进入结果。
+ 
+ ## Model Experience
+ 
+@@ -48,21 +48,21 @@
+ 
+ #### What the model sees
+ 
+-每条新上传图片的消息之后，模型会看到一条持久 notice，其中包含当前对话内完整的 `attachment_id`。工具结果之后不会再增加 notice。
++每条新上传图片的消息之后，模型会看到一条持久 notice，其中包含当前对话内完整的 `attachment_id`、媒体类型和会话级 `local_path`。工具结果之后不会再增加 notice。
+ 
+ ##### Reminder template
+ 
+ ```markdown
+ <system-reminder>
+ 本条用户消息包含图片，已保存到当前对话：
+-- attachment_id: <full attachment id>，name: <optional escaped name>
+-主模型不能直接读取图片像素。需要视觉信息时调用 vision_inspect；不需要时继续处理用户请求。
++- attachment_id: <full attachment id>，name: <optional escaped name>，media_type: <image media type>，local_path: <session path or unavailable>
++可使用 local_path 配合现有工具做确定性文件或像素分析；需要视觉理解时调用 vision_inspect。
+ </system-reminder>
+ ```
+ 
+ #### Token effect
+ 
+-每条包含图片的人类消息只增加一条有界文本 notice；每张图片增加一行 id。旧 notice 会保留为普通持久历史，不会再次生成。
++每条包含图片的人类消息只增加一条有界文本 notice；每张图片增加一行标识和路径，图片字节不会进入主模型历史。旧 notice 会保留为普通持久历史，不会再次生成。
+ 
+ #### KV Cache effect
+ 
+@@ -74,14 +74,18 @@
+ 
+ 模型会看到 `vision_inspect` 工具：`attachmentIds` 与 `paths` 均为可选图片来源，`prompt` 为必填的完整视觉任务，且至少要给出一种图片来源。精简后的定义为：
+ 
+-- 工具：`Inspect conversation attachments or local image files with the configured vision model.`
+-- `attachmentIds`：`Current-conversation attachment IDs to inspect.`
+-- `paths`：`Image file paths to import into this conversation and inspect.`
+-- `prompt`：`The complete visual question or inspection task.`
++##### Tool definition
++
++```markdown
++Tool: Inspect conversation attachments or local image files with the configured vision model.
++attachmentIds: Current-conversation attachment IDs to inspect.
++paths: Image file paths to import into this conversation and inspect.
++prompt: The complete visual question or inspection task.
++```
+ 
+ #### Token effect
+ 
+-插件加载期间，稳定工具定义始终存在。路径调用会额外增加一条仅含规范化附件引用、对模型不可见的导入记录。每次成功调用只增加一条结构化文本工具结果；源路径、图片字节和 data URL 都不会进入模型历史，后两者只存在于独立的视觉网关请求中。
++插件加载期间，稳定工具定义始终存在。路径调用会额外增加一条仅含规范化附件引用、对模型不可见的导入记录。每次成功调用只增加一条 Markdown 工具结果；源图片字节和 data URL 都不会进入模型历史，只存在于独立的视觉网关请求中。
+ 
+ #### KV Cache effect
+ 
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+index c84a8e9..c1c3459 100644
+--- a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+@@ -17,95 +17,26 @@ interface VisionModel {
+   readonly state: VisionState
+ }
+ 
+-function partialJsonString(text: string, start: number): string {
+-  let value = ''
+-  for (let index = start; index < text.length; index++) {
+-    const char = text[index]
+-    if (char === undefined) break
+-    if (char === '"') return value
+-    if (char !== '\\') {
+-      value += char
+-      continue
+-    }
+-    const escaped = text[++index]
+-    if (escaped === undefined) break
+-    if (escaped === 'b') value += '\b'
+-    else if (escaped === 'f') value += '\f'
+-    else if (escaped === 'n') value += '\n'
+-    else if (escaped === 'r') value += '\r'
+-    else if (escaped === 't') value += '\t'
+-    else if (escaped === 'u') {
+-      const hex = text.slice(index + 1, index + 5)
+-      if (!/^[0-9a-f]{4}$/i.test(hex)) break
+-      value += String.fromCharCode(Number.parseInt(hex, 16))
+-      index += 4
+-    } else value += escaped
+-  }
+-  return value
+-}
+-
+-function structuredObject(text: string): Record<string, unknown> | null {
+-  const trimmed = text.trimStart().replace(/^```(?:json)?\s*/i, '')
+-  try {
+-    const parsed = JSON.parse(trimmed) as unknown
+-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+-      ? parsed as Record<string, unknown>
+-      : null
+-  } catch {
+-    // A streaming JSON prefix is expected until the final fragment arrives.
+-    return null
+-  }
+-}
+-
+-/** Extract the leading structured summary even while its JSON string is incomplete. */
+-function visualSummary(text: string): string {
+-  const trimmed = text.trimStart().replace(/^```(?:json)?\s*/i, '')
+-  const summary = structuredObject(text)?.summary
+-  if (typeof summary === 'string') return summary.trim()
+-  const match = /"summary"\s*:\s*"/.exec(trimmed)
+-  if (match !== null) return partialJsonString(trimmed, match.index + match[0].length).trim()
+-  return trimmed.startsWith('{') ? '' : trimmed.trim()
+-}
+-
+-/** Follow the latest observation once the stream advances past its summary. */
+-function visualProgress(text: string): string {
+-  const observations = structuredObject(text)?.observations
+-  if (Array.isArray(observations)) {
+-    for (let index = observations.length - 1; index >= 0; index -= 1) {
+-      const observation: unknown = observations[index]
+-      if (typeof observation !== 'object' || observation === null || Array.isArray(observation)) continue
+-      const value = (observation as Record<string, unknown>).text
+-      if (typeof value === 'string' && value.trim() !== '') return value.trim()
+-    }
+-  }
+-
+-  const trimmed = text.trimStart().replace(/^```(?:json)?\s*/i, '')
+-  const observationsStart = /"observations"\s*:\s*\[/.exec(trimmed)
+-  if (observationsStart !== null) {
+-    const scopeStart = observationsStart.index + observationsStart[0].length
+-    const scope = trimmed.slice(scopeStart)
+-    const textPattern = /"text"\s*:\s*"/g
+-    let latestStart = -1
+-    for (let match = textPattern.exec(scope); match !== null; match = textPattern.exec(scope)) {
+-      latestStart = match.index + match[0].length
+-    }
+-    if (latestStart >= 0) {
+-      const observation = partialJsonString(scope, latestStart).trim()
+-      if (observation !== '') return observation
+-    }
+-  }
+-  return visualSummary(text)
++function compactMarkdownLine(text: string): string {
++  return text
++    .replace(/^#{1,6}\s+/, '')
++    .replace(/^[-+*]\s+/, '')
++    .replace(/\*\*([^*]+)\*\*/g, '$1')
++    .replace(/__([^_]+)__/g, '$1')
++    .trim()
+ }
+ 
+ function firstLine(text: string): string {
+-  const newline = text.indexOf('\n')
+-  return newline === -1 ? text : text.slice(0, newline)
++  return compactMarkdownLine(text.trim().split(/\r?\n/, 1)[0] ?? '')
+ }
+ 
+ function latestLine(text: string): string {
+-  const visible = text.trimEnd()
+-  const newline = visible.lastIndexOf('\n')
+-  return newline === -1 ? visible : visible.slice(newline + 1)
++  const lines = text.trimEnd().split(/\r?\n/)
++  for (let index = lines.length - 1; index >= 0; index -= 1) {
++    const line = lines[index]?.trim()
++    if (line !== undefined && line !== '') return compactMarkdownLine(line)
++  }
++  return ''
+ }
+ 
+ function resultText(block: ToolCallViewProps['block']): string | null {
+@@ -132,7 +63,7 @@ function visionModel(block: ToolCallViewProps['block']): VisionModel {
+   const settled = 'kind' in block
+   const argsRaw = (settled ? block.call?.argsRaw : block.argsRaw) ?? ''
+   const output = resultText(block)
+-  const progress = block.progressText === undefined ? '' : visualProgress(block.progressText)
++  const progress = block.progressText?.trim() ?? ''
+   const state: VisionState = !settled
+     ? 'running'
+     : block.error?.code === 'interrupted'
+@@ -144,7 +75,7 @@ function visionModel(block: ToolCallViewProps['block']): VisionModel {
+     summary: state === 'error' && output !== null
+       ? firstLine(output)
+       : state === 'ok' && output !== null
+-        ? visualSummary(output) || progress || promptSummary(argsRaw, block.callId)
++        ? firstLine(output) || firstLine(progress) || promptSummary(argsRaw, block.callId)
+         : progress || promptSummary(argsRaw, block.callId),
+     state,
+   }
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+index 2f1ea27..f373810 100644
+--- a/packages/vision/vision-bridge/src/index.ts
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -88,21 +88,6 @@ export interface VisionBridgeOptions {
+   readonly maxOutputTokens: number
+ }
+ 
+-/** Model-visible structured observation. */
+-export interface VisionObservation {
+-  readonly text: string
+-  readonly region?: string
+-  readonly confidence?: number
+-}
+-
+-/** Model-visible result; endpoint identity and timing deliberately stay out. */
+-export interface VisionInspectResult {
+-  readonly attachmentIds: string[]
+-  readonly summary: string
+-  readonly observations: VisionObservation[]
+-  readonly limitations: string[]
+-}
+-
+ /** Model-invisible durable record of local files imported for this session. */
+ export interface VisionImageImportEventData {
+   readonly attachments: ImageAttachmentRef[]
+@@ -132,12 +117,17 @@ function escapeXml(value: string): string {
+  * @param refs - durable image references from that one human message.
+  * @returns the XML-shaped reminder text stored in the adjacent user event.
+  */
+-export function renderImageReminder(refs: readonly ImageAttachmentRef[]): string {
++export function renderImageReminder(
++  refs: readonly ImageAttachmentRef[],
++  localPaths: ReadonlyMap<string, string | undefined> = new Map(),
++): string {
+   const items = refs.map((ref) => {
+     const displayName = ref.name === undefined ? '' : `，name: ${escapeXml(ref.name)}`
+-    return `- attachment_id: ${escapeXml(String(ref.attachmentId))}${displayName}`
++    const localPath = localPaths.get(String(ref.attachmentId))
++    const renderedPath = localPath === undefined ? 'unavailable' : escapeXml(localPath)
++    return `- attachment_id: ${escapeXml(String(ref.attachmentId))}${displayName}，media_type: ${ref.mediaType}，local_path: ${renderedPath}`
+   }).join('\n')
+-  return `<system-reminder>\n本条用户消息包含图片，已保存到当前对话：\n${items}\n主模型不能直接读取图片像素。需要视觉信息时调用 ${VISION_INSPECT_TOOL_NAME}；不需要时继续处理用户请求。\n</system-reminder>`
++  return `<system-reminder>\n本条用户消息包含图片，已保存到当前对话：\n${items}\n可使用 local_path 配合现有工具做确定性文件或像素分析；需要视觉理解时调用 ${VISION_INSPECT_TOOL_NAME}。\n</system-reminder>`
+ }
+ 
+ /** Collect only top-level durable image references from one uploaded user message. */
+@@ -152,7 +142,10 @@ function imageRefs(message: UserMessage): ImageAttachmentRef[] {
+  * @param messages - newly claimed messages returned by downstream pre-step hooks.
+  * @returns the messages with one notice adjacent to each human image message.
+  */
+-export function addImageReminders(messages: readonly UserMessage[]): UserMessage[] {
++export function addImageReminders(
++  messages: readonly UserMessage[],
++  localPaths: ReadonlyMap<string, string | undefined> = new Map(),
++): UserMessage[] {
+   const expanded: UserMessage[] = []
+   for (const message of messages) {
+     expanded.push(message)
+@@ -160,7 +153,7 @@ export function addImageReminders(messages: readonly UserMessage[]): UserMessage
+     const refs = imageRefs(message)
+     if (refs.length === 0) continue
+     expanded.push(createUserMessage({
+-      content: [{ type: 'text', text: renderImageReminder(refs) }],
++      content: [{ type: 'text', text: renderImageReminder(refs, localPaths) }],
+       source: {
+         kind: 'plugin',
+         plugin: name,
+@@ -390,69 +383,6 @@ async function readResponseText(response: Response, onDelta: (delta: string) =>
+   return text
+ }
+ 
+-/** Remove one optional Markdown fence before strict JSON parsing. */
+-function unfence(text: string): string {
+-  const trimmed = text.trim()
+-  const matched = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed)
+-  return matched?.[1]?.trim() ?? trimmed
+-}
+-
+-/**
+- * Sanitize untrusted visual-model JSON into the public result vocabulary.
+- * @param text - assistant text returned by the configured visual model.
+- * @param attachmentIds - authorized current-session ids included in the request.
+- * @returns a model-visible result without provider, endpoint, or timing metadata.
+- */
+-export function parseVisionResult(text: string, attachmentIds: readonly string[]): VisionInspectResult {
+-  let value: unknown
+-  try {
+-    value = JSON.parse(unfence(text))
+-  } catch {
+-    return {
+-      attachmentIds: [...attachmentIds],
+-      summary: text.trim() || '视觉模型未返回可用描述。',
+-      observations: [],
+-      limitations: ['视觉模型未返回约定的结构化 JSON；summary 保留了原始文本。'],
+-    }
+-  }
+-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+-    return {
+-      attachmentIds: [...attachmentIds],
+-      summary: text.trim(),
+-      observations: [],
+-      limitations: ['视觉模型返回的 JSON 根节点不是对象。'],
+-    }
+-  }
+-  const record = value as { summary?: unknown; observations?: unknown; limitations?: unknown }
+-  const observations: VisionObservation[] = Array.isArray(record.observations)
+-    ? record.observations.flatMap((item) => {
+-      if (typeof item !== 'object' || item === null || Array.isArray(item)) return []
+-      const observation = item as { text?: unknown; region?: unknown; confidence?: unknown }
+-      if (typeof observation.text !== 'string' || observation.text.trim().length === 0) return []
+-      const confidence = typeof observation.confidence === 'number'
+-        && Number.isFinite(observation.confidence)
+-        && observation.confidence >= 0
+-        && observation.confidence <= 1
+-        ? observation.confidence
+-        : undefined
+-      return [{
+-        text: observation.text,
+-        ...typeof observation.region === 'string' && observation.region.length > 0
+-          ? { region: observation.region }
+-          : {},
+-        ...confidence === undefined ? {} : { confidence },
+-      }]
+-    })
+-    : []
+-  const limitations = Array.isArray(record.limitations)
+-    ? record.limitations.filter((item): item is string => typeof item === 'string' && item.length > 0)
+-    : []
+-  const summary = typeof record.summary === 'string' && record.summary.trim().length > 0
+-    ? record.summary
+-    : observations.map(item => item.text).join('\n') || '视觉模型未返回可用描述。'
+-  return { attachmentIds: [...attachmentIds], summary, observations, limitations }
+-}
+-
+ /** Resolve the configured credential for one request. */
+ async function resolveApiKey(ctx: Context, options: VisionBridgeOptions): Promise<string | undefined> {
+   if (options.apiKey !== undefined && options.apiKey.length > 0) return options.apiKey
+@@ -472,7 +402,7 @@ async function inspect(
+   prompt: string,
+   exec: ToolRunContext,
+   fetchImpl: FetchLike,
+-): Promise<VisionInspectResult> {
++): Promise<string> {
+   const agent = exec.agent
+   if (agent === undefined) throw new Error('vision_inspect requires an active agent session')
+   const uniqueAttachmentIds = [...new Set(attachmentIds ?? [])]
+@@ -502,7 +432,6 @@ async function inspect(
+   if (newlyImported.length > 0) {
+     agent.session.append('vision/image-import', { attachments: newlyImported })
+   }
+-  const resolvedAttachmentIds = refs.map(ref => String(ref.attachmentId))
+   const stored: StoredImageAttachment[] = []
+   for (const ref of refs) stored.push(await ctx.attachments.readImage(ref, exec.signal))
+   const apiKey = await resolveApiKey(ctx, options)
+@@ -525,19 +454,19 @@ async function inspect(
+         chat_template_kwargs: { enable_thinking: false },
+         messages: [{
+           role: 'system',
+-          content: '你是视觉子智能体。根据用户给出的完整任务检查所有图片，只返回 JSON 对象：'
+-            + '{"summary":string,"observations":[{"text":string,"region"?:string,"confidence"?:number}],'
+-            + '"limitations":string[]}。不要使用 Markdown 代码围栏。confidence 取 0 到 1。不要猜测不可见内容。',
++          content: '你是视觉子智能体。结合用户给出的完整任务检查所有图片，只输出简洁、任务导向的 Markdown 正文。'
++            + '先直接回答问题，再按需列出可见证据和必要限制。不要输出 JSON 或 Markdown 代码围栏，不要猜测不可见内容。',
+         }, {
+           role: 'user',
+           content: [
+             { type: 'text', text: prompt },
+-            ...stored.map(image => ({
++            ...stored.flatMap((image, index) => [{
++              type: 'text',
++              text: `图片 ${String(index + 1)}：attachment_id=${String(image.ref.attachmentId)}${image.ref.name === undefined ? '' : `，name=${image.ref.name}`}`,
++            }, {
+               type: 'image_url',
+-              image_url: {
+-                url: `data:${image.ref.mediaType};base64,${Buffer.from(image.data).toString('base64')}`,
+-              },
+-            })),
++              image_url: { url: `data:${image.ref.mediaType};base64,${Buffer.from(image.data).toString('base64')}` },
++            }]),
+           ],
+         }],
+       }),
+@@ -551,7 +480,9 @@ async function inspect(
+   const text = await readResponseText(response, (delta) => {
+     exec.reportProgress(delta)
+   })
+-  return parseVisionResult(text, resolvedAttachmentIds)
++  const markdown = text.trim()
++  if (markdown.length === 0) throw new Error('vision service response did not contain usable assistant text')
++  return markdown
+ }
+ 
+ /**
+@@ -587,29 +518,8 @@ export function createVisionInspectTool(
+       },
+     },
+     output: {
+-      schema: {
+-        type: 'object',
+-        additionalProperties: false,
+-        properties: {
+-          attachmentIds: { type: 'array', items: { type: 'string' }, required: true },
+-          summary: { type: 'string', required: true },
+-          observations: {
+-            type: 'array',
+-            required: true,
+-            items: {
+-              type: 'object',
+-              additionalProperties: false,
+-              properties: {
+-                text: { type: 'string', required: true },
+-                region: { type: 'string' },
+-                confidence: { type: 'number' },
+-              },
+-            },
+-          },
+-          limitations: { type: 'array', items: { type: 'string' }, required: true },
+-        },
+-      },
+-      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
++      schema: { type: 'string' },
++      render: (_args, value) => [{ type: 'text', text: value }],
+     },
+     timeoutMs: options.timeoutMs,
+     isConcurrencySafe: () => true,
+@@ -645,9 +555,23 @@ export function apply(ctx: Context, config: Config): void {
+   const options = resolveOptions(ctx, config)
+   ctx.provide('imageInputBridge', { canHandle: () => true })
+   ctx.tools.register(createVisionInspectTool(ctx, options))
+-  ctx.on('agent/pre-step', async (_payload, next) => {
++  ctx.on('agent/pre-step', async ({ agent, signal }, next) => {
+     const downstream = await next()
+     if (downstream.kind === 'reject') return downstream
+-    return { kind: 'enter' as const, messages: addImageReminders(downstream.messages) }
++    const localPaths = new Map<string, string | undefined>()
++    const refs = downstream.messages.flatMap(imageRefs)
++    for (const ref of refs) {
++      const attachmentId = String(ref.attachmentId)
++      if (localPaths.has(attachmentId)) continue
++      try {
++        const materialized = await ctx.attachments.materializeImageForSession(ref, String(agent.session.id), signal)
++        localPaths.set(attachmentId, materialized?.path)
++      } catch (error) {
++        if (signal.aborted) throw signal.reason
++        ctx.logger.warn(`vision-bridge: could not materialize ${attachmentId} for session ${String(agent.session.id)}: ${String(error)}`)
++        localPaths.set(attachmentId, undefined)
++      }
++    }
++    return { kind: 'enter' as const, messages: addImageReminders(downstream.messages, localPaths) }
+   })
+ }
+diff --git a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+index de12679..aa0c43f 100644
+--- a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
++++ b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+@@ -66,20 +66,32 @@ function attachmentService(readImage = vi.fn().mockResolvedValue({ ref: REF, dat
+ 
+ describe('durable image reminder', () => {
+   it('renders full attachment ids and escapes untrusted names', () => {
+-    const reminder = VisionBridge.renderImageReminder([REF])
++    const reminder = VisionBridge.renderImageReminder([REF], new Map([[ID, 'D:/session/<image>.png']]))
+     expect(reminder).toContain('<system-reminder>\n本条用户消息包含图片，已保存到当前对话：')
+     expect(reminder).toContain(`attachment_id: ${ID}`)
+     expect(reminder).toContain('name: screen&lt;&amp;&gt;.png')
+-    expect(reminder).toContain('需要视觉信息时调用 vision_inspect；不需要时继续处理用户请求。')
++    expect(reminder).toContain('media_type: image/png')
++    expect(reminder).toContain('local_path: D:/session/&lt;image&gt;.png')
++    expect(reminder).toContain('需要视觉理解时调用 vision_inspect。')
+   })
+ 
+   it('renders unnamed images without an empty name field', () => {
+     const { name: _name, ...unnamed } = REF
+     const reminder = VisionBridge.renderImageReminder([unnamed])
+-    expect(reminder).toContain(`- attachment_id: ${ID}\n`)
++    expect(reminder).toContain(`- attachment_id: ${ID}，media_type: image/png，local_path: unavailable\n`)
+     expect(reminder).not.toContain('name:')
+   })
+ 
++  it('keeps a supplied session path stable in the adjacent durable reminder', () => {
++    const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
++    const path = 'C:\\Users\\fixture\\.dsh\\attachments\\v1\\session-view\\scope\\image.png'
++    const expanded = VisionBridge.addImageReminders([image], new Map([[ID, path]]))
++    const reminder = expanded[1]?.content[0]
++    expect(reminder).toEqual({ type: 'text', text: VisionBridge.renderImageReminder([REF], new Map([[ID, path]])) })
++    expect(reminder?.type).toBe('text')
++    expect(reminder?.type === 'text' ? reminder.text : '').toContain(`local_path: ${path}`)
++  })
++
+   it('adds exactly one adjacent reminder for each newly claimed human image message', () => {
+     const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
+     const oldReminder = createUserMessage({
+@@ -106,6 +118,8 @@ describe('durable image reminder', () => {
+     const ctx = new Context()
+     await mountAgentLoopTestDependencies(ctx, { systemPrompt: { persona: '' } })
+     const readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })
++    const localPath = 'D:/session-view/vision-reminder/image.png'
++    const materializeImageForSession = vi.fn().mockResolvedValue({ path: localPath })
+     ctx.provide('attachments', Object.setPrototypeOf({
+       imageLimits: {
+         maxImageBytes: 4,
+@@ -116,6 +130,7 @@ describe('durable image reminder', () => {
+         mediaTypes: ['image/png'],
+       },
+       readImage,
++      materializeImageForSession,
+     }, AttachmentStore.prototype) as never)
+     await ctx.plugin(AgentLoop, { agents: [] })
+     await ctx.plugin(VisionBridge, { baseURL: OPTIONS.baseURL, apiKey: 'secret' })
+@@ -139,6 +154,9 @@ describe('durable image reminder', () => {
+     const reminderBlock = reminders[0]?.data.content[0]
+     expect(reminderBlock?.type).toBe('text')
+     expect(reminderBlock?.type === 'text' ? reminderBlock.text : '').toContain(ID)
++    expect(reminderBlock?.type === 'text' ? reminderBlock.text : '').toContain(`local_path: ${localPath}`)
++    expect(materializeImageForSession).toHaveBeenCalledOnce()
++    expect(materializeImageForSession).toHaveBeenCalledWith(REF, 'vision-reminder', expect.any(AbortSignal))
+     expect(adapter.requests).toHaveLength(2)
+     for (const request of adapter.requests) {
+       expect(request.messages.flatMap(message => message.content).some(block => block.type === 'image')).toBe(false)
+@@ -152,6 +170,7 @@ describe('durable image reminder', () => {
+       .map(block => block.type === 'text' ? block.text : '')
+       .join('\n') ?? ''
+     expect(firstText).toContain(ID)
++    expect(firstText).toContain(localPath)
+     expect(secondText.indexOf(firstText)).toBe(0)
+     await ctx.fiber.dispose()
+   })
+@@ -201,27 +220,19 @@ describe('vision_inspect', () => {
+       expect(body.model).toBe('qwen-vision')
+       expect((parsed as { stream?: unknown }).stream).toBe(true)
+       expect(body.chat_template_kwargs).toEqual({ enable_thinking: false })
++      expect(JSON.stringify(body.messages[0]?.content)).toContain('只输出简洁、任务导向的 Markdown 正文')
++      expect(JSON.stringify(body.messages[0]?.content)).not.toContain('JSON 对象')
++      expect(JSON.stringify(body.messages[1]?.content)).toContain(`attachment_id=${ID}`)
+       expect(JSON.stringify(body.messages[1]?.content)).toContain('data:image/png;base64,AQ==')
+       expect((init?.headers as Record<string, string>).authorization).toBe('Bearer secret')
+       return new Response(JSON.stringify({
+-        choices: [{ message: { content: JSON.stringify({
+-          summary: '一张界面截图',
+-          observations: [{ text: '右上角有关闭按钮', region: '右上角', confidence: 0.9 }],
+-          limitations: [],
+-          model: 'must-not-leak',
+-          createdAt: 'must-not-leak',
+-        }) } }],
++        choices: [{ message: { content: '**结论：** 一张界面截图\n\n- 右上角有关闭按钮' } }],
+       }), { status: 200, headers: { 'content-type': 'application/json' } })
+     })
+     const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, fetchImpl)
+     const unrelated = { type: 'turn/start', data: {}, seq: 0, at: 0, meta: {} } as unknown as SessionEvent
+     const result = await tool.execute({ attachmentIds: [ID], prompt: '检查按钮' }, execution([unrelated, eventWithImage()]))
+-    expect(result).toEqual({
+-      attachmentIds: [ID],
+-      summary: '一张界面截图',
+-      observations: [{ text: '右上角有关闭按钮', region: '右上角', confidence: 0.9 }],
+-      limitations: [],
+-    })
++    expect(result).toBe('**结论：** 一张界面截图\n\n- 右上角有关闭按钮')
+     expect(readImage).toHaveBeenCalledOnce()
+     expect(fetchImpl).toHaveBeenCalledOnce()
+ 
+@@ -233,11 +244,11 @@ describe('vision_inspect', () => {
+     expect(fetchImpl).toHaveBeenCalledOnce()
+   })
+ 
+-  it('streams SSE deltas into replayable Tool progress and returns one structured result', async () => {
++  it('streams Markdown SSE deltas into replayable Tool progress and returns the exact result', async () => {
+     const pieces = [
+-      '{"sum',
+-      'mary":"顶部节点是请求进入",',
+-      '"observations":[],"limitations":[]}',
++      '**结论：** ',
++      '顶部节点是请求进入\n\n',
++      '- 箭头从上向下连接',
+     ]
+     const wire = pieces.map(content => `data: ${JSON.stringify({
+       choices: [{ delta: { content } }],
+@@ -265,81 +276,20 @@ describe('vision_inspect', () => {
+       status: 200,
+       headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+     })))
+-    await expect(tool.execute({ attachmentIds: [ID], prompt: '读取顶部节点' }, exec)).resolves.toEqual({
+-      attachmentIds: [ID],
+-      summary: '顶部节点是请求进入',
+-      observations: [],
+-      limitations: [],
+-    })
++    await expect(tool.execute({ attachmentIds: [ID], prompt: '读取顶部节点' }, exec))
++      .resolves.toBe('**结论：** 顶部节点是请求进入\n\n- 箭头从上向下连接')
+     expect(reportProgress.mock.calls.map(call => call[0])).toEqual(pieces)
+   })
+ 
+-  it('falls back safely when the visual model returns unstructured text', () => {
+-    expect(VisionBridge.parseVisionResult('plain observation', [ID])).toEqual({
+-      attachmentIds: [ID],
+-      summary: 'plain observation',
+-      observations: [],
+-      limitations: ['视觉模型未返回约定的结构化 JSON；summary 保留了原始文本。'],
+-    })
+-  })
+-
+-  it('sanitizes fenced structured results and derives missing summaries', () => {
+-    expect(VisionBridge.parseVisionResult(`\n\`\`\`json
+-      {"observations":[
+-        {"text":"first","region":"top","confidence":0},
+-        {"text":"second","region":"","confidence":1},
+-        {"text":"third","region":3,"confidence":-1},
+-        {"text":"fourth","confidence":2},
+-        {"text":"fifth","confidence":null}
+-      ],"limitations":["blurred","",3]}
+-      \`\`\`\n`, [ID])).toEqual({
+-      attachmentIds: [ID],
+-      summary: 'first\nsecond\nthird\nfourth\nfifth',
+-      observations: [
+-        { text: 'first', region: 'top', confidence: 0 },
+-        { text: 'second', confidence: 1 },
+-        { text: 'third' },
+-        { text: 'fourth' },
+-        { text: 'fifth' },
+-      ],
+-      limitations: ['blurred'],
+-    })
+-  })
+-
+-  it('drops invalid observation entries and supplies an empty-result summary', () => {
+-    const parsed = VisionBridge.parseVisionResult(JSON.stringify({
+-      summary: '  ',
+-      observations: [null, [], 3, {}, { text: 4 }, { text: '' }, { text: 'x', confidence: Number.POSITIVE_INFINITY }],
+-      limitations: 'not-an-array',
+-    }), [ID])
+-    expect(parsed).toEqual({
+-      attachmentIds: [ID],
+-      summary: 'x',
+-      observations: [{ text: 'x' }],
+-      limitations: [],
+-    })
+-    expect(VisionBridge.parseVisionResult('{"summary":"","observations":[]}', [ID]).summary)
+-      .toBe('视觉模型未返回可用描述。')
+-    expect(VisionBridge.parseVisionResult('{"summary":"without observations"}', [ID]))
+-      .toMatchObject({ summary: 'without observations', observations: [] })
+-  })
+-
+-  it.each([
+-    ['null', 'null'],
+-    ['array', '[]'],
+-    ['primitive', '1'],
+-  ])('rejects a structured %s root without exposing it as observations', (_label, text) => {
+-    expect(VisionBridge.parseVisionResult(text, [ID])).toEqual({
+-      attachmentIds: [ID],
+-      summary: text,
+-      observations: [],
+-      limitations: ['视觉模型返回的 JSON 根节点不是对象。'],
+-    })
+-  })
+-
+-  it('uses the stable empty fallback for empty malformed and empty invalid-root text', () => {
+-    expect(VisionBridge.parseVisionResult('   ', [ID]).summary).toBe('视觉模型未返回可用描述。')
+-    expect(VisionBridge.parseVisionResult(' null ', [ID]).summary).toBe('null')
++  it('preserves ordinary Markdown without parsing or rewriting it', async () => {
++    const markdown = '# 直接结论\n\n| 区域 | 可见内容 |\n| --- | --- |\n| 顶部 | 请求进入 |'
++    const tool = VisionBridge.createVisionInspectTool(
++      context(),
++      OPTIONS,
++      vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: markdown } }] })),
++    )
++    await expect(tool.execute({ attachmentIds: [ID], prompt: 'x' }, execution([eventWithImage()])))
++      .resolves.toBe(markdown)
+   })
+ 
+   it('rejects invalid batches before reading bytes or calling the gateway', async () => {
+@@ -410,17 +360,10 @@ describe('vision_inspect', () => {
+       agent: { session },
+       reportProgress: vi.fn(),
+     } as never
+-    const fetchImpl = vi.fn(async () => jsonResponse({
+-      choices: [{ message: { content: '{"summary":"local","observations":[],"limitations":[]}' } }],
+-    }))
++    const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: '**本地图：** local' } }] }))
+     const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, fetchImpl)
+ 
+-    await expect(tool.execute({ paths: ['local.png'], prompt: 'inspect local' }, exec)).resolves.toEqual({
+-      attachmentIds: [importedId],
+-      summary: 'local',
+-      observations: [],
+-      limitations: [],
+-    })
++    await expect(tool.execute({ paths: ['local.png'], prompt: 'inspect local' }, exec)).resolves.toBe('**本地图：** local')
+     expect(resolve).toHaveBeenCalledWith('local.png', { cwd: 'D:/workspace', signal })
+     expect(saveImages).toHaveBeenCalledWith([{ data: Uint8Array.of(2), mediaType: 'image/png', name: 'local.png' }])
+     expect(events.filter(event => event.type === 'vision/image-import')).toEqual([expect.objectContaining({
+@@ -430,13 +373,13 @@ describe('vision_inspect', () => {
+     expect(emit).toHaveBeenCalledWith('fs/observed', target, { kind: 'present', version: 'v1' }, exec)
+ 
+     await expect(tool.execute({ attachmentIds: [importedId, importedId], prompt: 'inspect again' }, exec))
+-      .resolves.toMatchObject({ attachmentIds: [importedId], summary: 'local' })
++      .resolves.toBe('**本地图：** local')
+     expect(saveImages).toHaveBeenCalledOnce()
+     expect(events.filter(event => event.type === 'vision/image-import')).toHaveLength(1)
+     expect(fetchImpl).toHaveBeenCalledTimes(2)
+ 
+     await expect(tool.execute({ attachmentIds: [ID], paths: ['local.png'], prompt: 'compare both' }, exec))
+-      .resolves.toMatchObject({ attachmentIds: [ID, importedId], summary: 'local' })
++      .resolves.toBe('**本地图：** local')
+     expect(saveImages).toHaveBeenCalledTimes(2)
+     expect(events.filter(event => event.type === 'vision/image-import')).toHaveLength(1)
+     expect(fetchImpl).toHaveBeenCalledTimes(3)
+@@ -504,7 +447,7 @@ describe('vision_inspect', () => {
+         null,
+         [],
+         { type: 'image', text: 'ignored' },
+-        { type: 'text', text: '{"summary":"parts","observations":[],"limitations":[]}' },
++        { type: 'text', text: '**结果：** parts' },
+       ] } }] })
+     })
+     const tool = VisionBridge.createVisionInspectTool(ctx, {
+@@ -513,7 +456,7 @@ describe('vision_inspect', () => {
+       apiKey: '',
+     }, fetchImpl)
+     await expect(tool.execute({ attachmentIds: [ID], prompt: 'parts' }, execution([eventWithImage()])))
+-      .resolves.toMatchObject({ summary: 'parts' })
++      .resolves.toBe('**结果：** parts')
+     expect(resolve).toHaveBeenCalledOnce()
+   })
+ 
+@@ -526,12 +469,12 @@ describe('vision_inspect', () => {
+       ]))
+       const fetchImpl = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+         expect((init?.headers as Record<string, string>).authorization).toBe(expected)
+-        return jsonResponse({ choices: [{ message: { content: '{"summary":"ok","observations":[],"limitations":[]}' } }] })
++        return jsonResponse({ choices: [{ message: { content: 'ok' } }] })
+       })
+       const { apiKey: _apiKey, ...withoutLiteralKey } = OPTIONS
+       const tool = VisionBridge.createVisionInspectTool(ctx, withoutLiteralKey, fetchImpl)
+       await expect(tool.execute({ attachmentIds: [ID], prompt: 'x' }, execution([eventWithImage()])))
+-        .resolves.toMatchObject({ summary: 'ok' })
++        .resolves.toBe('ok')
+     }
+   })
+ 
+@@ -572,8 +515,8 @@ describe('vision_inspect', () => {
+ 
+   it('renders the public value and declares cooperative concurrency', () => {
+     const tool = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn())
+-    const value = { attachmentIds: [ID], summary: 'ok', observations: [], limitations: [] }
+-    expect(tool.output.render({}, value)).toEqual([{ type: 'text', text: JSON.stringify(value, null, 2) }])
++    const value = '**结论：** ok'
++    expect(tool.output.render({}, value)).toEqual([{ type: 'text', text: value }])
+     expect(tool.isConcurrencySafe?.({ attachmentIds: [ID], prompt: 'x' })).toBe(true)
+     expect(tool.isConcurrencySafe?.({})).toBe(false)
+   })
+@@ -614,17 +557,49 @@ describe('plugin configuration and lifecycle', () => {
+     expect(tool?.timeoutMs).toBe(VisionBridge.DEFAULT_VISION_TIMEOUT_MS)
+ 
+     const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
+-    const payload = { agent: {} as Agent, messages: [image], turn: 1, step: 1, signal: new AbortController().signal }
++    const materializeImageForSession = vi.fn().mockResolvedValue({ path: 'D:/session/image.png' })
++    Object.assign(ctx.attachments, { materializeImageForSession })
++    const payload = {
++      agent: { session: { id: SessionId('vision-lifecycle') } } as Agent,
++      messages: [image], turn: 1, step: 1, signal: new AbortController().signal,
++    }
+     await expect(ctx.serial('agent/pre-step', payload, () => Promise.resolve({ kind: 'reject' as const })))
+       .resolves.toEqual({ kind: 'reject' })
+     await expect(ctx.serial('agent/pre-step', payload, () => Promise.resolve({ kind: 'enter' as const, messages: [image] })))
+       .resolves.toMatchObject({ kind: 'enter', messages: [{ source: { kind: 'user' } }, { source: { kind: 'plugin' } }] })
++    expect(materializeImageForSession).toHaveBeenCalledWith(REF, 'vision-lifecycle', payload.signal)
+ 
+     await fiber.dispose()
+     expect(ctx.get('imageInputBridge')).toBeUndefined()
+     expect(ctx.tools.get(VisionBridge.VISION_INSPECT_TOOL_NAME)).toBeUndefined()
+   })
+ 
++  it('keeps the image turn usable when session materialization fails', async () => {
++    const ctx = await baseContext(createLaunchEnvironmentSnapshot([
++      { source: 'process', values: { DSH_VISION_BASE_URL: 'http://vision.test/v1' } },
++    ]))
++    const materializeImageForSession = vi.fn().mockRejectedValue(new Error('disk unavailable'))
++    Object.assign(ctx.attachments, { materializeImageForSession })
++    const fiber = await ctx.plugin(VisionBridge, {})
++    const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
++    const payload = {
++      agent: { session: { id: SessionId('vision-fallback') } } as Agent,
++      messages: [image], turn: 1, step: 1, signal: new AbortController().signal,
++    }
++
++    const decision = await ctx.serial('agent/pre-step', payload, () => Promise.resolve({
++      kind: 'enter' as const,
++      messages: [image],
++    }))
++    expect(decision).toMatchObject({ kind: 'enter' })
++    if (decision.kind !== 'enter') throw new Error('expected enter decision')
++    const reminder = decision.messages[1]?.content[0]
++    expect(reminder?.type).toBe('text')
++    expect(reminder?.type === 'text' ? reminder.text : '').toContain('local_path: unavailable')
++    expect(materializeImageForSession).toHaveBeenCalledOnce()
++    await fiber.dispose()
++  })
++
+   it('rejects a missing or workspace-controlled gateway route', async () => {
+     const missing = await baseContext()
+     await expect(missing.plugin(VisionBridge, {})).rejects.toThrow(/baseURL.*required/)
+diff --git a/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+index ec25a13..d533d8a 100644
+--- a/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
++++ b/packages/vision/vision-bridge/tests/vision-inspect-row.client.spec.tsx
+@@ -38,7 +38,7 @@ function settled(over: Partial<ToolResultNode> = {}): ToolResultNode {
+       argsRaw: '{"attachmentIds":["sha256:a"],"prompt":"Read the flowchart labels"}',
+     },
+     callTime: 8_000,
+-    content: [{ type: 'text', text: '{"summary":"The node says request enters"}' }],
++    content: [{ type: 'text', text: '**Result:** The node says request enters' }],
+     isError: false, callView: null, resultView: null, subCalls: [],
+     ...over,
+   }
+@@ -92,7 +92,7 @@ describe('VisionInspectRow', () => {
+     vi.setSystemTime(9_300)
+     const block = {
+       ...running(),
+-      progressText: '{"summary":"顶部节点是请求进',
++      progressText: '**结论：** 顶部节点是请求进',
+     }
+     const view = render(<VisionInspectRow {...props(block, 'running')} />)
+     expect(view.container.textContent).toContain('Looking1s')
+@@ -101,27 +101,27 @@ describe('VisionInspectRow', () => {
+     expect(view.container.querySelector('[data-look-activity]')).not.toBeNull()
+   })
+ 
+-  it('continues from the summary into the latest streamed observation', () => {
++  it('continues from the first Markdown answer into the latest streamed line', () => {
+     const view = render(<VisionInspectRow {...props({
+       ...running(),
+-      progressText: '{"summary":"界面总览","observations":[{"text":"左侧文件列表正在展',
++      progressText: '**概览：** 界面总览\n\n- 左侧文件列表正在展',
+     }, 'running')} />)
+     const summary = view.container.querySelector<HTMLElement>('[data-vision-summary]')
+     expect(summary?.textContent).toBe('左侧文件列表正在展')
+ 
+     view.rerender(<VisionInspectRow {...props({
+       ...running(),
+-      progressText: '{"summary":"界面总览","observations":[{"text":"左侧文件列表已经展开"},{"text":"中间会话区域继续生成最',
++      progressText: '**概览：** 界面总览\n\n- 左侧文件列表已经展开\n- 中间会话区域继续生成最',
+     }, 'running')} />)
+     expect(summary?.textContent).toBe('中间会话区域继续生成最')
+ 
+     view.rerender(<VisionInspectRow {...props(settled({
+       content: [{
+         type: 'text',
+-        text: '{"summary":"界面总览","observations":[{"text":"左侧文件列表已经展开"},{"text":"中间会话区域生成完成"}]}',
++        text: '**概览：** 界面总览\n\n- 左侧文件列表已经展开\n- 中间会话区域生成完成',
+       }],
+     }), 'settled')} />)
+-    expect(summary?.textContent).toBe('界面总览')
++    expect(summary?.textContent).toBe('概览： 界面总览')
+   })
+ 
+   it('follows the newest streamed visual text and restores the final summary start', () => {
+@@ -143,7 +143,7 @@ describe('VisionInspectRow', () => {
+ 
+     const view = render(<VisionInspectRow {...props({
+       ...running(),
+-      progressText: '{"summary":"Initial visual observation\\nNewest visual tokens',
++      progressText: 'Initial visual observation\nNewest visual tokens',
+     }, 'running')} />)
+     const summary = view.container.querySelector<HTMLElement>('[data-vision-summary]')
+     expect(summary?.textContent).toBe('Newest visual tokens')
+@@ -155,14 +155,14 @@ describe('VisionInspectRow', () => {
+ 
+     view.rerender(<VisionInspectRow {...props({
+       ...running(),
+-      progressText: '{"summary":"Initial visual observation\\nNewest visual tokens keep arriving',
++      progressText: 'Initial visual observation\nNewest visual tokens keep arriving',
+     }, 'running')} />)
+     act(() => { flushFrames(3) })
+     expect(summary?.textContent).toBe('Newest visual tokens keep arriving')
+     expect(summary?.scrollLeft).toBe(220)
+ 
+     view.rerender(<VisionInspectRow {...props(settled({
+-      content: [{ type: 'text', text: '{"summary":"Final summary starts here\\nAdditional detail"}' }],
++      content: [{ type: 'text', text: 'Final summary starts here\nAdditional detail' }],
+     }), 'settled')} />)
+     act(() => { flushFrames(3) })
+     expect(summary?.textContent).toBe('Final summary starts here')
+@@ -173,7 +173,7 @@ describe('VisionInspectRow', () => {
+   it('discloses exact durable input/output and preserves Inspect', () => {
+     const inspect = vi.fn()
+     render(<VisionInspectRow {...props(settled())} inspect={inspect} />)
+-    const row = screen.getByRole('button', { name: /Look2sThe node says request enters/ })
++    const row = screen.getByRole('button', { name: /Look2sResult: The node says request enters/ })
+     expect(row.getAttribute('aria-expanded')).toBe('false')
+     fireEvent.click(row)
+     expect(row.getAttribute('aria-expanded')).toBe('true')
+diff --git a/scripts/client-tsconfig.spec.ts b/scripts/client-tsconfig.spec.ts
+index 0c74661..b619b21 100644
+--- a/scripts/client-tsconfig.spec.ts
++++ b/scripts/client-tsconfig.spec.ts
+@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
+ const root = fileURLToPath(new URL('..', import.meta.url))
+ 
+ function clientCssDeclarations(): string[] {
+-  const clientGroups = ['client', 'extensions']
++  const clientGroups = ['client', 'extensions', 'vision']
+   return clientGroups.flatMap((group) => {
+     const clientRoot = resolve(root, 'packages', group)
+     return readdirSync(clientRoot, { withFileTypes: true })
+diff --git a/scripts/gen-cordis-catalog.ts b/scripts/gen-cordis-catalog.ts
+index 3c08010..d0f70b2 100644
+--- a/scripts/gen-cordis-catalog.ts
++++ b/scripts/gen-cordis-catalog.ts
+@@ -296,6 +296,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
+   ImageAttachmentRef: 'attachment.md',
+   ImageInputBridgeRoute: 'attachment.md',
+   ImageRequestPolicy: 'attachment.md',
++  MaterializedImageAttachment: 'attachment.md',
+   RequestImageAttachment: 'attachment.md',
+   SaveImageAttachment: 'attachment.md',
+   StoredImageAttachment: 'attachment.md',
+-- 
+2.51.2.windows.1
+

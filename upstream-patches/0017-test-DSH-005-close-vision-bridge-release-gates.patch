@@ -1,0 +1,498 @@
+From e93914aa0a227b831b588109b18c389c8b1a22fd Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 22 Aug 2026 12:19:32 +0800
+Subject: [PATCH] test(DSH-005): close vision bridge release gates
+
+---
+ ...ext-model-vision-subagent-bridge.i18n.yaml |   6 +
+ ...08-22-text-model-vision-subagent-bridge.md |  37 +++
+ ...22-text-model-vision-subagent-bridge.zh.md |  37 +++
+ packages/vision/vision-bridge/src/index.ts    |  14 +-
+ .../vision-bridge/tests/vision-bridge.spec.ts | 273 +++++++++++++++++-
+ 5 files changed, 354 insertions(+), 13 deletions(-)
+ create mode 100644 .agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml
+ create mode 100644 .agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
+ create mode 100644 .agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md
+
+diff --git a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml
+new file mode 100644
+index 0000000..6241f45
+--- /dev/null
++++ b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
++2026-08-22-text-model-vision-subagent-bridge.md: 4a792e94730311fe6f51ba33764b9b627df18112
++2026-08-22-text-model-vision-subagent-bridge.zh.md: 170ace30c6c8b851cc2c9d346656095121692a07
+diff --git a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
+new file mode 100644
+index 0000000..4a792e9
+--- /dev/null
++++ b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.md
+@@ -0,0 +1,37 @@
++# Agent Note: Opt-in vision sub-agent bridge for text-only models
++
++Status: implemented
++
++English | [中文](2026-08-22-text-model-vision-subagent-bridge.zh.md)
++
++## Problem
++
++Text-only main models cannot consume durable image blocks, but rejecting every image prevents them from using an independently deployed visual model. Sending historical image bytes to the main model is invalid for text-only providers, while automatically invoking a visual model for every upload spends latency and tokens when the request needs no pixel evidence. Historical lookup must also preserve session isolation and the append-only prefix used for KV-cache reuse.
++
++## Decision
++
++The base bundle contains `@deepseek-ai/dsh-vision-bridge` as an explicitly disabled plugin. A text-only deployment enables it through a composition overlay and configures one OpenAI-compatible visual model. Native multimodal deployments leave it disabled and keep the existing image route.
++
++When the agent loop claims a new human message containing images, the plugin appends one adjacent durable plugin notice after that message. The notice carries the complete attachment ids and says that the main model cannot read pixels directly. Existing events are never regenerated or reordered. The ordinary text-only request projection replaces image blocks with stable text handles, so the main model receives no data URL, base64 payload, or image token.
++
++The plugin registers `vision_inspect` only while it is loaded. The main model supplies current-conversation attachment ids and one self-contained visual task. The tool authorizes the complete id batch against the calling agent's full session event log before reading any bytes. It then sends the prompt and authorized images to the configured visual model and returns only `attachmentIds`, `summary`, `observations`, and `limitations`. Provider identity, endpoint, credential, timing, and untrusted extra response fields do not enter the tool result.
++
++Gateway routing and credentials remain deployment concerns. The endpoint comes from operator composition or the inherited process/user environment; a workspace `.env` cannot redirect it. The credential is resolved per call from the configured credential reference unless an explicitly embedded host credential is supplied. Transport failures use stable errors that do not include the endpoint, key, or remote response body.
++
++## Alternatives considered
++
++**Send every historical image to the main model.** Text-only providers cannot accept that request, and repeated image payloads consume context independently of textual history. Stable handles plus an explicit tool preserve a text-only main request.
++
++**Invoke the visual model immediately on every upload.** Some requests only store a reference, discuss filenames, or do not require pixel evidence. Model-directed inspection avoids mandatory visual latency and lets the prompt name the exact region, comparison, and evidence needed.
++
++**Execute XML-shaped tool calls found in private reasoning.** Text is not an authenticated structured tool call and may contain examples or malformed partial output. The bridge exposes only the native `vision_inspect` definition and never interprets reasoning text as an action.
++
++**Make the bridge a global preset capability.** Native multimodal routes already own image handling. Explicit composition enablement keeps the tool, reminder, and text-only admission behavior absent from deployments that do not need them.
++
++## Verification
++
++The package test owns every statement, branch, and function in the bridge implementation. It covers durable one-time reminders, text-only replay, current-session and cross-session authorization, request construction, literal/credential/environment key resolution, structured and malformed visual responses, limits, duplicate ids, cancellation, HTTP and JSON failures, redacted results, configuration rejection, contribution disposal, and reject/enter pre-step chaining. ACP content and API-proxy tests cover the shared image admission and model capability paths. A deployment test must also list the configured visual model through the gateway and complete one real image inspection before the overlay is promoted.
++
++## Consequences
++
++Each image-bearing human message adds one bounded durable text notice, and each inspection adds an ordinary tool call and text result. Historical notices remain reusable request-prefix text, but compaction summaries must retain complete attachment ids for the main model to select an obscured historical image. The bridge supports one configured visual backend and does not provide automatic failover or proactive inspection. Disabling or unloading it removes its admission provider, reminder hook, and tool registration without changing durable attachments or native multimodal behavior.
+diff --git a/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md
+new file mode 100644
+index 0000000..170ace3
+--- /dev/null
++++ b/.agents/notes/implemented/feature/2026-08-22-text-model-vision-subagent-bridge.zh.md
+@@ -0,0 +1,37 @@
++# Agent Note: 纯文本模型的可选视觉子智能体桥
++
++Status: implemented
++
++[English](2026-08-22-text-model-vision-subagent-bridge.md) | 中文
++
++## Problem
++
++纯文本主模型无法消费持久图片块，但拒绝所有图片会使其无法利用独立部署的视觉模型。把历史图片字节发给主模型不符合纯文本提供商的输入要求，而每次上传都自动调用视觉模型，会在请求不需要像素证据时仍消耗延迟和 token。历史回看还必须维持会话隔离以及 KV cache 复用所依赖的仅追加前缀。
++
++## Decision
++
++基础 bundle 包含默认显式禁用的 `@deepseek-ai/dsh-vision-bridge` 插件。纯文本部署通过 composition 覆盖启用它，并配置一个 OpenAI 兼容视觉模型。原生多模态部署保持其禁用，继续使用既有图片路径。
++
++当 agent loop 领取一条包含图片的新用户消息时，插件紧邻该消息追加一条持久插件 notice。notice 包含完整 attachment id，并说明主模型不能直接读取像素。插件不会重新生成或重排既有事件。普通纯文本请求投影会把图片块替换为稳定文本句柄，因此主模型不会收到 data URL、base64 负载或图片 token。
++
++插件仅在加载期间注册 `vision_inspect`。主模型提供当前对话的 attachment id 和一个自包含视觉任务。工具在读取任何字节前，先依据调用 agent 的完整会话事件日志对整批 id 授权；随后把 prompt 和已授权图片发送给配置的视觉模型，并且只返回 `attachmentIds`、`summary`、`observations` 和 `limitations`。提供商身份、endpoint、credential、耗时以及远端响应中的不受信任额外字段不会进入工具结果。
++
++网关路由和凭据属于部署配置。endpoint 来自运维 composition 或继承的进程/用户环境，工作区 `.env` 不能重定向它。除非宿主显式内嵌凭据，否则每次调用都通过配置的 credential reference 解析密钥。传输失败使用稳定错误，不包含 endpoint、密钥或远端响应正文。
++
++## Alternatives considered
++
++**把所有历史图片发送给主模型。** 纯文本提供商无法接受该请求，并且重复图片负载会独立于文本历史消耗上下文。稳定句柄和显式工具可以维持纯文本主请求。
++
++**每次上传都立即调用视觉模型。** 有些请求只保存引用、讨论文件名，或不需要像素证据。由模型决定是否观察可以避免强制视觉延迟，并让 prompt 明确所需区域、比较对象和证据。
++
++**执行私有思考文本中的 XML 形状工具调用。** 文本不是经过鉴权的结构化工具调用，也可能只是示例或不完整输出。视觉桥只暴露原生 `vision_inspect` 定义，绝不把思考文本解释为操作。
++
++**把视觉桥作为全局 preset 能力。** 原生多模态路径已经负责图片处理。显式 composition 开关可以让不需要视觉桥的部署完全不出现其工具、reminder 和纯文本图片准入行为。
++
++## Verification
++
++包测试覆盖视觉桥实现的每条语句、分支和函数，包括持久单次 reminder、纯文本重放、当前会话与跨会话授权、请求构造、字面量/credential/环境密钥解析、结构化与异常视觉响应、数量限制、重复 id、取消、HTTP 与 JSON 失败、结果脱敏、配置拒绝、贡献卸载以及 reject/enter pre-step 链。ACP 内容与 API proxy 测试覆盖共享图片准入和模型能力路径。部署测试还必须先通过网关列出目标视觉模型，并完成一次真实图片检查，才能提升覆盖配置。
++
++## Consequences
++
++每条含图片的用户消息增加一条有界持久文本 notice，每次观察增加普通工具调用和文本结果。历史 notice 仍是可复用的请求前缀文本，但 compact 摘要必须保留完整 attachment id，主模型才能选择已被遮蔽的历史图片。视觉桥只支持一个已配置视觉后端，不提供自动故障转移或主动观察。禁用或卸载插件会移除准入提供者、reminder hook 和工具注册，不改变持久附件或原生多模态行为。
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+index 09a4ce7..2c19366 100644
+--- a/packages/vision/vision-bridge/src/index.ts
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -218,7 +218,7 @@ export function parseVisionResult(text: string, attachmentIds: readonly string[]
+   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+     return {
+       attachmentIds: [...attachmentIds],
+-      summary: text.trim() || '视觉模型未返回可用描述。',
++      summary: text.trim(),
+       observations: [],
+       limitations: ['视觉模型返回的 JSON 根节点不是对象。'],
+     }
+@@ -272,7 +272,8 @@ async function inspect(
+   exec: ToolRunContext,
+   fetchImpl: FetchLike,
+ ): Promise<VisionInspectResult> {
+-  if (exec.agent === undefined) throw new Error('vision_inspect requires an active agent session')
++  const agent = exec.agent
++  if (agent === undefined) throw new Error('vision_inspect requires an active agent session')
+   if (attachmentIds.length === 0) throw new Error('vision_inspect requires at least one attachmentId')
+   if (attachmentIds.length > options.maxImagesPerCall) {
+     throw new Error(`vision_inspect accepts at most ${String(options.maxImagesPerCall)} images per call`)
+@@ -282,7 +283,7 @@ async function inspect(
+ 
+   // Authorize the entire batch before reading any bytes or contacting the gateway.
+   const refs = attachmentIds.map((attachmentId) => {
+-    const ref = findSessionImage(exec.agent?.session.events ?? [], attachmentId)
++    const ref = findSessionImage(agent.session.events, attachmentId)
+     if (ref === undefined) throw new Error(`attachment "${attachmentId}" is not available in the current session`)
+     return ref
+   })
+@@ -411,13 +412,6 @@ function resolveOptions(ctx: Context, config: Config): VisionBridgeOptions {
+   if (baseURL === undefined || baseURL.trim().length === 0) {
+     throw new Error(`vision-bridge: baseURL or ${DEFAULT_VISION_BASE_URL_ENV} is required when the plugin is enabled`)
+   }
+-  for (const [key, value] of [
+-    ['timeoutMs', resolved.timeoutMs],
+-    ['maxImagesPerCall', resolved.maxImagesPerCall],
+-    ['maxOutputTokens', resolved.maxOutputTokens],
+-  ] as const) {
+-    if (!Number.isInteger(value) || value < 1) throw new Error(`vision-bridge: ${key} must be a positive integer`)
+-  }
+   credentialRef(resolved.apiKeyEnv)
+   return {
+     baseURL: baseURL.trim(),
+diff --git a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+index df7a2a9..6c16797 100644
+--- a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
++++ b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+@@ -5,6 +5,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+ import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
+ import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import { createLaunchEnvironmentSnapshot, DSH_LAUNCH_ENVIRONMENT_KEY } from '@deepseek-ai/dsh-launch-environment'
+ import { createUserMessage } from '@deepseek-ai/dsh-llm'
+ import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
+ import { SessionId } from '@deepseek-ai/dsh-session'
+@@ -49,6 +50,20 @@ class TextOnlyAdapter extends MockAdapter {
+   }
+ }
+ 
++function attachmentService(readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })) {
++  return Object.setPrototypeOf({
++    imageLimits: {
++      maxImageBytes: 4,
++      maxImagesPerMessage: 2,
++      maxMessageImageBytes: 4,
++      maxImagePixels: 4,
++      maxImageDimension: 2000,
++      mediaTypes: ['image/png'],
++    },
++    readImage,
++  }, AttachmentStore.prototype) as AttachmentStore
++}
++
+ describe('durable image reminder', () => {
+   it('renders full attachment ids and escapes untrusted names', () => {
+     const reminder = VisionBridge.renderImageReminder([REF])
+@@ -58,6 +73,13 @@ describe('durable image reminder', () => {
+     expect(reminder).toContain('需要视觉信息时调用 vision_inspect；不需要时继续处理用户请求。')
+   })
+ 
++  it('renders unnamed images without an empty name field', () => {
++    const { name: _name, ...unnamed } = REF
++    const reminder = VisionBridge.renderImageReminder([unnamed])
++    expect(reminder).toContain(`- attachment_id: ${ID}\n`)
++    expect(reminder).not.toContain('name:')
++  })
++
+   it('adds exactly one adjacent reminder for each newly claimed human image message', () => {
+     const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
+     const oldReminder = createUserMessage({
+@@ -71,6 +93,15 @@ describe('durable image reminder', () => {
+     expect(expanded[2]).toBe(oldReminder)
+   })
+ 
++  it('leaves plugin messages and image-free human messages unchanged', () => {
++    const humanText = createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } })
++    const pluginImage = createUserMessage({
++      content: [{ type: 'image', attachment: REF }],
++      source: { kind: 'plugin', plugin: 'fixture', form: 'notice', summary: 'fixture' },
++    })
++    expect(VisionBridge.addImageReminders([humanText, pluginImage])).toEqual([humanText, pluginImage])
++  })
++
+   it('persists the reminder once and replays a stable text-only prefix on later turns', async () => {
+     const ctx = new Context()
+     await mountAgentLoopTestDependencies(ctx, { systemPrompt: { persona: '' } })
+@@ -137,13 +168,24 @@ describe('vision_inspect', () => {
+     } as unknown as SessionEvent
+   }
+ 
+-  function execution(events: readonly SessionEvent[]) {
++  function execution(events: readonly SessionEvent[], signal = new AbortController().signal) {
+     return {
+-      signal: new AbortController().signal,
++      signal,
+       agent: { session: { events } },
+     } as never
+   }
+ 
++  function context(readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })) {
++    return { attachments: { readImage }, get: () => undefined } as unknown as Context
++  }
++
++  function jsonResponse(content: unknown, status = 200): Response {
++    return new Response(JSON.stringify(content), {
++      status,
++      headers: { 'content-type': 'application/json' },
++    })
++  }
++
+   it('authorizes the complete batch from the current session before sending image bytes', async () => {
+     const readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })
+     const ctx = { attachments: { readImage }, get: () => undefined } as unknown as Context
+@@ -171,7 +213,8 @@ describe('vision_inspect', () => {
+       }), { status: 200, headers: { 'content-type': 'application/json' } })
+     })
+     const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, fetchImpl)
+-    const result = await tool.execute({ attachmentIds: [ID], prompt: '检查按钮' }, execution([eventWithImage()]))
++    const unrelated = { type: 'turn/start', data: {}, seq: 0, at: 0, meta: {} } as unknown as SessionEvent
++    const result = await tool.execute({ attachmentIds: [ID], prompt: '检查按钮' }, execution([unrelated, eventWithImage()]))
+     expect(result).toEqual({
+       attachmentIds: [ID],
+       summary: '一张界面截图',
+@@ -198,6 +241,168 @@ describe('vision_inspect', () => {
+     })
+   })
+ 
++  it('sanitizes fenced structured results and derives missing summaries', () => {
++    expect(VisionBridge.parseVisionResult(`\n\`\`\`json
++      {"observations":[
++        {"text":"first","region":"top","confidence":0},
++        {"text":"second","region":"","confidence":1},
++        {"text":"third","region":3,"confidence":-1},
++        {"text":"fourth","confidence":2},
++        {"text":"fifth","confidence":null}
++      ],"limitations":["blurred","",3]}
++      \`\`\`\n`, [ID])).toEqual({
++      attachmentIds: [ID],
++      summary: 'first\nsecond\nthird\nfourth\nfifth',
++      observations: [
++        { text: 'first', region: 'top', confidence: 0 },
++        { text: 'second', confidence: 1 },
++        { text: 'third' },
++        { text: 'fourth' },
++        { text: 'fifth' },
++      ],
++      limitations: ['blurred'],
++    })
++  })
++
++  it('drops invalid observation entries and supplies an empty-result summary', () => {
++    const parsed = VisionBridge.parseVisionResult(JSON.stringify({
++      summary: '  ',
++      observations: [null, [], 3, {}, { text: 4 }, { text: '' }, { text: 'x', confidence: Number.POSITIVE_INFINITY }],
++      limitations: 'not-an-array',
++    }), [ID])
++    expect(parsed).toEqual({
++      attachmentIds: [ID],
++      summary: 'x',
++      observations: [{ text: 'x' }],
++      limitations: [],
++    })
++    expect(VisionBridge.parseVisionResult('{"summary":"","observations":[]}', [ID]).summary)
++      .toBe('视觉模型未返回可用描述。')
++    expect(VisionBridge.parseVisionResult('{"summary":"without observations"}', [ID]))
++      .toMatchObject({ summary: 'without observations', observations: [] })
++  })
++
++  it.each([
++    ['null', 'null'],
++    ['array', '[]'],
++    ['primitive', '1'],
++  ])('rejects a structured %s root without exposing it as observations', (_label, text) => {
++    expect(VisionBridge.parseVisionResult(text, [ID])).toEqual({
++      attachmentIds: [ID],
++      summary: text,
++      observations: [],
++      limitations: ['视觉模型返回的 JSON 根节点不是对象。'],
++    })
++  })
++
++  it('uses the stable empty fallback for empty malformed and empty invalid-root text', () => {
++    expect(VisionBridge.parseVisionResult('   ', [ID]).summary).toBe('视觉模型未返回可用描述。')
++    expect(VisionBridge.parseVisionResult(' null ', [ID]).summary).toBe('null')
++  })
++
++  it('rejects invalid batches before reading bytes or calling the gateway', async () => {
++    const readImage = vi.fn()
++    const fetchImpl = vi.fn()
++    const tool = VisionBridge.createVisionInspectTool(context(readImage), OPTIONS, fetchImpl)
++    await expect(tool.execute({ attachmentIds: [ID], prompt: 'x' }, {
++      signal: new AbortController().signal,
++      agent: undefined,
++    } as never)).rejects.toThrow(/active agent session/)
++    await expect(tool.execute({ attachmentIds: [], prompt: 'x' }, execution([]))).rejects.toThrow(/at least one/)
++    await expect(tool.execute({ attachmentIds: [ID, ID], prompt: 'x' }, execution([eventWithImage()])))
++      .rejects.toThrow(/must be unique/)
++    await expect(tool.execute({ attachmentIds: [ID, ID, ID, ID], prompt: 'x' }, execution([eventWithImage()])))
++      .rejects.toThrow(/at most 3/)
++    expect(readImage).not.toHaveBeenCalled()
++    expect(fetchImpl).not.toHaveBeenCalled()
++  })
++
++  it('uses an exact chat-completions endpoint and credential service key', async () => {
++    const resolve = vi.fn().mockResolvedValue({ value: 'credential-key', source: 'memory' })
++    const ctx = new Context()
++    ctx.provide('attachments', attachmentService())
++    ctx.provide('credentials', { resolve } as never)
++    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
++      expect(input).toBe('http://vision.test/chat/completions')
++      expect((init?.headers as Record<string, string>).authorization).toBe('Bearer credential-key')
++      return jsonResponse({ choices: [{ message: { content: [
++        null,
++        [],
++        { type: 'image', text: 'ignored' },
++        { type: 'text', text: '{"summary":"parts","observations":[],"limitations":[]}' },
++      ] } }] })
++    })
++    const tool = VisionBridge.createVisionInspectTool(ctx, {
++      ...OPTIONS,
++      baseURL: 'http://vision.test/chat/completions///',
++      apiKey: '',
++    }, fetchImpl)
++    await expect(tool.execute({ attachmentIds: [ID], prompt: 'parts' }, execution([eventWithImage()])))
++      .resolves.toMatchObject({ summary: 'parts' })
++    expect(resolve).toHaveBeenCalledOnce()
++  })
++
++  it('uses the inherited credential and omits authorization when none exists', async () => {
++    for (const [value, expected] of [['ambient-key', 'Bearer ambient-key'], ['', undefined]] as const) {
++      const ctx = new Context()
++      ctx.provide('attachments', attachmentService())
++      ctx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot([
++        { source: 'process', values: { QWEN_VISION_API_KEY: value } },
++      ]))
++      const fetchImpl = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
++        expect((init?.headers as Record<string, string>).authorization).toBe(expected)
++        return jsonResponse({ choices: [{ message: { content: '{"summary":"ok","observations":[],"limitations":[]}' } }] })
++      })
++      const { apiKey: _apiKey, ...withoutLiteralKey } = OPTIONS
++      const tool = VisionBridge.createVisionInspectTool(ctx, withoutLiteralKey, fetchImpl)
++      await expect(tool.execute({ attachmentIds: [ID], prompt: 'x' }, execution([eventWithImage()])))
++        .resolves.toMatchObject({ summary: 'ok' })
++    }
++  })
++
++  it.each([
++    ['non-object payload', null],
++    ['empty choices', { choices: [] }],
++    ['non-object choice', { choices: [null] }],
++    ['non-object message', { choices: [{ message: [] }] }],
++    ['non-text content', { choices: [{ message: { content: 3 } }] }],
++    ['empty text parts', { choices: [{ message: { content: [{ type: 'image' }] } }] }],
++  ])('rejects assistant responses with %s', async (_label, payload) => {
++    const tool = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn().mockResolvedValue(jsonResponse(payload)))
++    await expect(tool.execute({ attachmentIds: [ID], prompt: 'x' }, execution([eventWithImage()])))
++      .rejects.toThrow(/did not contain assistant text/)
++  })
++
++  it('normalizes gateway transport, status, JSON, and cancellation failures', async () => {
++    const args = { attachmentIds: [ID], prompt: 'x' }
++    const events = [eventWithImage()]
++    const failed = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn().mockRejectedValue(new Error('secret endpoint')))
++    await expect(failed.execute(args, execution(events))).rejects.toThrow('vision service request failed')
++
++    const controller = new AbortController()
++    const cancelled = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn(async () => {
++      controller.abort(new Error('cancelled by caller'))
++      throw new Error('transport aborted')
++    }))
++    await expect(cancelled.execute(args, execution(events, controller.signal))).rejects.toThrow('cancelled by caller')
++
++    const status = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn().mockResolvedValue(new Response('', { status: 503 })))
++    await expect(status.execute(args, execution(events))).rejects.toThrow('HTTP 503')
++
++    const invalidJson = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn().mockResolvedValue(
++      new Response('not-json', { status: 200, headers: { 'content-type': 'application/json' } }),
++    ))
++    await expect(invalidJson.execute(args, execution(events))).rejects.toThrow('returned invalid JSON')
++  })
++
++  it('renders the public value and declares cooperative concurrency', () => {
++    const tool = VisionBridge.createVisionInspectTool(context(), OPTIONS, vi.fn())
++    const value = { attachmentIds: [ID], summary: 'ok', observations: [], limitations: [] }
++    expect(tool.output.render({}, value)).toEqual([{ type: 'text', text: JSON.stringify(value, null, 2) }])
++    expect(tool.isConcurrencySafe?.({ attachmentIds: [ID], prompt: 'x' })).toBe(true)
++    expect(tool.isConcurrencySafe?.({})).toBe(false)
++  })
++
+   it('does not expose endpoint configuration in the output contract', () => {
+     const ctx = { attachments: {}, get: () => undefined } as unknown as Context
+     const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, vi.fn())
+@@ -208,3 +413,65 @@ describe('vision_inspect', () => {
+     expect(schema).not.toContain('apiKey')
+   })
+ })
++
++describe('plugin configuration and lifecycle', () => {
++  async function baseContext(environment = createLaunchEnvironmentSnapshot([])) {
++    const ctx = new Context()
++    await mountAgentLoopTestDependencies(ctx, { systemPrompt: { persona: '' } })
++    ctx.provide('attachments', attachmentService())
++    ctx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
++    await ctx.plugin(AgentLoop, { agents: [] })
++    return ctx
++  }
++
++  it('loads from an operator-owned environment route and unloads every contribution', async () => {
++    const ctx = await baseContext(createLaunchEnvironmentSnapshot([
++      { source: 'project-env', path: 'D:/workspace/.env', values: { DSH_VISION_BASE_URL: 'http://project.invalid' } },
++      { source: 'user-env', path: 'D:/home/.dsh/.env', values: { DSH_VISION_BASE_URL: ' http://vision.test/v1 ' } },
++    ]))
++    const fiber = await ctx.plugin(VisionBridge, {})
++    expect(ctx.imageInputBridge.canHandle({ provider: 'text-only', model: 'plain' })).toBe(true)
++    const tool = ctx.tools.get(VisionBridge.VISION_INSPECT_TOOL_NAME)
++    expect(tool?.timeoutMs).toBe(VisionBridge.DEFAULT_VISION_TIMEOUT_MS)
++
++    const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
++    const payload = { agent: {} as Agent, messages: [image], turn: 1, step: 1, signal: new AbortController().signal }
++    await expect(ctx.serial('agent/pre-step', payload, () => Promise.resolve({ kind: 'reject' as const })))
++      .resolves.toEqual({ kind: 'reject' })
++    await expect(ctx.serial('agent/pre-step', payload, () => Promise.resolve({ kind: 'enter' as const, messages: [image] })))
++      .resolves.toMatchObject({ kind: 'enter', messages: [{ source: { kind: 'user' } }, { source: { kind: 'plugin' } }] })
++
++    await fiber.dispose()
++    expect(ctx.get('imageInputBridge')).toBeUndefined()
++    expect(ctx.tools.get(VisionBridge.VISION_INSPECT_TOOL_NAME)).toBeUndefined()
++  })
++
++  it('rejects a missing or workspace-controlled gateway route', async () => {
++    const missing = await baseContext()
++    await expect(missing.plugin(VisionBridge, {})).rejects.toThrow(/baseURL.*required/)
++
++    const projectOnly = await baseContext(createLaunchEnvironmentSnapshot([
++      { source: 'project-env', path: 'D:/workspace/.env', values: { DSH_VISION_BASE_URL: 'http://project.invalid' } },
++    ]))
++    await expect(projectOnly.plugin(VisionBridge, {})).rejects.toThrow(/baseURL.*required/)
++
++    const empty = await baseContext()
++    await expect(empty.plugin(VisionBridge, { baseURL: '   ' })).rejects.toThrow(/baseURL.*required/)
++  })
++
++  it.each([
++    ['timeoutMs', { timeoutMs: 1.5 }],
++    ['maxImagesPerCall', { maxImagesPerCall: 1.5 }],
++    ['maxOutputTokens', { maxOutputTokens: 1.5 }],
++  ])('rejects non-integer %s configuration', async (key, config) => {
++    const ctx = await baseContext()
++    await expect(ctx.plugin(VisionBridge, { baseURL: 'http://vision.test', ...config }))
++      .rejects.toThrow(new RegExp(`${key}.*multiple of 1`))
++  })
++
++  it('rejects an invalid credential reference at load time', async () => {
++    const ctx = await baseContext()
++    await expect(ctx.plugin(VisionBridge, { baseURL: 'http://vision.test', apiKeyEnv: 'bad-key' }))
++      .rejects.toThrow(TypeError)
++  })
++})
+-- 
+2.51.2.windows.1
+

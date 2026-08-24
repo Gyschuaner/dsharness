@@ -1,1 +1,4 @@
 upstream-patches/*.patch binary
+*.sh text eol=lf
+plugins/*/lib/*.js text eol=lf
+plugins/*/lib/*.d.ts text eol=lf
