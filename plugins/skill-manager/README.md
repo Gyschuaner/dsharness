@@ -1,7 +1,7 @@
 # dsh-skill-manager
 
-DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增「扩展」一级入口，
-点开全页「扩展」视图，统一管理 DSH 的扩展能力（DSH-006；SKILL 管理中心 V1 重构 DSH-008）。
+DeepSeek Harness 的 Skill 管理插件：接入 `dsh-extension-manager` 提供的 Web GUI **扩展**外壳，
+贡献 SKILL 分区，统一管理 DSH 的 Skill 能力（DSH-006；SKILL 管理中心 V1/V1.1，DSH-008）。
 
 - **SKILL 分区**（DSH-008 V1）：两个子页面 ——
   - **项目管理**（默认）：按项目启用/禁用 Skill、批量启停、一键精简、
@@ -10,13 +10,13 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     详情列出全部来源，当前项目可显式选择来源。
   - 运行中的 host 尚未加载 apiVersion 6（未重启 `dsh web`）时，自动降级为
     旧版单页界面（见下方「旧版功能」）并显示提示条。
-- **MCP / Plugin 分区**（一期占位）：显示「建设中」占位页，规划能力见「规划」。
-- 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
+- **MCP / Plugin 分区**：由各自插件贡献到统一扩展外壳；Skill Manager 不重复注册侧边栏入口。
+- 设置页内旧「Skills 技能管理」入口已移除（build 13，DSH-006 / DSH-008）。
 
-## 页面结构（build 12 / DSH-008 V1）
+## 页面结构（build 13 / DSH-008 V1.1）
 
-- **入口**：侧边栏底部 `sidebar.footer.action` 插槽（增量式，与 Cordis 面板行同区），
-  宽态为图标 +「扩展」文案行，收起态为 36px 圆形图标（与「设置」同区域同行为）。
+- **入口**：由 `dsh-extension-manager` 统一拥有侧边栏底部 `sidebar.footer.action` 和全页外壳；
+  Skill Manager 只注册 `extension.manager.section` 的 `skill` 分区，与 MCP / Plugin 共用同一导航和布局。
 - **全页视图**：fixed 全屏覆盖（z-index 200，位于侧边浮动面板(30)之上、Modal(1000)/toast(1100)
   之下，SKILL 分区内的导入/删除确认弹窗仍正常浮于其上）。顶栏标题 + 关闭按钮；
   左导航 SKILL / MCP / Plugin（建设中带徽标）；右内容区。Esc 或关闭按钮退出
@@ -34,6 +34,10 @@ DeepSeek Harness 的扩展管理插件：在 Web GUI **侧边栏底部**新增�
     含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、标签编辑
     （全局，跨项目共享）、更新状态（V1 不检测远端更新，不伪造数据）、
     「为此项目特化」（V1.2 能力，只读展示 + 禁用按钮）、高级折叠（路径/格式/附属文件）。
+- **SKILL 分区（V1.1 市场）**：新增「Skill 市场」顶层页签，页面标题、Tab、市场列表行、
+  详情抽屉和 GitHub 操作与 MCP / Plugin 保持同一交互语言；市场目录由 Host 读取精选 GitHub
+  来源的实时仓库元数据和提交版本。详情会展示许可证、Stars、文件清单和安全校验；安装前必须
+  经过预览，默认写入当前项目并停用，不执行第三方脚本。
 - **SKILL 分区（旧版降级）**：host 未加载 apiVersion 6 时渲染
   `SkillManagerSection`（build 11 功能，见下），顶部显示重启提示条。
 
@@ -190,12 +194,19 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     - `presets.list / save / delete / setDefault / preview / apply`：
       预设管理；preview 返回精确 diff（toEnable / toDisable / sourceChanges / finalEnabled）。
     - `slim.preview / slim.apply`：一键精简（默认精简预设或全部关闭）。
+  - V1.1 市场操作（market apiVersion 1）：
+    - `capabilities`：声明市场能力和目录规模。
+    - `marketplace`：读取精选 GitHub Skill 目录、实时版本和当前项目安装状态。
+    - `marketplace.detail`：读取仓库详情、Skill 文件清单和来源校验结果。
+    - `marketplace.preview`：在写入前返回目标路径、内容哈希、文件数和冲突检查。
+    - `marketplace.install`：仅写入项目 `.dsh/skills/<name>`，保留来源追踪，默认停用；拒绝
+      符号链接、路径穿越、外部目标和已修改来源覆盖，不执行 scripts。
   - 响应信封统一 `{ ok:true, value }` / `{ ok:false, error:{ message } }`；
     业务错误用 `ApiError` 携带 4xx（400 参数 / 404 不存在 / 409 冲突）。
     `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
     `list` 幂等运行（旧版兼容）；Windows 文件锁问题由 tmp+rename 原子写入规避。
-- **测试**（`test/skill-manager.test.js`，`node --test`）：37 用例覆盖
+- **测试**（`test/*.test.js`，`node --test`）：40 用例覆盖
   状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
   三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
   标签、预设 diff/应用、一键精简、旧版兼容与只读根 403。
@@ -206,19 +217,18 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   重启前：client 探测到 `catalog` 为未知操作，自动降级旧版界面并提示重启。
 - **Client 半**（`lib/client.js`）：classic-script bundle（`window.__ModuleLoader__.load`），
   只 require 壳内 seed 词（`react`、`@deepseek-ai/dsh-client-ui-primitives`），无 JSX/TS/构建；
-  build 12 起 SKILL 分区为 V1 双子页 + 详情抽屉（`SkillCenterV1`），
+  build 12 起 SKILL 分区为 V1 双子页 + 详情抽屉（`SkillCenterV1`），build 13 起增加市场页签、
+  实时目录、详情抽屉和安装预览；
   项目选择器复用 `ctx.get('sessions')` 当前工作区与 `ctx.get('workspaces')`
   （`list.getSnapshot()` / `pickDirectory()` / `create({path})`），能力缺失时安全降级；
   主题只用 `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。
-  入口仍在 `sidebar.footer.action` slot（build 10 及以前的 `settings.section` 注册已移除）。
+  入口通过 `extension.manager.section` slot 注册（build 10 及以前的 `settings.section` 和旧版
+  `sidebar.footer.action` 重复注册已移除）。
 - 路径安全：所有写入/删除都限定在 4 个可编辑根目录或 preset skills 目录内，
   目标路径做包含性校验；内置根一律只读（save/delete 返回 403）；
   V1 派生产物只增删 marker 验证过的文件，外来同名文件永不触碰。
 
-## 规划（二期待立项）
+## 后续规划
 
-- **MCP 分区**：列出 web profile cordis 配置中的 `dsh-mcp-client` 服务器
-  （serverName、stdio/HTTP 传输、命令/URL）与连接状态、工具清单；
-  支持新增/编辑/删除（回写 profile 配置，利用 MCP 客户端原生 HMR 热加载，无需重启）。
-- **Plugin 分区**：列出已安装到 web profile 的 DSH 插件（名称、版本、来源、启用状态），
-  支持启用/停用（组合树挂回/摘除）。
+- 市场来源管理、智能推荐和更细粒度的版本锁定。
+- 通用 Skill 更新后由 AI 合并到项目特化 Skill。

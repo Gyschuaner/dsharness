@@ -12,7 +12,8 @@
  * Legacy ops (list / read / save / delete / import / exportZip / setStatus /
  * getPolicy / setPolicy) are unchanged in behavior so older clients keep
  * working against this host. New V1 ops: catalog / projectState / setEnabled
- * / setMany / setSource / setTags / presets.* / slim.*.
+ * / setMany / setSource / setTags / presets.* / slim.*. V1.1 adds a curated
+ * GitHub marketplace with Host-side validation and project installation.
  *
  * Zero bare dependencies: node: builtins only.
  */
@@ -53,6 +54,7 @@ import {
 	applySourceSelection,
 	buildProjectView,
 } from './catalog.js';
+import { createMarketplace, MARKET_API_VERSION, MARKETPLACE } from './marketplace.js';
 
 /** Stable Cordis plugin name (host half). */
 const name = 'skill-manager';
@@ -389,6 +391,13 @@ function configPayload(view, config) {
  */
 function makeHandler(deps) {
 	const opts = { agentPresets: deps.agentPresets, logger: deps.logger, home: deps.home };
+	const marketplace = createMarketplace({
+		home: deps.home,
+		logger: deps.logger,
+		fetch: deps.fetch,
+		entries: deps.marketplace,
+		cacheTtlMs: deps.marketCacheTtlMs,
+	});
 	const ops = {
 		async list(body) {
 			const cwd = await assertCwd(body.cwd);
@@ -883,6 +892,33 @@ function makeHandler(deps) {
 			});
 			return { preset: null, mode: 'all', view, report };
 		},
+		// ── V1.1 marketplace ops (DSH-008) ─────────────────────────────────
+		async capabilities() {
+			return {
+				apiVersion: MARKET_API_VERSION,
+				features: ['curated-github-marketplace', 'market-detail', 'market-preview', 'market-install', 'no-script-execution'],
+				catalogSize: marketplace.entries.length,
+			};
+		},
+		async marketplace(body) {
+			const cwd = await assertCwd(body.cwd);
+			return marketplace.list(cwd, body.force === true);
+		},
+		async ['marketplace.detail'](body) {
+			const cwd = await assertCwd(body.cwd);
+			const id = typeof body.id === 'string' ? body.id : '';
+			return marketplace.detail(id, cwd, body.force === true);
+		},
+		async ['marketplace.preview'](body) {
+			const cwd = await assertCwd(body.cwd);
+			const id = typeof body.id === 'string' ? body.id : '';
+			return marketplace.preview(id, cwd);
+		},
+		async ['marketplace.install'](body) {
+			const cwd = await assertCwd(body.cwd);
+			const id = typeof body.id === 'string' ? body.id : '';
+			return marketplace.install(id, cwd);
+		},
 	};
 	return async (req, res) => {
 		const send = (status, obj) => {
@@ -991,6 +1027,9 @@ export const internals = {
 	applySourceSelection,
 	buildProjectView,
 	buildIdentityCatalog: undefined, // re-exported below
+	createMarketplace,
+	MARKET_API_VERSION,
+	MARKETPLACE,
 };
 // buildIdentityCatalog is exported directly from ./catalog.js; alias it here
 // so tests can import everything from the plugin entry point.

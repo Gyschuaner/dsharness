@@ -181,6 +181,13 @@ export function normalizeProjectConfig(parsed, projectRoot) {
 			if (typeof sel.originHash === 'string' && sel.originHash.length > 0) entry.originHash = sel.originHash;
 			if (typeof sel.copyHash === 'string' && sel.copyHash.length > 0) entry.copyHash = sel.copyHash;
 			if (sel.generated === true) entry.generated = true;
+			// Marketplace provenance is project-local metadata.  Preserve it
+			// through the existing V1 config normalizer so a restart does not
+			// make a managed remote Skill look like an unrelated local file.
+			if (sel.marketManaged === true) entry.marketManaged = true;
+			for (const key of ['marketId', 'marketRepository', 'marketPath', 'marketRef', 'marketRevision', 'marketHash']) {
+				if (typeof sel[key] === 'string' && sel[key].length > 0) entry[key] = sel[key];
+			}
 			if (Object.keys(entry).length > 0) base.sources[name] = entry;
 		}
 	}

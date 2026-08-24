@@ -1,13 +1,13 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 11
+ * build: 13
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
  * window.__ModuleLoader__. The factory requires only shell seed words
- * (react, @deepseek-ai/dsh-client-ui-primitives) and registers a
- * `sidebar.footer.action` entry: the 「扩展」 sidebar-foot row that opens
- * the frame-wide Extensions page (SKILL / MCP / Plugin).
+ * (react, @deepseek-ai/dsh-client-ui-primitives) and registers the SKILL
+ * section in the shared Extensions page (the shell entry is owned by
+ * dsh-extension-manager).
  *
  * build 3: skill packages — skills sharing a prefix (first hyphen part)
  * with 3+ members collapse into one package row (default folded, per-root
@@ -49,6 +49,10 @@
  * presets with replace/merge preview, and 一键精简. When the running host
  * predates apiVersion 6 (unknown `catalog` op), the page degrades to the
  * legacy section above with a notice.
+ * build 13 (DSH-008 V1.1): Skill 市场 follows the shared
+ * extension-manager section contract and mirrors MCP/Plugin's market list
+ * and detail drawer; the Host provides curated GitHub metadata, safe
+ * preview, and project install.
  *
  * Plain JavaScript only — no JSX, no TypeScript, no imports.
  */
@@ -120,38 +124,6 @@
 				'.smgr-policy{display:flex;align-items:center;gap:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;padding:8px 12px}',
 				'.smgr-policyMain{flex:1;min-width:0}',
 				'.smgr-policyDesc{display:block;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
-				// ── DSH-006: sidebar-foot 「扩展」 entry + full page ────────────
-				'.ext-layer{flex:none;align-items:center;width:100%;height:49px;margin:8px 0 0;display:flex;position:relative}',
-				'.ext-layerRail{width:36px;height:36px;margin:0}',
-				'.ext-trigger{width:100%;height:49px;color:var(--dsw-alias-label-primary);cursor:pointer;background:0 0;border:none;border-radius:12px;align-items:center;gap:8px;padding:0 8px 0 6px;font-family:inherit;font-size:14px;display:inline-flex;overflow:hidden}',
-				'.ext-trigger:hover{background:var(--dsw-alias-interactive-bg-hover-solid)}',
-				'.ext-triggerActive,.ext-triggerActive:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-				'.ext-triggerLabel{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}',
-				'.ext-layerRail .ext-trigger{border-radius:50%;justify-content:center;gap:0;width:36px;height:36px;padding:0}',
-				'.ext-icon{flex:none;color:var(--dsw-alias-label-secondary);display:inline-flex;align-items:center;justify-content:center}',
-				'.ext-layerRail .ext-icon{color:var(--dsw-alias-label-primary)}',
-				'.ext-page{position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;background:var(--dsw-alias-bg-base);display:flex;flex-direction:column;color:var(--dsw-alias-label-primary)}',
-				'.ext-top{flex:none;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--dsw-alias-border-l2);padding:14px 20px}',
-				'.ext-topTitle{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}',
-				'.ext-topTitle .ext-icon{color:var(--dsw-alias-label-primary)}',
-				'.ext-topSub{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
-				'.ext-close{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:8px;padding:6px 9px;font-size:15px;line-height:1;margin-left:auto}',
-				'.ext-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.ext-body{flex:1;min-height:0;display:flex}',
-				'.ext-nav{flex:none;width:190px;border-right:1px solid var(--dsw-alias-border-l2);padding:12px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}',
-				'.ext-navBtn{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:10px;padding:9px 12px;text-align:left;font:inherit;display:flex;flex-direction:column;gap:2px;align-items:flex-start}',
-				'.ext-navBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-				'.ext-navBtnActive{background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-primary)}',
-				'.ext-navBtnActive:hover{background:var(--dsw-alias-fill-tsp-secondary)}',
-				'.ext-navLabel{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}',
-				'.ext-navDesc{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
-				'.ext-soon{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);color:var(--dsw-alias-label-tertiary);padding:0 6px;font-size:10px;font-weight:500;line-height:16px;white-space:nowrap}',
-				'.ext-main{flex:1;min-width:0;overflow-y:auto;padding:20px 24px}',
-				'.ext-placeholder{max-width:520px;display:flex;flex-direction:column;gap:10px;padding:48px 0}',
-				'.ext-phIcon{color:var(--dsw-alias-label-quaternary)}',
-				'.ext-placeholder h3{margin:0;font-size:16px;font-weight:600}',
-				'.ext-placeholder p{margin:0;font-size:13px;color:var(--dsw-alias-label-tertiary);line-height:1.7}',
-				'.ext-phSoon{color:var(--dsw-alias-label-quaternary);font-size:12px}',
 				// ── DSH-008 V1: SKILL 管理中心 (项目管理 / 统一资源库) ─────────
 				'.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:1080px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
 				'.sk-tabs{display:flex;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2);flex:none}',
@@ -252,6 +224,52 @@
 				'.sk-advBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
 				'.sk-advBody{border-top:1px solid var(--dsw-alias-border-l2);padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
 				'.sk-advBody code{overflow-wrap:anywhere;font-size:11px}',
+				// marketplace — same title / tab / row / drawer language as MCP and Plugin
+				'.sk-head{display:flex;align-items:baseline;gap:10px;flex:none;padding:2px 0 10px}',
+				'.sk-headTitle{margin:0;font-size:18px;font-weight:600}',
+				'.sk-headSub{font-size:13px;color:var(--dsw-alias-label-quaternary);font-weight:500}',
+				'.sk-primaryTabs{gap:28px}',
+				'.sk-localTabs{margin-top:10px}',
+				'.sk-marketLayout{display:flex;flex:1;min-height:0;min-width:0}',
+				'.sk-marketListCol{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}',
+				'.sk-marketToolbar{display:flex;align-items:center;gap:8px;padding:14px 0 9px;flex:none;flex-wrap:wrap}',
+				'.sk-marketProjectPicker{position:relative;flex:none}',
+				'.sk-marketSearch{min-width:180px}',
+				'.sk-marketHelper{flex:none;margin:0 0 9px;color:var(--dsw-alias-label-quaternary);font-size:11px;line-height:1.5}',
+				'.sk-marketNotice{flex:none;margin:0 0 9px;padding:7px 9px;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 35%,var(--dsw-alias-border-l2));border-radius:8px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5}',
+				'.sk-marketList{display:flex;flex:1;min-height:0;overflow-y:auto;flex-direction:column;padding:7px 0 26px}',
+				'.sk-marketRow{appearance:none;box-sizing:border-box;width:100%;min-height:88px;border:0;border-top:1px solid var(--dsw-alias-border-l2);background:transparent;color:inherit;text-align:left;font:inherit;padding:14px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:center;cursor:pointer}',
+				'.sk-marketRow:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
+				'.sk-marketRow:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+				'.sk-marketRow:focus-visible{outline:1px solid var(--dsw-static-blue-500);outline-offset:-1px}',
+				'.sk-marketRowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 7%,var(--dsw-alias-bg-module-platform))}',
+				'.sk-marketMain{display:flex;align-items:center;gap:14px;min-width:0}',
+				'.sk-marketIcon,.sk-marketFallback{flex:none;width:40px;height:40px;border-radius:10px;object-fit:cover}',
+				'.sk-marketIcon{background:var(--dsw-alias-fill-tsp-secondary)}',
+				'.sk-marketFallback{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}',
+				'.sk-marketCopy{display:flex;flex-direction:column;min-width:0}',
+				'.sk-marketTitle{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+				'.sk-marketDesc{display:block;margin-top:5px;color:var(--dsw-alias-label-tertiary);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+				'.sk-marketMeta{display:block;margin-top:5px;color:var(--dsw-alias-label-quaternary);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+				'.sk-marketSide{display:flex;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
+				'.sk-marketStatus{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
+				'.sk-marketStatus-update-available{color:var(--dsw-alias-state-error-primary)}',
+				'.sk-marketStatus-modified,.sk-marketStatus-conflict{color:var(--dsw-alias-state-warn-primary)}',
+				'.sk-marketLoadError{padding:10px 0}',
+				'.sk-marketDrawer{width:400px;max-width:46%;position:relative}',
+				'.sk-marketDrawerIdentity{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}',
+				'.sk-marketLink{display:inline-flex;align-items:center;gap:4px;max-width:100%;color:var(--dsw-static-blue-500);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none}',
+				'.sk-marketLink:hover{text-decoration:underline}',
+				'.sk-marketFacts{display:grid;grid-template-columns:1fr 1fr;gap:7px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.45}',
+				'.sk-marketState{display:flex;align-items:center;gap:7px;color:var(--dsw-alias-label-secondary);font-size:12px}',
+				'.sk-marketFiles,.sk-marketChecks{display:flex;flex-direction:column;gap:5px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;line-height:1.45}',
+				'.sk-marketFiles code{overflow-wrap:anywhere;color:var(--dsw-alias-label-secondary)}',
+				'.sk-marketChecks span{color:var(--dsw-alias-label-secondary)}',
+				'.sk-marketMetaNotice{margin:0;padding:7px 9px;border-radius:7px;background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,transparent);color:var(--dsw-alias-label-secondary);font-size:11.5px;line-height:1.5}',
+				'.sk-marketFoot{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:none;position:sticky;bottom:0;padding:10px 16px;border-top:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);z-index:2}',
+				'.sk-marketPreview{display:flex;flex-direction:column;gap:14px;max-height:360px;overflow-y:auto}',
+				'.sk-marketPreviewSummary{display:flex;flex-direction:column;gap:5px;font-size:12px;line-height:1.5}',
+				'.sk-marketPreviewSummary span{overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary)}',
 				// diff preview
 				'.sk-modalDiff{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}',
 				'.sk-diffRow{display:flex;gap:8px;font-size:12.5px;align-items:baseline}',
@@ -1097,12 +1115,184 @@
 					'应用后启用 ' + (diff.finalEnabled || []).length + ' 个 Skill；下一轮对话生效，无需重启'));
 				return h('div', { className: 'sk-modalDiff' }, rows);
 			}
+			// ── curated Skill marketplace (MCP / Plugin aligned shell) ────────
+			function MarketIcon(props) {
+				var [failed, setFailed] = React.useState(false);
+				if (props && props.src && !failed) {
+					return h('img', {
+						className: 'sk-marketIcon',
+						src: props.src,
+						alt: '',
+						'aria-hidden': true,
+						onError: function () { setFailed(true); }
+					});
+				}
+				return h('span', { className: 'sk-marketFallback', 'aria-hidden': true }, h(P.IconSkillOutline16, { size: 19 }));
+			}
+			function marketStatusLabel(status) {
+			if (status === 'installed') return '已安装';
+			if (status === 'update-available') return '可更新';
+			if (status === 'modified') return '本地已修改';
+			if (status === 'conflict') return '路径冲突';
+			if (status === 'project-required') return '需选择项目';
+			return '未安装';
+		}
+			function SkillMarketplacePage(props) {
+				var ctx = props.ctx;
+				var project = props.project;
+				var projects = props.projects || [];
+				var [items, setItems] = React.useState([]);
+				var [loaded, setLoaded] = React.useState(false);
+				var [loading, setLoading] = React.useState(false);
+				var [error, setError] = React.useState(null);
+				var [query, setQuery] = React.useState('');
+				var [selected, setSelected] = React.useState(null);
+				var [detail, setDetail] = React.useState(null);
+				var [detailLoading, setDetailLoading] = React.useState(false);
+				var [preview, setPreview] = React.useState(null);
+				var [previewLoading, setPreviewLoading] = React.useState(false);
+				var [busy, setBusy] = React.useState(false);
+				var [projectMenuOpen, setProjectMenuOpen] = React.useState(false);
+				var [message, setMessage] = React.useState(null);
+				var [attempt, setAttempt] = React.useState(0);
+
+				function loadMarket(force) {
+					setLoading(true);
+					setError(null);
+					return apiCallAt('marketplace', { cwd: project ? project.cwd : undefined, force: force === true }, ctx).then(
+						function (value) {
+							var next = Array.isArray(value && value.items) ? value.items : [];
+							setItems(next);
+							setLoaded(true);
+							setSelected(function (current) { return current ? (next.find(function (item) { return item.id === current.id; }) || current) : null; });
+						},
+						function (reason) { setError(String((reason && reason.message) || reason)); }
+					).finally(function () { setLoading(false); });
+				}
+				React.useEffect(function () {
+					setLoaded(false);
+					setSelected(null);
+					setDetail(null);
+					void loadMarket(false);
+				}, [project ? project.cwd : '', attempt]);
+				React.useEffect(function () {
+					function onKey(event) {
+						if (event.key !== 'Escape') return;
+						if (preview !== null) return;
+						if (selected !== null) { setSelected(null); setDetail(null); }
+					}
+					document.addEventListener('keydown', onKey);
+					return function () { document.removeEventListener('keydown', onKey); };
+				}, [preview, selected]);
+
+				function openItem(item) {
+					setSelected(item);
+					setDetail(null);
+					setDetailLoading(true);
+					apiCallAt('marketplace.detail', { cwd: project ? project.cwd : undefined, id: item.id }, ctx).then(
+						function (value) { setDetail(value); },
+						function (reason) { setDetail({ metadataError: String((reason && reason.message) || reason), id: item.id, name: item.name, repository: item.repository, description: item.description, status: item.status }); }
+					).finally(function () { setDetailLoading(false); });
+				}
+				function openPreview() {
+					if (selected === null) return;
+					if (project === null) { setMessage('请先选择安装目标项目'); return; }
+					setMessage(null);
+					setPreviewLoading(true);
+					apiCallAt('marketplace.preview', { cwd: project.cwd, id: selected.id }, ctx).then(
+						function (value) { setPreview(value); },
+						function (reason) { setMessage(String((reason && reason.message) || reason)); }
+					).finally(function () { setPreviewLoading(false); });
+				}
+				function installPreview() {
+					if (preview === null || !preview.canInstall || selected === null || project === null || busy) return;
+					setBusy(true);
+					apiCallAt('marketplace.install', { cwd: project.cwd, id: selected.id }, ctx).then(
+						function () {
+							setPreview(null);
+							setMessage('已安装到当前项目，默认停用；可在「本地 Skill」中启用。');
+							void loadMarket(true);
+							if (typeof props.onInstalled === 'function') props.onInstalled();
+						},
+						function (reason) { setMessage(String((reason && reason.message) || reason)); }
+					).finally(function () { setBusy(false); });
+				}
+
+				var needle = query.trim().toLowerCase();
+				var visible = items.filter(function (item) {
+					return needle === '' || String(item.name || '').toLowerCase().includes(needle) || String(item.repository || '').toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle);
+				});
+				var activeDetail = detail || selected;
+				var detailStatus = activeDetail ? (activeDetail.status || (selected && selected.status)) : null;
+				var canInstall = project !== null && activeDetail !== null && detailStatus !== 'modified' && detailStatus !== 'conflict';
+
+				return h(
+					'div',
+					{ className: 'sk-marketLayout' },
+					h('div', { className: 'sk-marketListCol' },
+						h('div', { className: 'sk-marketToolbar' },
+							h('span', { className: 'sk-projLabel' }, '安装目标'),
+							h('div', { className: 'sk-marketProjectPicker' },
+								h('button', {
+									type: 'button', className: 'sk-projBtn', disabled: projects.length === 0,
+								onClick: function () { setProjectMenuOpen(!projectMenuOpen); },
+								title: project ? project.cwd : '选择安装目标项目'
+							}, h('span', { className: 'sk-projTitle' }, project ? project.title : '（未选择）'), h(P.IconChevronDownOutline14)),
+							projectMenuOpen
+								? h('div', { className: 'sk-menu' },
+									projects.map(function (p) {
+										return h('button', { type: 'button', key: p.cwd, className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''), onClick: function () { setProjectMenuOpen(false); props.onChooseProject(p); } }, project && project.cwd === p.cwd ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title));
+									}),
+									h('div', { className: 'sk-menuSep' }),
+									h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjectMenuOpen(false); props.onAddProject(); } }, h(P.IconPlusOutline16), '添加本地项目…')
+								)
+								: null
+							),
+						h('div', { className: 'sk-searchWrap sk-marketSearch' },
+							h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)),
+							h('input', { className: 'sk-search', placeholder: '搜索 Skill 或 GitHub 仓库', value: query, onChange: function (event) { setQuery(event.target.value); } })
+						),
+						h('button', { type: 'button', className: 'sk-chip', disabled: loading, onClick: function () { setAttempt(function (value) { return value + 1; }); } }, h(P.IconRefreshOutline16), loading ? '刷新中…' : '刷新')
+					),
+					h('p', { className: 'sk-marketHelper' }, '精选自 GitHub · 安装前校验 SKILL.md、路径和来源；不会执行第三方脚本'),
+					message ? h('p', { className: 'sk-marketNotice', role: 'status' }, message) : null,
+					error ? h('div', { className: 'sk-marketLoadError', role: 'alert' }, h('p', { className: 'sk-error' }, '加载 Skill 市场失败：' + error), h(Button, { variant: 'outline', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, '重试')) : null,
+					h('div', { className: 'sk-marketList', 'data-testid': 'skill-market-list' },
+						loading && !loaded ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 Skill 市场…') : null,
+						!loading && visible.length === 0 ? h('p', { className: 'sk-empty' }, '没有匹配的 Skill。') : null,
+						visible.map(function (item) {
+							return h('button', { type: 'button', key: item.id, className: 'sk-marketRow' + (selected && selected.id === item.id ? ' sk-marketRowActive' : ''), onClick: function () { openItem(item); } },
+								h('span', { className: 'sk-marketMain' }, h(MarketIcon, { src: item.iconUrl }), h('span', { className: 'sk-marketCopy' }, h('span', { className: 'sk-marketTitle' }, item.name), h('span', { className: 'sk-marketDesc' }, item.description), h('span', { className: 'sk-marketMeta' }, item.repository, item.license ? ' · ' + item.license : ''))),
+								h('span', { className: 'sk-marketSide' }, h('span', { className: 'sk-marketStatus sk-marketStatus-' + item.status }, marketStatusLabel(item.status)), h(P.IconChevronRightOutline14))
+							);
+						})
+					)
+					),
+					activeDetail
+						? h('aside', { className: 'sk-drawer sk-marketDrawer', role: 'dialog', 'aria-label': activeDetail.name + ' 详情' },
+							h('div', { className: 'sk-drawerHead' }, h(MarketIcon, { src: activeDetail.iconUrl }), h('div', { className: 'sk-marketDrawerIdentity' }, h('div', { className: 'sk-drawerName' }, activeDetail.name), h('a', { className: 'sk-marketLink', href: activeDetail.url || ('https://github.com/' + activeDetail.repository), target: '_blank', rel: 'noreferrer' }, activeDetail.repository, h(P.IconRightUpOutline14))), h('button', { type: 'button', className: 'sk-icBtn', 'aria-label': '关闭详情', title: '关闭（Esc）', onClick: function () { setSelected(null); setDetail(null); } }, h(P.IconCloseOutline16))),
+							h('div', { className: 'sk-drawerBody' },
+								detailLoading ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 GitHub Skill 信息…') : null,
+								activeDetail.description ? h('p', { className: 'sk-descFull' }, activeDetail.description) : null,
+								activeDetail.metadataError ? h('p', { className: 'sk-marketMetaNotice' }, '部分远程信息暂不可用：' + activeDetail.metadataError) : null,
+								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '仓库信息'), h('div', { className: 'sk-marketFacts' }, h('span', null, '作者：' + (activeDetail.author || '—')), h('span', null, '许可证：' + (activeDetail.license || '—')), h('span', null, 'Stars：' + (activeDetail.stars === null || activeDetail.stars === undefined ? '—' : activeDetail.stars)), h('span', null, '文件：' + (activeDetail.fileCount === null || activeDetail.fileCount === undefined ? '—' : activeDetail.fileCount)))) ,
+								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '当前状态'), h('div', { className: 'sk-marketState' }, marketStatusLabel(detailStatus), project ? ' · 安装到 ' + project.title : ' · 请选择安装目标项目')),
+								activeDetail.files && activeDetail.files.length > 0 ? h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, 'Skill 文件'), h('div', { className: 'sk-marketFiles' }, activeDetail.files.map(function (file) { return h('code', { key: file }, file); }))) : null,
+								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '安装校验'), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ SKILL.md frontmatter'), h('span', null, '✓ 路径和文件大小'), h('span', null, '✓ 拒绝符号链接'), h('span', null, '✓ 不执行第三方脚本')))
+							),
+							h('div', { className: 'sk-marketFoot' }, h(Button, { variant: 'outline', onClick: function () { window.open(activeDetail.url || ('https://github.com/' + activeDetail.repository), '_blank', 'noopener,noreferrer'); } }, '在 GitHub 查看', h(P.IconRightUpOutline14)), h(Button, { disabled: !canInstall || previewLoading || busy, onClick: openPreview }, previewLoading ? '检查中…' : detailStatus === 'update-available' ? '更新到当前项目' : detailStatus === 'installed' ? '重新安装' : canInstall ? '安装到当前项目' : '需要人工处理'))
+						)
+						: null,
+					h(Modal, { open: preview !== null, onClose: function () { if (!busy) setPreview(null); }, title: preview ? (preview.action === 'update' ? '更新 Skill「' + preview.name + '」' : '安装 Skill「' + preview.name + '」') : '安装预览', closeLabel: '关闭', description: preview ? preview.message : '', footer: preview ? h(React.Fragment, null, h(Button, { variant: 'outline', disabled: busy, onClick: function () { setPreview(null); } }, '取消'), h(Button, { disabled: busy || !preview.canInstall, onClick: installPreview }, busy ? '写入中…' : preview.canInstall ? '确认安装' : '无法安装') ) : null }, preview ? h('div', { className: 'sk-marketPreview' }, h('div', { className: 'sk-marketPreviewSummary' }, h('strong', null, preview.action === 'update' ? '将更新受管 Skill' : '将安装到当前项目'), h('span', null, preview.projectRoot + '/.dsh/skills/' + preview.name)), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ 已校验远程 SKILL.md'), h('span', null, '✓ ' + preview.incoming.fileCount + ' 个文件，内容哈希 ' + preview.incoming.hash.slice(0, 18) + '…'), h('span', null, '✓ 不执行 scripts 或其他第三方代码')), preview.incoming.files && preview.incoming.files.length > 0 ? h('div', { className: 'sk-marketFiles' }, preview.incoming.files.map(function (file) { return h('code', { key: file }, file); })) : null) : null)
+				);
+			}
 			/**
 			 * The V1 body. Rendered only after the apiVersion 6 probe
 			 * succeeded, so all hooks here run unconditionally.
 			 */
 			function SkillCenterV1Body(props) {
 				var ctx = props.ctx;
+				var [topPage, setTopPage] = React.useState('local'); // 'local' | 'market'
 				var [activePage, setActivePage] = React.useState('project'); // 'project' | 'library'
 				var [projects, setProjects] = React.useState([]);
 				var [project, setProject] = React.useState(null); // { cwd, title, kind }
@@ -1686,9 +1876,34 @@
 				return h(
 					'div',
 					{ className: 'sk-root' },
+					h('div', { className: 'sk-head' }, h('h2', { className: 'sk-headTitle' }, 'SKILL'), h('span', { className: 'sk-headSub' }, 'Web 配置')),
 					h(
 						'div',
-						{ className: 'sk-tabs', role: 'tablist' },
+						{ className: 'sk-tabs sk-primaryTabs', role: 'tablist' },
+						h('button', {
+							type: 'button', role: 'tab', 'aria-selected': topPage === 'local',
+							className: 'sk-tab' + (topPage === 'local' ? ' sk-tabActive' : ''),
+							onClick: function () { setTopPage('local'); }
+						}, '本地 Skill'),
+						h('button', {
+							type: 'button', role: 'tab', 'aria-selected': topPage === 'market',
+							className: 'sk-tab' + (topPage === 'market' ? ' sk-tabActive' : ''),
+							onClick: function () { setTopPage('market'); }
+						}, 'Skill 市场')
+					),
+					topPage === 'market'
+						? h(SkillMarketplacePage, {
+							ctx: ctx,
+							project: project,
+							projects: projects,
+							onChooseProject: chooseProject,
+							onAddProject: addLocalProject,
+							onInstalled: function () { if (project !== null) void loadView(project); }
+						})
+						: h(React.Fragment, null,
+					h(
+						'div',
+						{ className: 'sk-tabs sk-localTabs', role: 'tablist' },
 						h('button', {
 							type: 'button', role: 'tab', 'aria-selected': activePage === 'project',
 							className: 'sk-tab' + (activePage === 'project' ? ' sk-tabActive' : ''),
@@ -1892,6 +2107,7 @@
 						),
 						drawerName !== null ? drawerEl() : null
 					),
+				),
 					h(Modal, {
 						open: presetModal !== null,
 						onClose: function () { setPresetModal(null); },
@@ -2186,16 +2402,16 @@
 			module.exports.apply = function (ctx) {
 				var slots = ctx.get('slots');
 				if (slots === undefined || typeof slots.register !== 'function') return;
-				// DSH-006: the Skills management page moved out of Settings into
-				// the frame-wide Extensions page; the only entry is the
-				// sidebar-foot 「扩展」 row (additive seat, no shell change).
-				slots.inject('sidebar.footer.action', function () {
+				// The extension-manager plugin owns the shared sidebar entry and
+				// frame. Skill Manager contributes only its business section, just
+				// like MCP Manager and Plugin Manager.
+				slots.inject('extension.manager.section', function () {
 					return slots.register(
 						{
-							name: 'sidebar.footer.action',
-							id: 'extensions-page',
-							order: 100,
-							label: function () { return '扩展'; },
+							name: 'extension.manager.section',
+							id: 'skill',
+							order: 10,
+							label: function () { return 'SKILL'; },
 							inject: function () {
 								return {
 									api: {
@@ -2208,7 +2424,7 @@
 								};
 							}
 						},
-						ExtensionsEntry
+						SkillCenterV1
 					);
 				});
 			};

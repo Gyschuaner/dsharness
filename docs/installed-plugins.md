@@ -19,7 +19,7 @@
 
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
-| dsh-skill-manager | 0.1.0（build 10） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003 | 本地持续开发；`~/.dsh/plugins/skill-manager` 为指向本仓库的 junction |
+| dsh-skill-manager | 0.2.0（build 13） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 | 本地持续开发；`~/.dsh/plugins/skill-manager` 为指向本仓库的 junction；V1.1 增加精选 GitHub Skill 市场 |
 | dsh-image-context-guard | 0.1.0 | 本仓库（提交 aa85d62，已合并 main） | `link:` 指向 `~/.dsh/plugin-cache/image-context-guard-aa85d62` | cordis.patch.yml insert（手动，DSH-004 注释段） | DSH-004 / BUG-3E5CFD04 | 模型请求图片上限 9 张；cache 目录名 = 源提交短哈希 |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
@@ -61,6 +61,12 @@
   （`.\restart-dsh-web.ps1`，会话持久化在磁盘、可恢复）；client 半变化硬刷新浏览器即可。
 
 ## 变更日志
+
+- **2026-08-24（DSH-008 V1.1）**：skill-manager 升级到 0.2.0 / build 13，改为向
+  `dsh-extension-manager` 的 `extension.manager.section` 注册 SKILL 分区，避免重复拥有扩展入口；
+  新增真实 GitHub 市场列表、详情、安装预览和项目安装接口。安装默认停用，Host 拒绝符号链接、
+  路径穿越、冲突覆盖，并且不执行第三方脚本。本地 3080 运行时联接已切换到当前工作树，
+  重启后 `/api/skill-manager` 返回 apiVersion 6。
 
 - **2026-08-17（macOS 宿主装 better-sidebar-smooth，BUG-1E130940）**：
   本地 CSS 补丁插件修复 better-sidebar 0.12.3 侧面板开合时 Session log
