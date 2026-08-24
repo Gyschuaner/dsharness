@@ -335,7 +335,7 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon').length, 2);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketFallback').length, 1);
 	assert.match(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-marketIcon').getAttribute('src') || '', /^https:\/\//);
-	assert.ok(h.dom.window.document.body.textContent.includes('精选自 GitHub · 安装前校验 DSH 插件清单'));
+	assert.ok(h.dom.window.document.body.textContent.includes('精选自 GitHub · Registry 只读发现 · 安装前校验 DSH 插件清单'));
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-rowMeta').length, 0, 'market home omits metadata columns');
 
 	const remoteImages = h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon');
@@ -360,4 +360,42 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	await act(async () => { h.dom.window.document.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
 	assert.equal(h.dom.window.document.querySelector('.pm-drawer'), null);
 	assert.ok(h.dom.window.document.querySelector('.ext-page'), 'Esc closes only the inner drawer');
+});
+
+test('marketplace switches between featured and Registry discovery sources', async (t) => {
+	const market = [
+		{ id: 'omdsh-dev/DSH-better-sidebar', repository: 'omdsh-dev/DSH-better-sidebar', description: '精选插件。', iconUrl: 'https://github.com/omdsh-dev.png?size=64', iconSource: 'github-avatar', marketSource: 'featured', installable: true, status: 'not-installed', installedVersion: null },
+		{ id: 'SiriLee/dsh-rewind', repository: 'SiriLee/dsh-rewind', description: '会话回退插件。', iconUrl: 'https://github.com/SiriLee.png?size=64', iconSource: 'github-avatar', marketSource: 'registry', installable: false, status: 'not-installed', installedVersion: null },
+	];
+	const calls = [];
+	const router = async (body) => {
+		calls.push(body);
+		if (body.op === 'list') return { apiVersion: 1, plugins: [localPlugin('dsh-plugin-manager', { protected: true })] };
+		if (body.op === 'marketplace') return { apiVersion: 1, items: market, registry: { status: 'fresh', generatedAt: '2026-08-24T03:00:00Z', warning: null } };
+		if (body.op === 'marketplace.detail') return {
+			id: body.id, repository: body.id, url: 'https://github.com/' + body.id, iconUrl: 'https://github.com/SiriLee.png?size=64', iconSource: 'github-avatar', marketSource: 'registry', installable: false, description: '会话回退插件。', author: 'SiriLee', stars: 10, forks: 1, language: 'TypeScript', license: 'MIT', lastPushedAt: new Date().toISOString(), topics: ['dsh-plugin'], latestVersion: 'v0.3.2', installedVersion: null, status: 'not-installed', manifest: { valid: true, dshRequirement: '>=0.0.1', hostEntry: './lib/index.js', clientEntry: './lib/client.js' },
+		};
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.openPlugin();
+	await h.click(h.button('插件市场'));
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 1);
+	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-rowTitle').textContent, 'omdsh-dev/DSH-better-sidebar');
+	assert.ok(h.dom.window.document.body.textContent.includes('Registry 已更新'));
+
+	await h.click(h.button('发现'));
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 1);
+	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-rowTitle').textContent, 'SiriLee/dsh-rewind');
+	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-status').textContent, '仅查看');
+
+	await h.click(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-row'));
+	await h.flush(); await h.flush();
+	assert.ok(calls.some((call) => call.op === 'marketplace.detail' && call.id === 'SiriLee/dsh-rewind'));
+	const installButton = h.dom.window.document.querySelector('.pm-drawerFoot button[disabled]');
+	assert.equal(installButton.textContent, '仅查看');
+	assert.equal(installButton.disabled, true);
 });

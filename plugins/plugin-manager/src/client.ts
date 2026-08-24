@@ -26,8 +26,22 @@ interface PluginMarketItem {
 	description: string;
 	iconUrl?: string | null;
 	iconSource?: string;
+	marketSource?: 'featured' | 'registry';
+	installable?: boolean;
 	status: string;
 	installedVersion: string | null;
+}
+
+interface PluginRegistryInfo {
+	status: 'fresh' | 'stale' | 'unavailable';
+	generatedAt: string | null;
+	warning: string | null;
+}
+
+interface PluginMarketplaceResponse {
+	items: PluginMarketItem[];
+	registry?: PluginRegistryInfo;
+	page?: { offset: number; limit: number; total: number; hasMore: boolean; nextCursor: string | null };
 }
 
 interface PluginMarketDetail {
@@ -35,6 +49,8 @@ interface PluginMarketDetail {
 	description?: string;
 	iconUrl?: string | null;
 	iconSource?: string;
+	marketSource?: 'featured' | 'registry';
+	installable?: boolean;
 	status?: string;
 	installedVersion?: string | null;
 	latestVersion?: string | null;
@@ -57,7 +73,7 @@ interface PluginMarketDetail {
 
 interface PluginApi {
 	call(op: 'list'): Promise<{ plugins: PluginLocalView[] }>;
-	call(op: 'marketplace'): Promise<{ items: PluginMarketItem[] }>;
+	call(op: 'marketplace'): Promise<PluginMarketplaceResponse>;
 	call(op: 'marketplace.detail', payload: { id: string; force?: boolean }): Promise<PluginMarketDetail>;
 	call(op: 'setEnabled', payload: { name: string; enabled: boolean }): Promise<{ restartRequired: boolean }>;
 	call(op: 'import' | 'marketplace.install', payload: Record<string, unknown>): Promise<{ plugin: PluginLocalView | null }>;
@@ -147,6 +163,12 @@ interface RemoteIconProps {
 				'.pm-btnPrimary:hover:not(:disabled){background:var(--dsw-alias-brand-primary-hover, var(--dsw-alias-brand-primary))}',
 				'.pm-iconBtn{width:38px;padding:0}',
 				'.pm-helper{flex:none;margin:0;padding:0 8px 10px;color:var(--dsw-alias-label-quaternary);font-size:12px}',
+				'.pm-marketFilters{flex:none;display:flex;gap:18px;padding:12px 8px 0}',
+				'.pm-marketFilter{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:12px;padding:0 1px 8px}',
+				'.pm-marketFilter:hover{color:var(--dsw-alias-label-primary)}',
+				'.pm-marketFilterOn{border-bottom-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);font-weight:600}',
+				'.pm-registryState{flex:none;margin:0;padding:0 8px 10px;color:var(--dsw-alias-label-quaternary);font-size:12px}',
+				'.pm-registryStateWarning{color:var(--dsw-alias-status-warning, #9a6700)}',
 				'.pm-list{min-height:0;overflow:auto;padding:0 8px 32px}',
 				'.pm-row{position:relative;box-sizing:border-box;width:100%;min-height:72px;border:0;border-top:1px solid var(--dsw-alias-border-l2);background:transparent;color:inherit;text-align:left;font:inherit;padding:13px 10px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;align-items:center}',
 				'.pm-row:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
@@ -390,37 +412,38 @@ interface RemoteIconProps {
 				);
 			}
 
-			function MarketDrawer(props: PluginMarketDrawerProps): React.ReactNode {
-				var item = props.item;
-				var detail = props.detail;
-				var loading = props.loading;
-				var url = detail && detail.url ? detail.url : 'https://github.com/' + item.repository;
-				var latest = detail && detail.latestVersion;
-				var status = detail && detail.status ? detail.status : item.status;
-				var actionText = status === 'update-available' && latest ? '更新到 ' + latest : status === 'installed' ? '已安装' : '安装插件';
-				return h('aside', { className: 'pm-drawer', role: 'dialog', 'aria-label': item.repository + ' 详情' },
-					h('header', { className: 'pm-drawerHead' },
-						h('div', { className: 'pm-drawerTitleRow' }, h(RemoteIcon, { src: detail && detail.iconUrl || item.iconUrl }), h('h3', { className: 'pm-drawerTitle' }, item.repository.split('/')[1]), h('button', { type: 'button', className: 'pm-close', 'aria-label': '关闭详情', onClick: props.onClose }, h(P.IconCloseOutline16))),
-						h('a', { className: 'pm-repo', href: url, target: '_blank', rel: 'noreferrer' }, h(Icon, { type: 'github' }), 'github.com/' + item.repository, h(Icon, { type: 'external', size: 13 })),
-						h('p', { className: 'pm-drawerDesc' }, detail && detail.description || item.description)
-				),
-				h('div', { className: 'pm-drawerBody' },
-					loading ? h('p', { className: 'pm-loading' }, '正在读取 GitHub 信息…') : !detail ? h('p', { className: 'pm-error' }, '仓库信息不可用') : detail.error ? h('p', { className: 'pm-error' }, detail.error) : h(React.Fragment, null,
-						status !== 'not-installed' ? h(React.Fragment, null,
-							h('div', { className: 'pm-versionDecision' }, h('span', null, '已安装 ', h('strong', null, detail.installedVersion || item.installedVersion || '—')), h('span', { className: 'pm-versionArrow' }, '→'), h('span', null, '最新 ', h('strong', null, latest || '—'))),
-							h('div', { className: 'pm-restart' }, '更新后需要重启 Web')
-						) : h('div', { className: 'pm-restart', style: { paddingTop: '20px' } }, '安装完成后需要重启 Web'),
-						h('section', { className: 'pm-section' }, h('h4', { className: 'pm-sectionTitle' }, '概览'), h(KeyValues, { rows: [['作者', detail.author], ['许可', detail.license], ['语言', detail.language], ['仓库', 'Stars ' + formatNumber(detail.stars) + ' · Forks ' + formatNumber(detail.forks)], ['最后推送', relativeTime(detail.lastPushedAt)]] })),
-						h(Disclosure, { title: 'GitHub 信息' }, h('div', null, '仓库：', item.repository, detail.releaseUrl ? h('div', null, '最新发布：', latest || '—') : null, detail.topics && detail.topics.length ? h('div', { className: 'pm-topics' }, detail.topics.map(function (topic) { return h('span', { className: 'pm-topic', key: topic }, topic); })) : null)),
-						h(Disclosure, { title: '兼容与技术信息' }, h(KeyValues, { rows: [['DSH 要求', detail.manifest && detail.manifest.dshRequirement], ['插件清单', detail.manifest && detail.manifest.valid ? '已校验' : '未识别'], ['Host 入口', detail.manifest && detail.manifest.hostEntry], ['Client 入口', detail.manifest && detail.manifest.clientEntry]] }))
-					)
-				),
-				h('footer', { className: 'pm-drawerFoot' },
-					h('a', { className: 'pm-btn', href: url, target: '_blank', rel: 'noreferrer' }, '在 GitHub 查看', h(Icon, { type: 'external', size: 13 })),
-					h(Button, { type: 'button', primary: true, disabled: props.busy || loading || (status === 'installed' && !latest) || detail?.manifest?.valid === false, onClick: props.onInstall }, props.busy ? '正在处理…' : actionText)
-				)
-				);
-			}
+				function MarketDrawer(props: PluginMarketDrawerProps): React.ReactNode {
+					var item = props.item;
+					var detail = props.detail;
+					var loading = props.loading;
+					var url = detail && detail.url ? detail.url : 'https://github.com/' + item.repository;
+					var latest = detail && detail.latestVersion;
+					var status = detail && detail.status ? detail.status : item.status;
+					var installable = detail && detail.installable !== undefined ? detail.installable !== false : item.installable !== false;
+					var actionText = !installable ? '仅查看' : status === 'update-available' && latest ? '更新到 ' + latest : status === 'installed' ? '已安装' : '安装插件';
+					return h('aside', { className: 'pm-drawer', role: 'dialog', 'aria-label': item.repository + ' 详情' },
+						h('header', { className: 'pm-drawerHead' },
+							h('div', { className: 'pm-drawerTitleRow' }, h(RemoteIcon, { src: detail && detail.iconUrl || item.iconUrl }), h('h3', { className: 'pm-drawerTitle' }, item.repository.split('/')[1]), h('button', { type: 'button', className: 'pm-close', 'aria-label': '关闭详情', onClick: props.onClose }, h(P.IconCloseOutline16))),
+							h('a', { className: 'pm-repo', href: url, target: '_blank', rel: 'noreferrer' }, h(Icon, { type: 'github' }), 'github.com/' + item.repository, h(Icon, { type: 'external', size: 13 })),
+							h('p', { className: 'pm-drawerDesc' }, detail && detail.description || item.description)
+						),
+						h('div', { className: 'pm-drawerBody' },
+							loading ? h('p', { className: 'pm-loading' }, '正在读取 GitHub 信息…') : !detail ? h('p', { className: 'pm-error' }, '仓库信息不可用') : detail.error ? h('p', { className: 'pm-error' }, detail.error) : h(React.Fragment, null,
+								status !== 'not-installed' ? h(React.Fragment, null,
+									h('div', { className: 'pm-versionDecision' }, h('span', null, '已安装 ', h('strong', null, detail.installedVersion || item.installedVersion || '—')), h('span', { className: 'pm-versionArrow' }, '→'), h('span', null, '最新 ', h('strong', null, latest || '—'))),
+									h('div', { className: 'pm-restart' }, installable ? '更新后需要重启 Web' : 'Registry 发现条目当前仅支持查看')
+								) : h('div', { className: 'pm-restart', style: { paddingTop: '20px' } }, installable ? '安装完成后需要重启 Web' : 'Registry 发现条目当前仅支持查看'),
+								h('section', { className: 'pm-section' }, h('h4', { className: 'pm-sectionTitle' }, '概览'), h(KeyValues, { rows: [['作者', detail.author], ['许可', detail.license], ['语言', detail.language], ['仓库', 'Stars ' + formatNumber(detail.stars) + ' · Forks ' + formatNumber(detail.forks)], ['最后推送', relativeTime(detail.lastPushedAt)]] })),
+								h(Disclosure, { title: 'GitHub 信息' }, h('div', null, '仓库：', item.repository, detail.releaseUrl ? h('div', null, '最新发布：', latest || '—') : null, detail.topics && detail.topics.length ? h('div', { className: 'pm-topics' }, detail.topics.map(function (topic) { return h('span', { className: 'pm-topic', key: topic }, topic); })) : null)),
+								h(Disclosure, { title: '兼容与技术信息' }, h(KeyValues, { rows: [['DSH 要求', detail.manifest && detail.manifest.dshRequirement], ['插件清单', detail.manifest && detail.manifest.valid ? '已校验' : '未识别'], ['Host 入口', detail.manifest && detail.manifest.hostEntry], ['Client 入口', detail.manifest && detail.manifest.clientEntry]] }))
+							)
+						),
+						h('footer', { className: 'pm-drawerFoot' },
+							h('a', { className: 'pm-btn', href: url, target: '_blank', rel: 'noreferrer' }, '在 GitHub 查看', h(Icon, { type: 'external', size: 13 })),
+							h(Button, { type: 'button', primary: installable, disabled: props.busy || loading || !installable || (status === 'installed' && !latest) || detail?.manifest?.valid === false, onClick: props.onInstall }, props.busy ? '正在处理…' : actionText)
+						)
+					);
+				}
 
 			function PluginLoadingState(): React.ReactNode {
 				var modules: Array<[string, boolean]> = [
@@ -440,12 +463,14 @@ interface RemoteIconProps {
 				);
 			}
 
-			function PluginManagerSection(props: { api: PluginApi }): React.ReactNode {
-				var api = props.api;
-				var [tab, setTab] = React.useState('local');
-				var [query, setQuery] = React.useState('');
-				var [local, setLocal] = React.useState<PluginLocalView[]>([]);
-				var [market, setMarket] = React.useState<PluginMarketItem[]>([]);
+				function PluginManagerSection(props: { api: PluginApi }): React.ReactNode {
+					var api = props.api;
+					var [tab, setTab] = React.useState('local');
+					var [marketSource, setMarketSource] = React.useState<'featured' | 'registry'>('featured');
+					var [query, setQuery] = React.useState('');
+					var [local, setLocal] = React.useState<PluginLocalView[]>([]);
+					var [market, setMarket] = React.useState<PluginMarketItem[]>([]);
+					var [registryInfo, setRegistryInfo] = React.useState<PluginRegistryInfo>({ status: 'unavailable', generatedAt: null, warning: null });
 				var [loading, setLoading] = React.useState(true);
 				var [error, setError] = React.useState('');
 				var [attempt, setAttempt] = React.useState(0);
@@ -470,7 +495,10 @@ interface RemoteIconProps {
 				}
 
 				function loadMarket(): Promise<void> {
-					return api.call('marketplace').then(function (value) { setMarket(value.items || []); });
+					return api.call('marketplace').then(function (value) {
+						setMarket(value.items || []);
+						setRegistryInfo(value.registry || { status: 'unavailable', generatedAt: null, warning: null });
+					});
 				}
 
 				React.useEffect(function () {
@@ -532,7 +560,11 @@ interface RemoteIconProps {
 
 				var needle = query.trim().toLowerCase();
 				var visibleLocal = local.filter(function (plugin) { return needle === '' || plugin.name.toLowerCase().includes(needle) || String(plugin.description || '').toLowerCase().includes(needle); });
-				var visibleMarket = market.filter(function (item) { return needle === '' || item.repository.toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle); });
+				var visibleMarket = market.filter(function (item) {
+					var itemSource = item.marketSource || 'featured';
+					return itemSource === marketSource && (needle === '' || item.repository.toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle));
+				});
+				var registryStatusLabel = registryInfo.status === 'fresh' ? 'Registry 已更新' : registryInfo.status === 'stale' ? 'Registry 使用缓存' : 'Registry 暂不可用，当前保留精选';
 
 				var body;
 				if (loading) body = h(PluginLoadingState);
@@ -544,7 +576,7 @@ interface RemoteIconProps {
 					);
 				}));
 				else body = visibleMarket.length === 0 ? h('p', { className: 'pm-empty' }, '没有匹配的市场插件。') : h('div', { className: 'pm-list', 'data-testid': 'market-list' }, visibleMarket.map(function (item) {
-					var statusLabel = item.status === 'installed' ? '已安装' : item.status === 'update-available' ? '可更新' : '未安装';
+						var statusLabel = item.installable === false ? '仅查看' : item.status === 'installed' ? '已安装' : item.status === 'update-available' ? '可更新' : '未安装';
 					return h('button', { key: item.id, type: 'button', className: 'pm-row pm-rowClick' + (selectedMarket && selectedMarket.id === item.id ? ' pm-rowSelected' : ''), onClick: function () { openMarket(item); } },
 						h('div', { className: 'pm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('div', { className: 'pm-marketCopy' }, h('div', { className: 'pm-rowTitle' }, item.repository), h('div', { className: 'pm-rowDesc' }, item.description))),
 						h('div', { className: 'pm-rowSide' }, h('span', { className: 'pm-status' + (item.status === 'update-available' ? ' pm-statusUpdate' : '') }, statusLabel), h(P.IconChevronRightOutline14))
@@ -553,12 +585,17 @@ interface RemoteIconProps {
 
 				return h('section', { className: 'pm-root', 'aria-label': 'Plugin Manager' },
 					h('header', { className: 'pm-head' }, h('h2', null, 'Plugin'), h('span', { className: 'pm-context' }, 'Web 配置')),
-					h('div', { className: 'pm-tabs', role: 'tablist' },
-						h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'local' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'local', onClick: function () { setTab('local'); setQuery(''); setSelectedMarket(null); } }, '本地插件'),
-						h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'market' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'market', onClick: function () { setTab('market'); setQuery(''); setSelectedLocal(null); } }, '插件市场')
-					),
-					h('div', { className: 'pm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: tab === 'local' ? '搜索本地插件' : '搜索插件或 GitHub 仓库' }), tab === 'local' ? h(React.Fragment, null, h(Button, { type: 'button', onClick: function () { setImportOpen(true); } }, h(Icon, { type: 'plus', size: 14 }), '导入插件'), h(Button, { type: 'button', className: 'pm-iconBtn', title: '更多操作', 'aria-label': '更多操作' }, h(Icon, { type: 'dots' }))) : null),
-					tab === 'market' ? h('p', { className: 'pm-helper' }, '精选自 GitHub · 安装前校验 DSH 插件清单') : null,
+						h('div', { className: 'pm-tabs', role: 'tablist' },
+							h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'local' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'local', onClick: function () { setTab('local'); setQuery(''); setSelectedMarket(null); } }, '本地插件'),
+							h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'market' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'market', onClick: function () { setTab('market'); setQuery(''); setSelectedLocal(null); } }, '插件市场')
+						),
+						tab === 'market' ? h('div', { className: 'pm-marketFilters', role: 'tablist', 'data-testid': 'market-channels' },
+							h('button', { type: 'button', role: 'tab', className: 'pm-marketFilter' + (marketSource === 'featured' ? ' pm-marketFilterOn' : ''), 'aria-selected': marketSource === 'featured', onClick: function () { setMarketSource('featured'); setQuery(''); setSelectedMarket(null); } }, '精选'),
+							h('button', { type: 'button', role: 'tab', className: 'pm-marketFilter' + (marketSource === 'registry' ? ' pm-marketFilterOn' : ''), 'aria-selected': marketSource === 'registry', onClick: function () { setMarketSource('registry'); setQuery(''); setSelectedMarket(null); } }, '发现')
+						) : null,
+						h('div', { className: 'pm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: tab === 'local' ? '搜索本地插件' : '搜索插件或 GitHub 仓库' }), tab === 'local' ? h(React.Fragment, null, h(Button, { type: 'button', onClick: function () { setImportOpen(true); } }, h(Icon, { type: 'plus', size: 14 }), '导入插件'), h(Button, { type: 'button', className: 'pm-iconBtn', title: '更多操作', 'aria-label': '更多操作' }, h(Icon, { type: 'dots' }))) : null),
+						tab === 'market' ? h('p', { className: 'pm-helper' }, '精选自 GitHub · Registry 只读发现 · 安装前校验 DSH 插件清单') : null,
+						tab === 'market' ? h('p', { className: 'pm-registryState' + (registryInfo.status === 'fresh' ? '' : ' pm-registryStateWarning'), role: 'status' }, registryStatusLabel) : null,
 					body,
 					selectedLocal ? h(LocalDrawer, { plugin: selectedLocal, busy: busy === selectedLocal.name, onClose: function () { setSelectedLocal(null); }, onToggle: function (enabled) { if (selectedLocal) toggle(selectedLocal, enabled); } }) : null,
 					selectedMarket ? h(MarketDrawer, { item: selectedMarket, detail: marketDetail, loading: detailLoading, busy: busy === selectedMarket.id, onClose: function () { setSelectedMarket(null); }, onInstall: installMarket }) : null,

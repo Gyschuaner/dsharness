@@ -41,6 +41,16 @@ Plugin Manager 不直接编辑依赖 JSON；安装和更新调用 `dsh plugin --
 HTTPS 图标源；Host 会拒绝非 HTTPS 图标，Client 图片加载失败时显示通用 Plugin
 图标，且不改变安装、更新和详情缓存流程。
 
+## Phase 1：只读 Registry（DSH-030）
+
+精选清单继续作为稳定兜底；Host 额外读取版本化
+`marketplace/plugin-registry.json`，校验 schema、仓库、描述和 HTTPS 图标，按仓库名
+去重并返回 `marketSource`、Registry 状态和分页字段。Client 在市场内提供“精选 / 发现”
+切换。Registry-only 条目本阶段仅支持查看，精选条目的原有安装路径不变。
+
+Registry 请求使用 10 分钟内存缓存：新数据优先，远程失败时使用 stale 缓存，没有缓存时
+仍显示精选列表。网络和 Registry 数据都由 Host 持有，Client 不直连远程来源。
+
 ## Build 2：Plugin Loading
 
 - 初次读取本地配置或市场索引时保留标题、页签和搜索框，只替换内容区，避免页面跳动；
