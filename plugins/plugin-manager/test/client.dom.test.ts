@@ -312,9 +312,9 @@ test('real Plugin contribution renders without shell business placeholders and s
 
 test('marketplace home stays flat and drawer reveals GitHub data on demand', async (t) => {
 	const market = [
-		{ id: 'omdsh-dev/DSH-better-sidebar', repository: 'omdsh-dev/DSH-better-sidebar', description: '更好的侧边栏体验。', status: 'installed', installedVersion: '0.12.3' },
-		{ id: 'huiliyi37/dsh-tianshu-tui', repository: 'huiliyi37/dsh-tianshu-tui', description: '天枢推理助手。', status: 'not-installed', installedVersion: null },
-		{ id: 'cccch1mneyyy/dsh-TUI', repository: 'cccch1mneyyy/dsh-TUI', description: 'DSH 命令行增强。', status: 'not-installed', installedVersion: null },
+		{ id: 'omdsh-dev/DSH-better-sidebar', repository: 'omdsh-dev/DSH-better-sidebar', description: '更好的侧边栏体验。', iconUrl: 'https://github.com/omdsh-dev.png?size=64', iconSource: 'github-avatar', status: 'installed', installedVersion: '0.12.3' },
+		{ id: 'huiliyi37/dsh-tianshu-tui', repository: 'huiliyi37/dsh-tianshu-tui', description: '天枢推理助手。', iconUrl: null, iconSource: 'generic', status: 'not-installed', installedVersion: null },
+		{ id: 'cccch1mneyyy/dsh-TUI', repository: 'cccch1mneyyy/dsh-TUI', description: 'DSH 命令行增强。', iconUrl: 'https://avatars.githubusercontent.com/u/123', iconSource: 'github', status: 'not-installed', installedVersion: null },
 	];
 	const calls = [];
 	const router = async (body) => {
@@ -322,7 +322,7 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 		if (body.op === 'list') return { apiVersion: 1, plugins: [localPlugin('dsh-plugin-manager', { protected: true })] };
 		if (body.op === 'marketplace') return { apiVersion: 1, items: market };
 		if (body.op === 'marketplace.detail') return {
-			id: body.id, repository: body.id, url: 'https://github.com/' + body.id, description: '更好的侧边栏体验。', author: 'omdsh-dev', stars: 2710, forks: 215, language: 'TypeScript', license: 'MIT', lastPushedAt: new Date().toISOString(), topics: ['deepseek-harness'], latestVersion: 'v0.15.2', installedVersion: '0.12.3', status: 'update-available', manifest: { valid: true, dshRequirement: '>=0.0.1', hostEntry: './lib/index.js', clientEntry: './lib/client.js' },
+			id: body.id, repository: body.id, url: 'https://github.com/' + body.id, iconUrl: 'https://avatars.githubusercontent.com/u/9919', iconSource: 'github', description: '更好的侧边栏体验。', author: 'omdsh-dev', stars: 2710, forks: 215, language: 'TypeScript', license: 'MIT', lastPushedAt: new Date().toISOString(), topics: ['deepseek-harness'], latestVersion: 'v0.15.2', installedVersion: '0.12.3', status: 'update-available', manifest: { valid: true, dshRequirement: '>=0.0.1', hostEntry: './lib/index.js', clientEntry: './lib/client.js' },
 		};
 		throw new Error(`unexpected op ${body.op}`);
 	};
@@ -332,14 +332,24 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	await h.click(h.button('插件市场'));
 	await h.flush();
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 3);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon').length, 2);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketFallback').length, 1);
+	assert.match(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-marketIcon').getAttribute('src') || '', /^https:\/\//);
 	assert.ok(h.dom.window.document.body.textContent.includes('精选自 GitHub · 安装前校验 DSH 插件清单'));
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-rowMeta').length, 0, 'market home omits metadata columns');
+
+	const remoteImages = h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon');
+	await act(async () => { remoteImages[1].dispatchEvent(new h.dom.window.Event('error', { bubbles: false })); });
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon').length, 1);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketFallback').length, 2);
 
 	const listNode = h.dom.window.document.querySelector('[data-testid="market-list"]');
 	await h.click([...h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row')][0]);
 	await h.flush(); await h.flush();
 	assert.ok(calls.some((call) => call.op === 'marketplace.detail'));
 	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"]'), listNode);
+	assert.ok(h.dom.window.document.querySelector('.pm-drawer .pm-marketIcon'));
 	assert.ok(h.dom.window.document.querySelector('.pm-versionDecision').textContent.includes('0.12.3'));
 	assert.equal(h.dom.window.document.querySelectorAll('.pm-disclosure').length, 2);
 	assert.ok(!h.dom.window.document.body.textContent.includes('./lib/index.js'), 'technical rows stay collapsed by default');

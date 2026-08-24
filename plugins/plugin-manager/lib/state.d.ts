@@ -80,6 +80,8 @@ export interface PluginManagerOptions extends ProfileOptions {
 interface GithubDetail extends UnknownRecord {
     id: string;
     repository: string;
+    iconUrl: string | null;
+    iconSource: 'github' | 'github-avatar' | 'generic';
     latestVersion: string | null;
 }
 export declare class ApiError extends Error {

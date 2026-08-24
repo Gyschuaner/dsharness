@@ -45,7 +45,9 @@ dsh plugin --profile web add <source> --ignore-scripts --reporter=append-only
 校验不通过时通过官方 remove 命令回滚。
 
 市场主页来自仓库内的受控发现清单，只展示仓库名、首句描述与本地状态，不批量请求
-GitHub。用户打开详情时，Host 才读取 GitHub Repository、latest release 与根目录
+GitHub；列表图标使用受控 `owner/repository` 推导的 GitHub owner 头像 URL，不增加
+市场列表请求。远程图标仅接受 HTTPS，Client 加载失败时回退为通用 Plugin 图标。
+用户打开详情时，Host 才读取 GitHub Repository、latest release 与根目录
 `package.json`，结果在内存缓存 5 分钟；超时、限流或离线时优先返回旧缓存，本地管理
 不受影响。
 
