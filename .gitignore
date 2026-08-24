@@ -2,7 +2,7 @@ node_modules/
 *.log
 *.tar.gz
 __pycache__/
-*.pyc
+*.py[cod]
 /.tmp/
 # junction 备份目录（位于 ~/.dsh/plugins，非仓库内；此行为防御性忽略）
 *.bak-*/

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -u
+
+STATE_ROOT=/home/gys/.local/state/dp-ai-relay-tunnel
+mkdir -p "$STATE_ROOT"
+exec 9>"$STATE_ROOT/lock"
+/usr/bin/flock -n 9 || exit 0
+
+while true; do
+  rm -f "$STATE_ROOT/control"
+  /usr/bin/ssh -NT \
+    -o BatchMode=yes \
+    -o ExitOnForwardFailure=yes \
+    -o ServerAliveInterval=20 \
+    -o ServerAliveCountMax=3 \
+    -o StrictHostKeyChecking=yes \
+    -o ControlMaster=yes \
+    -o ControlPersist=no \
+    -S "$STATE_ROOT/control" \
+    -i /home/gys/.ssh/dp_ai_relay_tunnel_ed25519 \
+    -R 172.18.0.1:23341:127.0.0.1:23341 \
+    -R 172.18.0.1:23340:127.0.0.1:23340 \
+    dp-relay-tunnel@124.156.103.213
+  sleep 5
+done
