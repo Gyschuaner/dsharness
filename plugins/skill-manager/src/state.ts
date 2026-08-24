@@ -65,6 +65,14 @@ export interface SourceSelection extends UnknownRecord {
 	originHash?: string;
 	copyHash?: string;
 	generated?: boolean;
+	/** Project-local provenance for a Skill installed from the curated market. */
+	marketManaged?: boolean;
+	marketId?: string;
+	marketRepository?: string;
+	marketPath?: string;
+	marketRef?: string;
+	marketRevision?: string | null;
+	marketHash?: string;
 }
 
 export interface ProjectConfig extends UnknownRecord {
@@ -432,6 +440,10 @@ export function normalizeProjectConfig(parsed: unknown, projectRoot: string): Pr
 			if (typeof sel.originHash === 'string' && sel.originHash.length > 0) entry.originHash = sel.originHash;
 			if (typeof sel.copyHash === 'string' && sel.copyHash.length > 0) entry.copyHash = sel.copyHash;
 			if (sel.generated === true) entry.generated = true;
+			if (sel.marketManaged === true) entry.marketManaged = true;
+			for (const key of ['marketId', 'marketRepository', 'marketPath', 'marketRef', 'marketRevision', 'marketHash']) {
+				if (typeof sel[key] === 'string' && sel[key].length > 0) entry[key] = sel[key];
+			}
 			// A future schema may carry unknown-only source fields: keep
 			// the raw entry so such fields survive the round-trip
 			// (review P2-1).

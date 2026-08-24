@@ -366,6 +366,12 @@ export function normalizeProjectConfig(parsed, projectRoot) {
                 entry.copyHash = sel.copyHash;
             if (sel.generated === true)
                 entry.generated = true;
+            if (sel.marketManaged === true)
+                entry.marketManaged = true;
+            for (const key of ['marketId', 'marketRepository', 'marketPath', 'marketRef', 'marketRevision', 'marketHash']) {
+                if (typeof sel[key] === 'string' && sel[key].length > 0)
+                    entry[key] = sel[key];
+            }
             // A future schema may carry unknown-only source fields: keep
             // the raw entry so such fields survive the round-trip
             // (review P2-1).

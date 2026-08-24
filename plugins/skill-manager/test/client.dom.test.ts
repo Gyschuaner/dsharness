@@ -313,8 +313,10 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 	const h = await makeHarness(router);
 	t.after(h.cleanup);
 	await h.open();
-	assert.equal(h.dom.window.document.querySelector('.sk-tabs'), null, 'redundant SKILL sub-page tabs are removed');
-	assert.equal(h.dom.window.document.querySelector('[role="tablist"]'), null);
+	assert.ok(h.dom.window.document.querySelector('.sk-tabs'), 'Skill keeps the main local/market tab strip');
+	assert.ok(h.dom.window.document.querySelector('[role="tablist"]'));
+	assert.ok(h.button('本地 Skill'));
+	assert.ok(h.button('Skill 市场'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('仅本机，不提交 Git'), 'technical project path is hidden from the primary list');
 	assert.ok(!h.dom.window.document.body.textContent.includes('可纳入 Git 版本管理'));
@@ -416,6 +418,55 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-presetCounter')].map((item) => item.textContent), ['0/64', '0/200']);
 	await h.click(h.button('取消'));
 	assert.equal(h.dom.window.document.querySelector('.sk-presetSave'), null);
+});
+
+test('Skill market uses the shared page chrome and opens a safe repository detail drawer', async (t) => {
+	const currentRow = row('local-skill', 'Local skill');
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable', 'marketplace'] };
+		if (body.op === 'catalog') return view('/project-a', [currentRow]);
+		if (body.op === 'presets.list') return { presets: [] };
+		if (body.op === 'marketplace') {
+			return {
+				apiVersion: 1,
+				source: 'curated-github',
+				items: [{
+					id: 'acme/demo#skills/demo',
+					name: 'demo',
+					repository: 'acme/demo',
+					description: 'A demo remote skill.',
+					repositoryUrl: 'https://github.com/acme/demo',
+					status: 'not-installed',
+				}],
+			};
+		}
+		if (body.op === 'marketplace.detail') {
+			return {
+				apiVersion: 1,
+				id: 'acme/demo#skills/demo',
+				name: 'demo',
+				repository: 'acme/demo',
+				description: 'A demo remote skill.',
+				status: 'not-installed',
+				files: ['SKILL.md'],
+				security: { thirdPartyCodeExecuted: false },
+			};
+		}
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.open();
+	await h.click(h.button('Skill 市场'));
+	await h.flush();
+	await h.flush();
+	assert.ok(h.dom.window.document.querySelector('[data-testid="skill-market-list"]'));
+	assert.ok(h.dom.window.document.body.textContent.includes('demo'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));
+	await h.click(h.dom.window.document.querySelector('.sk-marketRow'));
+	await h.flush();
+	assert.ok(h.dom.window.document.querySelector('.sk-marketDrawer'));
+	assert.ok(h.dom.window.document.body.textContent.includes('安装校验'));
 });
 
 test('string-valued broken sources are disabled in the source selector', async (t) => {

@@ -7,13 +7,15 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
 - **SKILL 分区**（DSH-008 V1）：单一项目管理页面，按项目启用/禁用 Skill、批量启停、
   一键精简、保存/应用自定义预设（替换/合并预览）、全局标签和项目选择器；全部支持目录
   中的同名 Skill 仍合并为一个身份，详情列出全部来源并允许当前项目显式选择来源。
+  顶部提供与 MCP / Plugin 一致的「本地 Skill / Skill 市场」页签；市场从 Host 侧读取受控
+  GitHub 清单，支持真实仓库元数据、详情、安装前预览和安全安装。
   - 运行中的 host 尚未加载 apiVersion 6（未重启 `dsh web`）时，自动降级为
     旧版单页界面（见下方「旧版功能」）并显示提示条。
 - 通用“扩展”入口、左导航以及 MCP / Plugin 占位由独立的
   [`dsh-extension-manager`](../extension-manager/README.md) 负责。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 24 / DSH-008 V1）
+## 页面结构（build 23 / DSH-008 V1.1）
 
 - **组合入口**：Client 只通过 `slots.inject('extension.manager.section', ...)` 注册
   `id: skill` 的业务分区。`dsh-extension-manager` 独立注册 `sidebar.footer.action`，
@@ -35,6 +37,11 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
     空状态提供查看全部或应用推荐预设；页面不再重复展示底部统计和项目配置路径。
     同名 Skill 合并为一行（「来源 ×N」徽标）；点击行在详情中切换来源，默认优先级为
     项目专属 > DSH 用户级 > 其他全局 > 内置。
+  - **Skill 市场（V1.1）**：与 MCP / Plugin 使用相同的页面标题和一级页签；列表只展示精选
+    GitHub Skill 条目，读取仓库描述、作者、许可证、Stars、最近提交和 Skill 文件树。
+    详情抽屉展示来源、文件和安全校验；安装必须经过预览，拒绝路径穿越、符号链接、不合法
+    frontmatter、超大文件和覆盖未受管/已修改的项目 Skill。安装只复制 Markdown/资源文件，
+    不执行 scripts、依赖安装或第三方生命周期脚本，默认停用并写入项目私有来源登记。
   - **详情抽屉**：启用此 Skill 开关、完整描述、当前来源摘要；可选来源默认折叠，点击「更改来源」
     后展示 radio（
     含「默认（按优先级自动选择）」、损坏/已修改/来源有更新徽标）、一体化标签编辑器
@@ -223,20 +230,24 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
     - `presets.list / save / delete / setDefault / preview / apply`：
       预设管理；preview 返回精确 diff（toEnable / toDisable / sourceChanges / finalEnabled）。
     - `slim.preview / slim.apply`：一键精简（默认精简预设或全部关闭）。
+    - `marketplace`：返回精选 GitHub 市场条目及当前项目安装状态。
+    - `marketplace.detail`：读取仓库元数据和 Skill 文件树，并返回安全校验结果。
+    - `marketplace.preview / marketplace.install`：安装前预览与受控项目安装。
   - 响应信封统一 `{ ok:true, value }` / `{ ok:false, error:{ message } }`；
     业务错误用 `ApiError` 携带 4xx（400 参数 / 404 不存在 / 409 冲突）。
     `list` 响应带 `apiVersion`（当前 6），旧 client 据此判断 host 能力。
   - 内置 skill 列表来自 `agentPresets` 服务；策略执行（`enforceGlobalPolicy`）每次
     `list` 幂等运行（旧版兼容）；配置文件用 tmp+rename 原子写入，目录副本使用受监控根外
     暂存、附属文件优先、`SKILL.md` 最后发布并整目录哈希复核。
-- **Host 测试**（`test/skill-manager.test.js`，`node --test`）：53 用例覆盖
+- **Host 测试**（`test/skill-manager.test.ts` + `test/skill-market.test.ts`，`tsx --test`）：
+  61 用例覆盖
   状态模型（含损坏降级）、发现与合并、新项目默认关闭的 marker 物化、
   三机制启停回环、孤儿清理与外来文件保护、来源选择/受管副本/409 保护、
   标签、预设 diff/应用、一键精简、旧版兼容与只读根 403；并覆盖并发写、
   配置前向兼容、原始字节哈希、50MB 边界、来源消失、文件副作用回滚与
   多来源预设冲突，以及已全局关闭的用户 Skill / 其他 preset bundled Skill 在项目启用后
   物化为真实可调用副本；并验证单项快速路径、缓存失效安全回退、配置写入失败时文件与配置回滚。
-- **Client DOM 测试**（`test/client.dom.test.js`，`node --test`）：8 用例直接执行
+- **Client DOM 测试**（`test/client.dom.test.ts`，`tsx --test`）：11 用例直接执行
   真实 classic-script bundle 并用 React 18 + JSDOM 挂载 Slot，覆盖单页信息架构、可收起导航、
   完整 description、可更新徽标、抽屉/来源/标签/预设/Esc，以及项目切换时
   丢弃过期 catalog、mutation、preset preview 响应、单项启停乐观更新/失败回滚、扫描加载态和旧 Host 降级。
@@ -254,7 +265,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   保持原位的已启用行，build 18 移除重复资源库入口并加入可持久化的左导航收起态，build 19
   将项目上下文压为单行、低频动作收进菜单、列表 description 收为第一句并按需展开来源与技术信息，build 20
   为单项启停加入乐观更新、安静保存态与失败回滚，build 21 为首次 catalog 加入居中的 Skill 扫描加载态，
-  build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区，build 24 将加载态收敛为无底板的光学聚焦动画：
+  build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区，build 23 加入与 MCP / Plugin 对齐的
+  本地 / 市场一级页签和真实 Host 市场接口，加载态保持无底板的光学聚焦动画：
   三颗非对称粒子在首秒依次汇入官方 Skill 图标，`Skill Finding` 同步由雾灰聚焦为墨色并带短蓝色焦点游标，
   同时提供 `prefers-reduced-motion` 静态降级；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。

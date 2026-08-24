@@ -225,6 +225,56 @@
                 '.sk-advBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
                 '.sk-advBody{border-top:1px solid var(--dsw-alias-border-l2);padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-tertiary);line-height:1.5}',
                 '.sk-advBody code{overflow-wrap:anywhere;font-size:11px}',
+                // marketplace — same title / tab / row / drawer language as MCP and Plugin
+                '.sk-head{display:flex;align-items:baseline;gap:10px;flex:none;padding:2px 0 10px}',
+                '.sk-headTitle{margin:0;font-size:18px;font-weight:600}',
+                '.sk-headSub{font-size:13px;color:var(--dsw-alias-label-quaternary);font-weight:500}',
+                '.sk-tabs{display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2);flex:none}',
+                '.sk-tab{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;font-size:13px;line-height:1.4;padding:8px 0 9px}',
+                '.sk-tab:hover{color:var(--dsw-alias-label-primary)}',
+                '.sk-tabActive{border-bottom-color:var(--dsw-alias-label-primary);color:var(--dsw-alias-label-primary);font-weight:600}',
+                '.sk-primaryTabs{gap:28px}',
+                '.sk-marketLayout{display:flex;flex:1;min-height:0;min-width:0}',
+                '.sk-marketListCol{display:flex;flex:1;min-width:0;min-height:0;flex-direction:column}',
+                '.sk-marketToolbar{display:flex;align-items:center;gap:8px;padding:14px 0 9px;flex:none;flex-wrap:wrap}',
+                '.sk-marketProjectPicker{position:relative;flex:none}',
+                '.sk-marketSearch{min-width:180px}',
+                '.sk-marketHelper{flex:none;margin:0 0 9px;color:var(--dsw-alias-label-quaternary);font-size:11px;line-height:1.5}',
+                '.sk-marketNotice{flex:none;margin:0 0 9px;padding:7px 9px;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 35%,var(--dsw-alias-border-l2));border-radius:8px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5}',
+                '.sk-marketList{display:flex;flex:1;min-height:0;overflow-y:auto;flex-direction:column;padding:7px 0 26px}',
+                '.sk-marketRow{appearance:none;box-sizing:border-box;width:100%;min-height:88px;border:0;border-top:1px solid var(--dsw-alias-border-l2);background:transparent;color:inherit;text-align:left;font:inherit;padding:14px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:center;cursor:pointer}',
+                '.sk-marketRow:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
+                '.sk-marketRow:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+                '.sk-marketRow:focus-visible{outline:1px solid var(--dsw-static-blue-500);outline-offset:-1px}',
+                '.sk-marketRowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 7%,var(--dsw-alias-bg-module-platform))}',
+                '.sk-marketMain{display:flex;align-items:center;gap:14px;min-width:0}',
+                '.sk-marketIcon,.sk-marketFallback{flex:none;width:40px;height:40px;border-radius:10px;object-fit:cover}',
+                '.sk-marketIcon{background:var(--dsw-alias-fill-tsp-secondary)}',
+                '.sk-marketFallback{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}',
+                '.sk-marketCopy{display:flex;flex-direction:column;min-width:0}',
+                '.sk-marketTitle{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+                '.sk-marketDesc{display:block;margin-top:5px;color:var(--dsw-alias-label-tertiary);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+                '.sk-marketMeta{display:block;margin-top:5px;color:var(--dsw-alias-label-quaternary);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+                '.sk-marketSide{display:flex;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
+                '.sk-marketStatus{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
+                '.sk-marketStatus-update-available{color:var(--dsw-alias-state-error-primary)}',
+                '.sk-marketStatus-modified,.sk-marketStatus-conflict{color:var(--dsw-alias-state-warn-primary)}',
+                '.sk-marketLoadError{padding:10px 0}',
+                '.sk-marketDrawer{width:400px;max-width:46%;position:relative}',
+                '.sk-marketDrawerIdentity{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}',
+                '.sk-marketLink{display:inline-flex;align-items:center;gap:4px;max-width:100%;color:var(--dsw-static-blue-500);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none}',
+                '.sk-marketLink:hover{text-decoration:underline}',
+                '.sk-marketFacts{display:grid;grid-template-columns:1fr 1fr;gap:7px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.45}',
+                '.sk-marketState{display:flex;align-items:center;gap:7px;color:var(--dsw-alias-label-secondary);font-size:12px}',
+                '.sk-marketFiles,.sk-marketChecks{display:flex;flex-direction:column;gap:5px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;line-height:1.45}',
+                '.sk-marketFiles code{overflow-wrap:anywhere;color:var(--dsw-alias-label-secondary)}',
+                '.sk-marketChecks span{color:var(--dsw-alias-label-secondary)}',
+                '.sk-marketMetaNotice{margin:0;padding:7px 9px;border-radius:7px;background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,transparent);color:var(--dsw-alias-label-secondary);font-size:11.5px;line-height:1.5}',
+                '.sk-marketFoot{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:none;position:sticky;bottom:0;padding:10px 16px;border-top:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);z-index:2}',
+                '.sk-marketPreview{display:flex;flex-direction:column;gap:14px;max-height:360px;overflow-y:auto}',
+                '.sk-marketPreviewSummary{display:flex;flex-direction:column;gap:5px;font-size:12px;line-height:1.5}',
+                '.sk-marketPreviewSummary span{overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary)}',
+                '@media(max-width:680px){.sk-marketDrawer{position:absolute;inset:0 0 0 auto;width:min(400px,100%);max-width:none;z-index:20}}',
                 // preset / slim previews
                 '[role="dialog"]:has(.sk-presetApply){width:min(700px,calc(100vw - 40px));max-width:none}',
                 '[role="dialog"]:has(.sk-presetSave){width:min(580px,calc(100vw - 40px));max-width:none}',
@@ -961,6 +1011,131 @@
                     groups.push(h('p', { key: 'final', className: 'sk-slimNote' }, '应用后启用 ' + (diff.finalEnabled || []).length + ' 个 Skill；下一轮对话生效，无需重启'));
                 return h('div', { className: 'sk-modalDiff' }, groups);
             }
+            function MarketIcon(props) {
+                var [failed, setFailed] = React.useState(false);
+                if (props && props.src && !failed) {
+                    return h('img', {
+                        className: 'sk-marketIcon',
+                        src: props.src,
+                        alt: '',
+                        'aria-hidden': true,
+                        onError: function () { setFailed(true); }
+                    });
+                }
+                return h('span', { className: 'sk-marketFallback', 'aria-hidden': true }, h(P.IconSkillOutline16, { size: 19 }));
+            }
+            function marketStatusLabel(status) {
+                if (status === 'installed')
+                    return '已安装';
+                if (status === 'update-available')
+                    return '可更新';
+                if (status === 'modified')
+                    return '本地已修改';
+                if (status === 'conflict')
+                    return '路径冲突';
+                if (status === 'project-required')
+                    return '需选择项目';
+                return '未安装';
+            }
+            function SkillMarketplacePage(props) {
+                var ctx = props.ctx;
+                var project = props.project;
+                var projects = props.projects || [];
+                var [items, setItems] = React.useState([]);
+                var [loaded, setLoaded] = React.useState(false);
+                var [loading, setLoading] = React.useState(false);
+                var [error, setError] = React.useState(null);
+                var [query, setQuery] = React.useState('');
+                var [selected, setSelected] = React.useState(null);
+                var [detail, setDetail] = React.useState(null);
+                var [detailLoading, setDetailLoading] = React.useState(false);
+                var [preview, setPreview] = React.useState(null);
+                var [previewLoading, setPreviewLoading] = React.useState(false);
+                var [busy, setBusy] = React.useState(false);
+                var [projectMenuOpen, setProjectMenuOpen] = React.useState(false);
+                var [message, setMessage] = React.useState(null);
+                var [attempt, setAttempt] = React.useState(0);
+                function loadMarket(force) {
+                    setLoading(true);
+                    setError(null);
+                    return apiCallAt('marketplace', { cwd: project ? project.cwd : undefined, force: force === true }, ctx).then(function (value) {
+                        var next = Array.isArray(value && value.items) ? value.items : [];
+                        setItems(next);
+                        setLoaded(true);
+                        setSelected(function (current) { return current ? (next.find(function (item) { return item.id === current.id; }) || current) : null; });
+                    }, function (reason) { setError(String((reason && reason.message) || reason)); }).finally(function () { setLoading(false); });
+                }
+                React.useEffect(function () {
+                    setLoaded(false);
+                    setSelected(null);
+                    setDetail(null);
+                    void loadMarket(false);
+                }, [project ? project.cwd : '', attempt]);
+                React.useEffect(function () {
+                    function onKey(event) {
+                        if (event.key !== 'Escape')
+                            return;
+                        if (preview !== null)
+                            return;
+                        if (selected !== null) {
+                            setSelected(null);
+                            setDetail(null);
+                        }
+                    }
+                    document.addEventListener('keydown', onKey);
+                    return function () { document.removeEventListener('keydown', onKey); };
+                }, [preview, selected]);
+                function openItem(item) {
+                    setSelected(item);
+                    setDetail(null);
+                    setDetailLoading(true);
+                    apiCallAt('marketplace.detail', { cwd: project ? project.cwd : undefined, id: item.id }, ctx).then(function (value) { setDetail(value); }, function (reason) { setDetail({ metadataError: String((reason && reason.message) || reason), id: item.id, name: item.name, repository: item.repository, description: item.description, status: item.status }); }).finally(function () { setDetailLoading(false); });
+                }
+                function openPreview() {
+                    if (selected === null)
+                        return;
+                    if (project === null) {
+                        setMessage('请先选择安装目标项目');
+                        return;
+                    }
+                    setMessage(null);
+                    setPreviewLoading(true);
+                    apiCallAt('marketplace.preview', { cwd: project.cwd, id: selected.id }, ctx).then(function (value) { setPreview(value); }, function (reason) { setMessage(String((reason && reason.message) || reason)); }).finally(function () { setPreviewLoading(false); });
+                }
+                function installPreview() {
+                    if (preview === null || !preview.canInstall || selected === null || project === null || busy)
+                        return;
+                    setBusy(true);
+                    apiCallAt('marketplace.install', { cwd: project.cwd, id: selected.id }, ctx).then(function () {
+                        setPreview(null);
+                        setMessage('已安装到当前项目，默认停用；可在「本地 Skill」中启用。');
+                        void loadMarket(true);
+                        if (typeof props.onInstalled === 'function')
+                            props.onInstalled();
+                    }, function (reason) { setMessage(String((reason && reason.message) || reason)); }).finally(function () { setBusy(false); });
+                }
+                var needle = query.trim().toLowerCase();
+                var visible = items.filter(function (item) {
+                    return needle === '' || String(item.name || '').toLowerCase().includes(needle) || String(item.repository || '').toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle);
+                });
+                var activeDetail = detail || selected;
+                var detailStatus = activeDetail ? (activeDetail.status || (selected && selected.status)) : null;
+                var canInstall = project !== null && activeDetail !== null && detailStatus !== 'modified' && detailStatus !== 'conflict';
+                return h('div', { className: 'sk-marketLayout' }, h('div', { className: 'sk-marketListCol' }, h('div', { className: 'sk-marketToolbar' }, h('span', { className: 'sk-projLabel' }, '安装目标'), h('div', { className: 'sk-marketProjectPicker' }, h('button', {
+                    type: 'button', className: 'sk-projBtn', disabled: projects.length === 0,
+                    onClick: function () { setProjectMenuOpen(!projectMenuOpen); },
+                    title: project ? project.cwd : '选择安装目标项目'
+                }, h('span', { className: 'sk-projTitle' }, project ? project.title : '（未选择）'), h(P.IconChevronDownOutline14)), projectMenuOpen
+                    ? h('div', { className: 'sk-menu' }, projects.map(function (p) {
+                        return h('button', { type: 'button', key: p.cwd, className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''), onClick: function () { setProjectMenuOpen(false); props.onChooseProject(p); } }, project && project.cwd === p.cwd ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title));
+                    }), h('div', { className: 'sk-menuSep' }), h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjectMenuOpen(false); props.onAddProject(); } }, h(P.IconPlusOutline16), '添加本地项目…'))
+                    : null), h('div', { className: 'sk-searchWrap sk-marketSearch' }, h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)), h('input', { className: 'sk-search', placeholder: '搜索 Skill 或 GitHub 仓库', value: query, onChange: function (event) { setQuery(event.target.value); } })), h('button', { type: 'button', className: 'sk-chip', disabled: loading, onClick: function () { setAttempt(function (value) { return value + 1; }); } }, h(P.IconRefreshOutline16), loading ? '刷新中…' : '刷新')), h('p', { className: 'sk-marketHelper' }, '精选自 GitHub · 安装前校验 SKILL.md、路径和来源；不会执行第三方脚本'), message ? h('p', { className: 'sk-marketNotice', role: 'status' }, message) : null, error ? h('div', { className: 'sk-marketLoadError', role: 'alert' }, h('p', { className: 'sk-error' }, '加载 Skill 市场失败：' + error), h(Button, { variant: 'outline', onClick: function () { setAttempt(function (value) { return value + 1; }); } }, '重试')) : null, h('div', { className: 'sk-marketList', 'data-testid': 'skill-market-list' }, loading && !loaded ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 Skill 市场…') : null, !loading && visible.length === 0 ? h('p', { className: 'sk-empty' }, '没有匹配的 Skill。') : null, visible.map(function (item) {
+                    return h('button', { type: 'button', key: item.id, className: 'sk-marketRow' + (selected && selected.id === item.id ? ' sk-marketRowActive' : ''), onClick: function () { openItem(item); } }, h('span', { className: 'sk-marketMain' }, h(MarketIcon, { src: item.iconUrl }), h('span', { className: 'sk-marketCopy' }, h('span', { className: 'sk-marketTitle' }, item.name), h('span', { className: 'sk-marketDesc' }, item.description), h('span', { className: 'sk-marketMeta' }, item.repository, item.license ? ' · ' + item.license : ''))), h('span', { className: 'sk-marketSide' }, h('span', { className: 'sk-marketStatus sk-marketStatus-' + item.status }, marketStatusLabel(item.status)), h(P.IconChevronRightOutline14)));
+                }))), activeDetail
+                    ? h('aside', { className: 'sk-drawer sk-marketDrawer', role: 'dialog', 'aria-label': activeDetail.name + ' 详情' }, h('div', { className: 'sk-drawerHead' }, h(MarketIcon, { src: activeDetail.iconUrl }), h('div', { className: 'sk-marketDrawerIdentity' }, h('div', { className: 'sk-drawerName' }, activeDetail.name), h('a', { className: 'sk-marketLink', href: activeDetail.url || ('https://github.com/' + activeDetail.repository), target: '_blank', rel: 'noreferrer' }, activeDetail.repository, h(P.IconRightUpOutline14))), h('button', { type: 'button', className: 'sk-icBtn', 'aria-label': '关闭详情', title: '关闭（Esc）', onClick: function () { setSelected(null); setDetail(null); } }, h(P.IconCloseOutline16))), h('div', { className: 'sk-drawerBody' }, detailLoading ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 GitHub Skill 信息…') : null, activeDetail.description ? h('p', { className: 'sk-descFull' }, activeDetail.description) : null, activeDetail.metadataError ? h('p', { className: 'sk-marketMetaNotice' }, '部分远程信息暂不可用：' + activeDetail.metadataError) : null, h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '仓库信息'), h('div', { className: 'sk-marketFacts' }, h('span', null, '作者：' + (activeDetail.author || '—')), h('span', null, '许可证：' + (activeDetail.license || '—')), h('span', null, 'Stars：' + (activeDetail.stars === null || activeDetail.stars === undefined ? '—' : activeDetail.stars)), h('span', null, '文件：' + (activeDetail.fileCount === null || activeDetail.fileCount === undefined ? '—' : activeDetail.fileCount)))), h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '当前状态'), h('div', { className: 'sk-marketState' }, marketStatusLabel(detailStatus), project ? ' · 安装到 ' + project.title : ' · 请选择安装目标项目')), activeDetail.files && activeDetail.files.length > 0 ? h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, 'Skill 文件'), h('div', { className: 'sk-marketFiles' }, activeDetail.files.map(function (file) { return h('code', { key: file }, file); }))) : null, h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '安装校验'), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ SKILL.md frontmatter'), h('span', null, '✓ 路径和文件大小'), h('span', null, '✓ 拒绝符号链接'), h('span', null, '✓ 不执行第三方脚本')))), h('div', { className: 'sk-marketFoot' }, h(Button, { variant: 'outline', onClick: function () { window.open(activeDetail.url || ('https://github.com/' + activeDetail.repository), '_blank', 'noopener,noreferrer'); } }, '在 GitHub 查看', h(P.IconRightUpOutline14)), h(Button, { disabled: !canInstall || previewLoading || busy, onClick: openPreview }, previewLoading ? '检查中…' : detailStatus === 'update-available' ? '更新到当前项目' : detailStatus === 'installed' ? '重新安装' : canInstall ? '安装到当前项目' : '需要人工处理')))
+                    : null, h(Modal, { open: preview !== null, onClose: function () { if (!busy)
+                        setPreview(null); }, title: preview ? (preview.action === 'update' ? '更新 Skill「' + preview.name + '」' : '安装 Skill「' + preview.name + '」') : '安装预览', closeLabel: '关闭', description: preview ? preview.message : '', footer: preview ? h(React.Fragment, null, h(Button, { variant: 'outline', disabled: busy, onClick: function () { setPreview(null); } }, '取消'), h(Button, { disabled: busy || !preview.canInstall, onClick: installPreview }, busy ? '写入中…' : preview.canInstall ? '确认安装' : '无法安装')) : null }, preview ? h('div', { className: 'sk-marketPreview' }, h('div', { className: 'sk-marketPreviewSummary' }, h('strong', null, preview.action === 'update' ? '将更新受管 Skill' : '将安装到当前项目'), h('span', null, preview.projectRoot + '/.dsh/skills/' + preview.name)), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ 已校验远程 SKILL.md'), h('span', null, '✓ ' + preview.incoming.fileCount + ' 个文件，内容哈希 ' + preview.incoming.hash.slice(0, 18) + '…'), h('span', null, '✓ 不执行 scripts 或其他第三方代码')), preview.incoming.files && preview.incoming.files.length > 0 ? h('div', { className: 'sk-marketFiles' }, preview.incoming.files.map(function (file) { return h('code', { key: file }, file); })) : null) : null));
+            }
             function SkillFindingState() {
                 var particles = [
                     ['North', false],
@@ -981,6 +1156,7 @@
              */
             function SkillCenterV1Body(props) {
                 var ctx = props.ctx;
+                var [topPage, setTopPage] = React.useState('local');
                 var [projects, setProjects] = React.useState([]);
                 var [project, setProject] = React.useState(null); // { cwd, title, kind }
                 var [projMenuOpen, setProjMenuOpen] = React.useState(false);
@@ -1719,187 +1895,197 @@
                 }
                 if (recommendedPreset === null && presets.length > 0)
                     recommendedPreset = presets[0];
-                return h('div', { className: 'sk-root' }, view && view.configCorrupt === true
-                    ? h('div', { className: 'sk-banner sk-bannerErr', role: 'alert' }, h('strong', null, '项目配置已损坏'), ' .dsh/skill-manager.json 无法解析（JSON 错误）。当前按空配置展示，且所有修改被拒绝，未写入任何文件。请修复或删除该文件后重新打开本页面。')
-                    : view && view.configFuture === true
-                        ? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' }, h('strong', null, '配置版本更高（只读）'), ' 项目配置 apiVersion 高于当前 DSH 版本。为保护数据，本页仅可查看；请升级 DSH 后再修改。')
-                        : partialWarning !== null
-                            ? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' }, h('span', null, partialWarning), h('button', { type: 'button', className: 'sk-chip', onClick: function () { setPartialWarning(null); } }, '知道了'))
-                            : null, h('div', { className: 'sk-content' }, h('div', { className: 'sk-listcol' }, h('div', { className: 'sk-projectCard' }, h('div', { className: 'sk-projectIdentity' }, h('div', { className: 'sk-projectMeta' }, h('span', { className: 'sk-currentBadge' }, project && project.cwd === currentCwd(ctx) ? '当前项目' : '所选项目'), h('span', { className: 'sk-projectTitle', title: project ? project.cwd : undefined }, project ? project.title : '未选择项目'))), h('div', { className: 'sk-projectStats' }, h('div', { className: 'sk-statValue' }, '已启用 ' + enabledCount + ' / ' + totalCount)), h('div', { className: 'sk-projectActions' }, h('div', { style: { position: 'relative' } }, h('button', {
-                    type: 'button',
-                    className: 'sk-quietBtn sk-projBtn' + (projMenuOpen ? ' sk-quietBtnOn' : ''),
-                    disabled: projects.length === 0,
-                    onClick: function () {
-                        setProjects(buildProjectOptions(ctx));
-                        setProjMenuOpen(!projMenuOpen);
-                        setTagMenuOpen(false);
-                        setPresetMenuOpen(false);
-                        setActionMenuOpen(false);
-                    },
-                    title: project ? '当前项目：' + project.cwd : '选择要管理的项目'
-                }, '切换项目', h(P.IconChevronDownOutline14)), projMenuOpen
-                    ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0 } }, projects.map(function (p) {
-                        var isCurrent = p.cwd === currentCwd(ctx);
-                        return h('button', {
-                            type: 'button', key: p.cwd,
-                            className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''),
-                            onClick: function () { chooseProject(p); }
-                        }, isCurrent ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title), isCurrent ? h('span', { className: 'sk-menuHint' }, '当前工作区') : null);
-                    }), h('div', { className: 'sk-menuSep' }), h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjMenuOpen(false); addLocalProject(); } }, h(P.IconPlusOutline16), '添加本地项目…'))
-                    : null), h('div', { style: { position: 'relative' } }, h('button', {
-                    type: 'button',
-                    className: 'sk-quietBtn' + (presetMenuOpen ? ' sk-quietBtnOn' : ''),
-                    'aria-expanded': presetMenuOpen,
-                    onClick: function () {
-                        setPresetMenuOpen(!presetMenuOpen);
-                        setProjMenuOpen(false);
-                        setTagMenuOpen(false);
-                        setActionMenuOpen(false);
-                    }
-                }, '预设', h(P.IconChevronDownOutline14)), presetMenuOpen
-                    ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } }, recommendedPreset !== null
-                        ? h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); openPreset(recommendedPreset); } }, '应用推荐预设')
-                        : null, h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); setSaveName(''); setSaveDesc(''); setSaveOpen(true); } }, '保存为预设'))
-                    : null))), h('div', { className: 'sk-toolbar' }, h('div', { className: 'sk-searchWrap' }, h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)), h('input', {
-                    className: 'sk-search',
-                    placeholder: '搜索 Skill',
-                    value: search,
-                    onChange: function (event) { setSearch(event.target.value); setSelectedRows({}); }
-                })), h('div', { className: 'sk-filters' }, [['all', '全部', totalCount], ['on', '已启用', enabledCount], ['off', '未启用', disabledCount]].map(function (f) {
-                    return h('button', {
+                return h('div', { className: 'sk-root' }, h('div', { className: 'sk-head' }, h('h2', { className: 'sk-headTitle' }, 'SKILL'), h('span', { className: 'sk-headSub' }, 'Web 配置')), h('div', { className: 'sk-tabs sk-primaryTabs', role: 'tablist', 'aria-label': 'Skill 页面' }, h('button', { type: 'button', role: 'tab', 'aria-selected': topPage === 'local', className: 'sk-tab' + (topPage === 'local' ? ' sk-tabActive' : ''), onClick: function () { setTopPage('local'); } }, '本地 Skill'), h('button', { type: 'button', role: 'tab', 'aria-selected': topPage === 'market', className: 'sk-tab' + (topPage === 'market' ? ' sk-tabActive' : ''), onClick: function () { setTopPage('market'); } }, 'Skill 市场')), topPage === 'market'
+                    ? h(SkillMarketplacePage, {
+                        ctx: ctx,
+                        project: project,
+                        projects: projects,
+                        onChooseProject: chooseProject,
+                        onAddProject: addLocalProject,
+                        onInstalled: function () { if (project !== null)
+                            void loadView(project); }
+                    })
+                    : h(React.Fragment, null, view && view.configCorrupt === true
+                        ? h('div', { className: 'sk-banner sk-bannerErr', role: 'alert' }, h('strong', null, '项目配置已损坏'), ' .dsh/skill-manager.json 无法解析（JSON 错误）。当前按空配置展示，且所有修改被拒绝，未写入任何文件。请修复或删除该文件后重新打开本页面。')
+                        : view && view.configFuture === true
+                            ? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' }, h('strong', null, '配置版本更高（只读）'), ' 项目配置 apiVersion 高于当前 DSH 版本。为保护数据，本页仅可查看；请升级 DSH 后再修改。')
+                            : partialWarning !== null
+                                ? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' }, h('span', null, partialWarning), h('button', { type: 'button', className: 'sk-chip', onClick: function () { setPartialWarning(null); } }, '知道了'))
+                                : null, h('div', { className: 'sk-content' }, h('div', { className: 'sk-listcol' }, h('div', { className: 'sk-projectCard' }, h('div', { className: 'sk-projectIdentity' }, h('div', { className: 'sk-projectMeta' }, h('span', { className: 'sk-currentBadge' }, project && project.cwd === currentCwd(ctx) ? '当前项目' : '所选项目'), h('span', { className: 'sk-projectTitle', title: project ? project.cwd : undefined }, project ? project.title : '未选择项目'))), h('div', { className: 'sk-projectStats' }, h('div', { className: 'sk-statValue' }, '已启用 ' + enabledCount + ' / ' + totalCount)), h('div', { className: 'sk-projectActions' }, h('div', { style: { position: 'relative' } }, h('button', {
                         type: 'button',
-                        key: f[0],
-                        className: 'sk-filterBtn' + (enableFilter === f[0] ? ' sk-filterBtnActive' : ''),
-                        onClick: function () { setEnableFilter(f[0]); setSelectedRows({}); }
-                    }, f[1], h('span', { className: 'sk-filterCount' }, f[2]));
-                })), h('div', { style: { position: 'relative' } }, h('button', {
-                    type: 'button',
-                    className: 'sk-quietBtn' + (tagMenuOpen || tagFilter !== null ? ' sk-quietBtnOn' : ''),
-                    'aria-expanded': tagMenuOpen,
-                    onClick: function () {
-                        setTagMenuOpen(!tagMenuOpen);
-                        setProjMenuOpen(false);
-                        setPresetMenuOpen(false);
-                        setActionMenuOpen(false);
-                    }
-                }, tagFilter !== null ? tagFilter : '筛选', h(P.IconChevronDownOutline14)), tagMenuOpen
-                    ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } }, h('button', {
+                        className: 'sk-quietBtn sk-projBtn' + (projMenuOpen ? ' sk-quietBtnOn' : ''),
+                        disabled: projects.length === 0,
+                        onClick: function () {
+                            setProjects(buildProjectOptions(ctx));
+                            setProjMenuOpen(!projMenuOpen);
+                            setTagMenuOpen(false);
+                            setPresetMenuOpen(false);
+                            setActionMenuOpen(false);
+                        },
+                        title: project ? '当前项目：' + project.cwd : '选择要管理的项目'
+                    }, '切换项目', h(P.IconChevronDownOutline14)), projMenuOpen
+                        ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0 } }, projects.map(function (p) {
+                            var isCurrent = p.cwd === currentCwd(ctx);
+                            return h('button', {
+                                type: 'button', key: p.cwd,
+                                className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''),
+                                onClick: function () { chooseProject(p); }
+                            }, isCurrent ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title), isCurrent ? h('span', { className: 'sk-menuHint' }, '当前工作区') : null);
+                        }), h('div', { className: 'sk-menuSep' }), h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjMenuOpen(false); addLocalProject(); } }, h(P.IconPlusOutline16), '添加本地项目…'))
+                        : null), h('div', { style: { position: 'relative' } }, h('button', {
                         type: 'button',
-                        className: 'sk-menuBtn' + (tagFilter === null ? ' sk-menuBtnActive' : ''),
-                        onClick: function () { setTagFilter(null); setTagMenuOpen(false); setSelectedRows({}); }
-                    }, '全部标签'), ((view && view.allTags) || []).map(function (t) {
+                        className: 'sk-quietBtn' + (presetMenuOpen ? ' sk-quietBtnOn' : ''),
+                        'aria-expanded': presetMenuOpen,
+                        onClick: function () {
+                            setPresetMenuOpen(!presetMenuOpen);
+                            setProjMenuOpen(false);
+                            setTagMenuOpen(false);
+                            setActionMenuOpen(false);
+                        }
+                    }, '预设', h(P.IconChevronDownOutline14)), presetMenuOpen
+                        ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } }, recommendedPreset !== null
+                            ? h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); openPreset(recommendedPreset); } }, '应用推荐预设')
+                            : null, h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); setSaveName(''); setSaveDesc(''); setSaveOpen(true); } }, '保存为预设'))
+                        : null))), h('div', { className: 'sk-toolbar' }, h('div', { className: 'sk-searchWrap' }, h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)), h('input', {
+                        className: 'sk-search',
+                        placeholder: '搜索 Skill',
+                        value: search,
+                        onChange: function (event) { setSearch(event.target.value); setSelectedRows({}); }
+                    })), h('div', { className: 'sk-filters' }, [['all', '全部', totalCount], ['on', '已启用', enabledCount], ['off', '未启用', disabledCount]].map(function (f) {
                         return h('button', {
                             type: 'button',
-                            key: t,
-                            className: 'sk-menuBtn' + (tagFilter === t ? ' sk-menuBtnActive' : ''),
-                            onClick: function () { setTagFilter(t); setTagMenuOpen(false); setSelectedRows({}); }
-                        }, t);
-                    }))
-                    : null), bulkMode
-                    ? h('label', { className: 'sk-selectVisible' }, h('input', {
-                        type: 'checkbox',
-                        checked: allVisibleSelected,
-                        disabled: visibleRows.length === 0 || viewBusy === true,
-                        onChange: toggleVisibleSelection,
-                        'aria-label': allVisibleSelected ? '取消选择当前结果' : '全选当前结果'
-                    }), '全选当前结果', visibleRows.length > 0 ? h('span', { className: 'sk-filterCount' }, visibleRows.length) : null)
-                    : null, bulkMode
-                    ? h('button', {
+                            key: f[0],
+                            className: 'sk-filterBtn' + (enableFilter === f[0] ? ' sk-filterBtnActive' : ''),
+                            onClick: function () { setEnableFilter(f[0]); setSelectedRows({}); }
+                        }, f[1], h('span', { className: 'sk-filterCount' }, f[2]));
+                    })), h('div', { style: { position: 'relative' } }, h('button', {
                         type: 'button',
-                        className: 'sk-quietBtn sk-quietBtnOn',
-                        onClick: function () { setSelectedRows({}); setBulkMode(false); }
-                    }, '完成批量管理')
-                    : h('div', { style: { position: 'relative' } }, h('button', {
-                        type: 'button',
-                        className: 'sk-quietBtn' + (actionMenuOpen ? ' sk-quietBtnOn' : ''),
-                        'aria-label': '更多操作',
-                        'aria-expanded': actionMenuOpen,
+                        className: 'sk-quietBtn' + (tagMenuOpen || tagFilter !== null ? ' sk-quietBtnOn' : ''),
+                        'aria-expanded': tagMenuOpen,
                         onClick: function () {
-                            setActionMenuOpen(!actionMenuOpen);
-                            setTagMenuOpen(false);
+                            setTagMenuOpen(!tagMenuOpen);
                             setProjMenuOpen(false);
                             setPresetMenuOpen(false);
+                            setActionMenuOpen(false);
                         }
-                    }, '更多', h(P.IconChevronDownOutline14)), actionMenuOpen
+                    }, tagFilter !== null ? tagFilter : '筛选', h(P.IconChevronDownOutline14)), tagMenuOpen
                         ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } }, h('button', {
-                            type: 'button', className: 'sk-menuBtn',
-                            onClick: function () { setActionMenuOpen(false); setSelectedRows({}); setBulkMode(true); }
-                        }, '批量管理'), h('button', {
-                            type: 'button', className: 'sk-menuBtn',
-                            disabled: project === null || viewBusy === true || (view !== null && enabledCount === 0) || (view && (view.configCorrupt === true || view.configFuture === true)),
-                            onClick: function () { setActionMenuOpen(false); doSlimPreview(); }
-                        }, '一键精简'))
-                        : null)), bulkMode
-                    ? h('div', { className: 'sk-batchHint', role: 'status' }, '批量管理模式：勾选 Skill 后统一启用或停用，右侧单项开关已暂时隐藏。')
-                    : null, viewError !== null ? h('p', { className: 'sk-error', role: 'alert' }, viewError) : null, h('div', { className: 'sk-list' }, view === null && !viewError
-                    ? (viewBusy
-                        ? h(SkillFindingState)
-                        : h('p', { className: 'sk-empty' }, '（空）'))
-                    : null, visibleRows.length === 0 && view !== null
-                    ? h('div', { className: 'sk-empty' }, h('div', null, search !== '' || tagFilter !== null || enableFilter !== 'all'
-                        ? (enableFilter === 'on' && enabledCount === 0 ? '这个项目还没有启用任何 Skill' : '没有匹配的 Skill')
-                        : '没有发现任何 Skill'), h('div', { className: 'sk-emptyActions' }, search !== '' || tagFilter !== null || enableFilter !== 'all'
-                        ? h('button', { type: 'button', className: 'sk-chip', onClick: function () { setSearch(''); setTagFilter(null); setEnableFilter('all'); } }, '查看全部 Skill')
-                        : null, recommendedPreset !== null
-                        ? h('button', { type: 'button', className: 'sk-chip', onClick: function () { openPreset(recommendedPreset); } }, '应用推荐预设')
-                        : null))
-                    : null, visibleRows.map(rowEl)), bulkMode && selectedCount > 0
-                    ? h('div', { className: 'sk-bulkbar', role: 'region', 'aria-label': '批量操作' }, h('strong', null, '已选择 ' + selectedCount + ' 项'), h('span', { className: 'sk-slimNote' }, '更改仅作用于 ' + (project ? project.title : '当前项目')), h('span', { className: 'sk-spacer' }), h('button', { type: 'button', className: 'sk-bulkPrimary', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(true); } }, '在本项目启用（' + selectedCount + '）'), h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(false); } }, '在本项目停用（' + selectedCount + '）'), h('button', { type: 'button', className: 'sk-chip sk-chipAdd', onClick: function () { setSelectedRows({}); } }, '清除选择'))
-                    : null), drawerName !== null ? drawerEl() : null), h(Modal, {
-                    open: presetModal !== null,
-                    onClose: function () { setPresetModal(null); },
-                    title: presetModal ? '应用预设「' + presetModal.name + '」' : '应用预设',
-                    closeLabel: '关闭',
-                    description: '预览当前项目将发生的变化，再选择替换或合并；版本与项目特化内容不会写入预设。',
-                    footer: h('div', { className: 'sk-presetFooter' }, presetModal
-                        ? h(React.Fragment, null, h('div', { className: 'sk-presetFooterLeft' }, h('button', { type: 'button', className: 'sk-presetTextBtn', title: '设为默认精简预设', onClick: function () { setDefaultPreset(presetModal.name); } }, '设为默认'), h('button', { type: 'button', className: 'sk-presetTextBtn sk-presetTextDanger', onClick: function () { deletePreset(presetModal.name); } }, '删除预设')), h('span', { className: 'sk-spacer' }), h(Button, { variant: 'outline', onClick: function () { setPresetModal(null); } }, '取消'), h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || viewBusy === true || (project !== null && presetModal.cwd !== project.cwd), onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
-                        : null)
-                }, presetModal
-                    ? h('div', { className: 'sk-presetApply' }, h('div', { className: 'sk-presetMode', role: 'radiogroup', 'aria-label': '预设应用方式' }, [['replace', '替换当前配置'], ['merge', '合并到当前配置']].map(function (m) {
-                        return h('button', {
                             type: 'button',
-                            role: 'radio',
-                            'aria-checked': presetModal.mode === m[0],
-                            key: m[0],
-                            className: 'sk-presetModeBtn' + (presetModal.mode === m[0] ? ' sk-presetModeBtnOn' : ''),
-                            onClick: function () { switchPresetMode(m[0]); }
-                        }, m[1]);
-                    })), h('div', { className: 'sk-presetImpact', role: 'status', 'aria-live': 'polite' }, h('span', { className: 'sk-presetImpactMain' }, '将启用 ' + (presetModal.diff.toEnable || []).length + ' 个 Skill，停用 ' + (presetModal.diff.toDisable || []).length + ' 个'), h('span', { className: 'sk-presetImpactMeta' }, (presetModal.diff.sourceChanges || []).length + ' 项来源变更')), presetModal.desc ? h('p', { className: 'sk-slimNote' }, presetModal.desc) : null, h('div', { className: 'sk-presetListTitle' }, h('span', null, '全部变更'), h('span', { className: 'sk-presetImpactMeta' }, '下一轮对话生效')), h(DiffView, { diff: presetModal.diff, showFinal: false }))
-                    : null), h(Modal, {
-                    open: slimModal !== null,
-                    onClose: function () { setSlimModal(null); },
-                    title: slimModal && slimModal.kind === 'preset' ? '一键精简：按预设「' + slimModal.preset + '」' : '一键精简：关闭全部启用',
-                    closeLabel: '关闭',
-                    description: slimModal && slimModal.kind === 'preset'
-                        ? '按默认精简预设替换当前启用集合（下一轮对话生效）。'
-                        : '没有默认精简预设：将关闭本项目全部已启用的 Skill（仍可用 /skill-name 手动调用）。',
-                    footer: h(React.Fragment, null, h(Button, { variant: 'outline', onClick: function () { setSlimModal(null); } }, '取消'), h(Button, { disabled: slimBusy || viewBusy === true || (project !== null && slimModal && slimModal.cwd !== project.cwd), onClick: doSlimApply }, slimBusy ? '精简中…' : '确认精简'))
-                }, slimModal ? h(DiffView, { diff: slimModal.diff }) : null), h(Modal, {
-                    open: saveOpen,
-                    onClose: function () { setSaveOpen(false); },
-                    title: '保存为自定义预设',
-                    closeLabel: '关闭',
-                    description: '保存当前项目的启用 Skill 与所选来源，可在其他项目复用。',
-                    footer: h('div', { className: 'sk-presetFooter' }, h('span', { className: 'sk-spacer' }), h(Button, { variant: 'outline', onClick: function () { setSaveOpen(false); } }, '取消'), h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || saveName.trim() === '', onClick: savePreset }, presetBusy ? '保存中…' : '保存'))
-                }, h('div', { className: 'sk-presetSave' }, h('label', { className: 'sk-presetField' }, h('span', { className: 'sk-presetFieldHead' }, h('span', null, '预设名称'), h('span', { className: 'sk-presetCounter' }, saveName.length + '/64')), h('input', {
-                    className: 'sk-presetInput',
-                    placeholder: '例如：日常研发 · 精简',
-                    value: saveName,
-                    maxLength: 64,
-                    onChange: function (event) { setSaveName(event.target.value); },
-                    onKeyDown: function (event) { if (event.key === 'Enter' && saveName.trim() !== '')
-                        savePreset(); }
-                })), h('label', { className: 'sk-presetField' }, h('span', { className: 'sk-presetFieldHead' }, h('span', null, '描述（可选）'), h('span', { className: 'sk-presetCounter' }, saveDesc.length + '/200')), h('textarea', {
-                    className: 'sk-presetTextarea',
-                    placeholder: '说明适用场景、来源或使用建议',
-                    value: saveDesc,
-                    maxLength: 200,
-                    onChange: function (event) { setSaveDesc(event.target.value); }
-                })), project !== null
-                    ? h('div', { className: 'sk-presetSaveSummary' }, h('strong', null, '将保存当前项目的 ' + enabledCount + ' 个已启用 Skill 与所选来源'), h('span', null, '可跨项目复用 · 不保存版本与项目特化内容'))
-                    : null, project === null
-                    ? h('p', { className: 'sk-slimNote' }, '需要项目上下文：请先在顶部选择项目。')
-                    : null)));
+                            className: 'sk-menuBtn' + (tagFilter === null ? ' sk-menuBtnActive' : ''),
+                            onClick: function () { setTagFilter(null); setTagMenuOpen(false); setSelectedRows({}); }
+                        }, '全部标签'), ((view && view.allTags) || []).map(function (t) {
+                            return h('button', {
+                                type: 'button',
+                                key: t,
+                                className: 'sk-menuBtn' + (tagFilter === t ? ' sk-menuBtnActive' : ''),
+                                onClick: function () { setTagFilter(t); setTagMenuOpen(false); setSelectedRows({}); }
+                            }, t);
+                        }))
+                        : null), bulkMode
+                        ? h('label', { className: 'sk-selectVisible' }, h('input', {
+                            type: 'checkbox',
+                            checked: allVisibleSelected,
+                            disabled: visibleRows.length === 0 || viewBusy === true,
+                            onChange: toggleVisibleSelection,
+                            'aria-label': allVisibleSelected ? '取消选择当前结果' : '全选当前结果'
+                        }), '全选当前结果', visibleRows.length > 0 ? h('span', { className: 'sk-filterCount' }, visibleRows.length) : null)
+                        : null, bulkMode
+                        ? h('button', {
+                            type: 'button',
+                            className: 'sk-quietBtn sk-quietBtnOn',
+                            onClick: function () { setSelectedRows({}); setBulkMode(false); }
+                        }, '完成批量管理')
+                        : h('div', { style: { position: 'relative' } }, h('button', {
+                            type: 'button',
+                            className: 'sk-quietBtn' + (actionMenuOpen ? ' sk-quietBtnOn' : ''),
+                            'aria-label': '更多操作',
+                            'aria-expanded': actionMenuOpen,
+                            onClick: function () {
+                                setActionMenuOpen(!actionMenuOpen);
+                                setTagMenuOpen(false);
+                                setProjMenuOpen(false);
+                                setPresetMenuOpen(false);
+                            }
+                        }, '更多', h(P.IconChevronDownOutline14)), actionMenuOpen
+                            ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } }, h('button', {
+                                type: 'button', className: 'sk-menuBtn',
+                                onClick: function () { setActionMenuOpen(false); setSelectedRows({}); setBulkMode(true); }
+                            }, '批量管理'), h('button', {
+                                type: 'button', className: 'sk-menuBtn',
+                                disabled: project === null || viewBusy === true || (view !== null && enabledCount === 0) || (view && (view.configCorrupt === true || view.configFuture === true)),
+                                onClick: function () { setActionMenuOpen(false); doSlimPreview(); }
+                            }, '一键精简'))
+                            : null)), bulkMode
+                        ? h('div', { className: 'sk-batchHint', role: 'status' }, '批量管理模式：勾选 Skill 后统一启用或停用，右侧单项开关已暂时隐藏。')
+                        : null, viewError !== null ? h('p', { className: 'sk-error', role: 'alert' }, viewError) : null, h('div', { className: 'sk-list' }, view === null && !viewError
+                        ? (viewBusy
+                            ? h(SkillFindingState)
+                            : h('p', { className: 'sk-empty' }, '（空）'))
+                        : null, visibleRows.length === 0 && view !== null
+                        ? h('div', { className: 'sk-empty' }, h('div', null, search !== '' || tagFilter !== null || enableFilter !== 'all'
+                            ? (enableFilter === 'on' && enabledCount === 0 ? '这个项目还没有启用任何 Skill' : '没有匹配的 Skill')
+                            : '没有发现任何 Skill'), h('div', { className: 'sk-emptyActions' }, search !== '' || tagFilter !== null || enableFilter !== 'all'
+                            ? h('button', { type: 'button', className: 'sk-chip', onClick: function () { setSearch(''); setTagFilter(null); setEnableFilter('all'); } }, '查看全部 Skill')
+                            : null, recommendedPreset !== null
+                            ? h('button', { type: 'button', className: 'sk-chip', onClick: function () { openPreset(recommendedPreset); } }, '应用推荐预设')
+                            : null))
+                        : null, visibleRows.map(rowEl)), bulkMode && selectedCount > 0
+                        ? h('div', { className: 'sk-bulkbar', role: 'region', 'aria-label': '批量操作' }, h('strong', null, '已选择 ' + selectedCount + ' 项'), h('span', { className: 'sk-slimNote' }, '更改仅作用于 ' + (project ? project.title : '当前项目')), h('span', { className: 'sk-spacer' }), h('button', { type: 'button', className: 'sk-bulkPrimary', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(true); } }, '在本项目启用（' + selectedCount + '）'), h('button', { type: 'button', className: 'sk-chip', disabled: project === null || viewBusy === true || (view && (view.configCorrupt === true || view.configFuture === true)), onClick: function () { doBulk(false); } }, '在本项目停用（' + selectedCount + '）'), h('button', { type: 'button', className: 'sk-chip sk-chipAdd', onClick: function () { setSelectedRows({}); } }, '清除选择'))
+                        : null), drawerName !== null ? drawerEl() : null), h(Modal, {
+                        open: presetModal !== null,
+                        onClose: function () { setPresetModal(null); },
+                        title: presetModal ? '应用预设「' + presetModal.name + '」' : '应用预设',
+                        closeLabel: '关闭',
+                        description: '预览当前项目将发生的变化，再选择替换或合并；版本与项目特化内容不会写入预设。',
+                        footer: h('div', { className: 'sk-presetFooter' }, presetModal
+                            ? h(React.Fragment, null, h('div', { className: 'sk-presetFooterLeft' }, h('button', { type: 'button', className: 'sk-presetTextBtn', title: '设为默认精简预设', onClick: function () { setDefaultPreset(presetModal.name); } }, '设为默认'), h('button', { type: 'button', className: 'sk-presetTextBtn sk-presetTextDanger', onClick: function () { deletePreset(presetModal.name); } }, '删除预设')), h('span', { className: 'sk-spacer' }), h(Button, { variant: 'outline', onClick: function () { setPresetModal(null); } }, '取消'), h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || viewBusy === true || (project !== null && presetModal.cwd !== project.cwd), onClick: applyPreset }, presetBusy ? '应用中…' : '应用（' + (presetModal.mode === 'replace' ? '替换' : '合并') + '）'))
+                            : null)
+                    }, presetModal
+                        ? h('div', { className: 'sk-presetApply' }, h('div', { className: 'sk-presetMode', role: 'radiogroup', 'aria-label': '预设应用方式' }, [['replace', '替换当前配置'], ['merge', '合并到当前配置']].map(function (m) {
+                            return h('button', {
+                                type: 'button',
+                                role: 'radio',
+                                'aria-checked': presetModal.mode === m[0],
+                                key: m[0],
+                                className: 'sk-presetModeBtn' + (presetModal.mode === m[0] ? ' sk-presetModeBtnOn' : ''),
+                                onClick: function () { switchPresetMode(m[0]); }
+                            }, m[1]);
+                        })), h('div', { className: 'sk-presetImpact', role: 'status', 'aria-live': 'polite' }, h('span', { className: 'sk-presetImpactMain' }, '将启用 ' + (presetModal.diff.toEnable || []).length + ' 个 Skill，停用 ' + (presetModal.diff.toDisable || []).length + ' 个'), h('span', { className: 'sk-presetImpactMeta' }, (presetModal.diff.sourceChanges || []).length + ' 项来源变更')), presetModal.desc ? h('p', { className: 'sk-slimNote' }, presetModal.desc) : null, h('div', { className: 'sk-presetListTitle' }, h('span', null, '全部变更'), h('span', { className: 'sk-presetImpactMeta' }, '下一轮对话生效')), h(DiffView, { diff: presetModal.diff, showFinal: false }))
+                        : null), h(Modal, {
+                        open: slimModal !== null,
+                        onClose: function () { setSlimModal(null); },
+                        title: slimModal && slimModal.kind === 'preset' ? '一键精简：按预设「' + slimModal.preset + '」' : '一键精简：关闭全部启用',
+                        closeLabel: '关闭',
+                        description: slimModal && slimModal.kind === 'preset'
+                            ? '按默认精简预设替换当前启用集合（下一轮对话生效）。'
+                            : '没有默认精简预设：将关闭本项目全部已启用的 Skill（仍可用 /skill-name 手动调用）。',
+                        footer: h(React.Fragment, null, h(Button, { variant: 'outline', onClick: function () { setSlimModal(null); } }, '取消'), h(Button, { disabled: slimBusy || viewBusy === true || (project !== null && slimModal && slimModal.cwd !== project.cwd), onClick: doSlimApply }, slimBusy ? '精简中…' : '确认精简'))
+                    }, slimModal ? h(DiffView, { diff: slimModal.diff }) : null), h(Modal, {
+                        open: saveOpen,
+                        onClose: function () { setSaveOpen(false); },
+                        title: '保存为自定义预设',
+                        closeLabel: '关闭',
+                        description: '保存当前项目的启用 Skill 与所选来源，可在其他项目复用。',
+                        footer: h('div', { className: 'sk-presetFooter' }, h('span', { className: 'sk-spacer' }), h(Button, { variant: 'outline', onClick: function () { setSaveOpen(false); } }, '取消'), h(Button, { className: 'sk-presetPrimary', disabled: presetBusy || saveName.trim() === '', onClick: savePreset }, presetBusy ? '保存中…' : '保存'))
+                    }, h('div', { className: 'sk-presetSave' }, h('label', { className: 'sk-presetField' }, h('span', { className: 'sk-presetFieldHead' }, h('span', null, '预设名称'), h('span', { className: 'sk-presetCounter' }, saveName.length + '/64')), h('input', {
+                        className: 'sk-presetInput',
+                        placeholder: '例如：日常研发 · 精简',
+                        value: saveName,
+                        maxLength: 64,
+                        onChange: function (event) { setSaveName(event.target.value); },
+                        onKeyDown: function (event) { if (event.key === 'Enter' && saveName.trim() !== '')
+                            savePreset(); }
+                    })), h('label', { className: 'sk-presetField' }, h('span', { className: 'sk-presetFieldHead' }, h('span', null, '描述（可选）'), h('span', { className: 'sk-presetCounter' }, saveDesc.length + '/200')), h('textarea', {
+                        className: 'sk-presetTextarea',
+                        placeholder: '说明适用场景、来源或使用建议',
+                        value: saveDesc,
+                        maxLength: 200,
+                        onChange: function (event) { setSaveDesc(event.target.value); }
+                    })), project !== null
+                        ? h('div', { className: 'sk-presetSaveSummary' }, h('strong', null, '将保存当前项目的 ' + enabledCount + ' 个已启用 Skill 与所选来源'), h('span', null, '可跨项目复用 · 不保存版本与项目特化内容'))
+                        : null, project === null
+                        ? h('p', { className: 'sk-slimNote' }, '需要项目上下文：请先在顶部选择项目。')
+                        : null))));
             }
             /**
              * The SKILL tab: probes the host for the V1 (apiVersion 6)

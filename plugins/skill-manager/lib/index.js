@@ -22,6 +22,7 @@ import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { NAME_RE, ApiError, PROJECT_API_VERSION, findProjectRoot, assertCwd, projectConfigPath, globalConfigPath, atomicWriteFile, readProjectConfig, writeProjectConfig, readGlobalConfig, writeGlobalConfig, validateTagList, normalizeTagsMap, normalizePresetsMap, assertPresetName, withConfigLock, projectLockKey, globalLockKey, createLedger, } from './state.js';
 import { RANKS, SHADOW_DESC_PREFIX, SHADOW_STUB_PREFIX, shadowStubPath, parseSkill, patchInvocationFlag, isShadowFile, markerContent, computeRoots, discoverInRoot, discoverBundled, walkSkillFiles, copySkillToProject, reconcileProject, applySourceSelection, buildProjectView, buildIdentityCatalog, } from './catalog.js';
+import { createMarketplace } from './marketplace.js';
 function errorCode(error) {
     return error !== null && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : undefined;
 }
@@ -514,6 +515,12 @@ function makeHandler(deps) {
         ...(deps.home === undefined ? {} : { home: deps.home }),
         ...(deps.faults === undefined ? {} : { faults: deps.faults }),
     };
+    const marketplace = createMarketplace({
+        ...(opts.home === undefined ? {} : { home: opts.home }),
+        ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+        ...(deps.marketplace === undefined ? {} : { entries: deps.marketplace }),
+        ...(deps.logger === undefined ? {} : { logger: deps.logger }),
+    });
     const projectSnapshots = new Map();
     async function rememberProjectSnapshot(cwd, built) {
         if (!built || !built.view || built.view.projectRoot === null || !built.identities || !built.config)
@@ -602,8 +609,26 @@ function makeHandler(deps) {
         async capabilities() {
             return {
                 apiVersion: PROJECT_API_VERSION,
-                features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim'],
+                features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace'],
             };
+        },
+        async marketplace(body) {
+            return marketplace.list(body.cwd, body.force === true);
+        },
+        async ['marketplace.detail'](body) {
+            if (typeof body.id !== 'string' || body.id === '')
+                throw new ApiError(400, '缺少市场条目 id');
+            return marketplace.detail(body.id, body.cwd, body.force === true);
+        },
+        async ['marketplace.preview'](body) {
+            if (typeof body.id !== 'string' || body.id === '')
+                throw new ApiError(400, '缺少市场条目 id');
+            return marketplace.preview(body.id, body.cwd);
+        },
+        async ['marketplace.install'](body) {
+            if (typeof body.id !== 'string' || body.id === '')
+                throw new ApiError(400, '缺少市场条目 id');
+            return marketplace.install(body.id, body.cwd);
         },
         async list(body) {
             const cwd = await assertCwd(body.cwd);
@@ -1293,6 +1318,7 @@ export const internals = {
     shadowStubPath,
     STATE_PATH,
     buildZip,
+    createMarketplace,
     // V1 surface (DSH-008)
     ApiError,
     NAME_RE,

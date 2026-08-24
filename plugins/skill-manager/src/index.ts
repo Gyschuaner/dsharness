@@ -71,12 +71,16 @@ import {
 	type SkillFile,
 	type SkillIdentity,
 } from './catalog.js';
+import { createMarketplace } from './marketplace.js';
 
 interface AgentPresetService { list(): Promise<unknown[]> }
 interface Logger { warn?(message: string): void }
 interface HandlerDeps extends CatalogOptions {
 	agentPresets: AgentPresetService;
 	logger?: Logger;
+	/** Injectable transport/catalog for deterministic Host tests. */
+	fetch?: (...args: any[]) => Promise<any>;
+	marketplace?: unknown[];
 }
 interface PolicyState { globalDefaultOff: boolean }
 interface TargetPlan {
@@ -114,6 +118,8 @@ interface ApiBody extends UnknownRecord {
 	tags?: unknown;
 	description?: string;
 	mode?: string;
+	id?: string;
+	force?: boolean;
 }
 interface ZipValue extends UnknownRecord { __zip: Buffer; filename: string }
 interface RequestLike extends AsyncIterable<Uint8Array> { method?: string }
@@ -596,6 +602,12 @@ function makeHandler(deps: HandlerDeps): RequestHandler {
 		...(deps.home === undefined ? {} : { home: deps.home }),
 		...(deps.faults === undefined ? {} : { faults: deps.faults }),
 	};
+	const marketplace = createMarketplace({
+		...(opts.home === undefined ? {} : { home: opts.home }),
+		...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+		...(deps.marketplace === undefined ? {} : { entries: deps.marketplace }),
+		...(deps.logger === undefined ? {} : { logger: deps.logger }),
+	});
 	const projectSnapshots = new Map<string, ProjectSnapshot>();
 	async function rememberProjectSnapshot(cwd: string | undefined, built: Pick<Awaited<ReturnType<typeof buildProjectView>>, 'view' | 'config' | 'identities'>): Promise<void> {
 		if (!built || !built.view || built.view.projectRoot === null || !built.identities || !built.config) return;
@@ -681,8 +693,23 @@ function makeHandler(deps: HandlerDeps): RequestHandler {
 		async capabilities() {
 			return {
 				apiVersion: PROJECT_API_VERSION,
-				features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim'],
+				features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace'],
 			};
+		},
+		async marketplace(body) {
+			return marketplace.list(body.cwd, body.force === true);
+		},
+		async ['marketplace.detail'](body) {
+			if (typeof body.id !== 'string' || body.id === '') throw new ApiError(400, '缺少市场条目 id');
+			return marketplace.detail(body.id, body.cwd, body.force === true);
+		},
+		async ['marketplace.preview'](body) {
+			if (typeof body.id !== 'string' || body.id === '') throw new ApiError(400, '缺少市场条目 id');
+			return marketplace.preview(body.id, body.cwd);
+		},
+		async ['marketplace.install'](body) {
+			if (typeof body.id !== 'string' || body.id === '') throw new ApiError(400, '缺少市场条目 id');
+			return marketplace.install(body.id, body.cwd);
 		},
 		async list(body) {
 			const cwd = await assertCwd(body.cwd);
@@ -1300,6 +1327,7 @@ export const internals = {
 	shadowStubPath,
 	STATE_PATH,
 	buildZip,
+	createMarketplace,
 	// V1 surface (DSH-008)
 	ApiError,
 	NAME_RE,

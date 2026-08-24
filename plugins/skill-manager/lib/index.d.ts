@@ -1,5 +1,6 @@
 import { ApiError, findProjectRoot, projectConfigPath, globalConfigPath, atomicWriteFile, readProjectConfig, writeProjectConfig, readGlobalConfig, writeGlobalConfig, validateTagList, normalizeTagsMap, normalizePresetsMap, assertPresetName } from './state.js';
 import { shadowStubPath, parseSkill, patchInvocationFlag, isShadowFile, markerContent, computeRoots, discoverInRoot, discoverBundled, walkSkillFiles, copySkillToProject, reconcileProject, applySourceSelection, buildProjectView, buildIdentityCatalog, type CatalogOptions } from './catalog.js';
+import { createMarketplace } from './marketplace.js';
 interface AgentPresetService {
     list(): Promise<unknown[]>;
 }
@@ -9,6 +10,9 @@ interface Logger {
 interface HandlerDeps extends CatalogOptions {
     agentPresets: AgentPresetService;
     logger?: Logger;
+    /** Injectable transport/catalog for deterministic Host tests. */
+    fetch?: (...args: any[]) => Promise<any>;
+    marketplace?: unknown[];
 }
 interface PolicyState {
     globalDefaultOff: boolean;
@@ -135,6 +139,7 @@ export declare const internals: {
     shadowStubPath: typeof shadowStubPath;
     STATE_PATH: string;
     buildZip: typeof buildZip;
+    createMarketplace: typeof createMarketplace;
     ApiError: typeof ApiError;
     NAME_RE: RegExp;
     PROJECT_API_VERSION: number;

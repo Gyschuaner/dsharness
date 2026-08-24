@@ -24,6 +24,14 @@ export interface SourceSelection extends UnknownRecord {
     originHash?: string;
     copyHash?: string;
     generated?: boolean;
+    /** Project-local provenance for a Skill installed from the curated market. */
+    marketManaged?: boolean;
+    marketId?: string;
+    marketRepository?: string;
+    marketPath?: string;
+    marketRef?: string;
+    marketRevision?: string | null;
+    marketHash?: string;
 }
 export interface ProjectConfig extends UnknownRecord {
     schema: string;

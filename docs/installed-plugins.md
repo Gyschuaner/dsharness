@@ -20,7 +20,7 @@
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
 | dsh-extension-manager | 0.2.0（build 2） | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
-| dsh-skill-manager | 0.1.0（build 22） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 | 只负责 SKILL 分区与 `/api/skill-manager`，向 extension-manager 贡献页面 |
+| dsh-skill-manager | 0.2.0（build 23） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 | 负责本地 Skill、真实 GitHub Skill 市场与 `/api/skill-manager`，向 extension-manager 贡献页面 |
 | dsh-plugin-manager | 0.2.0（build 2） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027 | 独立 Plugin 分区；本地插件管理、受控导入、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
@@ -78,6 +78,12 @@
   启停只写受管覆盖块；导入走官方 `dsh plugin` 且默认忽略第三方安装脚本。市场首页使用
   受控 GitHub 清单，详情按需请求并带缓存/离线降级。Windows web profile 新增 link
   依赖、junction 与独立 Cordis 行。
+
+- **2026-08-24（DSH-008 build 23）**：Skill 页迁移到最新 main 的 TypeScript / 单页结构，
+  保留本地 Skill 单页并新增与 MCP、Plugin 一致的「本地 Skill / Skill 市场」一级页签；
+  市场 Host 接口使用精选 GitHub 条目，支持元数据、详情、安全预览和受控安装，不执行第三方脚本。
+  同时将本机 `~/.dsh/plugins` 的仓库插件链接统一指向同一份当前 checkout，避免页面壳与业务插件
+  来自不同 worktree 导致样式回退。
 
 - **2026-08-24（DSH-006）**：把通用“扩展”入口与全页导航壳从
   `dsh-skill-manager` 拆到新的 `dsh-extension-manager`。新壳独立注册

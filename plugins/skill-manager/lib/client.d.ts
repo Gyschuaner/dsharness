@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 22
+ * build: 23
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
