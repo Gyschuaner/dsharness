@@ -54,6 +54,11 @@ function Test-DshWebCommandLine([string]$CommandLine, [int]$ExpectedPort) {
 	return $isDshWeb -and $usesExpectedPort
 }
 
+function Test-DshWebProcess($process) {
+	if (-not $process -or -not $process.CommandLine) { return $false }
+	return Test-DshWebCommandLine ([string]$process.CommandLine) $Port
+}
+
 function Get-LogTail([string]$Path) {
 	if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
 	return ((Get-Content -LiteralPath $Path -Tail 20 -ErrorAction SilentlyContinue) -join [Environment]::NewLine)
@@ -90,13 +95,13 @@ Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object {
 
 $unknownListeners = @()
 foreach ($listenerProcessId in $portPids) {
-	$listenerProcess = Get-ProcessInfo $listenerProcessId
-	if (-not $listenerProcess -or -not (Test-DshWebCommandLine $listenerProcess.CommandLine $Port)) {
+	$listener = Get-ProcessInfo $listenerProcessId
+	if (-not (Test-DshWebProcess $listener)) {
 		$unknownListeners += $listenerProcessId
 	}
 }
 if ($unknownListeners.Count -gt 0) {
-	throw "端口 $Port 由非 DSH 进程占用（PID：$($unknownListeners -join ', ')），为避免误伤未停止它。"
+	throw "端口 $Port 由非 DSH 进程占用（PID：$($unknownListeners -join ', ')），拒绝停止，为避免误伤未停止它。"
 }
 
 $all = @($portPids + $webPids) | Where-Object { $_ } | Sort-Object -Unique
