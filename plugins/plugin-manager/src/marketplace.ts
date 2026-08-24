@@ -1,5 +1,5 @@
 /**
- * DSH-027 curated discovery index.
+ * DSH-027 featured discovery index.
  *
  * The marketplace home intentionally keeps only stable discovery facts. Live
  * repository, release and manifest metadata is fetched on demand by the Host.
@@ -8,12 +8,12 @@ export interface MarketplaceEntry {
 	readonly id: string;
 	readonly repository: string;
 	readonly packageName: string | null;
-	readonly installSource: string;
+	readonly installSource?: string;
 	readonly latestHint?: string;
 	readonly description: string;
 }
 
-export const MARKETPLACE = Object.freeze([
+export const FEATURED_MARKETPLACE = Object.freeze([
 	Object.freeze({
 		id: 'omdsh-dev/DSH-better-sidebar',
 		repository: 'omdsh-dev/DSH-better-sidebar',
@@ -37,6 +37,9 @@ export const MARKETPLACE = Object.freeze([
 		description: 'DSH 命令行增强（TUI），提供更流畅的终端体验。',
 	}),
 ] satisfies readonly MarketplaceEntry[]);
+
+/** Backwards-compatible name for callers that only need the featured list. */
+export const MARKETPLACE = FEATURED_MARKETPLACE;
 
 export function findMarketplaceEntry(id: string): MarketplaceEntry | null {
 	return MARKETPLACE.find((entry) => entry.id === id) ?? null;

@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { MARKETPLACE, findMarketplaceEntry } from './marketplace.js';
+import { DEFAULT_REGISTRY_URL, normalizeRegistry } from './registry.js';
 export const API_VERSION = 1;
 export const OVERRIDE_START = '# plugin-manager:overrides:start';
 export const OVERRIDE_END = '# plugin-manager:overrides:end';
@@ -470,6 +471,53 @@ async function fetchText(url, deps, optional = false) {
         throw error;
     }
 }
+function validateRegistryUrl(value) {
+    let parsed;
+    try {
+        parsed = new URL(value);
+    }
+    catch {
+        throw new ApiError(500, 'Plugin Registry 地址不合法', 'REGISTRY_URL_INVALID');
+    }
+    const local = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]' || parsed.hostname === '::1';
+    if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && local)) {
+        throw new ApiError(500, 'Plugin Registry 必须使用 HTTPS；仅本机地址允许 HTTP', 'REGISTRY_URL_INVALID');
+    }
+    return parsed.toString();
+}
+async function fetchRegistryDocument(url, deps) {
+    const fetchImpl = deps.fetch || globalThis.fetch;
+    if (typeof fetchImpl !== 'function')
+        throw new ApiError(503, '当前运行时不支持 Plugin Registry 请求', 'FETCH_UNAVAILABLE');
+    let response;
+    try {
+        response = await fetchImpl(url, {
+            headers: { accept: 'application/json', 'user-agent': 'dsh-plugin-manager/0.2' },
+            signal: AbortSignal.timeout(deps.githubTimeoutMs || 6000),
+        });
+    }
+    catch (error) {
+        throw new ApiError(503, `Plugin Registry 请求失败：${error instanceof Error ? error.message : String(error)}`, 'REGISTRY_UNAVAILABLE');
+    }
+    if (!response.ok) {
+        const remaining = response.headers?.get?.('x-ratelimit-remaining');
+        const suffix = response.status === 403 && remaining === '0' ? '（API 限流）' : '';
+        throw new ApiError(503, `Plugin Registry 返回 ${response.status}${suffix}`, 'REGISTRY_UNAVAILABLE');
+    }
+    let value;
+    try {
+        value = await response.json();
+    }
+    catch (error) {
+        throw new ApiError(502, `Plugin Registry JSON 无法解析：${error instanceof Error ? error.message : String(error)}`, 'REGISTRY_INVALID');
+    }
+    try {
+        return normalizeRegistry(value);
+    }
+    catch (error) {
+        throw new ApiError(502, `Plugin Registry 格式无效：${error instanceof Error ? error.message : String(error)}`, 'REGISTRY_INVALID');
+    }
+}
 async function fetchGithubDetail(entry, deps) {
     validateRepository(entry.repository);
     const repoValue = await fetchJson(`https://api.github.com/repos/${entry.repository}`, deps, false);
@@ -679,6 +727,10 @@ export function createPluginManager(options = {}) {
     const profileName = options.profileName || 'web';
     const deps = options.deps || {};
     const detailCache = new Map();
+    const registryUrl = validateRegistryUrl(options.registryUrl || process.env.DSH_PLUGIN_REGISTRY_URL || DEFAULT_REGISTRY_URL);
+    const registryCacheMs = options.registryCacheMs ?? 10 * 60 * 1000;
+    let registryCache = null;
+    let registryRequest = null;
     let mutationTail = Promise.resolve();
     function enqueueMutation(work) {
         const run = mutationTail.then(work, work);
@@ -705,26 +757,91 @@ export function createPluginManager(options = {}) {
         }
         return { apiVersion: API_VERSION, profile: profileName, profileDir, restartRequired: false, plugins };
     }
+    async function readRegistry(force = false) {
+        if (!force && registryCache && Date.now() - registryCache.at < registryCacheMs) {
+            return { document: registryCache.document, status: 'fresh', warning: null, generatedAt: registryCache.document.generatedAt };
+        }
+        if (registryRequest)
+            return registryRequest;
+        registryRequest = fetchRegistryDocument(registryUrl, deps).then((document) => {
+            registryCache = { at: Date.now(), document };
+            return { document, status: 'fresh', warning: null, generatedAt: document.generatedAt };
+        }).catch((error) => {
+            const warning = error instanceof Error ? error.message : String(error);
+            if (registryCache) {
+                return { document: registryCache.document, status: 'stale', warning, generatedAt: registryCache.document.generatedAt };
+            }
+            return { document: null, status: 'unavailable', warning, generatedAt: null };
+        }).finally(() => {
+            registryRequest = null;
+        });
+        return registryRequest;
+    }
+    function registryEntry(item) {
+        const entry = {
+            id: item.id,
+            repository: item.repository,
+            packageName: item.packageName,
+            description: item.description,
+        };
+        if (item.latestHint !== null)
+            return Object.assign(entry, { latestHint: item.latestHint });
+        return entry;
+    }
+    function mergeMarketplaceEntries(document) {
+        const result = MARKETPLACE.map((entry) => ({ entry, marketSource: 'featured' }));
+        const seen = new Set(result.map(({ entry }) => entry.repository.toLowerCase()));
+        for (const item of document?.items || []) {
+            const key = item.repository.toLowerCase();
+            if (seen.has(key))
+                continue;
+            seen.add(key);
+            result.push({ entry: registryEntry(item), marketSource: 'registry' });
+        }
+        return result;
+    }
+    async function resolveMarketplaceEntry(id, cacheOnly = false) {
+        const featured = findMarketplaceEntry(id);
+        if (featured)
+            return { entry: featured, marketSource: 'featured' };
+        const registry = cacheOnly && registryCache
+            ? { document: registryCache.document, status: 'fresh', warning: null, generatedAt: registryCache.document.generatedAt }
+            : await readRegistry();
+        const item = registry.document?.items.find((candidate) => candidate.id === id || candidate.repository.toLowerCase() === id.toLowerCase());
+        if (!item)
+            throw new ApiError(404, '市场中不存在这个插件', 'MARKET_ENTRY_NOT_FOUND');
+        return { entry: registryEntry(item), marketSource: 'registry' };
+    }
     async function marketplace() {
         const local = await listLocalPlugins(profileDir);
+        const registry = await readRegistry();
+        const entries = mergeMarketplaceEntries(registry.document);
         return {
             apiVersion: API_VERSION,
-            items: MARKETPLACE.map((entry) => {
-                const iconUrl = githubAvatarUrl(entry.repository);
+            registry: {
+                status: registry.status,
+                generatedAt: registry.generatedAt,
+                warning: registry.warning,
+            },
+            page: { offset: 0, limit: entries.length, total: entries.length, hasMore: false, nextCursor: null },
+            items: entries.map(({ entry, marketSource }) => {
+                const registryIcon = safeOptionalIconUrl((registry.document?.items.find((item) => item.id === entry.id)?.iconUrl) || '');
+                const iconUrl = registryIcon || githubAvatarUrl(entry.repository);
                 return Object.assign({
                     id: entry.id,
                     repository: entry.repository,
                     description: entry.description,
                     iconUrl,
-                    iconSource: iconUrl ? 'github-avatar' : 'generic',
+                    iconSource: registryIcon ? 'registry' : iconUrl ? 'github-avatar' : 'generic',
+                    marketSource,
+                    installable: Boolean(entry.installSource),
                 }, marketplaceStatus(entry, local));
             }),
         };
     }
     async function detail(id, force = false) {
-        const entry = findMarketplaceEntry(id);
-        if (!entry)
-            throw new ApiError(404, '市场中不存在这个插件', 'MARKET_ENTRY_NOT_FOUND');
+        const resolved = await resolveMarketplaceEntry(id);
+        const entry = resolved.entry;
         const cached = detailCache.get(id);
         const maxAge = options.githubCacheMs || 5 * 60 * 1000;
         let value;
@@ -749,7 +866,7 @@ export function createPluginManager(options = {}) {
         const state = marketplaceStatus(entry, local);
         if (state.status === 'installed' && value.latestVersion && compareVersions(state.installedVersion, value.latestVersion) < 0)
             state.status = 'update-available';
-        return Object.assign({}, cacheState, value, state);
+        return Object.assign({}, cacheState, value, state, { marketSource: resolved.marketSource, installable: Boolean(entry.installSource) });
     }
     async function setEnabled(name, enabled) {
         const pluginName = String(name || '');
@@ -788,10 +905,10 @@ export function createPluginManager(options = {}) {
         });
     }
     async function installMarket(id) {
-        const entry = findMarketplaceEntry(String(id || ''));
-        if (!entry)
-            throw new ApiError(404, '市场中不存在这个插件', 'MARKET_ENTRY_NOT_FOUND');
-        return importPlugin(entry.installSource);
+        const resolved = await resolveMarketplaceEntry(String(id || ''), true);
+        if (!resolved.entry.installSource)
+            throw new ApiError(409, 'Registry 发现条目当前仅支持查看，请使用手动导入', 'MARKET_REGISTRY_READ_ONLY');
+        return importPlugin(resolved.entry.installSource);
     }
     return {
         profileDir,

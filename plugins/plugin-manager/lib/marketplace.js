@@ -1,4 +1,4 @@
-export const MARKETPLACE = Object.freeze([
+export const FEATURED_MARKETPLACE = Object.freeze([
     Object.freeze({
         id: 'omdsh-dev/DSH-better-sidebar',
         repository: 'omdsh-dev/DSH-better-sidebar',
@@ -22,6 +22,8 @@ export const MARKETPLACE = Object.freeze([
         description: 'DSH 命令行增强（TUI），提供更流畅的终端体验。',
     }),
 ]);
+/** Backwards-compatible name for callers that only need the featured list. */
+export const MARKETPLACE = FEATURED_MARKETPLACE;
 export function findMarketplaceEntry(id) {
     return MARKETPLACE.find((entry) => entry.id === id) ?? null;
 }

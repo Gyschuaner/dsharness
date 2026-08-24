@@ -29,14 +29,34 @@ interface PluginMarketItem {
     description: string;
     iconUrl?: string | null;
     iconSource?: string;
+    marketSource?: 'featured' | 'registry';
+    installable?: boolean;
     status: string;
     installedVersion: string | null;
+}
+interface PluginRegistryInfo {
+    status: 'fresh' | 'stale' | 'unavailable';
+    generatedAt: string | null;
+    warning: string | null;
+}
+interface PluginMarketplaceResponse {
+    items: PluginMarketItem[];
+    registry?: PluginRegistryInfo;
+    page?: {
+        offset: number;
+        limit: number;
+        total: number;
+        hasMore: boolean;
+        nextCursor: string | null;
+    };
 }
 interface PluginMarketDetail {
     url?: string;
     description?: string;
     iconUrl?: string | null;
     iconSource?: string;
+    marketSource?: 'featured' | 'registry';
+    installable?: boolean;
     status?: string;
     installedVersion?: string | null;
     latestVersion?: string | null;
@@ -60,9 +80,7 @@ interface PluginApi {
     call(op: 'list'): Promise<{
         plugins: PluginLocalView[];
     }>;
-    call(op: 'marketplace'): Promise<{
-        items: PluginMarketItem[];
-    }>;
+    call(op: 'marketplace'): Promise<PluginMarketplaceResponse>;
     call(op: 'marketplace.detail', payload: {
         id: string;
         force?: boolean;

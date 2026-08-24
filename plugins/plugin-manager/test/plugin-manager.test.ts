@@ -16,6 +16,7 @@ import {
 	replaceManagedBlock,
 	validateImportSource,
 } from '../lib/state.js';
+import { normalizeRegistry } from '../lib/registry.js';
 
 async function json(path, value) {
 	await mkdir(join(path, '..'), { recursive: true });
@@ -290,24 +291,29 @@ test('installed manifest names cannot redirect bundle inspection to another pack
 	assert.equal(isDshPluginManifest({ name: '../../outside', dsh: { bundle: { patch: 'cordis.patch.yml' } } }), false);
 });
 
-test('marketplace does not fetch until detail opens, then caches the GitHub result', async () => {
+test('marketplace fetches Registry without GitHub detail, then caches the GitHub result', async () => {
 	const f = await fixture();
 	let calls = 0;
 	const fetch = async (url) => {
 		calls += 1;
+		if (url.includes('/plugin-registry.json')) return response({ schemaVersion: 1, generatedAt: '2026-08-24T03:00:00Z', items: [] });
 		if (url.endsWith('/releases/latest')) return response({ tag_name: 'v0.15.2', html_url: 'https://github.com/release' });
 		if (url.includes('raw.githubusercontent.com')) return response({ name: 'dsh-better-sidebar', version: '0.15.2', main: './lib/index.js', exports: { './client': './lib/client.js' }, engines: { dsh: '>=0.0.1' }, dsh: { client: { platform: 'web' } } });
 		return response({ html_url: 'https://github.com/omdsh-dev/DSH-better-sidebar', description: 'Better sidebar.', owner: { login: 'omdsh-dev', avatar_url: 'http://evil.example/avatar.png' }, stargazers_count: 2710, forks_count: 215, language: 'TypeScript', license: { spdx_id: 'MIT' }, pushed_at: '2026-08-24T00:00:00Z', topics: ['deepseek-harness'], default_branch: 'main' });
 	};
-	const manager = createPluginManager({ profileDir: f.profile, deps: { fetch: fetch as any } });
+	const manager = createPluginManager({ profileDir: f.profile, registryUrl: 'https://registry.example/plugin-registry.json', deps: { fetch: fetch as any } });
 	const market = await manager.call('marketplace');
-	assert.equal(calls, 0);
+	assert.equal(calls, 1);
 	assert.equal(market.items.length, 3);
+	assert.equal(market.registry.status, 'fresh');
+	assert.deepEqual(market.page, { offset: 0, limit: 3, total: 3, hasMore: false, nextCursor: null });
 	assert.equal(market.items[0].status, 'update-available');
 	assert.equal(market.items[0].iconUrl, 'https://github.com/omdsh-dev.png?size=64');
 	assert.equal(market.items[0].iconSource, 'github-avatar');
+	assert.equal(market.items[0].marketSource, 'featured');
+	assert.equal(market.items[0].installable, true);
 	const detail = await manager.call('marketplace.detail', { id: 'omdsh-dev/DSH-better-sidebar' });
-	assert.equal(calls, 3);
+	assert.equal(calls, 4);
 	assert.equal(detail.status, 'update-available');
 	assert.equal(detail.iconUrl, 'https://github.com/omdsh-dev.png?size=64');
 	assert.equal(detail.iconSource, 'github-avatar');
@@ -318,10 +324,58 @@ test('marketplace does not fetch until detail opens, then caches the GitHub resu
 	installedManifest.version = '0.15.2';
 	await json(installedManifestPath, installedManifest);
 	const cached = await manager.call('marketplace.detail', { id: 'omdsh-dev/DSH-better-sidebar' });
-	assert.equal(calls, 3);
+	assert.equal(calls, 4);
 	assert.equal(cached.cached, true);
 	assert.equal(cached.installedVersion, '0.15.2');
 	assert.equal(cached.status, 'installed');
+});
+
+test('Registry entries are validated, deduplicated and kept view-only with stale fallback', async () => {
+	const f = await fixture();
+	let fail = false;
+	let registryCalls = 0;
+	const registry = {
+		schemaVersion: 1,
+		generatedAt: '2026-08-24T03:00:00Z',
+		items: [
+			{ id: 'omdsh-dev/DSH-better-sidebar', repository: 'omdsh-dev/DSH-better-sidebar', description: 'duplicate featured row' },
+			{ id: 'SiriLee/dsh-rewind', repository: 'SiriLee/dsh-rewind', description: 'Conversation rewind.' },
+			{ id: 'sirilee/dsh-rewind', repository: 'sirilee/dsh-rewind', description: 'duplicate by owner casing.' },
+		],
+	};
+	const fetch = async (url) => {
+		if (url.includes('/plugin-registry.json')) {
+			registryCalls += 1;
+			if (fail) throw new Error('offline');
+			return response(registry);
+		}
+		throw new Error(`unexpected URL ${url}`);
+	};
+	const manager = createPluginManager({ profileDir: f.profile, registryUrl: 'https://registry.example/plugin-registry.json', registryCacheMs: 0, deps: { fetch: fetch as any } });
+	const fresh = await manager.call('marketplace');
+	assert.equal(registryCalls, 1);
+	assert.equal(fresh.registry.status, 'fresh');
+	assert.equal(fresh.items.length, 4, 'duplicate Registry repositories do not create duplicate rows');
+	const discovered = fresh.items.find((item) => item.id === 'SiriLee/dsh-rewind');
+	assert.equal(discovered.marketSource, 'registry');
+	assert.equal(discovered.installable, false);
+	await assert.rejects(
+		manager.call('marketplace.install', { id: 'SiriLee/dsh-rewind' }),
+		(error: unknown) => error instanceof ApiError && error.code === 'MARKET_REGISTRY_READ_ONLY',
+	);
+
+	fail = true;
+	const stale = await manager.call('marketplace');
+	assert.equal(registryCalls, 2);
+	assert.equal(stale.registry.status, 'stale');
+	assert.match(stale.registry.warning, /Registry 请求失败：offline/);
+	assert.equal(stale.items.length, 4, 'stale cache keeps the last valid discovery list');
+});
+
+test('Registry schema rejects unsafe or malformed data', () => {
+	assert.throws(() => normalizeRegistry({ schemaVersion: 2, generatedAt: '2026-08-24T03:00:00Z', items: [] }), /schemaVersion/);
+	assert.throws(() => normalizeRegistry({ schemaVersion: 1, generatedAt: '2026-08-24T03:00:00Z', items: [{ id: 'owner/repo', repository: 'owner/repo', description: 'x', iconUrl: 'http://evil.example/icon.png' }] }), /HTTPS/);
+	assert.throws(() => normalizeRegistry({ schemaVersion: 1, generatedAt: '2026-08-24T03:00:00Z', items: [{ id: 'owner/other', repository: 'owner/repo', description: 'x' }] }), /必须等于 repository/);
 });
 
 test('forced GitHub failure falls back to stale cached detail', async () => {
