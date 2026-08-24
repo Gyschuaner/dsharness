@@ -23,6 +23,10 @@ const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
 const PACKAGE_SPEC_RE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@(?:latest|next|beta|alpha|\d[^\s]*))?$/i;
 const REPOSITORY_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
+function isAbsolutePluginPath(value: string): boolean {
+	return isAbsolute(value) || /^[A-Za-z]:[\\/]/.test(value) || /^\\\\[^\\/]+[\\/]/.test(value);
+}
+
 function safeOptionalIconUrl(value: unknown): string | null {
 	if (!value) return null;
 	try {
@@ -668,10 +672,10 @@ export function validateImportSource(source: unknown): string {
 	if (/^(?:git\+)?https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?(?:#[A-Za-z0-9._/-]+)?$/.test(value)) return value;
 	if (/^(?:link:|file:)/i.test(value)) {
 		const path = value.slice(value.indexOf(':') + 1);
-		if (!isAbsolute(path)) throw new ApiError(400, '本地插件目录必须使用绝对路径', 'SOURCE_PATH_RELATIVE');
+		if (!isAbsolutePluginPath(path)) throw new ApiError(400, '本地插件目录必须使用绝对路径', 'SOURCE_PATH_RELATIVE');
 		return value;
 	}
-	if (isAbsolute(value)) return value;
+	if (isAbsolutePluginPath(value)) return value;
 	throw new ApiError(400, '仅支持 npm 包、GitHub 仓库或本地绝对目录', 'SOURCE_UNSUPPORTED');
 }
 
