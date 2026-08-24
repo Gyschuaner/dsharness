@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 23
+ * build: 24
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -72,6 +72,9 @@
  * build 22: the generic sidebar entry, full-page shell, and MCP / Plugin
  * placeholders move to dsh-extension-manager. This plugin now owns only the
  * SKILL section and its `/api/skill-manager` business API.
+ * build 24: the Skill section adopts the MCP / Plugin page chrome: a 980px
+ * centered frame, shared title and tab rhythm, compact project summary and
+ * toolbar, flat 72px list rows, and fixed 400px detail drawers.
  *
  * TypeScript source compiled to a classic browser script — no JSX/imports.
  */
@@ -406,9 +409,66 @@ interface SectionProps { api: HostClientApi; ctx?: ClientContext }
 				'.sk-presetSaveSummary span{font-size:11px;color:var(--dsw-alias-label-quaternary)}',
 				'@media(max-width:900px){.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
 				'@media(max-width:680px){.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}}',
-				'@media(max-width:600px){[role="dialog"]:has(.sk-presetApply),[role="dialog"]:has(.sk-presetSave){width:calc(100vw - 24px)}.sk-presetApply,.sk-presetSave{width:auto}.sk-presetMode{grid-template-columns:1fr}.sk-presetImpact{align-items:flex-start;flex-direction:column;gap:3px}.sk-presetFooter{flex-wrap:wrap}.sk-presetFooterLeft{width:100%}}',
-				'@media(max-width:480px){.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}'
-			].join('');
+					'@media(max-width:600px){[role="dialog"]:has(.sk-presetApply),[role="dialog"]:has(.sk-presetSave){width:calc(100vw - 24px)}.sk-presetApply,.sk-presetSave{width:auto}.sk-presetMode{grid-template-columns:1fr}.sk-presetImpact{align-items:flex-start;flex-direction:column;gap:3px}.sk-presetFooter{flex-wrap:wrap}.sk-presetFooterLeft{width:100%}}',
+					'@media(max-width:480px){.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}',
+					// build 24: use the same page chrome as MCP / Plugin. Skill keeps
+					// its project controls and richer row semantics, but shares the
+					// centered width, compact toolbar, flat list rhythm, and overlay
+					// drawer geometry of the sibling managers.
+					'.sk-root{box-sizing:border-box;height:100%;min-height:0;max-width:980px;margin:0 auto;font-size:13px}',
+					'.sk-head{padding:6px 8px 16px}',
+					'.sk-headTitle{font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.02em}',
+					'.sk-headSub{color:var(--dsw-alias-label-tertiary);font-size:13px;font-weight:400}',
+					'.sk-tabs{height:40px;align-items:flex-end;gap:28px;padding:0 8px}',
+					'.sk-primaryTabs{gap:28px}',
+					'.sk-tab{height:40px;padding:0 1px;display:inline-flex;align-items:center;font-size:13px;line-height:normal;font-weight:500}',
+					'.sk-tabActive{border-bottom-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);font-weight:600}',
+					'.sk-projectCard{box-sizing:border-box;min-height:60px;margin:16px 8px 14px;padding:10px 14px;border-radius:10px}',
+					'.sk-currentBadge{border-radius:0;background:transparent;padding:0;font-size:12px;color:var(--dsw-alias-label-tertiary)}',
+					'.sk-projectTitle{font-size:14px;font-weight:650}',
+					'.sk-toolbar{margin:0;padding:16px 8px 8px;gap:10px}',
+					'.sk-searchWrap{box-sizing:border-box;height:38px;min-width:0;background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;gap:8px;padding:0 11px;color:var(--dsw-alias-label-tertiary)}',
+					'.sk-searchWrap>.sk-ic{position:static;left:auto;color:var(--dsw-alias-label-tertiary);pointer-events:none}',
+					'.sk-search{box-sizing:border-box;height:36px;min-width:0;flex:1;width:auto;background:transparent;border:0;border-radius:0;padding:0;color:var(--dsw-alias-label-primary)}',
+					'.sk-search:focus{outline:0}',
+					'.sk-searchWrap:focus-within{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}',
+					'.sk-filters{height:38px;align-items:stretch}',
+					'.sk-filterBtn{height:38px;padding:0 10px}',
+					'.sk-quietBtn{height:38px;box-sizing:border-box;padding:0 10px}',
+					'.sk-list{gap:0;padding:0 8px 32px}',
+					'.sk-row{box-sizing:border-box;min-height:72px;border:0;border-top:1px solid var(--dsw-alias-border-l2);border-radius:0;padding:13px 10px}',
+					'.sk-list>.sk-row:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
+					'.sk-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+					'.sk-rowEnabled{background:color-mix(in srgb,var(--dsw-static-blue-500) 7%,var(--dsw-alias-bg-module-platform))}',
+					'.sk-rowEnabled:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 9%,var(--dsw-alias-bg-module-platform))}',
+					'.sk-rowActive{background:var(--dsw-alias-interactive-bg-hover)}',
+					'.sk-rowEnabled.sk-rowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 9%,var(--dsw-alias-bg-module-platform))}',
+					'.sk-rowName{font-size:13.5px}',
+					'.sk-rowDesc{margin-top:4px;line-height:1.45}',
+					'.sk-rowSide{gap:12px}',
+					'.sk-root .smgr-switch{width:36px;height:20px;background:var(--dsw-alias-fill-tsp-secondary)}',
+					'.sk-root .smgr-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
+					'.sk-root .smgr-switchKnob{width:16px;height:16px;left:2px;top:2px}',
+					'.sk-root .smgr-switchOn .smgr-switchKnob{transform:translateX(16px)}',
+					'.sk-marketToolbar{padding:16px 8px 8px;gap:10px}',
+					'.sk-marketSearch{min-width:180px}',
+					'.sk-marketList{padding:0 8px 32px}',
+					'.sk-marketRow{min-height:72px;padding:13px 10px;column-gap:14px}',
+					'.sk-marketMain{align-items:flex-start;gap:11px}',
+					'.sk-marketIcon,.sk-marketFallback{width:28px;height:28px;border-radius:8px}',
+					'.sk-marketFallback{margin-top:1px}',
+					'.sk-marketTitle{font-size:13.5px;font-weight:600}',
+					'.sk-marketDesc{margin-top:4px;line-height:1.45}',
+					'.sk-marketMeta{margin-top:5px;font-size:11.5px}',
+					'.sk-marketSide{gap:12px}',
+					'.sk-drawer{position:fixed;top:66px;right:0;bottom:0;left:auto;box-sizing:border-box;width:400px;max-width:calc(100vw - 64px);z-index:230;box-shadow:-10px 0 24px rgba(16,24,40,.06)}',
+					'.sk-marketDrawer{position:fixed;top:66px;right:0;bottom:0;left:auto;width:400px;max-width:calc(100vw - 64px);z-index:230}',
+					'.sk-drawerHead{padding:24px 24px 16px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
+					'.sk-drawerName{font-size:19px;font-weight:650}',
+					'.sk-drawerBody{padding:0 24px 24px}',
+					'.sk-marketFoot{padding:16px 24px}',
+					'@media(max-width:680px){.sk-root{margin:0}.sk-head,.sk-tabs,.sk-toolbar,.sk-list,.sk-marketList{padding-left:0;padding-right:0}.sk-toolbar{flex-wrap:wrap}.sk-searchWrap{flex-basis:100%}.sk-drawer,.sk-marketDrawer{top:61px;width:calc(100vw - 12px);max-width:none}}'
+				].join('');
 			if (!existingStyle) document.head.appendChild(style);
 
 			function sourceIsBroken(value: unknown): boolean {

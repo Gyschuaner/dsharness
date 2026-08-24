@@ -1,6 +1,6 @@
 /**
  * dsh-skill-manager — client half (browser bundle).
- * build: 23
+ * build: 24
  *
  * Served verbatim at /plugins/dsh-skill-manager/client.js by the client
  * module system; a classic script that registers its lazy-CJS factory on
@@ -72,6 +72,9 @@
  * build 22: the generic sidebar entry, full-page shell, and MCP / Plugin
  * placeholders move to dsh-extension-manager. This plugin now owns only the
  * SKILL section and its `/api/skill-manager` business API.
+ * build 24: the Skill section adopts the MCP / Plugin page chrome: a 980px
+ * centered frame, shared title and tab rhythm, compact project summary and
+ * toolbar, flat 72px list rows, and fixed 400px detail drawers.
  *
  * TypeScript source compiled to a classic browser script — no JSX/imports.
  */

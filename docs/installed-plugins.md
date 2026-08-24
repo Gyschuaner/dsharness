@@ -20,7 +20,7 @@
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
 | dsh-extension-manager | 0.2.0（build 2） | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
-| dsh-skill-manager | 0.2.0（build 23） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 | 负责本地 Skill、真实 GitHub Skill 市场与 `/api/skill-manager`，向 extension-manager 贡献页面 |
+| dsh-skill-manager | 0.2.0（build 24） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 | 负责本地 Skill、真实 GitHub Skill 市场与 `/api/skill-manager`，向 extension-manager 贡献页面 |
 | dsh-plugin-manager | 0.2.0（build 2） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030 | 独立 Plugin 分区；本地插件管理、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
@@ -67,6 +67,10 @@
   （`.\restart-dsh-web.ps1`，会话持久化在磁盘、可恢复）；client 半变化硬刷新浏览器即可。
 
 ## 变更日志
+
+- **2026-08-24（DSH-008 build 24）**：Skill 页视觉骨架对齐 MCP / Plugin：统一 980px 居中宽度、
+  标题与 Tab 节奏、项目摘要和工具栏间距、72px 扁平分隔列表行，以及 400px 固定详情抽屉；
+  保留 Skill 独有的项目统计、启停、来源选择、标签和真实市场能力。
 
 - **2026-08-24（DSH-030 Phase 1）**：Plugin 市场增加精选 / Registry 发现切换。Host 通过
   HTTPS 校验版本化 Registry，使用内存缓存和精选降级；Registry-only 条目只读展示，

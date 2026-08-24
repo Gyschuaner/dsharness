@@ -15,7 +15,11 @@ DeepSeek Harness 的 SKILL 业务管理插件（DSH-008）。它独立拥有
   [`dsh-extension-manager`](../extension-manager/README.md) 负责。
 - 设置页内旧「Skills 技能管理」入口已移除（build 11，DSH-006）。
 
-## 页面结构（build 23 / DSH-008 V1.1）
+## 页面结构（build 24 / DSH-008 V1.1）
+
+- **视觉规格（build 24）**：页面宽度、标题与一级页签节奏、项目摘要卡、38px 工具栏、72px
+  扁平分隔列表行和 400px 固定详情抽屉与 MCP / Plugin 共用同一套页面骨架；Skill 独有的项目
+  统计、启停、来源选择、标签和真实市场能力保持不变。
 
 - **组合入口**：Client 只通过 `slots.inject('extension.manager.section', ...)` 注册
   `id: skill` 的业务分区。`dsh-extension-manager` 独立注册 `sidebar.footer.action`，
@@ -266,7 +270,8 @@ Remove-Item -Recurse -Force $env:USERPROFILE\.dsh\plugins\skill-manager
   将项目上下文压为单行、低频动作收进菜单、列表 description 收为第一句并按需展开来源与技术信息，build 20
   为单项启停加入乐观更新、安静保存态与失败回滚，build 21 为首次 catalog 加入居中的 Skill 扫描加载态，
   build 22 将通用扩展壳拆到独立插件并仅贡献 SKILL 分区，build 23 加入与 MCP / Plugin 对齐的
-  本地 / 市场一级页签和真实 Host 市场接口，加载态保持无底板的光学聚焦动画：
+  本地 / 市场一级页签和真实 Host 市场接口，build 24 统一 MCP / Plugin 的页面宽度、工具栏、
+  扁平列表行和固定详情抽屉几何，加载态保持无底板的光学聚焦动画：
   三颗非对称粒子在首秒依次汇入官方 Skill 图标，`Skill Finding` 同步由雾灰聚焦为墨色并带短蓝色焦点游标，
   同时提供 `prefers-reduced-motion` 静态降级；主题只用
   `--dsw-alias-*` / `--dsw-static-*` 令牌，图标用官方 `Icon*Outline*` 组件。

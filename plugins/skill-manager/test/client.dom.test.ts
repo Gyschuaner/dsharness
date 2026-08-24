@@ -323,6 +323,10 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 	const pluginCss = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
 	assert.ok(pluginCss.includes('.sk-drawer{position:absolute'), 'drawer is an overlay instead of a flex sibling');
 	assert.ok(!pluginCss.includes('.sk-contentDrawer .sk-projectCard'), 'drawer no longer forces project-card wrapping');
+	assert.match(pluginCss, /\.sk-root\{[^}]*max-width:980px/, 'Skill uses the shared centered page width');
+	assert.match(pluginCss, /\.sk-tabs\{height:40px/, 'Skill uses the shared tab rhythm');
+	assert.match(pluginCss, /\.sk-row\{box-sizing:border-box;min-height:72px/, 'Skill uses the shared flat row rhythm');
+	assert.match(pluginCss, /\.sk-drawer\{position:fixed;top:66px/, 'Skill uses the shared fixed drawer geometry');
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, '列表只保留第一句话。');
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-row .sk-badge')].filter((item) => item.textContent === '未启用').length, 0, 'disabled state is communicated by the switch instead of a repeated badge');
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-badgeUpdate')].length, 1);
