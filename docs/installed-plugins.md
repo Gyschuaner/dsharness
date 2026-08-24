@@ -68,6 +68,16 @@
 
 ## 变更日志
 
+- **2026-08-24（macOS 宿主，DSH-005 部署）**：启用 `@deepseek-ai/dsh-vision-bridge`。
+  将 `dev/vision-bridge.dp-gateway.patch.yml` 覆盖行（`disabled: false` +
+  `DPGATEWAY_API_KEY` + `Qwen3.6-35B-A3B`）合入 `~/.dsh/profiles/web/cordis.patch.yml`，
+  base bundle 行保持默认关闭、仅本机覆盖。启用前健康检查：DP Gateway
+  `GET /v1/models` 确认仍暴露 `Qwen3.6-35B-A3B`。`--dump-config` 离线树确认
+  `disabled: false` 生效；重启 dsh web（`DSH_SOURCE_DIR=deepseek-harness-main-build`
+  的 restart-dsh-web.command）后冒烟测试通过：`vision_inspect` 本地 JPEG 路径输入，
+  视觉模型正确返回图片描述（含界面标题与模型名）。注意：插件页本地列表以 profile
+  直接依赖为数据源，bundle 层行不展示，故视觉桥不在「扩展-插件」页显示。
+
 - **2026-08-24（BUG-0AA85F45 / build 25）**：Skill catalog/projectState 改为严格只读，
   破坏性孤儿清理默认关闭；加入任意公开 GitHub 仓库的目录发现、安装预览、原子安装和一等来源
   provenance（含 REST 限流下的 codeload 安全回退），并提供 `validate` dry-run 与公开哈希 schema。
