@@ -39,8 +39,13 @@ Check (Test-Path -LiteralPath (Join-Path $SourceDirectory '.git')) "源码目录
 if (Test-Path -LiteralPath (Join-Path $SourceDirectory '.git')) {
     $Tree = (& git -C $SourceDirectory rev-parse 'HEAD^{tree}').Trim()
     Check ($Tree -eq $Lock.resultTree) "源码树 $($Lock.resultTree)"
-    $Dirty = @(& git -C $SourceDirectory status --porcelain)
-    Check ($Dirty.Count -eq 0) '源码工作区无未提交修改'
+    $Status = @(& git -C $SourceDirectory status --porcelain=v1 --untracked-files=all)
+    $TrackedDirty = @($Status | Where-Object { $_ -and $_ -notmatch '^\?\? ' })
+    Check ($TrackedDirty.Count -eq 0) '源码工作区无已跟踪文件修改'
+    $Untracked = @($Status | Where-Object { $_ -and $_ -match '^\?\? ' })
+    if ($Untracked.Count -gt 0) {
+        Write-Host "[warn] 忽略未跟踪文件（不参与锁定 tree）：$($Untracked -join '; ')" -ForegroundColor Yellow
+    }
 }
 
 foreach ($Patch in $Lock.patches) {
@@ -86,6 +91,10 @@ $ToolCallTreeStylePath = Join-Path $SourceDirectory 'packages/client/ui-tool/src
 $ToolEventTypesPath = Join-Path $SourceDirectory 'packages/core/tools/src/types.ts'
 $KnownEventTypesPath = Join-Path $SourceDirectory 'packages/core/session/src/known-event-types.ts'
 $BaseCordisPatchPath = Join-Path $SourceDirectory 'packages/bundle/base/cordis.patch.yml'
+$ApiProxySourcePath = Join-Path $SourceDirectory 'packages/host/apiproxy/src/api-proxy.ts'
+$ApiProxyBundlePath = Join-Path $SourceDirectory 'packages/host/apiproxy/lib/index.js'
+$AttachmentSourcePath = Join-Path $SourceDirectory 'packages/attachment/attachment/src/index.ts'
+$AcpSourcePath = Join-Path $SourceDirectory 'packages/acp/acp/src/content.ts'
 Check (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) 'DSH-005 vision-bridge 源码存在'
 Check (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) 'DSH-005 vision-bridge 构建产物存在'
 if (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) {
@@ -134,6 +143,26 @@ if (Test-Path -LiteralPath $AttachmentSessionViewPath -PathType Leaf) {
         $AttachmentSessionView -match 'await handle\.chmod\(0o400\)') 'DSH-024 会话图片视图隔离、独占发布且只读'
 } else {
     Check $false 'DSH-024 会话图片视图源码存在'
+}
+Check (Test-Path -LiteralPath $ApiProxySourcePath -PathType Leaf) 'DSH-005 Host apiproxy 源码存在'
+Check (Test-Path -LiteralPath $ApiProxyBundlePath -PathType Leaf) 'DSH-005 Host apiproxy 构建产物存在'
+Check (Test-Path -LiteralPath $AttachmentSourcePath -PathType Leaf) 'DSH-005 attachment seam 源码存在'
+Check (Test-Path -LiteralPath $AcpSourcePath -PathType Leaf) 'DSH-005 ACP admission seam 源码存在'
+if (Test-Path -LiteralPath $ApiProxySourcePath -PathType Leaf) {
+    $ApiProxySource = Get-Content -LiteralPath $ApiProxySourcePath -Raw -Encoding UTF8
+    Check ($ApiProxySource -match 'imageInputBridge' -and $ApiProxySource -match 'MODEL_DOES_NOT_SUPPORT_IMAGES') 'Host apiproxy 尊重 imageInputBridge'
+}
+if (Test-Path -LiteralPath $ApiProxyBundlePath -PathType Leaf) {
+    $ApiProxyBundle = Get-Content -LiteralPath $ApiProxyBundlePath -Raw -Encoding UTF8
+    Check ($ApiProxyBundle -match 'imageInputBridge' -and $ApiProxyBundle -match 'MODEL_DOES_NOT_SUPPORT_IMAGES') 'Host apiproxy 构建产物尊重 imageInputBridge'
+}
+if (Test-Path -LiteralPath $AttachmentSourcePath -PathType Leaf) {
+    $AttachmentSource = Get-Content -LiteralPath $AttachmentSourcePath -Raw -Encoding UTF8
+    Check ($AttachmentSource -match 'ImageInputBridge') 'attachment 导出 ImageInputBridge seam'
+}
+if (Test-Path -LiteralPath $AcpSourcePath -PathType Leaf) {
+    $AcpSource = Get-Content -LiteralPath $AcpSourcePath -Raw -Encoding UTF8
+    Check ($AcpSource -match 'imageInputBridge') 'ACP admission 使用 imageInputBridge seam'
 }
 if ((Test-Path -LiteralPath $ToolEventTypesPath -PathType Leaf) -and (Test-Path -LiteralPath $KnownEventTypesPath -PathType Leaf)) {
     $ToolEventTypes = Get-Content -LiteralPath $ToolEventTypesPath -Raw -Encoding UTF8

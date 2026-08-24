@@ -9,9 +9,10 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
   .\restart-dsh-web.ps1 -Port 3080  端口可改（默认 3080）
 
 行为：
-  1. 校验本地 deepseek-harness 源码构建和 node.exe，再停止目标端口上的 dsh web
-  2. 直接用本地 apps/cli/lib/bin.js 启动独立 Node 进程，默认隐藏窗口并把日志写入 ~/.dsh/logs
-  3. 轮询等待 HTTP 恢复，再校验监听 PID、实际命令行和 skill-manager apiVersion
+  1. 校验锁定源码 tree、Node/pnpm 工具链，并在停止旧进程前执行 frozen install + 完整构建
+  2. 校验 Host/vision-bridge 构建产物和实际 web profile，拒绝复用 stale lib
+  3. 直接用刚构建的 apps/cli/lib/bin.js 启动独立 Node 进程，默认隐藏窗口并把日志写入 ~/.dsh/logs
+  4. 轮询等待 HTTP 恢复，再校验监听 PID、实际命令行和插件 API
 
 注意：
   - 这会重启正在服务本 Web GUI 的宿主进程：进行中的轮次会中断，
@@ -35,6 +36,58 @@ param(
 
 $ErrorActionPreference = 'Stop'
 function Write-Step($m) { Write-Host "[restart] $m" -ForegroundColor Cyan }
+
+$RepoRoot = $PSScriptRoot
+$LockPath = Join-Path $RepoRoot 'upstream.lock.json'
+if (-not (Test-Path -LiteralPath $LockPath -PathType Leaf)) {
+	throw "找不到可复现构建锁文件：$LockPath"
+}
+$Lock = Get-Content -LiteralPath $LockPath -Raw -Encoding UTF8 | ConvertFrom-Json
+
+function Invoke-Native([string]$FilePath, [string[]]$Arguments, [string]$WorkingDirectory) {
+	Push-Location $WorkingDirectory
+	try {
+		& $FilePath @Arguments
+		if ($LASTEXITCODE -ne 0) {
+			throw "$FilePath $($Arguments -join ' ') 执行失败，退出码 $LASTEXITCODE。"
+		}
+	} finally {
+		Pop-Location
+	}
+}
+
+function Get-GitTree([string]$RepositoryPath) {
+	$tree = (& git -C $RepositoryPath rev-parse 'HEAD^{tree}').Trim()
+	if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tree)) {
+		throw "无法读取源码 Git tree：$RepositoryPath"
+	}
+	return $tree
+}
+
+function Ensure-CleanBuildWorktree([string]$SourceDirectory, [string]$SourceHead) {
+	$sourceParent = Split-Path -Parent $SourceDirectory
+	$sourceLeaf = Split-Path -Leaf $SourceDirectory
+	$buildDirectory = Join-Path $sourceParent "$sourceLeaf-runtime"
+	$gitMarker = Join-Path $buildDirectory '.git'
+	if (-not (Test-Path -LiteralPath $buildDirectory)) {
+		Write-Step "创建干净构建 worktree：$buildDirectory"
+		$null = Invoke-Native 'git' @('worktree', 'add', '--detach', $buildDirectory, $SourceHead) $SourceDirectory
+	} elseif (-not (Test-Path -LiteralPath $gitMarker)) {
+		throw "构建目录已存在但不是受 Git 管理的 worktree：$buildDirectory"
+	}
+
+	$runtimeStatus = @(& git -C $buildDirectory status --porcelain=v1 --untracked-files=all)
+	$runtimeTrackedChanges = @($runtimeStatus | Where-Object { $_ -and $_ -notmatch '^\?\? ' })
+	if ($runtimeTrackedChanges.Count -gt 0) {
+		throw "构建 worktree 存在已跟踪文件修改，拒绝覆盖：$($runtimeTrackedChanges -join '; ')"
+	}
+	$runtimeHead = (& git -C $buildDirectory rev-parse HEAD).Trim()
+	if ($runtimeHead -ne $SourceHead) {
+		Write-Step "更新构建 worktree：$runtimeHead -> $SourceHead"
+		$null = Invoke-Native 'git' @('checkout', '--detach', $SourceHead) $buildDirectory
+	}
+	return [IO.Path]::GetFullPath($buildDirectory)
+}
 
 $parsedAddress = $null
 if ($HostAddr -ne 'localhost' -and -not [Net.IPAddress]::TryParse($HostAddr, [ref]$parsedAddress)) {
@@ -66,21 +119,123 @@ function Get-LogTail([string]$Path) {
 
 # 启动前先验证依赖，避免停掉健康服务后才发现本地源码不可用。
 $resolvedSourceDirectory = $null
+$buildSourceDirectory = $null
 $cliEntry = $null
 $nodePath = $null
 $resolvedLogDirectory = $null
 $visionPatchPath = Join-Path $PSScriptRoot 'dev\vision-bridge.dp-gateway.patch.yml'
+$sourceHead = $null
+$sourceTree = $null
+$buildMetadataPath = $null
 if (-not $NoLaunch) {
 	$resolvedSourceDirectory = [IO.Path]::GetFullPath($DshSourceDirectory)
-	$cliEntry = Join-Path $resolvedSourceDirectory 'apps\cli\lib\bin.js'
-	if (-not (Test-Path -LiteralPath $cliEntry -PathType Leaf)) {
-		throw "找不到本地 DSH CLI 构建产物：$cliEntry。请先完成源码构建，或传入正确的 -DshSourceDirectory。"
+	if (-not (Test-Path -LiteralPath (Join-Path $resolvedSourceDirectory '.git'))) {
+		throw "源码目录不是 Git 仓库：$resolvedSourceDirectory"
 	}
+	$sourceHead = (& git -C $resolvedSourceDirectory rev-parse HEAD).Trim()
+	$sourceTree = Get-GitTree $resolvedSourceDirectory
+	if ($sourceTree -ne $Lock.resultTree) {
+		throw "源码 tree 不是锁定的最新完整版本。预期 $($Lock.resultTree)，实际 $sourceTree。请先运行 dev\\install-dsh-source.ps1，或传入已命中锁定 tree 的 -DshSourceDirectory。"
+	}
+	$sourceStatus = @(& git -C $resolvedSourceDirectory status --porcelain=v1 --untracked-files=all)
+	$trackedChanges = @($sourceStatus | Where-Object { $_ -and $_ -notmatch '^\?\? ' })
+	if ($trackedChanges.Count -gt 0) {
+		throw "源码目录存在已跟踪文件修改，拒绝构建以避免启动非锁定版本：$($trackedChanges -join '; ')"
+	}
+	$untrackedChanges = @($sourceStatus | Where-Object { $_ -and $_ -match '^\?\? ' })
+	if ($untrackedChanges.Count -gt 0) {
+		Write-Host "源码目录有未跟踪文件（不参与锁定 tree）：$($untrackedChanges -join '; ')" -ForegroundColor Yellow
+	}
+	$buildSourceDirectory = Ensure-CleanBuildWorktree $resolvedSourceDirectory $sourceHead
+	$buildTree = Get-GitTree $buildSourceDirectory
+	if ($buildTree -ne $Lock.resultTree) {
+		throw "构建 worktree tree 不匹配锁定结果。预期 $($Lock.resultTree)，实际 $buildTree。"
+	}
+	$cliEntry = Join-Path $buildSourceDirectory 'apps\cli\lib\bin.js'
 	$nodeCommand = Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
 	$nodePath = $nodeCommand.Source
 	if (-not $nodePath) { throw '找不到 node.exe。' }
+	$nodeVersion = (& $nodePath --version).Trim().TrimStart('v')
+	if ($nodeVersion -ne $Lock.nodeVersion) {
+		throw "Node 版本必须是 $($Lock.nodeVersion)，当前为 $nodeVersion。"
+	}
+	$corepack = Get-Command corepack -CommandType Application -ErrorAction Stop | Select-Object -First 1
+	$previousLocation = Get-Location
+	try {
+		Set-Location -LiteralPath $buildSourceDirectory
+		$pnpmVersion = (& $corepack.Source pnpm --version).Trim()
+	} finally {
+		Set-Location -LiteralPath $previousLocation
+	}
+	if ($pnpmVersion -ne $Lock.pnpmVersion) {
+		throw "pnpm 版本必须是 $($Lock.pnpmVersion)，当前为 $pnpmVersion。"
+	}
 	$resolvedLogDirectory = [IO.Path]::GetFullPath($LogDirectory)
 	New-Item -ItemType Directory -Path $resolvedLogDirectory -Force | Out-Null
+	$buildMetadataPath = Join-Path $resolvedLogDirectory "dsh-web-$Port.build.json"
+
+	Write-Step "源码 tree 已锁定：$sourceTree（$sourceHead）"
+	Write-Step "同步锁定依赖并构建最新 Host/Client/Web 产物"
+	$previousCi = $env:CI
+	try {
+		$env:CI = 'true'
+		Invoke-Native $corepack.Source @('pnpm', 'install', '--frozen-lockfile') $buildSourceDirectory
+		Invoke-Native $corepack.Source @('pnpm', 'run', 'build') $buildSourceDirectory
+	} finally {
+		$env:CI = $previousCi
+	}
+
+	$hostBundle = Join-Path $buildSourceDirectory 'packages\host\apiproxy\lib\index.js'
+	$visionBundle = Join-Path $buildSourceDirectory 'packages\vision\vision-bridge\lib\index.js'
+	foreach ($artifact in @($cliEntry, $hostBundle, $visionBundle)) {
+		if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+			throw "构建完成但缺少产物：$artifact"
+		}
+	}
+$hostBundleText = Get-Content -LiteralPath $hostBundle -Raw -Encoding UTF8
+	$visionBundleText = Get-Content -LiteralPath $visionBundle -Raw -Encoding UTF8
+	if ($hostBundleText -notmatch 'imageInputBridge') {
+		throw "Host apiproxy 构建产物未包含 imageInputBridge 准入集成：$hostBundle"
+	}
+	if ($visionBundleText -notmatch 'imageInputBridge') {
+		throw "vision-bridge 构建产物未包含 imageInputBridge provider：$visionBundle"
+	}
+
+	$configDumpArguments = @('--profile', 'web')
+	if ($EnableVisionBridge) {
+		if (-not (Test-Path -LiteralPath $visionPatchPath -PathType Leaf)) {
+			throw "视觉桥覆盖不存在：$visionPatchPath"
+		}
+		$configDumpArguments += @('--patch', $visionPatchPath)
+	}
+	$configDumpArguments += '--dump-config'
+	$configDump = (& $nodePath $cliEntry @configDumpArguments 2>&1 | Out-String)
+	if ($LASTEXITCODE -ne 0) {
+		throw "无法读取 web profile 配置：$configDump"
+	}
+	if ($configDump -notmatch '(?ms)- id: vision-bridge.*?disabled: false') {
+		throw 'web profile 未启用 vision-bridge，拒绝启动不完整组合。'
+	}
+	if ($configDump -match 'image-context-guard') {
+		throw 'web profile 仍包含已移除的 image-context-guard，拒绝启动旧组合。'
+	}
+
+	[ordered]@{
+		sourceDirectory = $resolvedSourceDirectory
+		buildDirectory = $buildSourceDirectory
+		sourceHead = $sourceHead
+		sourceTree = $sourceTree
+		buildTree = $buildTree
+		expectedTree = $Lock.resultTree
+		builtAt = (Get-Date).ToString('o')
+		nodeVersion = $nodeVersion
+		pnpmVersion = $pnpmVersion
+		cli = $cliEntry
+		hostApiproxy = $hostBundle
+		visionBridge = $visionBundle
+		visionBridgeEnabled = $true
+	} | ConvertTo-Json | Set-Content -LiteralPath $buildMetadataPath -Encoding UTF8
+	Write-Step "最新构建和 profile 校验通过；构建元数据：$buildMetadataPath"
 }
 
 # ── 1) 停止现有进程 ─────────────────────────────────────────────────────────
@@ -141,19 +296,17 @@ $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stdoutLog = Join-Path $resolvedLogDirectory "dsh-web-$Port-$timestamp.stdout.log"
 $stderrLog = Join-Path $resolvedLogDirectory "dsh-web-$Port-$timestamp.stderr.log"
 $metadataPath = Join-Path $resolvedLogDirectory "dsh-web-$Port.latest.json"
-$arguments = @("`"$cliEntry`"", 'web', '--host', $HostAddr, '--port', [string]$Port)
+$arguments = @("`"$cliEntry`"", '--profile', 'web')
 if ($EnableVisionBridge) {
-	if (-not (Test-Path -LiteralPath $visionPatchPath -PathType Leaf)) {
-		throw "视觉桥覆盖不存在：$visionPatchPath"
-	}
-	$arguments = @("`"$cliEntry`"", '--profile', 'web', '--patch', $visionPatchPath, 'web', '--host', $HostAddr, '--port', [string]$Port)
-	Write-Step "启用 vision-bridge（覆盖：$visionPatchPath）"
+	$arguments += @('--patch', "`"$visionPatchPath`"")
+	Write-Step "兼容性覆盖 vision-bridge（profile 默认已启用）"
 }
+$arguments += @('--host', $HostAddr, '--port', [string]$Port)
 
 Write-Step "隐藏启动本地源码 dsh web：$cliEntry"
 $startedProcess = Start-Process -FilePath $nodePath `
 	-ArgumentList $arguments `
-	-WorkingDirectory $resolvedSourceDirectory `
+	-WorkingDirectory $buildSourceDirectory `
 	-WindowStyle Hidden `
 	-RedirectStandardOutput $stdoutLog `
 	-RedirectStandardError $stderrLog `
@@ -166,6 +319,11 @@ $startedProcess = Start-Process -FilePath $nodePath `
 	port = $Port
 	node = $nodePath
 	cli = $cliEntry
+	sourceHead = $sourceHead
+	sourceTree = $sourceTree
+	expectedTree = $Lock.resultTree
+	buildMetadata = $buildMetadataPath
+	buildDirectory = $buildSourceDirectory
 	stdout = $stdoutLog
 	stderr = $stderrLog
 } | ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8

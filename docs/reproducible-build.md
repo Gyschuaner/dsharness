@@ -56,9 +56,11 @@ cd dsharness
 安装脚本不会对既有目录执行 `reset`、清空或覆盖操作。目标目录只有以下两种状态可以继续：
 
 - 空路径，由脚本新建并拉取锁定源码；
-- 工作区干净，且 Git tree 已经等于官方基线或最终锁定结果。
+- 没有已跟踪文件修改，且 Git tree 已经等于官方基线或最终锁定结果；未跟踪临时文件会被保留。
 
-目录不是 Git 仓库、存在未提交修改或源码树不匹配时，脚本直接停止。保留原目录，改用新的 `-SourceDirectory` 即可，不需要删除已有文件。
+目录不是 Git 仓库、存在已跟踪文件修改或源码树不匹配时，脚本直接停止。未跟踪的临时
+检查脚本会保留并忽略，不会改变锁定 tree；保留原目录，改用新的 `-SourceDirectory`
+即可，不需要删除已有文件。
 
 ## 五、验证与更新
 
@@ -69,8 +71,10 @@ cd dsharness
 ```
 
 日常重启使用仓库根目录的 `.\restart-dsh-web.ps1`。脚本不依赖全局 `dsh` 的当前指向，
-而是直接启动同级 `deepseek-harness` 的构建产物；默认隐藏后台运行并将日志写入
-`~/.dsh/logs`，启动成功后同时校验 HTTP、监听 PID 与实际 CLI 命令行。
+每次启动前都会对同级 `deepseek-harness` 执行 frozen install 和完整 `pnpm run build`，
+并拒绝非锁定 tree、旧的 Host apiproxy 或未启用 vision-bridge 的 profile；随后才启动
+刚构建的 CLI。默认隐藏后台运行并将日志写入 `~/.dsh/logs`，启动成功后同时校验 HTTP、
+监听 PID、实际 CLI 命令行、源码 tree 和构建元数据。
 
 升级官方 DSH 或新增上游补丁时，需要同步更新 `upstream.lock.json` 中的基线提交、补丁哈希和最终 tree，并从空目录重新执行安装脚本。只有干净构建、完整构建和 Web 冒烟都通过后，新的锁定结果才能合入 `main`。
 

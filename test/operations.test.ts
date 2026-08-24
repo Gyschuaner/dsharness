@@ -39,7 +39,7 @@ function quotePowerShellLiteral(value: string): string {
 test('PowerShell operations scripts parse and never delegate interpolated commands to another shell', async (t) => {
 	const powershell = await powershellExecutable();
 	if (powershell === null) return t.skip('PowerShell is unavailable');
-	for (const relativePath of ['restart-dsh-web.ps1', 'dev/setup-plugin-junction.ps1']) {
+	for (const relativePath of ['restart-dsh-web.ps1', 'dev/install-dsh-source.ps1', 'dev/verify-dsh-source.ps1', 'dev/setup-plugin-junction.ps1']) {
 		const path = join(repositoryRoot, relativePath);
 		const command = [
 			'$tokens = $null; $errors = $null;',
@@ -63,6 +63,18 @@ test('restart scripts verify listener ownership before stopping a process', asyn
 	assert.match(macSource, /if ! command_line="\$\(is_dsh_web_pid "\$pid"\)"; then/);
 	assert.match(macSource, /kill "\$pid"/);
 	assert.doesNotMatch(macSource, /\*dsh\*" web/);
+});
+
+test('Windows startup rebuilds and validates the locked latest source before launch', async () => {
+	const source = await readFile(join(repositoryRoot, 'restart-dsh-web.ps1'), 'utf8');
+	assert.match(source, /upstream\.lock\.json/);
+	assert.match(source, /rev-parse 'HEAD\^\{tree\}'/);
+	assert.match(source, /pnpm.*install.*--frozen-lockfile/);
+	assert.match(source, /pnpm.*run.*build/);
+	assert.match(source, /imageInputBridge/);
+	assert.match(source, /vision-bridge.*disabled: false/);
+	assert.match(source, /image-context-guard/);
+	assert.match(source, /buildMetadata/);
 });
 
 test('junction setup rejects unsafe names and restore paths outside the runtime plugin directory', async (t) => {

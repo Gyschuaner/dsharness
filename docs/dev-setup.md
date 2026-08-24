@@ -58,9 +58,11 @@ git push
 - 在 `plugins/<name>/` 下改代码 = 改运行时加载的文件（junction 透传）。
 - 改 **client**：保存后浏览器刷新页面即可看到。
 - 改 **host**：保存后运行 `.\restart-dsh-web.ps1` 重启（会短暂打断当前 Web GUI，
-  会话持久化在磁盘，浏览器重连后恢复）。脚本直接使用同级
-  `deepseek-harness\apps\cli\lib\bin.js`，默认以隐藏后台进程启动；标准输出、错误输出
-  和最新 PID 元数据写入 `~/.dsh/logs`。如源码目录不在默认位置，传入
+  会话持久化在磁盘，浏览器重连后恢复）。脚本启动前会校验 `upstream.lock.json` 的源码
+  tree、Node/pnpm 版本，执行 `pnpm install --frozen-lockfile` 和完整 `pnpm run build`，
+  再校验 Host apiproxy 已包含 `imageInputBridge`、web profile 默认启用 vision-bridge，
+  最后才使用同级 `deepseek-harness\apps\cli\lib\bin.js` 启动。标准输出、错误输出、
+  构建元数据和最新 PID 元数据写入 `~/.dsh/logs`。如源码目录不在默认位置，传入
   `-DshSourceDirectory <路径>`；排障时直接查看日志文件，不需要保留承载服务的终端窗口。
 - `list` 响应的 `apiVersion` 是插件 host 的能力版本，client 用它判断运行中的 host
   是否已加载较新操作；升级 host 功能后应递增并在 client 侧处理兼容。
