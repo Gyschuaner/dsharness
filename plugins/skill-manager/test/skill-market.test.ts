@@ -180,3 +180,54 @@ test('marketplace: never overwrites a modified or unrelated project Skill', asyn
 	assert.equal(install.status, 409);
 	assert.equal((await readFile(join(env.project, '.dsh', 'skills', 'demo', 'SKILL.md'), 'utf8')).includes('Local instructions.'), true);
 });
+
+test('github install: discovers an arbitrary repository Skill, previews it, and records first-class provenance', async (t) => {
+	const remote = makeRemote();
+	const env = await makeEnv(remote);
+	t.after(env.cleanup);
+	const url = 'https://github.com/acme/demo';
+	const inspected = await env.api('github.inspect', { url });
+	assert.equal(inspected.status, 200);
+	assert.deepEqual(inspected.value.candidates, [{ path: 'skills/demo', suggestedName: 'demo' }]);
+
+	const preview = await env.api('github.preview', { cwd: env.project, url, path: 'skills/demo' });
+	assert.equal(preview.status, 200);
+	assert.equal(preview.value.name, 'demo');
+	assert.equal(preview.value.checks.trustedSource, false);
+	assert.equal(preview.value.checks.thirdPartyCodeExecuted, false);
+
+	const installed = await env.api('github.install', { cwd: env.project, url, path: 'skills/demo' });
+	assert.equal(installed.status, 200);
+	const config = JSON.parse(await readFile(join(env.project, '.dsh', 'skill-manager.json'), 'utf8'));
+	assert.equal(config.sources.demo.source, undefined, 'remote provenance is not stored in the catalog source-selection field');
+	assert.equal(config.sources.demo.marketManaged, undefined);
+	assert.equal(config.sources.demo.originType, 'github');
+	assert.equal(config.sources.demo.originRepository, 'acme/demo');
+	assert.equal(config.sources.demo.originPath, 'skills/demo');
+	assert.equal(config.sources.demo.originRef, 'main');
+	assert.match(config.sources.demo.originBundleHash, /^sha256:/);
+	assert.equal(config.sources.demo.originHash, undefined);
+});
+
+test('github install: rejects non-GitHub hosts and requires a selected path for multi-Skill repositories', async (t) => {
+	const remote = makeRemote();
+	const originalFetch = remote.fetch;
+	remote.fetch = async (url) => {
+		if (url === 'https://api.github.com/repos/acme/demo/git/trees/main?recursive=1') {
+			return responseJson({ truncated: false, tree: [
+				{ path: 'SKILL.md', type: 'blob', size: 100 },
+				{ path: 'skills/demo/SKILL.md', type: 'blob', size: 100 },
+				{ path: 'skills/second/SKILL.md', type: 'blob', size: 100 },
+			] });
+		}
+		return originalFetch(url);
+	};
+	const env = await makeEnv(remote);
+	t.after(env.cleanup);
+	const rejected = await env.api('github.inspect', { url: 'https://example.com/acme/demo' });
+	assert.equal(rejected.status, 400);
+	const inspected = await env.api('github.inspect', { url: 'https://github.com/acme/demo' });
+	assert.ok(inspected.value.candidates.some((candidate) => candidate.path === '.'), 'repository-root SKILL.md is discoverable');
+	const missingPath = await env.api('github.preview', { cwd: env.project, url: 'https://github.com/acme/demo' });
+	assert.equal(missingPath.status, 409);
+});

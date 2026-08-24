@@ -32,6 +32,15 @@ export interface SourceSelection extends UnknownRecord {
     marketRef?: string;
     marketRevision?: string | null;
     marketHash?: string;
+    /** First-class provenance shared by curated and ad-hoc GitHub installs. */
+    originType?: 'github';
+    originRepository?: string;
+    originPath?: string;
+    originRef?: string;
+    originRevision?: string | null;
+    /** Hash of the normalized remote bundle; distinct from managed-copy originHash. */
+    originBundleHash?: string;
+    originUrl?: string;
 }
 export interface ProjectConfig extends UnknownRecord {
     schema: string;

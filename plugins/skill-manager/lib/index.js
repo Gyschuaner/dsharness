@@ -356,9 +356,9 @@ function presetDiff(currentConfig, preset, _identities, mode) {
 /** Serialize read/reconcile views for the same project config path. */
 async function buildProjectViewLocked(cwd, opts) {
     if (typeof cwd !== 'string' || cwd.length === 0)
-        return buildProjectView(cwd, opts);
+        return buildProjectView(cwd, opts, { reconcile: false });
     const projectRoot = await findProjectRoot(cwd);
-    return withConfigLock(projectLockKey(projectRoot), () => buildProjectView(cwd, opts));
+    return withConfigLock(projectLockKey(projectRoot), () => buildProjectView(cwd, opts, { reconcile: false }));
 }
 /** Cheap invalidation key for a warmed per-project identity snapshot. */
 async function projectRootSignature(cwd, opts) {
@@ -425,7 +425,7 @@ async function mutateProject(cwd, opts, fn) {
             // Re-read the truth file under the lock: a concurrent mutation
             // committed while this one waited for the lock must be visible
             // before this one computes its changes (review P1-1).
-            const locked = await buildProjectView(cwd, opts);
+            const locked = await buildProjectView(cwd, opts, { reconcile: false });
             const config = locked.config;
             const raw = locked.raw;
             const report = locked.report;
@@ -437,12 +437,18 @@ async function mutateProject(cwd, opts, fn) {
                 throw new ApiError(409, `项目配置已损坏（JSON 无法解析）：为避免覆盖无法读取的真相文件，本次未修改任何文件；请修复或删除 ${view.projectRoot}/.dsh/skill-manager.json 后重试`);
             if (view.configFuture === true)
                 throw new ApiError(409, `项目配置 apiVersion 高于当前 host 支持的 ${PROJECT_API_VERSION}：为保护未来版本数据，本次未修改任何文件；升级 host 后重试`);
+            if (view.configExisted === false) {
+                config.enabled = [...identities.values()]
+                    .filter((identity) => identity.v1?.modelInvocable === true)
+                    .map((identity) => identity.name)
+                    .sort((a, b) => a.localeCompare(b));
+            }
             await fn({ projectRoot: view.projectRoot, config, identities, view, ledger });
             config.updatedAt = new Date().toISOString();
             // Source mutations can create, move or remove the rank-100 copy. Re-scan
             // before reconcile so it never acts on paths from the pre-mutation view.
             const refreshed = await buildIdentityCatalog(cwd, opts, config);
-            const report2 = await reconcileProject(view.projectRoot, config, refreshed.identities, opts, opts.logger, ledger);
+            const report2 = await reconcileProject(view.projectRoot, config, refreshed.identities, opts, opts.logger, ledger, { sweepOrphans: false });
             const reportAll = {
                 created: [...report.created, ...report2.created],
                 removed: [...report.removed, ...report2.removed],
@@ -456,7 +462,7 @@ async function mutateProject(cwd, opts, fn) {
             await writeProjectConfig(view.projectRoot, config, opts, raw);
             const commitFailures = await ledger.commit();
             commitFailures.forEach((f) => reportAll.failed.push({ name: '*', error: `副本备份清理失败：${f}` }));
-            const after = await buildProjectView(cwd, opts);
+            const after = await buildProjectView(cwd, opts, { reconcile: false });
             reportAll.created.push(...after.report.created);
             reportAll.removed.push(...after.report.removed);
             reportAll.rewritten.push(...after.report.rewritten);
@@ -545,6 +551,8 @@ function makeHandler(deps) {
                 throw new ApiError(409, `项目配置已损坏（JSON 无法解析）：为避免覆盖无法读取的真相文件，本次未修改任何文件；请修复或删除 ${projectRoot}/.dsh/skill-manager.json 后重试`);
             if (read.future === true)
                 throw new ApiError(409, `项目配置 apiVersion 高于当前 host 支持的 ${PROJECT_API_VERSION}：为保护未来版本数据，本次未修改任何文件；升级 host 后重试`);
+            if (read.existed === false)
+                return { value: null, reason: 'baseline-not-persisted' };
             const identity = snapshot.identities.get(skillName);
             if (!canUseTargetToggle(identity, read.config, skillName))
                 return { value: null, reason: 'target-ineligible' };
@@ -605,11 +613,41 @@ function makeHandler(deps) {
             }
         });
     }
+    async function installWithProjectBaseline(cwd, install) {
+        const checkedCwd = await assertCwd(cwd);
+        if (checkedCwd === undefined)
+            throw new ApiError(400, '安装 Skill 前请先选择当前项目');
+        const projectRoot = await findProjectRoot(checkedCwd);
+        return withConfigLock(projectLockKey(projectRoot), async () => {
+            const built = await buildProjectView(checkedCwd, opts, { reconcile: false });
+            let baselineCreated = false;
+            if (built.view.configCorrupt === true)
+                throw new ApiError(409, `项目配置已损坏：${projectConfigPath(projectRoot)}`);
+            if (built.view.configFuture === true)
+                throw new ApiError(409, `项目配置版本高于 Host ${PROJECT_API_VERSION}`);
+            if (built.view.configExisted === false) {
+                built.config.enabled = [...built.identities.values()]
+                    .filter((identity) => identity.v1?.modelInvocable === true)
+                    .map((identity) => identity.name)
+                    .sort((a, b) => a.localeCompare(b));
+                await writeProjectConfig(projectRoot, built.config, opts, built.raw);
+                baselineCreated = true;
+            }
+            try {
+                return await install();
+            }
+            catch (error) {
+                if (baselineCreated)
+                    await unlink(projectConfigPath(projectRoot)).catch(() => { });
+                throw error;
+            }
+        });
+    }
     const ops = {
         async capabilities() {
             return {
                 apiVersion: PROJECT_API_VERSION,
-                features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace'],
+                features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace', 'github-install', 'project-validate', 'read-only-catalog'],
             };
         },
         async marketplace(body) {
@@ -628,7 +666,22 @@ function makeHandler(deps) {
         async ['marketplace.install'](body) {
             if (typeof body.id !== 'string' || body.id === '')
                 throw new ApiError(400, '缺少市场条目 id');
-            return marketplace.install(body.id, body.cwd);
+            return installWithProjectBaseline(body.cwd, () => marketplace.install(body.id, body.cwd));
+        },
+        async ['github.inspect'](body) {
+            if (typeof body.url !== 'string' || body.url.trim() === '')
+                throw new ApiError(400, '缺少 GitHub URL');
+            return marketplace.inspectGithub(body.url);
+        },
+        async ['github.preview'](body) {
+            if (typeof body.url !== 'string' || body.url.trim() === '')
+                throw new ApiError(400, '缺少 GitHub URL');
+            return marketplace.githubPreview(body.url, typeof body.path === 'string' ? body.path : undefined, body.cwd);
+        },
+        async ['github.install'](body) {
+            if (typeof body.url !== 'string' || body.url.trim() === '')
+                throw new ApiError(400, '缺少 GitHub URL');
+            return installWithProjectBaseline(body.cwd, () => marketplace.githubInstall(body.url, typeof body.path === 'string' ? body.path : undefined, body.cwd));
         },
         async list(body) {
             const cwd = await assertCwd(body.cwd);
@@ -961,6 +1014,43 @@ function makeHandler(deps) {
             const cwd = await assertCwd(body.cwd);
             const { view, config, report } = await buildProjectViewLocked(cwd, opts);
             return Object.assign(configPayload(view, config), { report });
+        },
+        /** Read-only consistency report. It never reconciles, writes, or deletes. */
+        async validate(body) {
+            const cwd = await assertCwd(body.cwd);
+            const { view, config, identities } = await buildProjectViewLocked(cwd, opts);
+            const issues = [];
+            if (view.configCorrupt === true)
+                issues.push({ code: 'config-corrupt', severity: 'error', message: '项目配置无法解析' });
+            if (view.configFuture === true)
+                issues.push({ code: 'config-future', severity: 'error', message: `项目配置版本高于 Host ${PROJECT_API_VERSION}` });
+            for (const row of view.identities) {
+                if (row.enabled !== row.modelInvocable)
+                    issues.push({ code: 'invocation-drift', severity: 'warning', name: row.name, message: `配置为${row.enabled ? '启用' : '停用'}，磁盘状态为${row.modelInvocable ? '可调用' : '不可调用'}` });
+            }
+            for (const [name, source] of Object.entries(config.sources || {})) {
+                if (!identities.has(name))
+                    issues.push({ code: 'orphan-registration', severity: 'warning', name, action: 'preserve', message: '来源登记没有对应项目文件；只读校验不会注销或删除' });
+                if (source.generated === true && typeof source.copyHash !== 'string' && typeof source.contentHash !== 'string')
+                    issues.push({ code: 'managed-hash-missing', severity: 'error', name, action: 'preserve', message: '托管副本缺少可验证哈希，必须人工处理' });
+                if (source.originType === 'github' && (![source.originRepository, source.originPath, source.originRef, source.originBundleHash].every((value) => typeof value === 'string' && value !== '')))
+                    issues.push({ code: 'github-provenance-incomplete', severity: 'error', name, action: 'preserve', message: 'GitHub 来源信息不完整，禁止自动更新或清理' });
+            }
+            return {
+                apiVersion: PROJECT_API_VERSION,
+                projectRoot: view.projectRoot,
+                healthy: issues.length === 0,
+                readOnly: true,
+                willWrite: false,
+                willDelete: false,
+                issues,
+                hashSchema: {
+                    current: 'sha256:<byteLength>:<hex>',
+                    legacy: 'sha256:<64hex>',
+                    directory: '按相对路径排序；逐文件 rel:byteLength:sha256hex 后再做 SHA-256；忽略点文件；最大深度 8',
+                    remoteBundle: 'sha256:<64hex>；按远端相对路径排序后拼接 path=sha256(file) 再做 SHA-256',
+                },
+            };
         },
         /** Enable or disable one skill for this project. */
         async setEnabled(body) {

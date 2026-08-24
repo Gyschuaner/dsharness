@@ -139,6 +139,7 @@ export interface ProjectIdentityRow extends UnknownRecord {
 }
 interface CopySourcePlan { path: string; format: SkillFormat }
 interface ReconcileOptions { sweepOrphans?: boolean }
+interface ProjectViewOptions { reconcile?: boolean; sweepOrphans?: boolean }
 
 function errorCode(error: unknown): string | undefined {
 	return error !== null && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : undefined;
@@ -952,7 +953,9 @@ export async function reconcileProject(
 	reconcileOptions?: ReconcileOptions,
 ): Promise<ReconcileReport> {
 	const report: ReconcileReport = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
-	const sweepOrphans = !reconcileOptions || reconcileOptions.sweepOrphans !== false;
+	// Destructive cleanup is opt-in. Ordinary mutations only reconcile the
+	// identities they know about; catalog reads never call this function.
+	const sweepOrphans = reconcileOptions?.sweepOrphans === true;
 	const fail = (name: string, error: unknown) => {
 		report.failed.push({ name, error: error instanceof Error ? error.message : String(error) });
 	};
@@ -1458,7 +1461,7 @@ export async function applySourceSelection(
  * @returns { view, config, report } — view is a plain-JSON-safe project
  *   catalog; config/report are for persistence and the API response.
  */
-export async function buildProjectView(cwd?: string | null, opts?: CatalogOptions): Promise<{ view: ProjectView; config: ProjectConfig; report: ReconcileReport; identities: Map<string, SkillIdentity>; raw: UnknownRecord | undefined }> {
+export async function buildProjectView(cwd?: string | null, opts?: CatalogOptions, viewOptions?: ProjectViewOptions): Promise<{ view: ProjectView; config: ProjectConfig; report: ReconcileReport; identities: Map<string, SkillIdentity>; raw: UnknownRecord | undefined }> {
 	const o = optsOf(opts);
 	const projectRoot = typeof cwd === 'string' && cwd.length > 0 ? await findProjectRoot(cwd) : null;
 	const { config, existed, corrupt, future, raw } = projectRoot === null
@@ -1472,11 +1475,11 @@ export async function buildProjectView(cwd?: string | null, opts?: CatalogOption
 	// Pass 1: scan + reconcile (materialize/clean derived artifacts).
 	const pre = await buildIdentityCatalog(cwd, o, config);
 	let report: ReconcileReport = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
-	if (projectRoot !== null && !readOnlyConfig) {
+	if (projectRoot !== null && !readOnlyConfig && viewOptions?.reconcile !== false) {
 		const ledger = createLedger();
 		const configBefore = JSON.parse(JSON.stringify(config)) as ProjectConfig;
 		try {
-			report = await reconcileProject(projectRoot, config, pre.identities, o, o.logger, ledger);
+			report = await reconcileProject(projectRoot, config, pre.identities, o, o.logger, ledger, { sweepOrphans: viewOptions?.sweepOrphans === true });
 			if (JSON.stringify(config) !== JSON.stringify(configBefore)) {
 				// Reconcile changed source registrations (managed copies,
 				// orphan cleanup, copyHash refresh). File and config changes are one
@@ -1531,7 +1534,6 @@ export async function buildProjectView(cwd?: string | null, opts?: CatalogOption
 					&& !(await hashMatches(entry.originHash, origin.path, origin.format, originHash));
 			}
 		}
-		const enabled = config.enabled.includes(identity.name);
 		const described = effectiveSource && !effectiveSource.broken ? effectiveSource
 			: identity.sources.find((s) => !s.broken) || null;
 		// Whether the skill really appears in this project's model catalog:
@@ -1550,6 +1552,10 @@ export async function buildProjectView(cwd?: string | null, opts?: CatalogOption
 			}
 			modelInvocable = !stubPresent;
 		}
+		// A project without a sidecar has no declared policy yet. Present the
+		// actual disk/runtime state instead of pretending every Skill is off;
+		// the first explicit mutation snapshots this baseline into the sidecar.
+		const enabled = existed ? config.enabled.includes(identity.name) : modelInvocable;
 		identity.v1 = {
 			description: described ? described.description : '',
 			...(described?.whenToUse === undefined ? {} : { whenToUse: described.whenToUse }),

@@ -124,6 +124,10 @@ interface CopySourcePlan {
 interface ReconcileOptions {
     sweepOrphans?: boolean;
 }
+interface ProjectViewOptions {
+    reconcile?: boolean;
+    sweepOrphans?: boolean;
+}
 /** Precedence ranks mirroring dsh-skill-filesystem (lower wins). */
 export declare const RANKS: {
     readonly 'project-dsh': 100;
@@ -274,7 +278,7 @@ export declare function applySourceSelection(projectRoot: string, projectConfig:
  * @returns { view, config, report } — view is a plain-JSON-safe project
  *   catalog; config/report are for persistence and the API response.
  */
-export declare function buildProjectView(cwd?: string | null, opts?: CatalogOptions): Promise<{
+export declare function buildProjectView(cwd?: string | null, opts?: CatalogOptions, viewOptions?: ProjectViewOptions): Promise<{
     view: ProjectView;
     config: ProjectConfig;
     report: ReconcileReport;

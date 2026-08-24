@@ -870,7 +870,9 @@ function classifyIdentity(identity, projectConfig, _projectRoot) {
  */
 export async function reconcileProject(projectRoot, projectConfig, identities, opts, logger, ledger, reconcileOptions) {
     const report = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
-    const sweepOrphans = !reconcileOptions || reconcileOptions.sweepOrphans !== false;
+    // Destructive cleanup is opt-in. Ordinary mutations only reconcile the
+    // identities they know about; catalog reads never call this function.
+    const sweepOrphans = reconcileOptions?.sweepOrphans === true;
     const fail = (name, error) => {
         report.failed.push({ name, error: error instanceof Error ? error.message : String(error) });
     };
@@ -1359,7 +1361,7 @@ export async function applySourceSelection(projectRoot, projectConfig, identity,
  * @returns { view, config, report } — view is a plain-JSON-safe project
  *   catalog; config/report are for persistence and the API response.
  */
-export async function buildProjectView(cwd, opts) {
+export async function buildProjectView(cwd, opts, viewOptions) {
     const o = optsOf(opts);
     const projectRoot = typeof cwd === 'string' && cwd.length > 0 ? await findProjectRoot(cwd) : null;
     const { config, existed, corrupt, future, raw } = projectRoot === null
@@ -1373,11 +1375,11 @@ export async function buildProjectView(cwd, opts) {
     // Pass 1: scan + reconcile (materialize/clean derived artifacts).
     const pre = await buildIdentityCatalog(cwd, o, config);
     let report = { created: [], removed: [], rewritten: [], conflicts: [], failed: [] };
-    if (projectRoot !== null && !readOnlyConfig) {
+    if (projectRoot !== null && !readOnlyConfig && viewOptions?.reconcile !== false) {
         const ledger = createLedger();
         const configBefore = JSON.parse(JSON.stringify(config));
         try {
-            report = await reconcileProject(projectRoot, config, pre.identities, o, o.logger, ledger);
+            report = await reconcileProject(projectRoot, config, pre.identities, o, o.logger, ledger, { sweepOrphans: viewOptions?.sweepOrphans === true });
             if (JSON.stringify(config) !== JSON.stringify(configBefore)) {
                 // Reconcile changed source registrations (managed copies,
                 // orphan cleanup, copyHash refresh). File and config changes are one
@@ -1433,7 +1435,6 @@ export async function buildProjectView(cwd, opts) {
                     && !(await hashMatches(entry.originHash, origin.path, origin.format, originHash));
             }
         }
-        const enabled = config.enabled.includes(identity.name);
         const described = effectiveSource && !effectiveSource.broken ? effectiveSource
             : identity.sources.find((s) => !s.broken) || null;
         // Whether the skill really appears in this project's model catalog:
@@ -1452,6 +1453,10 @@ export async function buildProjectView(cwd, opts) {
             }
             modelInvocable = !stubPresent;
         }
+        // A project without a sidecar has no declared policy yet. Present the
+        // actual disk/runtime state instead of pretending every Skill is off;
+        // the first explicit mutation snapshots this baseline into the sidecar.
+        const enabled = existed ? config.enabled.includes(identity.name) : modelInvocable;
         identity.v1 = {
             description: described ? described.description : '',
             ...(described?.whenToUse === undefined ? {} : { whenToUse: described.whenToUse }),
