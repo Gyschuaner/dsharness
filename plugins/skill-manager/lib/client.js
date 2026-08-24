@@ -13,11 +13,16 @@
             var style = existingStyle || document.createElement('style');
             style.setAttribute('data-plugin', 'dsh-skill-manager');
             style.textContent = [
-                '.sk-switch{position:relative;width:30px;height:17px;flex:none;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-fill-tsp-secondary);cursor:pointer;padding:0;transition:background .12s,border-color .12s}',
-                '.sk-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
-                '.sk-switchKnob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .12s,background .12s;pointer-events:none}',
-                '.sk-switchOn .sk-switchKnob{transform:translateX(13px);background:#fff}',
+                '.sk-switch{appearance:none;position:relative;flex:none;width:44px;height:24px;border-radius:999px;border:0;background:color-mix(in srgb,var(--dsw-alias-label-primary) 20%,var(--dsw-alias-bg-module-platform));cursor:pointer;padding:0;transition:background-color .25s ease}',
+                '.sk-switchOn{background:var(--dsw-alias-state-business-primary)}',
+                '.sk-switchKnob{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none}',
+                '.sk-switchOn .sk-switchKnob{transform:translateX(20px)}',
+                '.sk-switch:active .sk-switchKnob,.sk-switchOn:active .sk-switchKnob{transition-duration:.12s}',
+                '.sk-switch:active .sk-switchKnob{transform:scaleX(1.12)}',
+                '.sk-switchOn:active .sk-switchKnob{transform:translateX(20px) scaleX(1.12)}',
                 '.sk-switchDim{opacity:.5;cursor:not-allowed}',
+                '.sk-switch:focus-visible{outline:2px solid color-mix(in srgb,var(--dsw-alias-state-business-primary) 55%,transparent);outline-offset:2px}',
+                '@media (prefers-reduced-motion:reduce){.sk-switch,.sk-switchKnob{transition:none}}',
                 // ── DSH-008 V1: per-project SKILL management ─────────────────
                 '.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%;max-width:1180px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
                 '.sk-content{position:relative;isolation:isolate;display:flex;flex:1;min-height:0}',
@@ -306,10 +311,6 @@
                 '.sk-rowName{font-size:13.5px}',
                 '.sk-rowDesc{margin-top:4px;line-height:1.45}',
                 '.sk-rowSide{gap:12px}',
-                '.sk-root .sk-switch{width:36px;height:20px;background:var(--dsw-alias-fill-tsp-secondary)}',
-                '.sk-root .sk-switchOn{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
-                '.sk-root .sk-switchKnob{width:16px;height:16px;left:2px;top:2px}',
-                '.sk-root .sk-switchOn .sk-switchKnob{transform:translateX(16px)}',
                 '.sk-marketToolbar{padding:16px 8px 8px;gap:10px}',
                 '.sk-marketSearch{min-width:180px}',
                 '.sk-marketList{padding:0 8px 32px}',
