@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { parseSessionFile } from './parser.js'
-import { PRICE_NOTE } from './pricing.js'
+import { estimatePrice, PRICE_NOTE } from './pricing.js'
 import type {
 	BillingCall,
 	BillingDaily,
@@ -236,6 +236,45 @@ export class BillingStore {
 			}
 		}
 		for (const path of this.issuesByPath.keys()) if (!seen.has(path)) this.issuesByPath.delete(path)
+		this.repriceStoredCalls()
+	}
+
+	private repriceStoredCalls(): void {
+		const rows = this.db.prepare(`
+			SELECT call_key, model, timestamp_ms, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens
+			FROM billing_calls
+		`).all() as unknown as Array<{
+			call_key: string
+			model: string
+			timestamp_ms: number
+			input_tokens: number
+			output_tokens: number
+			cache_read_tokens: number
+			cache_write_tokens: number
+		}>
+		if (rows.length === 0) return
+
+		const update = this.db.prepare(`
+			UPDATE billing_calls
+			SET estimated_cost = ?, price_mode = ?, price_reason = ?
+			WHERE call_key = ?
+		`)
+		this.db.exec('BEGIN')
+		try {
+			for (const row of rows) {
+				const price = estimatePrice(row.model, numberValue(row.timestamp_ms), {
+					inputTokens: numberValue(row.input_tokens),
+					outputTokens: numberValue(row.output_tokens),
+					cacheReadTokens: numberValue(row.cache_read_tokens),
+					cacheWriteTokens: numberValue(row.cache_write_tokens),
+				})
+				update.run(price.estimatedCost, price.mode, price.reason, row.call_key)
+			}
+			this.db.exec('COMMIT')
+		} catch (error) {
+			this.db.exec('ROLLBACK')
+			throw error
+		}
 	}
 
 	async summary(request: { from?: number; to?: number; sessionId?: string } = {}): Promise<BillingSummary> {

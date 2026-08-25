@@ -154,17 +154,32 @@ interface BillingState {
 		'.bl-chartTooltipCost{color:#bd7b32;font-weight:650}',
 		'.bl-chartEmpty{height:100%;display:grid;place-items:center;color:var(--dsw-alias-label-tertiary);font-size:13px}',
 		'.bl-modelCard{padding:18px 22px 9px}',
-		'.bl-modelHead,.bl-modelRow{display:grid;grid-template-columns:minmax(210px,1.6fr) minmax(110px,1fr) 104px 72px 100px;gap:16px;align-items:center}',
+		'.bl-modelHead,.bl-modelRow{display:grid;grid-template-columns:minmax(210px,1.35fr) minmax(230px,1.8fr) 104px 72px 100px;gap:16px;align-items:center}',
 		'.bl-modelHead{color:var(--dsw-alias-label-tertiary);font-size:12px;padding:0 0 13px}',
-		'.bl-modelHead span:nth-child(n+3),.bl-modelRow span:nth-child(n+3){text-align:right}',
-		'.bl-modelRow{min-height:52px;border-top:1px solid var(--dsw-alias-border-l2);font-size:13px}',
+		'.bl-modelHead>span:nth-child(n+3),.bl-modelRow>span:nth-child(n+3){text-align:right}',
+		'.bl-modelRow{min-height:78px;border-top:1px solid var(--dsw-alias-border-l2);font-size:13px}',
 		'.bl-modelName{min-width:0;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-		'.bl-modelDot{width:22px;height:22px;border-radius:7px;background:#1677ff;color:#fff;display:grid;place-items:center;font-size:11px;flex:none}',
-		'.bl-modelDotPurple{background:#7957df}',
-		'.bl-modelDotDark{background:#17233f}',
-		'.bl-modelDotGrey{background:#667085}',
-		'.bl-progress{height:6px;border-radius:9px;background:var(--dsw-alias-fill-tsp-secondary);overflow:hidden}',
-		'.bl-progress>span{display:block;height:100%;border-radius:inherit;background:#3c8bf4}',
+		'.bl-modelBrand{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex:none}',
+		'.bl-modelBrand svg{width:18px;height:18px;display:block;fill:currentColor}',
+		'.bl-modelBrandDeepSeek{background:#eaf1ff;color:#3f7ff2}',
+		'.bl-modelBrandQwen{background:#f0ecff;color:#7254df}',
+		'.bl-modelBrandOpenAI{background:#edf1f6;color:#223049}',
+		'.bl-modelBrandAnthropic{background:#fff0e9;color:#b56b4c}',
+		'.bl-modelBrandGeneric{background:#edf1f7;color:#63728b}',
+		'.bl-modelProgress{min-width:0}',
+		'.bl-progress{height:7px;display:flex;border-radius:9px;background:var(--dsw-alias-fill-tsp-secondary);overflow:hidden}',
+		'.bl-progressSegment{display:block;height:100%;min-width:0}',
+		'.bl-progressInput{background:#4b8ff7}',
+		'.bl-progressCache{background:#4faf9c}',
+		'.bl-progressOutput{background:#a8c6eb}',
+		'.bl-modelShare{margin-bottom:7px;color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:1.2}',
+		'.bl-modelBreakdown{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px;color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:1.2}',
+		'.bl-modelBreakdownItem{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}',
+		'.bl-modelBreakdownSwatch{width:6px;height:6px;border-radius:2px;display:inline-block;flex:none}',
+		'.bl-modelBreakdownSwatchInput{background:#4b8ff7}',
+		'.bl-modelBreakdownSwatchCache{background:#4faf9c}',
+		'.bl-modelBreakdownSwatchOutput{background:#a8c6eb}',
+		'.bl-modelBreakdownStrong{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;font-weight:600}',
 		'.bl-modelMuted{color:var(--dsw-alias-label-tertiary)}',
 		'.bl-total{font-weight:650;border-top:1px solid var(--dsw-alias-border-l2);padding-top:13px;margin-top:4px}',
 		'.bl-detailCard{overflow:hidden}',
@@ -194,8 +209,8 @@ interface BillingState {
 		'.bl-popoverMeta{margin-top:7px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1.6}',
 		'.bl-popoverLink{appearance:none;border:0;background:transparent;color:#1677ff;cursor:pointer;font:inherit;font-size:12px;padding:9px 0 0}',
 		'.bl-loading{min-height:240px;display:grid;place-items:center;color:var(--dsw-alias-label-tertiary);font-size:13px}',
-		'@media(max-width:900px){.bl-page{padding:23px 20px 35px}.bl-modelHead,.bl-modelRow{grid-template-columns:minmax(180px,1.4fr) minmax(80px,1fr) 90px 60px 80px;gap:10px}.bl-metrics{padding:17px 14px}.bl-metric{padding:0 14px}}',
-		'@media(max-width:680px){.bl-heading{flex-wrap:wrap}.bl-headingActions{width:100%;margin-left:46px}.bl-metrics{grid-template-columns:1fr;gap:15px}.bl-metric,.bl-metric:first-child{border-left:0;border-top:1px solid var(--dsw-alias-border-l2);padding:15px 0 0}.bl-metric:first-child{border-top:0;padding-top:0}.bl-legend{display:none}.bl-chart{padding-left:42px;padding-right:53px}.bl-yLabels{width:35px}.bl-costLabels{width:45px}.bl-xLabels{left:42px;right:53px}.bl-costPoints{left:42px;right:53px}.bl-modelHead,.bl-modelRow{grid-template-columns:minmax(150px,1fr) 100px 80px;gap:10px}.bl-modelHead span:nth-child(2),.bl-modelRow .bl-modelProgress{display:none}.bl-modelHead span:nth-child(3){grid-column:2}.bl-modelHead span:nth-child(4){grid-column:3}.bl-modelHead span:nth-child(5){display:none}.bl-modelRow span:nth-child(3){grid-column:2}.bl-modelRow span:nth-child(4){grid-column:3}.bl-modelRow span:nth-child(5){display:none}}',
+		'@media(max-width:900px){.bl-page{padding:23px 20px 35px}.bl-modelHead,.bl-modelRow{grid-template-columns:minmax(180px,1.25fr) minmax(205px,1.65fr) 90px 60px 80px;gap:10px}.bl-metrics{padding:17px 14px}.bl-metric{padding:0 14px}}',
+		'@media(max-width:680px){.bl-heading{flex-wrap:wrap}.bl-headingActions{width:100%;margin-left:46px}.bl-metrics{grid-template-columns:1fr;gap:15px}.bl-metric,.bl-metric:first-child{border-left:0;border-top:1px solid var(--dsw-alias-border-l2);padding:15px 0 0}.bl-metric:first-child{border-top:0;padding-top:0}.bl-legend{display:none}.bl-chart{padding-left:42px;padding-right:53px}.bl-yLabels{width:35px}.bl-costLabels{width:45px}.bl-xLabels{left:42px;right:53px}.bl-costPoints{left:42px;right:53px}.bl-modelHead,.bl-modelRow{grid-template-columns:minmax(150px,1fr) minmax(180px,1.2fr) 80px;gap:10px}.bl-modelHead>span:nth-child(4),.bl-modelRow>span:nth-child(4),.bl-modelHead>span:nth-child(5),.bl-modelRow>span:nth-child(5){display:none}.bl-modelHead>span:nth-child(3),.bl-modelRow>span:nth-child(3){grid-column:3}}',
 		'@media(prefers-reduced-motion:reduce){.bl-barStack,.bl-card{animation:none!important;transition:none!important}}',
 	].join('');
 	if (!existingStyle) document.head.appendChild(style);
@@ -395,8 +410,57 @@ interface BillingState {
 		);
 	}
 
-	function modelClass(index: number): string {
-		return index === 1 ? 'bl-modelDot bl-modelDotPurple' : index === 2 ? 'bl-modelDot bl-modelDotDark' : index > 2 ? 'bl-modelDot bl-modelDotGrey' : 'bl-modelDot';
+	function ModelIcon(props: { model: string }): React.ReactNode {
+		var value = props.model.toLowerCase();
+		var provider = '其他模型';
+		var className = 'bl-modelBrand bl-modelBrandGeneric';
+		var path = 'M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2Zm0 4-4 2.3v4.4l4 2.3 4-2.3V8.3L12 6Z';
+		if (value.includes('deepseek')) {
+			provider = 'DeepSeek';
+			className = 'bl-modelBrand bl-modelBrandDeepSeek';
+			path = 'M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45';
+		} else if (value.includes('qwen')) {
+			provider = 'Qwen';
+			className = 'bl-modelBrand bl-modelBrandQwen';
+			path = 'M23.919 14.545 20.817 9.17l1.47-2.544a.56.56 0 0 0 0-.566l-1.633-2.83a.57.57 0 0 0-.49-.283h-6.207L12.487.402a.57.57 0 0 0-.49-.284H8.732a.56.56 0 0 0-.49.284L5.139 5.775h-2.94a.56.56 0 0 0-.49.284L.077 8.887a.56.56 0 0 0 0 .567L3.18 14.83l-1.47 2.545a.56.56 0 0 0 0 .566l1.634 2.83a.57.57 0 0 0 .49.283h6.205l1.47 2.545a.57.57 0 0 0 .49.284h3.266a.57.57 0 0 0 .49-.284l3.104-5.375h2.94a.57.57 0 0 0 .49-.283l1.634-2.828a.55.55 0 0 0-.004-.568M8.733.686l1.634 2.828-1.634 2.828H21.8L20.164 9.17H7.425L5.63 6.06Zm1.306 19.801-6.205-.002 1.634-2.83h3.265L2.201 6.344h3.267q3.182 5.517 6.367 11.032zm10.124-5.66L18.53 12l-6.532 11.315-1.634-2.83c2.129-3.673 4.25-7.351 6.373-11.028h3.592l3.102 5.374z';
+		} else if (value.includes('gpt') || value.includes('openai')) {
+			provider = 'OpenAI';
+			className = 'bl-modelBrand bl-modelBrandOpenAI';
+			path = 'M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z';
+		} else if (value.includes('claude') || value.includes('anthropic')) {
+			provider = 'Anthropic';
+			className = 'bl-modelBrand bl-modelBrandAnthropic';
+			path = 'M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z';
+		}
+		return h('span', { className: className, title: provider }, h('svg', { viewBox: '0 0 24 24', role: 'img', 'aria-label': provider }, h('path', { d: path })));
+	}
+
+	function formatShare(value: number, total: number): string {
+		return `${total > 0 ? (value / total * 100).toFixed(1) : '0.0'}%`;
+	}
+
+	function TokenComposition(props: { model: BillingModel; totalTokens: number }): React.ReactNode {
+		var inputTokens = props.model.inputTokens + props.model.cacheWriteTokens;
+		var cacheTokens = props.model.cacheReadTokens;
+		var outputTokens = props.model.outputTokens;
+		var total = inputTokens + cacheTokens + outputTokens;
+		var inputShare = total > 0 ? inputTokens / total * 100 : 0;
+		var cacheShare = total > 0 ? cacheTokens / total * 100 : 0;
+		var outputShare = total > 0 ? outputTokens / total * 100 : 0;
+		var label = `模型占总量 ${formatShare(props.model.totalTokens, props.totalTokens)}；输入 ${formatTokens(inputTokens)}（${formatShare(inputTokens, total)}），缓存命中 ${formatTokens(cacheTokens)}（${formatShare(cacheTokens, total)}），输出 ${formatTokens(outputTokens)}（${formatShare(outputTokens, total)}）`;
+		return h('div', { className: 'bl-modelProgress', title: label, 'aria-label': label },
+			h('div', { className: 'bl-modelShare' }, `模型占总量 ${formatShare(props.model.totalTokens, props.totalTokens)}`),
+			h('div', { className: 'bl-progress', role: 'img', 'aria-label': label },
+				h('span', { className: 'bl-progressSegment bl-progressInput', style: { width: `${inputShare}%` } }),
+				h('span', { className: 'bl-progressSegment bl-progressCache', style: { width: `${cacheShare}%` } }),
+				h('span', { className: 'bl-progressSegment bl-progressOutput', style: { width: `${outputShare}%` } }),
+			),
+			h('div', { className: 'bl-modelBreakdown' },
+				h('span', { className: 'bl-modelBreakdownItem' }, h('i', { className: 'bl-modelBreakdownSwatch bl-modelBreakdownSwatchInput' }), '输入 ', h('strong', { className: 'bl-modelBreakdownStrong' }, formatTokens(inputTokens)), ` · ${formatShare(inputTokens, total)}`),
+				h('span', { className: 'bl-modelBreakdownItem' }, h('i', { className: 'bl-modelBreakdownSwatch bl-modelBreakdownSwatchCache' }), '命中 ', h('strong', { className: 'bl-modelBreakdownStrong' }, formatTokens(cacheTokens)), ` · ${formatShare(cacheTokens, total)}`),
+				h('span', { className: 'bl-modelBreakdownItem' }, h('i', { className: 'bl-modelBreakdownSwatch bl-modelBreakdownSwatchOutput' }), '输出 ', h('strong', { className: 'bl-modelBreakdownStrong' }, formatTokens(outputTokens)), ` · ${formatShare(outputTokens, total)}`),
+			),
+		);
 	}
 
 	function ModelList(props: { data: BillingSummary }): React.ReactNode {
@@ -405,16 +469,16 @@ interface BillingState {
 			h('div', { className: 'bl-cardHeader' }, h('div', { className: 'bl-cardTitle' }, '按模型')),
 			models.length === 0 ? h('div', { className: 'bl-empty' }, '暂无可展示的模型调用') : h(React.Fragment, null,
 				h('div', { className: 'bl-modelHead' }, h('span', null, '模型'), h('span', null, '用量占比'), h('span', null, 'Token'), h('span', null, '缓存命中'), h('span', null, '估算费用（¥）')),
-				models.map(function (model, index) {
+				models.map(function (model) {
 					return h('div', { className: 'bl-modelRow', key: model.model },
-						h('span', { className: 'bl-modelName', title: model.model }, h('i', { className: modelClass(index) }, '◉'), model.model),
-						h('span', { className: 'bl-modelProgress' }, h('div', { className: 'bl-progress' }, h('span', { style: { width: `${Math.max(2, model.share * 100)}%` } }))),
+						h('span', { className: 'bl-modelName', title: model.model }, h(ModelIcon, { model: model.model }), model.model),
+						h(TokenComposition, { model: model, totalTokens: props.data.totals.totalTokens }),
 						h('span', null, formatTokens(model.totalTokens)),
 						h('span', null, formatTokens(model.cacheReadTokens)),
 						h('span', { className: model.estimatedCost === 0 && model.unpricedCalls > 0 ? 'bl-modelMuted' : '' }, formatCost(model.estimatedCost === 0 && model.unpricedCalls > 0 ? null : model.estimatedCost)),
 					);
 				}),
-				h('div', { className: 'bl-modelRow bl-total' }, h('span', null, '合计'), h('span', { className: 'bl-modelProgress' }), h('span', null, formatTokens(props.data.totals.totalTokens)), h('span', null, formatTokens(props.data.totals.cacheReadTokens)), h('span', null, formatCost(props.data.totals.estimatedCost))),
+				h('div', { className: 'bl-modelRow bl-total' }, h('span', null, '合计'), h('div', { className: 'bl-modelProgress' }), h('span', null, formatTokens(props.data.totals.totalTokens)), h('span', null, formatTokens(props.data.totals.cacheReadTokens)), h('span', null, formatCost(props.data.totals.estimatedCost))),
 			),
 		);
 	}
@@ -460,8 +524,8 @@ interface BillingState {
 		return h('div', { className: 'bl-page' }, h('div', { className: 'bl-shell bl-settings' },
 			h('div', { className: 'bl-heading' }, h('div', { className: 'bl-headingIcon' }, h(icon, { size: 20 })), h('div', { className: 'bl-headingCopy' }, h('h1', { className: 'bl-title' }, 'Billing'), h('div', { className: 'bl-subtitle' }, '影子计费设置'))),
 			h('div', { className: 'bl-card' },
-				h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '计价口径'), h('div', { className: 'bl-settingText' }, '以下价格只用于本地估算，不会产生真实扣费。DeepSeek Flash 按每百万 Token 计价，峰值时段按低谷价 ×2。')), 
-				h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, 'DeepSeek Flash 价目表（¥ / 1M Token）'), h('table', { className: 'bl-rateTable' }, h('thead', null, h('tr', null, h('th', null, 'Token 类型'), h('th', null, '低谷'), h('th', null, '高峰'))), h('tbody', null, h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥0.05'), h('td', null, '¥0.10')), h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥1.50'), h('td', null, '¥3.00')), h('tr', null, h('td', null, '输出'), h('td', null, '¥4.50'), h('td', null, '¥9.00'))))),
+			h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '计价口径'), h('div', { className: 'bl-settingText' }, '以下价格只用于本地估算，不会产生真实扣费。基于 DeepSeek-V4-Flash 官方美元价，按 ¥7.2/USD 折算；峰值时段按低谷价 ×2。缓存命中价显著低于输入未命中价。')),
+			h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, 'DeepSeek Flash 价目表（¥ / 1M Token）'), h('table', { className: 'bl-rateTable' }, h('thead', null, h('tr', null, h('th', null, 'Token 类型'), h('th', null, '低谷'), h('th', null, '高峰'))), h('tbody', null, h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥1.01'), h('td', null, '¥2.02')), h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥0.02'), h('td', null, '¥0.04')), h('tr', null, h('td', null, '输出'), h('td', null, '¥2.02'), h('td', null, '¥4.03'))))),
 				h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '峰谷规则'), h('div', { className: 'bl-settingText' }, '高峰：北京时间工作日 09:00–12:00、14:00–18:00；低谷：其他时段及周末（2026-08-23 起周末全天低谷）。未知模型只展示 Token，不计入费用。')),
 			),
 		));

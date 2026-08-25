@@ -15,6 +15,7 @@ export declare class BillingStore {
     constructor(options?: BillingStoreOptions);
     sync(): Promise<void>;
     private syncNow;
+    private repriceStoredCalls;
     summary(request?: {
         from?: number;
         to?: number;

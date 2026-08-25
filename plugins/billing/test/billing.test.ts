@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
 import test from 'node:test'
@@ -57,6 +58,10 @@ test('DeepSeek Flash pricing follows Beijing peak and weekend rules', () => {
 	assert.equal(isPeakBeijing(weekendAt), false)
 	assert.equal(estimatePrice('DeepSeek-V4-Flash-0731-Q8', peakAt, usage).mode, 'peak')
 	assert.equal(estimatePrice('DeepSeek-V4-Flash-0731-Q8', offpeakAt, usage).mode, 'offpeak')
+	const offpeakPrice = estimatePrice('DeepSeek-V4-Flash-0731-Q8', offpeakAt, usage)
+	assert.ok(Math.abs(offpeakPrice.rates.input - 1.008) < 1e-12)
+	assert.ok(Math.abs(offpeakPrice.rates.cacheRead - 0.02016) < 1e-12)
+	assert.ok(offpeakPrice.rates.cacheRead < offpeakPrice.rates.input)
 	assert.equal(estimatePrice('local-unknown', offpeakAt, usage).estimatedCost, null)
 })
 
@@ -85,7 +90,7 @@ test('parser folds chunk usage into the final assistant message without double c
 		priceMode: 'peak',
 		priceReason: '北京时间工作日高峰 09:00–12:00 / 14:00–18:00',
 	})
-	assert.ok(Math.abs(firstCall.estimatedCost! - 0.0000431) < 1e-12)
+	assert.ok(Math.abs(firstCall.estimatedCost! - 0.0000344736) < 1e-12)
 })
 
 test('store persists calls and repeated scans do not create duplicates', async (t) => {
@@ -108,6 +113,13 @@ test('store persists calls and repeated scans do not create duplicates', async (
 	assert.equal(first.totals.cacheReadTokens, 5)
 	assert.equal(second.totals.calls, 1)
 	assert.equal(second.totals.estimatedCost, first.totals.estimatedCost)
+
+	const staleDb = new DatabaseSync(join(root, 'billing.sqlite'))
+	staleDb.prepare('UPDATE billing_calls SET estimated_cost = 999').run()
+	staleDb.close()
+	const repriced = await store.summary({ from: 0, to: timestamp('2026-08-26T00:00:00+08:00') })
+	assert.ok(repriced.totals.estimatedCost < 1)
+	assert.equal(repriced.totals.estimatedCost, first.totals.estimatedCost)
 
 	writeFileSync(logPath, Buffer.concat([readFileSync(logPath), compressed(sessionLines(2, 4, 1, 2).slice(1))]))
 	const afterAppend = await store.summary({ from: 0, to: timestamp('2026-08-26T00:00:00+08:00') })

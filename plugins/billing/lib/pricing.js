@@ -1,9 +1,17 @@
-export const PRICE_NOTE = '估算价，非真实账单；按北京时间峰谷价计算。';
+// DeepSeek-V4-Flash 的官方美元价按本地估算汇率折算为人民币。
+// 这里的价格始终是 shadow billing，不代表实际账单或实时汇率。
+export const USD_TO_CNY = 7.2;
+export const OFFICIAL_USD_RATES = Object.freeze({
+    input: 0.14,
+    cacheRead: 0.0028,
+    output: 0.28,
+});
+export const PRICE_NOTE = `估算价，非真实账单；按 DeepSeek-V4-Flash 官方美元价折算人民币（汇率按 ¥${USD_TO_CNY}/USD 估算），并按北京时间峰谷价计算。`;
 export const LOW_RATES = Object.freeze({
-    input: 0.05,
-    cacheRead: 1.5,
-    cacheWrite: 0.05,
-    output: 4.5,
+    input: OFFICIAL_USD_RATES.input * USD_TO_CNY,
+    cacheRead: OFFICIAL_USD_RATES.cacheRead * USD_TO_CNY,
+    cacheWrite: OFFICIAL_USD_RATES.input * USD_TO_CNY,
+    output: OFFICIAL_USD_RATES.output * USD_TO_CNY,
 });
 export const PEAK_MULTIPLIER = 2;
 const BEIJING_DATE = new Intl.DateTimeFormat('en-US', {
