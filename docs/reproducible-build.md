@@ -72,6 +72,12 @@ cd dsharness
 而是直接启动同级 `deepseek-harness` 的构建产物；默认隐藏后台运行并将日志写入
 `~/.dsh/logs`，启动成功后同时校验 HTTP、监听 PID 与实际 CLI 命令行。
 
+macOS 使用仓库根目录的 `./restart-dsh-web.command`。脚本会优先检查同级
+`deepseek-harness-main-build`，再检查 `deepseek-harness`，只选择同时命中
+`upstream.lock.json` 的 `dshVersion` 与 `resultTree` 的构建；启动后还会验证
+Skill / Plugin / MCP API 和六个客户端插件资源。若要显式指定目录，设置
+`DSH_SOURCE_DIR`，但该目录也必须命中锁定版本。
+
 升级官方 DSH 或新增上游补丁时，需要同步更新 `upstream.lock.json` 中的基线提交、补丁哈希和最终 tree，并从空目录重新执行安装脚本。只有干净构建、完整构建和 Web 冒烟都通过后，新的锁定结果才能合入 `main`。
 
 2026-08-17 已在一条全新目录链路上完成验证：官方源码浅拉取、DSH-009 补丁应用、923 个锁定依赖安装和完整 `build:lib + build:web` 均通过，总耗时约 166 秒；补丁涉及的 `adapter.spec.ts` 与 `convert.spec.ts` 共 119 条测试全部通过。随后直接使用新源码树启动 3083 验证实例，首页返回 HTTP 200；验证完成后仅关闭该实例，现有 3080 运行环境未被修改。

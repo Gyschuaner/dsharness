@@ -10,36 +10,36 @@
   （`D:\Pythonproject\deepseek-harness` 源码构建，`dsh` 全局命令链接到
   `apps/cli`），Node v24.11.1，源码构建使用 pnpm 11.7.0。当前源码与补丁由
   `upstream.lock.json` 锁定；`~/.dsh/profiles/web` 继续作为独立运行配置维护。
-- **macOS（gys MacBook，2026-08-17）**：`@deepseek-ai/dsh` 0.1.0-rc.6
-  （npm 预构建包，npx 缓存启动 `npm exec @deepseek-ai/dsh@latest web`），
-  Node v22.15.0，pnpm 11.19.0。同为裸环境起步（零插件），相关插件
-  均已于 2026-08-17 安装（见变更日志与宿主差异）。
+- **macOS（gys MacBook，2026-08-25）**：`@deepseek-ai/dsh` 0.1.1-rc.2
+  （`deepseek-harness-main-build` 锁定源码构建，Node v24.11.1，pnpm 11.7.0）。
+  Web profile 当前包含本仓库 link 插件、better-sidebar 及 vision-bridge 覆盖；
+  `restart-dsh-web.command` 会按 `upstream.lock.json` 自动选择匹配的源码构建。
 
 ## 插件清单
 
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
-| dsh-extension-manager | 0.2.0（build 2） | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
+| dsh-extension-manager | 0.3.0 | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
 | dsh-skill-manager | 0.2.0（build 25） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`，向 extension-manager 贡献页面；catalog 读取零副作用 |
+| dsh-mcp-manager | 0.1.0 | 本仓库 `plugins/mcp-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-026 | MCP 服务器管理、热重载、工具投影与精选/Registry 市场，向 extension-manager 贡献 `mcp` 分区 |
 | dsh-plugin-manager | 0.2.0（build 2） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030 | 独立 Plugin 分区；本地插件管理、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
 `@deepseek-ai/dsh-vision-bridge` 已进入 DSH-005 锁定源码和 base bundle，但 base 行默认
-`disabled: true`，不属于当前 3080 已启用插件。DP Gateway 暴露
-`Qwen3.6-35B-A3B` 并完成健康检查后，才按
-[`DSH-005-vision-bridge.md`](DSH-005-vision-bridge.md) 合入 profile 覆盖。
+`disabled: true`；当前 macOS profile 已按
+[`DSH-005-vision-bridge.md`](DSH-005-vision-bridge.md) 通过 DP Gateway 覆盖为启用，
+Windows 仍以各自 profile 覆盖状态为准。
 
-## 宿主差异（2026-08-17）
+## 宿主差异（2026-08-25）
 
 - **Windows**：extension-manager、skill-manager、plugin-manager 与 better-sidebar 已安装；三个本仓库插件均以
   junction 指向当前 checkout。better-sidebar-smooth
   未安装（该胶囊动画撕裂在 Windows 宿主同样存在，需要时按 macOS 同法接入）。
-- **macOS**：历史上安装过 image-context-guard；同步 DSH-022 后应移除该依赖和挂载。
-  skill-manager / better-sidebar-smooth 为 link 通道，`~/.dsh/plugins/<name>` 符号链接 →
-  本仓库 `plugins/<name>`（macOS 下的 junction 等价物，
-  `dev/setup-plugin-junction.ps1` 仅 Windows 可用，手工 `ln -sfn` 建链）；
-  better-sidebar 0.12.3 走 npm 官方通道（与 Windows 同版本）。
+- **macOS**：extension-manager、skill-manager、mcp-manager、plugin-manager、
+  better-sidebar-smooth 均通过 profile link 通道挂载，better-sidebar 0.12.3 走 npm
+  官方通道；vision-bridge 通过 profile overlay 启用。历史遗留的 image-context-guard
+  只保留源码回溯，不再属于已安装插件。
 
 ## 安装 / 更新 / 回退约定
 
@@ -66,6 +66,14 @@
 - **重启边界**：host 半变化（新插件、bundle 变更、host 代码更新）需重启 dsh web
   （`.\restart-dsh-web.ps1`，会话持久化在磁盘、可恢复）；client 半变化硬刷新浏览器即可。
 
+## 版本门禁记录
+
+- **2026-08-25（BUG-7BA7358C）**：macOS `restart-dsh-web.command` 不再按目录名盲选
+  源码。无显式 `DSH_SOURCE_DIR` 时，会在相邻构建目录中选择与 `upstream.lock.json`
+  的 `dshVersion` / `resultTree` 同时匹配的构建；显式指定旧 worktree 会在停止现有服务前
+  失败。启动后增加 Skill / Plugin / MCP API 及六个 Client bundle 端点门禁，任一插件缺失
+  都不会输出重启成功。
+
 ## 变更日志
 
 - **2026-08-24（macOS 宿主，DSH-005 部署）**：启用 `@deepseek-ai/dsh-vision-bridge`。
@@ -73,8 +81,8 @@
   `DPGATEWAY_API_KEY` + `Qwen3.6-35B-A3B`）合入 `~/.dsh/profiles/web/cordis.patch.yml`，
   base bundle 行保持默认关闭、仅本机覆盖。启用前健康检查：DP Gateway
   `GET /v1/models` 确认仍暴露 `Qwen3.6-35B-A3B`。`--dump-config` 离线树确认
-  `disabled: false` 生效；重启 dsh web（`DSH_SOURCE_DIR=deepseek-harness-main-build`
-  的 restart-dsh-web.command）后冒烟测试通过：`vision_inspect` 本地 JPEG 路径输入，
+  `disabled: false` 生效；重启 dsh web（新版 restart-dsh-web.command 自动选择
+  `deepseek-harness-main-build`）后冒烟测试通过：`vision_inspect` 本地 JPEG 路径输入，
   视觉模型正确返回图片描述（含界面标题与模型名）。注意：插件页本地列表以 profile
   直接依赖为数据源，bundle 层行不展示，故视觉桥不在「扩展-插件」页显示。
 
