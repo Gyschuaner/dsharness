@@ -294,6 +294,15 @@ interface BillingState {
 
 	function Chart(props: { data: BillingSummary }): React.ReactNode {
 		var [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
+		var [hoverPosition, setHoverPosition] = React.useState<{ x: number; y: number } | null>(null);
+		function updateHoverPosition(event: React.MouseEvent<HTMLDivElement>): void {
+			var rect = event.currentTarget.getBoundingClientRect();
+			if (rect.width <= 0 || rect.height <= 0) return;
+			setHoverPosition({
+				x: (event.clientX - rect.left) / rect.width * 100,
+				y: (event.clientY - rect.top) / rect.height * 100,
+			});
+		}
 		var days = props.data.daily.slice(-7);
 		var maxTokens = Math.max(1, ...days.map(function (day) { return day.totalTokens; }));
 		var maxCost = Math.max(0.01, ...days.map(function (day) { return day.estimatedCost; }));
@@ -320,8 +329,17 @@ interface BillingState {
 			var hoveredPoint = costPoints[hoveredIndex];
 			if (hoveredDay !== undefined && hoveredPoint !== undefined) {
 				var hoveredTimestamp = new Date(`${hoveredDay.date}T00:00:00+08:00`).getTime();
+				var tooltipLeft = Math.min(82, Math.max(18, hoveredPoint.x));
 				var tooltipTop = Math.max(5, Math.min(48, hoveredPoint.y - 24));
-				tooltip = h('div', { className: 'bl-chartTooltip', role: 'tooltip', style: { left: `${Math.min(82, Math.max(18, hoveredPoint.x))}%`, top: `${tooltipTop}%`, transform: 'translateX(-50%)' } },
+				var tooltipTransform = 'translateX(-50%)';
+				if (hoverPosition !== null) {
+					tooltipLeft = Math.min(84, Math.max(16, hoverPosition.x));
+					tooltipTop = Math.min(92, Math.max(6, hoverPosition.y));
+					tooltipTransform = hoverPosition.y >= 55
+						? 'translate(-50%, calc(-100% - 12px))'
+						: 'translate(-50%, 12px)';
+				}
+				tooltip = h('div', { className: 'bl-chartTooltip', role: 'tooltip', style: { left: `${tooltipLeft}%`, top: `${tooltipTop}%`, transform: tooltipTransform } },
 					h('div', { className: 'bl-chartTooltipTitle' }, formatDate(hoveredTimestamp)),
 					h('div', { className: 'bl-chartTooltipRows' },
 						h('div', { className: 'bl-chartTooltipRow' }, h('i', { className: 'bl-chartTooltipSwatch bl-chartTooltipSwatchInput' }), h('span', { className: 'bl-chartTooltipLabel' }, '输入 Token'), h('strong', { className: 'bl-chartTooltipValue' }, formatTokens(hoveredDay.inputTokens + hoveredDay.cacheWriteTokens))),
@@ -342,10 +360,10 @@ interface BillingState {
 					h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-lineLegend' }), '估算费用（¥）'),
 				),
 			),
-			days.length === 0 ? h('div', { className: 'bl-chartEmpty' }, '暂无模型调用记录') : h('div', { className: 'bl-chart', onMouseLeave: function () { setHoveredIndex(null); } },
+			days.length === 0 ? h('div', { className: 'bl-chartEmpty' }, '暂无模型调用记录') : h('div', { className: 'bl-chart', onMouseLeave: function () { setHoveredIndex(null); setHoverPosition(null); } },
 				h('div', { className: 'bl-yLabels' }, h('span', null, formatTokens(maxTokens)), h('span', null, formatTokens(maxTokens / 2)), h('span', null, '0')),
 				h('div', { className: 'bl-costLabels' }, h('span', null, `¥${maxCost.toFixed(2)}`), h('span', null, `¥${(maxCost / 2).toFixed(2)}`), h('span', null, '¥0')),
-				h('div', { className: 'bl-chartPlot' },
+				h('div', { className: 'bl-chartPlot', onMouseMove: updateHoverPosition },
 					h('div', { className: 'bl-bars', style: { gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` } }, days.map(function (day, index) {
 					var scale = 100 / maxTokens;
 					return h('div', { className: 'bl-barColumn', key: day.date, tabIndex: 0, 'aria-label': `${formatDate(new Date(`${day.date}T00:00:00+08:00`).getTime())}，输入 ${formatTokens(day.inputTokens + day.cacheWriteTokens)}，缓存命中 ${formatTokens(day.cacheReadTokens)}，输出 ${formatTokens(day.outputTokens)}，估算费用 ${formatCost(day.estimatedCost)}`, onMouseEnter: function () { setHoveredIndex(index); }, onFocus: function () { setHoveredIndex(index); } },
