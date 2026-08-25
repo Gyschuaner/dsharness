@@ -51,6 +51,7 @@
                 '.bl-chartPlot{position:relative;height:100%;border-bottom:1px solid var(--dsw-alias-border-l2);background:repeating-linear-gradient(to bottom,transparent 0,transparent calc(25% - 1px),var(--dsw-alias-border-l2) 25%,transparent calc(25% + 1px))}',
                 '.bl-bars{position:absolute;inset:0;display:grid;align-items:end}',
                 '.bl-barColumn{height:100%;display:flex;align-items:center;justify-content:flex-end;flex-direction:column;min-width:0}',
+                '.bl-barColumn:focus-visible{outline:2px solid color-mix(in srgb,#1677ff 70%,transparent);outline-offset:3px;border-radius:6px}',
                 '.bl-barStack{width:min(34px,65%);display:flex;flex-direction:column;justify-content:flex-end;border-radius:4px 4px 0 0;overflow:hidden;min-height:1px}',
                 '.bl-bar{width:100%;min-height:1px}',
                 '.bl-barInput{background:#4a91f5}',
@@ -61,6 +62,18 @@
                 '.bl-costLine{position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;pointer-events:none;overflow:visible}',
                 '.bl-costPoints{position:absolute;left:49px;right:58px;top:10px;bottom:29px;pointer-events:none;z-index:3}',
                 '.bl-costPoint{position:absolute;width:9px;height:9px;border:2px solid #e59a13;border-radius:50%;background:var(--dsw-alias-bg-base);box-sizing:border-box;transform:translate(-50%,-50%);box-shadow:0 0 0 3px color-mix(in srgb,#e59a13 12%,transparent)}',
+                '.bl-chartTooltip{position:absolute;z-index:5;min-width:194px;padding:11px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-base);box-shadow:0 10px 28px rgba(15,23,42,.16);pointer-events:none}',
+                '.bl-chartTooltipTitle{font-size:12px;font-weight:650;color:var(--dsw-alias-label-primary)}',
+                '.bl-chartTooltipRows{display:grid;gap:7px;margin-top:9px}',
+                '.bl-chartTooltipRow{display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:7px;font-size:12px}',
+                '.bl-chartTooltipSwatch{width:8px;height:8px;border-radius:3px;display:block}',
+                '.bl-chartTooltipSwatchInput{background:#3f8df5}',
+                '.bl-chartTooltipSwatchCache{background:#8e6be8}',
+                '.bl-chartTooltipSwatchOutput{background:#a8c8f7}',
+                '.bl-chartTooltipSwatchCost{background:#e59a13;border-radius:50%}',
+                '.bl-chartTooltipLabel{color:var(--dsw-alias-label-secondary)}',
+                '.bl-chartTooltipValue{color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}',
+                '.bl-chartTooltipCost{color:#d98b00;font-weight:650}',
                 '.bl-chartEmpty{height:100%;display:grid;place-items:center;color:var(--dsw-alias-label-tertiary);font-size:13px}',
                 '.bl-modelCard{padding:18px 22px 9px}',
                 '.bl-modelHead,.bl-modelRow{display:grid;grid-template-columns:minmax(210px,1.6fr) minmax(110px,1fr) 104px 72px 100px;gap:16px;align-items:center}',
@@ -111,7 +124,7 @@
                 document.head.appendChild(style);
             function icon(props) {
                 var size = props && props.size ? props.size : 16;
-                return h('svg', { width: size, height: size, viewBox: '0 0 18 18', fill: 'none', 'aria-hidden': true }, h('ellipse', { cx: 8, cy: 4, rx: 5.5, ry: 2.5, stroke: 'currentColor', strokeWidth: 1.4 }), h('path', { d: 'M2.5 4v4c0 1.4 2.5 2.5 5.5 2.5M13.5 6.2V4', stroke: 'currentColor', strokeWidth: 1.4 }), h('path', { d: 'M8 8.4c0 1.4 2.5 2.5 5.5 2.5S19 9.8 19 8.4v-4', stroke: 'currentColor', strokeWidth: 1.4, transform: 'translate(-2.5 2)' }), h('path', { d: 'M8 12.2v1.3c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-4', stroke: 'currentColor', strokeWidth: 1.4, transform: 'translate(-2.5 0)' }));
+                return h('svg', { width: size, height: size, viewBox: '0 0 18 18', fill: 'none', 'aria-hidden': true }, h('path', { d: 'M4 2.25h10v13.5l-2.5-1.5-2.5 1.5-2.5-1.5L4 15.75V2.25Z', stroke: 'currentColor', strokeWidth: 1.35, strokeLinejoin: 'round' }), h('path', { d: 'M6.5 5.75h5M6.5 8.75h5M6.5 11.75h3', stroke: 'currentColor', strokeWidth: 1.25, strokeLinecap: 'round' }));
             }
             function isRecord(value) {
                 return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -185,6 +198,7 @@
                 return h('div', { className: 'bl-card bl-metrics' }, h(Metric, { label: '时间范围 Token', value: formatTokens(totals.totalTokens), hint: `${totals.calls} 次调用` }), h(Metric, { label: '估算费用', value: formatCost(totals.estimatedCost), hint: totals.unpricedCalls > 0 ? `${totals.unpricedCalls} 次未知模型未计价` : '估算费用，非官方账单', cost: true }), h(Metric, { label: '缓存命中 Token', value: formatTokens(totals.cacheReadTokens), hint: totals.totalTokens > 0 ? `占总量 ${(totals.cacheReadTokens / totals.totalTokens * 100).toFixed(1)}%` : '暂无缓存命中数据' }));
             }
             function Chart(props) {
+                var [hoveredIndex, setHoveredIndex] = React.useState(null);
                 var days = props.data.daily.slice(-7);
                 var maxTokens = Math.max(1, ...days.map(function (day) { return day.totalTokens; }));
                 var maxCost = Math.max(0.01, ...days.map(function (day) { return day.estimatedCost; }));
@@ -206,10 +220,20 @@
                         return `${path} C ${cp1x} ${previous.y}, ${cp2x} ${point.y}, ${point.x} ${point.y}`;
                     }, '');
                 var areaPath = costPath === '' ? '' : `${costPath} L ${costPoints[costPoints.length - 1].x} 92 L ${costPoints[0].x} 92 Z`;
-                return h('div', { className: 'bl-card bl-chartCard' }, h('div', { className: 'bl-cardHeader' }, h('div', { className: 'bl-cardTitle' }, '最近 7 天'), h('div', { className: 'bl-legend' }, h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchInput' }), '输入 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchCache' }), '缓存命中 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchOutput' }), '输出 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-lineLegend' }), '估算费用（¥）'))), days.length === 0 ? h('div', { className: 'bl-chartEmpty' }, '暂无模型调用记录') : h('div', { className: 'bl-chart' }, h('div', { className: 'bl-yLabels' }, h('span', null, formatTokens(maxTokens)), h('span', null, formatTokens(maxTokens / 2)), h('span', null, '0')), h('div', { className: 'bl-costLabels' }, h('span', null, `¥${maxCost.toFixed(2)}`), h('span', null, `¥${(maxCost / 2).toFixed(2)}`), h('span', null, '¥0')), h('div', { className: 'bl-chartPlot' }, h('div', { className: 'bl-bars', style: { gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` } }, days.map(function (day) {
+                var tooltip = null;
+                if (hoveredIndex !== null) {
+                    var hoveredDay = days[hoveredIndex];
+                    var hoveredPoint = costPoints[hoveredIndex];
+                    if (hoveredDay !== undefined && hoveredPoint !== undefined) {
+                        var hoveredTimestamp = new Date(`${hoveredDay.date}T00:00:00+08:00`).getTime();
+                        var tooltipTop = Math.max(5, Math.min(48, hoveredPoint.y - 24));
+                        tooltip = h('div', { className: 'bl-chartTooltip', role: 'tooltip', style: { left: `${Math.min(82, Math.max(18, hoveredPoint.x))}%`, top: `${tooltipTop}%`, transform: 'translateX(-50%)' } }, h('div', { className: 'bl-chartTooltipTitle' }, formatDate(hoveredTimestamp)), h('div', { className: 'bl-chartTooltipRows' }, h('div', { className: 'bl-chartTooltipRow' }, h('i', { className: 'bl-chartTooltipSwatch bl-chartTooltipSwatchInput' }), h('span', { className: 'bl-chartTooltipLabel' }, '输入 Token'), h('strong', { className: 'bl-chartTooltipValue' }, formatTokens(hoveredDay.inputTokens + hoveredDay.cacheWriteTokens))), h('div', { className: 'bl-chartTooltipRow' }, h('i', { className: 'bl-chartTooltipSwatch bl-chartTooltipSwatchCache' }), h('span', { className: 'bl-chartTooltipLabel' }, '缓存命中 Token'), h('strong', { className: 'bl-chartTooltipValue' }, formatTokens(hoveredDay.cacheReadTokens))), h('div', { className: 'bl-chartTooltipRow' }, h('i', { className: 'bl-chartTooltipSwatch bl-chartTooltipSwatchOutput' }), h('span', { className: 'bl-chartTooltipLabel' }, '输出 Token'), h('strong', { className: 'bl-chartTooltipValue' }, formatTokens(hoveredDay.outputTokens))), h('div', { className: 'bl-chartTooltipRow' }, h('i', { className: 'bl-chartTooltipSwatch bl-chartTooltipSwatchCost' }), h('span', { className: 'bl-chartTooltipLabel' }, '估算费用'), h('strong', { className: 'bl-chartTooltipValue bl-chartTooltipCost' }, formatCost(hoveredDay.estimatedCost)))));
+                    }
+                }
+                return h('div', { className: 'bl-card bl-chartCard' }, h('div', { className: 'bl-cardHeader' }, h('div', { className: 'bl-cardTitle' }, '最近 7 天'), h('div', { className: 'bl-legend' }, h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchInput' }), '输入 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchCache' }), '缓存命中 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchOutput' }), '输出 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-lineLegend' }), '估算费用（¥）'))), days.length === 0 ? h('div', { className: 'bl-chartEmpty' }, '暂无模型调用记录') : h('div', { className: 'bl-chart', onMouseLeave: function () { setHoveredIndex(null); } }, h('div', { className: 'bl-yLabels' }, h('span', null, formatTokens(maxTokens)), h('span', null, formatTokens(maxTokens / 2)), h('span', null, '0')), h('div', { className: 'bl-costLabels' }, h('span', null, `¥${maxCost.toFixed(2)}`), h('span', null, `¥${(maxCost / 2).toFixed(2)}`), h('span', null, '¥0')), h('div', { className: 'bl-chartPlot' }, h('div', { className: 'bl-bars', style: { gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` } }, days.map(function (day, index) {
                     var scale = 100 / maxTokens;
-                    return h('div', { className: 'bl-barColumn', key: day.date }, h('div', { className: 'bl-barStack', style: { height: `${Math.max(1, day.totalTokens * scale)}%` } }, h('div', { className: 'bl-bar bl-barOutput', style: { flex: day.outputTokens } }), h('div', { className: 'bl-bar bl-barCache', style: { flex: day.cacheReadTokens } }), h('div', { className: 'bl-bar bl-barInput', style: { flex: day.inputTokens + day.cacheWriteTokens } })));
-                })), h('svg', { className: 'bl-costLine', viewBox: '0 0 100 100', preserveAspectRatio: 'none', 'aria-hidden': true }, h('defs', null, h('linearGradient', { id: 'billing-cost-fill', x1: '0', y1: '0', x2: '0', y2: '1' }, h('stop', { offset: '0%', stopColor: '#f0a116', stopOpacity: '0.18' }), h('stop', { offset: '100%', stopColor: '#f0a116', stopOpacity: '0' }))), areaPath === '' ? null : h('path', { d: areaPath, fill: 'url(#billing-cost-fill)' }), costPath === '' ? null : h('path', { d: costPath, fill: 'none', stroke: '#e59a13', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke' }))), h('div', { className: 'bl-costPoints' }, days.map(function (day, index) {
+                    return h('div', { className: 'bl-barColumn', key: day.date, tabIndex: 0, 'aria-label': `${formatDate(new Date(`${day.date}T00:00:00+08:00`).getTime())}，输入 ${formatTokens(day.inputTokens + day.cacheWriteTokens)}，缓存命中 ${formatTokens(day.cacheReadTokens)}，输出 ${formatTokens(day.outputTokens)}，估算费用 ${formatCost(day.estimatedCost)}`, onMouseEnter: function () { setHoveredIndex(index); }, onFocus: function () { setHoveredIndex(index); } }, h('div', { className: 'bl-barStack', style: { height: `${Math.max(1, day.totalTokens * scale)}%` } }, h('div', { className: 'bl-bar bl-barOutput', style: { flex: day.outputTokens } }), h('div', { className: 'bl-bar bl-barCache', style: { flex: day.cacheReadTokens } }), h('div', { className: 'bl-bar bl-barInput', style: { flex: day.inputTokens + day.cacheWriteTokens } })));
+                })), h('svg', { className: 'bl-costLine', viewBox: '0 0 100 100', preserveAspectRatio: 'none', 'aria-hidden': true }, h('defs', null, h('linearGradient', { id: 'billing-cost-fill', x1: '0', y1: '0', x2: '0', y2: '1' }, h('stop', { offset: '0%', stopColor: '#f0a116', stopOpacity: '0.18' }), h('stop', { offset: '100%', stopColor: '#f0a116', stopOpacity: '0' }))), areaPath === '' ? null : h('path', { d: areaPath, fill: 'url(#billing-cost-fill)' }), costPath === '' ? null : h('path', { d: costPath, fill: 'none', stroke: '#e59a13', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke' })), tooltip), h('div', { className: 'bl-costPoints' }, days.map(function (day, index) {
                     var point = costPoints[index];
                     return h('span', { key: day.date, className: 'bl-costPoint', style: { left: `${point.x}%`, top: `${point.y}%` } });
                 })), h('div', { className: 'bl-xLabels', style: { gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` } }, days.map(function (day, index) {

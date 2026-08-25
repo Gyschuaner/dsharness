@@ -110,10 +110,21 @@ interface ExtensionEntryProps {
 				);
 			}
 
+			function BillingIcon(props: { size?: number }): React.ReactNode {
+				var size = (props && props.size) || 16;
+				return h(
+					'svg',
+					{ className: 'ext-icon', width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
+					h('path', { d: 'M3.5 1.75h9v12.5l-2.25-1.35L8 14.25l-2.25-1.35L3.5 14.25V1.75Z', stroke: 'currentColor', strokeWidth: 1.25, strokeLinejoin: 'round' }),
+					h('path', { d: 'M5.75 5h4.5M5.75 7.5h4.5M5.75 10h2.8', stroke: 'currentColor', strokeWidth: 1.15, strokeLinecap: 'round' })
+				);
+			}
+
 			function iconFor(id: string): ClientPrimitive {
 				if (id === 'skill') return P.IconSkillOutline16;
 				if (id === 'mcp') return P.IconLinkOutline16;
 				if (id === 'plugin') return P.IconCordisPluginOutline14;
+				if (id === 'billing') return BillingIcon;
 				return ExtIcon;
 			}
 
