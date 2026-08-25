@@ -23,6 +23,7 @@
 | dsh-skill-manager | 0.2.0（build 25） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`，向 extension-manager 贡献页面；catalog 读取零副作用 |
 | dsh-mcp-manager | 0.1.0 | 本仓库 `plugins/mcp-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-026 | MCP 服务器管理、热重载、工具投影与精选/Registry 市场，向 extension-manager 贡献 `mcp` 分区 |
 | dsh-plugin-manager | 0.2.0（build 2） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030 | 独立 Plugin 分区；本地插件管理、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
+| dsh-billing | 0.1.0 | 本仓库 `plugins/billing` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动） | DSH-032 | 影子计费 Host、SQLite 持久化、Extensions 独立 Billing 分区（Token 用量/调用明细）与 Billing 设置页 |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
@@ -36,7 +37,7 @@ Windows 仍以各自 profile 覆盖状态为准。
 - **Windows**：extension-manager、skill-manager、plugin-manager 与 better-sidebar 已安装；三个本仓库插件均以
   junction 指向当前 checkout。better-sidebar-smooth
   未安装（该胶囊动画撕裂在 Windows 宿主同样存在，需要时按 macOS 同法接入）。
-- **macOS**：extension-manager、skill-manager、mcp-manager、plugin-manager、
+- **macOS**：extension-manager、skill-manager、mcp-manager、plugin-manager、billing、
   better-sidebar-smooth 均通过 profile link 通道挂载，better-sidebar 0.12.3 走 npm
   官方通道；vision-bridge 通过 profile overlay 启用。历史遗留的 image-context-guard
   只保留源码回溯，不再属于已安装插件。

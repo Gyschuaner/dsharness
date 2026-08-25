@@ -23,6 +23,8 @@ importers:
 
   plugins/better-sidebar-smooth: {}
 
+  plugins/billing: {}
+
   plugins/extension-manager: {}
 
   plugins/image-context-guard: {}
