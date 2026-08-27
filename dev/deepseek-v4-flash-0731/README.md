@@ -66,11 +66,15 @@ scripts rather than copying or modifying their environments.
 
 ## DP-controlled single-model switching
 
-The relay publishes three logical model IDs, but the GPU host loads exactly one
+The relay publishes four logical model IDs, but the GPU host loads exactly one
 model on port 23341. `model-controller.py` listens only on `127.0.0.1:23340` and
 serializes switch requests. It stops known model screens, launches the requested
-profile, waits for both `/health` and the exact `/v1/models` alias, and rolls back
-to the previous model if the target does not become healthy within 2,700 seconds.
+profile, waits for the exact `/v1/models` alias, then requires a real short-prompt
+chat completion before reporting `ready`. It rolls back to the previous model if
+the target does not pass that inference gate within 2,700 seconds. The fourth
+entry is `Qwen3.8-Flash-Next-FP8`, launched from the isolated
+`/data1/gys/qwen38-flash-next` runtime; the preserved optimized DeepSeek Q8
+launcher remains its rollback target.
 
 ```bash
 install -m 600 model-controller.env.example \
@@ -84,7 +88,7 @@ The restricted reverse tunnel exposes only the Compose-private listeners
 `172.18.0.1:23341` (model API) and `172.18.0.1:23340` (controller) on the relay
 host. Neither port binds a public NIC. DP is the only UI that may call the switch
 endpoint. The 45-minute deadline covers a Q8 + DSpark cold load on the current
-disk. DSH lists all three IDs and can select one, but selecting an inactive model
+disk. DSH lists all four IDs and can select one, but selecting an inactive model
 returns HTTP 409 and never triggers a deployment change.
 
 If the controller process restarts while a switch is still loading, it resumes
