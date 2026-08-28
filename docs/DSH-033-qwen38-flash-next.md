@@ -3,8 +3,8 @@
 ## 目标
 
 DP-035 已将 `Qwen3.8-Flash-Next-FP8` 发布到 DP AI Relay。DSH-033 在不保存或改写
-Relay 密钥的前提下完成三项接入：把模型加入 DSH 可选列表、将本机默认主模型切到该
-模型试用、将 `vision-bridge` 的默认及部署覆盖路由切到同一模型。
+Relay 密钥的前提下完成两项接入：把模型加入 DSH 可选列表，并将 `vision-bridge` 的
+视觉后端及部署覆盖路由切到该模型。默认主模型继续使用现有 DeepSeek 纯文本模型。
 
 ## DSH 模型配置
 
@@ -25,8 +25,9 @@ Relay 密钥的前提下完成三项接入：把模型加入 DSH 可选列表、
     xhigh: xhigh
 ```
 
-本机试用配置把 `agent-default-model.model` 设为 `Qwen3.8-Flash-Next-FP8`，provider 仍为
-`dpgateway`，`reasoningEffort` 保持 `xhigh`。旧 Qwen3.8-27B、DeepSeek Q4/Q8 条目不删除。
+`Qwen3.8-Flash-Next-FP8` 保留为可选模型，但不设为默认主模型。本机
+`agent-default-model.model` 继续使用 `DeepSeek-V4-Flash-0731-Q8_K_XL`，provider 为
+`dpgateway`，`reasoningEffort` 为 `xhigh`。旧 Qwen3.8-27B、DeepSeek Q4/Q8 条目不删除。
 
 视觉桥使用 [`../dev/vision-bridge.dp-gateway.patch.yml`](../dev/vision-bridge.dp-gateway.patch.yml)
 中的受管覆盖；base bundle 行继续保持 `disabled: true`，只有目标 profile 显式覆盖才启用。
@@ -51,7 +52,7 @@ Plugin Manager 0.2.1 将该 inventory-only 条目合并为“系统 Bundle / 只
 请求。随后检查 `--dump-config` 中 vision-bridge 为 `disabled: false` 且模型正确，重启
 Web 后执行 `vision_inspect` 和插件库浏览器回归。
 
-回退主模型时将 `agent-default-model.model` 恢复为
-`DeepSeek-V4-Flash-0731-Q8_K_XL`。回退视觉模型时将 profile 覆盖恢复为
-`Qwen3.6-35B-A3B`；也可将 vision-bridge 设为 `disabled: true` 完全关闭。配置修改前的
-备份应保留到文本、图片与插件库冒烟全部完成。
+主模型没有随 DSH-033 切换，因此视觉桥启停和回退不应改写 `agent-default-model`。
+回退视觉模型时将 profile 覆盖恢复为 `Qwen3.6-35B-A3B`；也可将 vision-bridge 设为
+`disabled: true` 完全关闭，此时 `vision_inspect` 及其视觉代理链路不会挂载。配置修改前
+的备份应保留到文本、图片与插件库冒烟全部完成。

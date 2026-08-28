@@ -68,9 +68,9 @@ DSH-033 将 DP Gateway 路由更新为 `Qwen3.8-Flash-Next-FP8`。
 
 ## 变更日志
 
-- **2026-08-28（DSH-033 / BUG-F3AF6354）**：DSH 模型列表新增并默认选择 Relay 的
-  `Qwen3.8-Flash-Next-FP8`；视觉桥默认值、base bundle 默认关闭行和 profile 覆盖同步
-  使用该模型。Plugin Manager 0.2.1 将 `pluginInventory` 中的 vision-bridge 合并到
+- **2026-08-28（DSH-033 / BUG-F3AF6354）**：DSH 模型列表新增 Relay 的
+  `Qwen3.8-Flash-Next-FP8`，默认主模型保持 DeepSeek 纯文本路由；视觉桥默认值、base
+  bundle 默认关闭行和 profile 覆盖同步使用 Flash Next。Plugin Manager 0.2.1 将 `pluginInventory` 中的 vision-bridge 合并到
   本地插件列表，标记为“系统 Bundle / 只读”，显示真实 Loader 状态，并在 Host API
   拒绝从管理页写启停覆盖。
 
