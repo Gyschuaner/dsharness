@@ -26,11 +26,15 @@ export interface Watermark {
     fileMtimeMs: number;
     title: string | null;
     lastOffset: number;
+    routeProvider: string | null;
+    routeModel: string | null;
     updatedAt: number;
 }
 export interface Store {
     db: import('node:sqlite').DatabaseSync;
     insertUsage(record: UsageRecord): boolean;
+    hasUnknownUsage(sessionId: string): boolean;
+    repairUnknownUsage(recordId: string, model: string, costNano: number): boolean;
     putWatermark(watermark: Watermark): void;
     getWatermark(sessionId: string): Watermark | null;
     summarySince(dayFloor: string): {

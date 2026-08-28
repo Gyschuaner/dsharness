@@ -5,6 +5,7 @@
     { "path": "./plugins/extension-manager" },
     { "path": "./plugins/mcp-manager" },
     { "path": "./plugins/plugin-manager" },
+    { "path": "./plugins/shadow-billing" },
     { "path": "./plugins/skill-manager" }
   ]
 }

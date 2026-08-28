@@ -204,7 +204,7 @@ function prefersReducedMotion() {
                 }, []);
                 return h('div', { className: 'sb-settings', 'data-testid': 'sb-settings' }, h('h2', null, '用量计费'), h('p', null, '按 DeepSeek Flash 官方峰谷价对本地模型调用做影子计费。数据来自 DSH 会话日志中的真实 token 用量，仅作成本核算参考，不是真实账单。'), h('h3', null, '价目表（¥ / 1M tokens）'), h('table', { className: 'sb-table' }, h('thead', null, h('tr', null, h('th', null, '档位'), h('th', null, '低谷价'), h('th', null, '高峰价（×2）'))), h('tbody', null, h('tr', null, h('td', null, '缓存命中'), h('td', null, '0.05'), h('td', null, '0.10')), h('tr', null, h('td', null, '未命中'), h('td', null, '1.5'), h('td', null, '3.0')), h('tr', null, h('td', null, '输出'), h('td', null, '4.5'), h('td', null, '9.0')))), h('p', { className: 'sb-muted' }, '高峰时段：北京时间 9:00-12:00 / 14:00-18:00；2026-08-23 起周末全天低谷价。峰谷按北京时间判定，不随用户时区漂移。'), h('h3', null, '数据源'), status === null ? h('p', { className: 'sb-muted' }, '读取中…') : h(React.Fragment, null, h('p', { className: 'sb-mono' }, status.sessionsRoot), h('p', { className: 'sb-muted' }, status.lastFold === null
                     ? '尚未完成日志折叠。'
-                    : `上次折叠：${fmtTime(status.lastFold.at)} · 扫描 ${status.lastFold.scanned} 个会话 · 新增 ${status.lastFold.imported} 条记录。`)));
+                    : `上次折叠：${fmtTime(status.lastFold.at)} · 扫描 ${status.lastFold.scanned} 个会话 · 新增 ${status.lastFold.imported} 条 · 修复 ${status.lastFold.repaired ?? 0} 条。`)));
             }
             var existingStyle = document.querySelector('style[data-plugin="dsh-shadow-billing"]');
             var style = existingStyle || document.createElement('style');

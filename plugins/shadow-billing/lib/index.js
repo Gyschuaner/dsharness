@@ -72,9 +72,9 @@ function apply(ctx, rawConfig = {}) {
         folding = true;
         try {
             const result = foldAllSessions(store, pricing, sessionsRoot, ctx.logger);
-            lastFold = { at: Date.now(), imported: result.imported, scanned: result.scanned, errors: result.errors };
-            if (result.imported > 0) {
-                ctx.logger.info?.(`shadow-billing: folded ${result.scanned} sessions, imported ${result.imported}`);
+            lastFold = { at: Date.now(), imported: result.imported, repaired: result.repaired, scanned: result.scanned, errors: result.errors };
+            if (result.imported > 0 || result.repaired > 0) {
+                ctx.logger.info?.(`shadow-billing: folded ${result.scanned} sessions, imported ${result.imported}, repaired ${result.repaired}`);
             }
             // 明细保留清理：只删 usage_requests，聚合永久保留。
             if (retentionDays > 0) {

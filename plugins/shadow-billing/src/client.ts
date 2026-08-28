@@ -374,9 +374,9 @@ function prefersReducedMotion(): boolean {
 
 			/** 设置页：价目表与口径说明。 */
 			function SettingsView(): React.ReactNode {
-				const [status, setStatus] = React.useState<{ lastFold: { at: number; imported: number; scanned: number } | null; sessionsRoot: string } | null>(null);
+				const [status, setStatus] = React.useState<{ lastFold: { at: number; imported: number; repaired?: number; scanned: number } | null; sessionsRoot: string } | null>(null);
 				React.useEffect(() => {
-					apiGet<{ lastFold: { at: number; imported: number; scanned: number } | null; sessionsRoot: string }>('/api/shadow-billing/status').then(setStatus);
+					apiGet<{ lastFold: { at: number; imported: number; repaired?: number; scanned: number } | null; sessionsRoot: string }>('/api/shadow-billing/status').then(setStatus);
 				}, []);
 				return h('div', { className: 'sb-settings', 'data-testid': 'sb-settings' },
 					h('h2', null, '用量计费'),
@@ -398,7 +398,7 @@ function prefersReducedMotion(): boolean {
 						h('p', { className: 'sb-muted' },
 							status.lastFold === null
 								? '尚未完成日志折叠。'
-								: `上次折叠：${fmtTime(status.lastFold.at)} · 扫描 ${status.lastFold.scanned} 个会话 · 新增 ${status.lastFold.imported} 条记录。`),
+								: `上次折叠：${fmtTime(status.lastFold.at)} · 扫描 ${status.lastFold.scanned} 个会话 · 新增 ${status.lastFold.imported} 条 · 修复 ${status.lastFold.repaired ?? 0} 条。`),
 					),
 				);
 			}
