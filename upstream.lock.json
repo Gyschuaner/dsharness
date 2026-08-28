@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "cd5ef8148158c3a752a658978873241fdf8e2bbc",
   "baseTree": "a712eec535b48badc4fefb4df5176a7002e4280b",
-  "resultTree": "d6f183595a69d77b6d08b4b980825147bf8dd4c2",
+  "resultTree": "3c507de8928ae7f0ead43a997a52b5020f4a8a9c",
   "dshVersion": "0.1.2-alpha.1",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -12,6 +12,14 @@
     {
       "path": "upstream-patches/0027-feat-DSH-034-port-vision-bridge-to-alpha1.patch",
       "sha256": "7734BCCE03D41D9D42F7EC49A8CFB28478C11345FF801807334199106C816616"
+    },
+    {
+      "path": "upstream-patches/0028-fix-BUG-ED668FD3-detect-node-loader-shape.patch",
+      "sha256": "56D0A961DE4C634ED866D4344A16E845D17EF63F38EDBCAA64AC10E3C00F245A"
+    },
+    {
+      "path": "upstream-patches/0029-fix-BUG-046F63F9-restore-alpha1-tool-durations.patch",
+      "sha256": "4FCB78083B53712C00F638362421A5F456718925832DE5FABC44246B344CB821"
     }
   ]
 }

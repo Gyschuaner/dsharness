@@ -1,0 +1,129 @@
+From fbe70b254384416c6108366da6391e6a3b29f1ac Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 29 Aug 2026 00:53:26 +0800
+Subject: [PATCH] fix(BUG-ED668FD3): detect Node internal loader API shape
+
+---
+ .../modules/tests/node-half.client.spec.ts    | 38 +++++++++++++++++++
+ vendor/README.md                              |  1 +
+ vendor/loader/src/internal.ts                 | 30 +++++++++++----
+ 3 files changed, 61 insertions(+), 8 deletions(-)
+
+diff --git a/packages/client/modules/tests/node-half.client.spec.ts b/packages/client/modules/tests/node-half.client.spec.ts
+index 5553c94c8e..0559dd1c14 100644
+--- a/packages/client/modules/tests/node-half.client.spec.ts
++++ b/packages/client/modules/tests/node-half.client.spec.ts
+@@ -10,6 +10,7 @@ import { runInNewContext } from 'node:vm'
+ import { Context, type Fiber } from '@deepseek-ai/cordis'
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import { renderIndexInjections, type WebServer, type WebRoute } from '@deepseek-ai/dsh-host-webserver'
++import { detectModuleLoader } from '../../../../vendor/loader/src/internal.ts'
+ import * as modulesClient from '../src/client/index.ts'
+ import { ClientModuleRegistry, bootInjections, orderByModuleGraph } from '../src/index.ts'
+ import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
+@@ -30,6 +31,43 @@ afterEach(() => {
+   root = undefined
+ })
+ 
++describe('Node internal ModuleLoader detection', () => {
++  it('uses the v1 call contract when Node 24 exposes getModuleJobForImport', () => {
++    const raw = {
++      resolveSync() {},
++      getModuleJobForImport() {},
++    }
++
++    expect(detectModuleLoader(raw)).toBe(raw)
++    expect(raw).toMatchObject({ version: 'v1' })
++  })
++
++  it('uses the v2 request-object contract when getOrCreateModuleJob is exposed', () => {
++    const raw = {
++      resolveSync() {},
++      getOrCreateModuleJob() {},
++    }
++
++    expect(detectModuleLoader(raw)).toBe(raw)
++    expect(raw).toMatchObject({ version: 'v2' })
++  })
++
++  it('prefers the v2 discriminator when a transitional loader exposes both methods', () => {
++    const raw = {
++      resolveSync() {},
++      getModuleJobForImport() {},
++      getOrCreateModuleJob() {},
++    }
++
++    expect(detectModuleLoader(raw)).toMatchObject({ version: 'v2' })
++  })
++
++  it('rejects an unsupported internal loader shape', () => {
++    expect(detectModuleLoader({ resolveSync() {} })).toBeUndefined()
++    expect(detectModuleLoader(undefined)).toBeUndefined()
++  })
++})
++
+ /** Create a resolvable package whose client export points at the returned path. */
+ function writePackage(
+   packageName: string,
+diff --git a/vendor/README.md b/vendor/README.md
+index d587daf486..0aaa462916 100644
+--- a/vendor/README.md
++++ b/vendor/README.md
+@@ -48,6 +48,7 @@ Keep this log exhaustive — every divergence from upstream must be listed.
+ 16. **`cordis/package.json` publishes `src`**: added `src` to the `files` list, joining the other eight vendored packages. Cordis declares `"./src/*": "./src/*"` in its exports, so a tarball without `src` publishes an export map pointing at absent files; the release change judgement also reads `files` to decide whether a diff reaches the payload, and a package whose only published paths are build output has no tracked path to match.
+ 17. **`@deepseek-ai` rescope**: every vendored manifest `name`, every internal dependency entry among the vendored set, and every module specifier that reaches them use the scoped names in the manifest table's `npm name` column. Directory names, version numbers, and dependency ranges are unchanged, and no upstream runtime identifier is renamed — `Symbol.for('schemastery')` and Schemastery's `vendor:` metadata field keep their upstream values. Re-apply with `pnpm run rescope-vendor --apply` after a sync; the table's two name columns are the mapping, restated for consumers in [docs/rescope.md](../docs/rescope.md).
+ 18. **Entry `disabled` interpolation in `loader/src/config/entry.ts`**: a `disabled: !!js` expression evaluates against the loader context at every mount decision; the raw node stays in the options, so write-back keeps the `!!js` form. `disabled` is the only interpolated metadata field. Covered by `packages/boot/app-boot/tests/user-patches.spec.ts` and `apps/cli/tests/windows-shell.spec.ts`.
++19. **Node internal ESM loader capability detection in `loader/src/internal.ts`**: chooses the v1 or v2 `resolveSync` call contract from the methods exposed by the running loader instead of assuming every Node 24 build uses v2. Node 24.11 exposes the v1 `getModuleJobForImport` shape; misclassifying it made package resolution throw and left the web client boot graph empty. Covered by `packages/client/modules/tests/node-half.client.spec.ts`.
+ 
+ ## Sync procedure
+ 
+diff --git a/vendor/loader/src/internal.ts b/vendor/loader/src/internal.ts
+index ccf08debc6..5dfede5a70 100644
+--- a/vendor/loader/src/internal.ts
++++ b/vendor/loader/src/internal.ts
+@@ -101,6 +101,25 @@ export interface ModuleLoaderV2 {
+ /** Supported Node internal ESM loader shapes. */
+ export type ModuleLoader = ModuleLoaderV1 | ModuleLoaderV2
+ 
++/**
++ * Tag a Node internal ESM loader from the methods it actually exposes. Node's
++ * private API shape does not follow a stable major-version boundary: Node
++ * 24.11 again exposes the v1 `resolveSync(specifier, parentURL, attributes)`
++ * contract even though earlier Node 24 builds exposed the request-object v2
++ * contract. Capability detection keeps call sites aligned with the running
++ * executable instead of guessing from `process.versions.node`.
++ */
++export function detectModuleLoader(raw: Record<string, unknown> | undefined): ModuleLoader | undefined {
++  if (raw === undefined || typeof raw.resolveSync !== 'function') return undefined
++  if (typeof raw.getOrCreateModuleJob === 'function') {
++    return Object.assign(raw, { version: 'v2' }) as unknown as ModuleLoaderV2
++  }
++  if (typeof raw.getModuleJobForImport === 'function') {
++    return Object.assign(raw, { version: 'v1' }) as unknown as ModuleLoaderV1
++  }
++  return undefined
++}
++
+ /** Helpers for locating the current Node internal module loader. */
+ export namespace ModuleLoader {
+   let _cachedLoader: ModuleLoader | undefined
+@@ -120,13 +139,8 @@ export namespace ModuleLoader {
+   export function fromInternal(): ModuleLoader | undefined {
+     if (_cachedLoader) return _cachedLoader
+     const [major] = process.versions.node.split('.').map(Number)
+-
+-    if (major >= 24) {
+-      const raw = requireInternal('internal/modules/esm/loader')?.getOrInitializeCascadedLoader()
+-      if (raw) return _cachedLoader = Object.assign(raw, { version: 'v2' })
+-    } else if (major >= 22) {
+-      const raw = requireInternal('internal/modules/esm/loader')?.getOrInitializeCascadedLoader()
+-      if (raw) return _cachedLoader = Object.assign(raw, { version: 'v1' })
+-    }
++    if (major < 22) return undefined
++    const raw = requireInternal('internal/modules/esm/loader')?.getOrInitializeCascadedLoader()
++    return _cachedLoader = detectModuleLoader(raw)
+   }
+ }
+-- 
+2.51.2.windows.1
+

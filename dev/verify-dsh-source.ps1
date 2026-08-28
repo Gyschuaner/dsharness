@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$SourceDirectory,
+    [string]$BuildDirectory,
     [int]$Port = 3080,
     [switch]$RequireWeb,
     [switch]$SkipCliVersion
@@ -14,6 +15,17 @@ if ([string]::IsNullOrWhiteSpace($SourceDirectory)) {
     $SourceDirectory = Join-Path (Split-Path -Parent $RepoRoot) 'deepseek-harness'
 }
 $SourceDirectory = [IO.Path]::GetFullPath($SourceDirectory)
+if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
+    $SourceParent = Split-Path -Parent $SourceDirectory
+    $SourceLeaf = Split-Path -Leaf $SourceDirectory
+    $RuntimeCandidate = Join-Path $SourceParent "$SourceLeaf-runtime"
+    $BuildDirectory = if (Test-Path -LiteralPath (Join-Path $RuntimeCandidate '.git')) {
+        $RuntimeCandidate
+    } else {
+        $SourceDirectory
+    }
+}
+$BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 
 $Failures = New-Object 'System.Collections.Generic.List[string]'
 function Check([bool]$Condition, [string]$Message) {
@@ -82,6 +94,16 @@ if (Test-Path -LiteralPath $GitDirectory) {
     }
 }
 
+$BuildGitDirectory = Join-Path $BuildDirectory '.git'
+Check (Test-Path -LiteralPath $BuildGitDirectory) "构建目录是 Git worktree：$BuildDirectory"
+if (Test-Path -LiteralPath $BuildGitDirectory) {
+    $BuildTree = Get-GitTree $BuildDirectory
+    Check ($BuildTree -eq $Lock.resultTree) "构建目录 tree $($Lock.resultTree)"
+    $BuildStatus = @(& git -C $BuildDirectory status --porcelain=v1 --untracked-files=all)
+    $BuildTrackedDirty = @($BuildStatus | Where-Object { $_ -and $_ -notmatch '^\?\? ' })
+    Check ($BuildTrackedDirty.Count -eq 0) '构建工作区无已跟踪文件修改'
+}
+
 foreach ($Patch in $Lock.patches) {
     $PatchPath = Join-Path $RepoRoot $Patch.path
     $HashMatches = $false
@@ -96,19 +118,19 @@ $RootPackage = Read-Text (Join-Path $SourceDirectory 'package.json')
 Check ($RootPackage -match '"version"\s*:\s*"0\.1\.2-alpha\.1"') '源码版本 0.1.2-alpha.1'
 Check ($RootPackage -match '"packageManager"\s*:\s*"pnpm@11\.7\.0"') '源码 packageManager 为 pnpm@11.7.0'
 
-$CliEntry = Join-Path $SourceDirectory 'apps/cli/lib/bin.js'
+$CliEntry = Join-Path $BuildDirectory 'apps/cli/lib/bin.js'
 $GatewaySource = Join-Path $SourceDirectory 'packages/api/gateway/src/index.ts'
-$GatewayBundle = Join-Path $SourceDirectory 'packages/api/gateway/lib/index.js'
+$GatewayBundle = Join-Path $BuildDirectory 'packages/api/gateway/lib/index.js'
 $SessionControllerSource = Join-Path $SourceDirectory 'packages/api/session-controller/src/commands.ts'
-$SessionControllerBundle = Join-Path $SourceDirectory 'packages/api/session-controller/lib/index.js'
+$SessionControllerBundle = Join-Path $BuildDirectory 'packages/api/session-controller/lib/index.js'
 $AcpSource = Join-Path $SourceDirectory 'packages/acp/acp/src/index.ts'
-$AcpBundle = Join-Path $SourceDirectory 'packages/acp/acp/lib/index.js'
+$AcpBundle = Join-Path $BuildDirectory 'packages/acp/acp/lib/index.js'
 $AttachmentSource = Join-Path $SourceDirectory 'packages/attachment/attachment-local/src/index.ts'
-$AttachmentBundle = Join-Path $SourceDirectory 'packages/attachment/attachment-local/lib/index.js'
+$AttachmentBundle = Join-Path $BuildDirectory 'packages/attachment/attachment-local/lib/index.js'
 $DeepSeekAdapterSource = Join-Path $SourceDirectory 'packages/llm/llm-deepseek/src/adapter.ts'
-$DeepSeekAdapterBundle = Join-Path $SourceDirectory 'packages/llm/llm-deepseek/lib/index.js'
+$DeepSeekAdapterBundle = Join-Path $BuildDirectory 'packages/llm/llm-deepseek/lib/index.js'
 $VisionSourcePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/index.ts'
-$VisionBundlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/lib/index.js'
+$VisionBundlePath = Join-Path $BuildDirectory 'packages/vision/vision-bridge/lib/index.js'
 $VisionRowPath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.tsx'
 $VisionStylePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.module.css'
 $VisionThrottlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts'
@@ -213,11 +235,15 @@ if ($RequireWeb) {
         $RuntimeMetadata = Get-Content -LiteralPath $RuntimeMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
         Check ([int]$RuntimeMetadata.anonymousHttpStatus -eq 401) '运行元数据记录匿名 HTTP 401'
         Check ([int]$RuntimeMetadata.authenticatedHttpStatus -eq 200) '运行元数据记录认证 HTTP 200'
+        Check ([int]$RuntimeMetadata.clientBootEntryCount -gt 0) '运行元数据记录非空 client boot entries'
+        Check ([int]$RuntimeMetadata.clientBootBatchCount -gt 0) '运行元数据记录非空 client boot batches'
+        Check ([int]$RuntimeMetadata.clientBootBatchHttp200Count -eq [int]$RuntimeMetadata.clientBootBatchCount) '运行元数据记录全部 client boot batch HTTP 200'
+        Check ($RuntimeMetadata.clientModulesPreloaded -eq $true) '运行元数据记录 client-modules 已预加载'
         Check ([int]$RuntimeMetadata.skillManagerApiVersion -ge 6) '运行元数据记录 skill-manager apiVersion >= 6'
         Check ([int]$RuntimeMetadata.pluginManagerApiVersion -ge 1) '运行元数据记录 plugin-manager apiVersion >= 1'
         Check ($RuntimeMetadata.sourceTree -eq $Lock.resultTree) '运行元数据源码 tree 与锁文件一致'
         Check ($RuntimeMetadata.expectedTree -eq $Lock.resultTree) '运行元数据期望 tree 与锁文件一致'
-        Check ([IO.Path]::GetFullPath([string]$RuntimeMetadata.buildDirectory) -eq $SourceDirectory) '运行元数据构建目录与本次校验目录一致'
+        Check ([IO.Path]::GetFullPath([string]$RuntimeMetadata.buildDirectory) -eq $BuildDirectory) '运行元数据构建目录与本次校验目录一致'
         $Listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
         Check ($null -ne $Listener -and [int]$Listener.OwningProcess -eq [int]$RuntimeMetadata.pid) '运行元数据 PID 与监听进程一致'
     }

@@ -73,6 +73,9 @@
      一次性 token 换取会话后的认证 HTTP 200、监听 PID、实际命令行、skill-manager/plugin-manager
      API 版本和构建元数据；一次性 token 必须立即从启动日志脱敏。只看到构建成功、没有看到实际
      启动成功，不能声明本地服务可用。
+   - 本仓库每个 `plugins/*/tsconfig.json` 都必须登记在根 `tsconfig.json` 的 project references；标准
+     启动入口必须先对本仓库执行 frozen install、clean build，并逐个校验插件 `package.json` 指向的
+     `lib` export，再构建上游 runtime。仅检查旧 `lib` 是否存在不算通过。
 
 4. 不同改动的最小执行范围如下：
    - 插件 Host、插件 Client、插件依赖或插件 profile：先在 `dsharness` 执行
