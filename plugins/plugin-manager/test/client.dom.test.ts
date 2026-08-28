@@ -60,6 +60,7 @@ function localPlugin(name, overrides = {}) {
 		source: '本地',
 		spec: `link:C:/plugins/${name}`,
 		enabled: true,
+		managed: true,
 		protected: false,
 		repository: null,
 		license: 'MIT',
@@ -264,6 +265,7 @@ test('Plugin loading exits to a retryable error and retry restores the real list
 
 test('real Plugin contribution renders without shell business placeholders and shows the denoised local page', async (t) => {
 	let plugins = [
+		localPlugin('@deepseek-ai/dsh-vision-bridge', { rowId: 'vision-bridge', source: '系统 Bundle', spec: '@deepseek-ai/dsh-base', enabled: false, managed: false, runtimeEnabled: false, runtimePhase: null }),
 		localPlugin('dsh-extension-manager', { protected: true }),
 		localPlugin('dsh-plugin-manager', { protected: true }),
 		localPlugin('dsh-skill-manager'),
@@ -286,9 +288,14 @@ test('real Plugin contribution renders without shell business placeholders and s
 	assert.ok(h.dom.window.document.querySelector('.pm-root'));
 	assert.equal(h.dom.window.document.querySelector('.pm-head h2').textContent, 'Plugin');
 	assert.ok(!h.dom.window.document.body.textContent.includes('插件管理（建设中）'));
-	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-row').length, 3);
-	assert.equal(h.dom.window.document.querySelectorAll('.pm-switch').length, 3);
-	assert.equal(h.dom.window.document.querySelectorAll('.pm-switch:disabled').length, 2);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-row').length, 4);
+	assert.equal(h.dom.window.document.querySelectorAll('.pm-switch').length, 4);
+	assert.equal(h.dom.window.document.querySelectorAll('.pm-switch:disabled').length, 3);
+	const visionRow = [...h.dom.window.document.querySelectorAll('.pm-row')].find((item) => item.textContent.includes('@deepseek-ai/dsh-vision-bridge'));
+	assert.ok(visionRow.textContent.includes('系统 Bundle'));
+	assert.ok(visionRow.textContent.includes('只读'));
+	assert.equal(visionRow.querySelector('[role="switch"]').getAttribute('aria-checked'), 'false');
+	assert.equal(visionRow.querySelector('[role="switch"]').disabled, true);
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'Plugin']);
 
 	const listNode = h.dom.window.document.querySelector('[data-testid="local-list"]');
@@ -303,7 +310,7 @@ test('real Plugin contribution renders without shell business placeholders and s
 	await h.click(toggle);
 	await h.flush();
 	assert.ok(calls.some((call) => call.op === 'setEnabled' && call.name === 'dsh-skill-manager' && call.enabled === false));
-	assert.deepEqual([...h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-rowTitle')].map((item) => item.textContent), ['dsh-extension-manager', 'dsh-plugin-manager', 'dsh-skill-manager'], 'toggle does not reorder rows');
+	assert.deepEqual([...h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-rowTitle')].map((item) => item.textContent), ['@deepseek-ai/dsh-vision-bridge', 'dsh-extension-manager', 'dsh-plugin-manager', 'dsh-skill-manager'], 'toggle does not reorder rows');
 
 	await h.click(h.dom.window.document.querySelector('.pm-drawer .pm-close'));
 	await h.click(h.button('导入插件'));

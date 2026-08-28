@@ -21,14 +21,15 @@
 |---|---|---|---|---|---|---|
 | dsh-extension-manager | 0.2.0（build 2） | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
 | dsh-skill-manager | 0.2.0（build 25） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`，向 extension-manager 贡献页面；catalog 读取零副作用 |
-| dsh-plugin-manager | 0.2.0（build 2） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030 | 独立 Plugin 分区；本地插件管理、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
+| dsh-plugin-manager | 0.2.1（build 3） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030 / BUG-F3AF6354 | 独立 Plugin 分区；本地插件管理、系统 Bundle 只读展示、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
 `@deepseek-ai/dsh-vision-bridge` 已进入 DSH-005 锁定源码和 base bundle，但 base 行默认
-`disabled: true`，不属于当前 3080 已启用插件。DP Gateway 暴露
-`Qwen3.6-35B-A3B` 并完成健康检查后，才按
-[`DSH-005-vision-bridge.md`](DSH-005-vision-bridge.md) 合入 profile 覆盖。
+`disabled: true`；Plugin Manager 0.2.1 起仍会将它显示为系统 Bundle 只读条目。当前
+macOS profile 不再覆盖该行，启动时保持关闭；需要时可按
+[`DSH-005-vision-bridge.md`](DSH-005-vision-bridge.md) 显式启用，并通过
+`Qwen3.8-Flash-Next-FP8` 提供视觉能力。
 
 ## 宿主差异（2026-08-17）
 
@@ -68,6 +69,13 @@
 
 ## 变更日志
 
+- **2026-08-28（DSH-033 / BUG-F3AF6354）**：DSH 模型列表新增 Relay 的
+  `Qwen3.8-Flash-Next-FP8`，默认主模型保持 DeepSeek 纯文本路由；视觉桥默认值、base
+  bundle 默认关闭行和显式启用模板同步使用 Flash Next。本机移除 profile 启用覆盖，
+  启动时继承 `disabled: true`。Plugin Manager 0.2.1 将 `pluginInventory` 中的
+  vision-bridge 合并到本地插件列表，标记为“系统 Bundle / 只读”，显示真实 Loader
+  状态，并在 Host API 拒绝从管理页写启停覆盖。
+
 - **2026-08-24（macOS 宿主，DSH-005 部署）**：启用 `@deepseek-ai/dsh-vision-bridge`。
   将 `dev/vision-bridge.dp-gateway.patch.yml` 覆盖行（`disabled: false` +
   `DPGATEWAY_API_KEY` + `Qwen3.6-35B-A3B`）合入 `~/.dsh/profiles/web/cordis.patch.yml`，
@@ -75,8 +83,8 @@
   `GET /v1/models` 确认仍暴露 `Qwen3.6-35B-A3B`。`--dump-config` 离线树确认
   `disabled: false` 生效；重启 dsh web（`DSH_SOURCE_DIR=deepseek-harness-main-build`
   的 restart-dsh-web.command）后冒烟测试通过：`vision_inspect` 本地 JPEG 路径输入，
-  视觉模型正确返回图片描述（含界面标题与模型名）。注意：插件页本地列表以 profile
-  直接依赖为数据源，bundle 层行不展示，故视觉桥不在「扩展-插件」页显示。
+  视觉模型正确返回图片描述（含界面标题与模型名）。当时插件页本地列表仅以 profile
+  直接依赖为数据源，bundle 层行不展示；该限制已由 BUG-F3AF6354 修复。
 
 - **2026-08-24（BUG-0AA85F45 / build 25）**：Skill catalog/projectState 改为严格只读，
   破坏性孤儿清理默认关闭；加入任意公开 GitHub 仓库的目录发现、安装预览、原子安装和一等来源

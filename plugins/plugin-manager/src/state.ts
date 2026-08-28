@@ -7,17 +7,26 @@
  */
 import { mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { MARKETPLACE, findMarketplaceEntry, type MarketplaceEntry } from './marketplace.js';
 import { DEFAULT_REGISTRY_URL, normalizeRegistry, type PluginRegistry, type RegistryItem } from './registry.js';
 
-export const API_VERSION = 1;
+export const API_VERSION = 2;
 export const OVERRIDE_START = '# plugin-manager:overrides:start';
 export const OVERRIDE_END = '# plugin-manager:overrides:end';
 export const MOUNT_START = '# plugin-manager:mounts:start';
 export const MOUNT_END = '# plugin-manager:mounts:end';
 export const PROTECTED_PACKAGES = new Set(['dsh-extension-manager', 'dsh-plugin-manager']);
+
+const SYSTEM_VISIBLE_PACKAGES: ReadonlyMap<string, { source: string; spec: string; description: string }> = new Map([
+	['@deepseek-ai/dsh-vision-bridge', {
+		source: '系统 Bundle',
+		spec: '@deepseek-ai/dsh-base',
+		description: '为纯文本主模型提供按需图片理解的可选视觉桥。',
+	}],
+]);
 
 const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
 const PACKAGE_SPEC_RE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@(?:latest|next|beta|alpha|\d[^\s]*))?$/i;
@@ -76,6 +85,7 @@ export interface LocalPlugin {
 	source: string;
 	spec: string;
 	enabled: boolean;
+	managed: boolean;
 	protected: boolean;
 	repository: string | null;
 	license: string | null;
@@ -412,6 +422,18 @@ async function readInstalledManifest(profileDir: string, name: string): Promise<
 	}
 }
 
+async function readRuntimeManifest(profileDir: string, name: string): Promise<PluginManifest | null> {
+	if (!PACKAGE_NAME_RE.test(name)) return null;
+	try {
+		const profileRequire = createRequire(join(profileDir, 'package.json'));
+		const manifestPath = profileRequire.resolve(`${name}/package.json`);
+		const parsed: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
+		return isDshPluginManifest(parsed) && parsed.name === name ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
 function isContainedPath(root: string, candidate: string): boolean {
 	const rel = relative(root, candidate);
 	return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`));
@@ -495,6 +517,7 @@ async function listLocalPlugins(profileDir: string): Promise<LocalPlugin[]> {
 			source: dependencySource(spec),
 			spec: String(spec),
 			enabled: effectiveEnabledFor(rowId, patch),
+			managed: true,
 			protected: PROTECTED_PACKAGES.has(name),
 			repository: repositorySlug(manifest.repository),
 			license: typeof manifest.license === 'string' ? manifest.license : null,
@@ -823,6 +846,36 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 					const entry = isRecord(entryValue) ? entryValue : null;
 					return entry ? Object.assign({}, plugin, { runtimeEnabled: entry.enabled === true, runtimePhase: typeof entry.fiberPhase === 'string' ? entry.fiberPhase : null }) : plugin;
 				});
+				const knownNames = new Set(plugins.map((plugin) => plugin.name));
+				for (const entryValue of entries) {
+					if (!isRecord(entryValue) || typeof entryValue.moduleName !== 'string' || typeof entryValue.entryId !== 'string') continue;
+					const catalog = SYSTEM_VISIBLE_PACKAGES.get(entryValue.moduleName);
+					if (!catalog || knownNames.has(entryValue.moduleName)) continue;
+					const manifest = await readRuntimeManifest(profileDir, entryValue.moduleName);
+					const runtimeEnabled = entryValue.enabled === true;
+					plugins.push({
+						name: entryValue.moduleName,
+						rowId: entryValue.entryId,
+						version: String(manifest?.version || '未知'),
+						description: firstSentence(manifest?.description) || catalog.description,
+						source: catalog.source,
+						spec: catalog.spec,
+						enabled: runtimeEnabled,
+						managed: false,
+						protected: false,
+						repository: repositorySlug(manifest?.repository),
+						license: typeof manifest?.license === 'string' ? manifest.license : null,
+						runtimeEnabled,
+						runtimePhase: typeof entryValue.fiberPhase === 'string' ? entryValue.fiberPhase : null,
+						manifest: {
+							hostEntry: typeof manifest?.main === 'string' ? manifest.main : null,
+							clientEntry: manifest ? exportClientEntry(manifest) : null,
+							bundlePatch: manifest?.dsh.bundle?.patch || null,
+						},
+					});
+					knownNames.add(entryValue.moduleName);
+				}
+				plugins.sort((a, b) => a.name.localeCompare(b.name));
 			} catch {
 				// Runtime inventory is supplementary. Profile management remains
 				// available when the optional read-only service is absent or failed.
@@ -947,6 +1000,9 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 		return enqueueMutation(async () => {
 			const local = await listLocalPlugins(profileDir);
 			const plugin = local.find((item) => item.name === pluginName);
+			if (!plugin && SYSTEM_VISIBLE_PACKAGES.has(pluginName)) {
+				throw new ApiError(409, '此插件由系统 Bundle 管理，当前页面只读展示', 'PLUGIN_SYSTEM_READ_ONLY');
+			}
 			if (!plugin) throw new ApiError(404, `未安装插件：${pluginName}`, 'PLUGIN_NOT_FOUND');
 			if (plugin.enabled === enabled) return { changed: false, restartRequired: false, plugin };
 			const patchPath = join(profileDir, 'cordis.patch.yml');

@@ -1,0 +1,80 @@
+From 7e472a0079e0d14245fedd3fa8ce5ccf1e029092 Mon Sep 17 00:00:00 2001
+From: guyisheng <guyisheng@senzadmindeMacBook-Air.local>
+Date: Fri, 28 Aug 2026 10:27:01 +0800
+Subject: [PATCH] feat(DSH-033): route vision bridge to Qwen3.8 Flash Next
+
+---
+ packages/bundle/base/cordis.patch.yml          | 2 +-
+ packages/vision/vision-bridge/README.i18n.yaml | 4 ++--
+ packages/vision/vision-bridge/README.md        | 2 +-
+ packages/vision/vision-bridge/README.zh.md     | 2 +-
+ packages/vision/vision-bridge/src/index.ts     | 2 +-
+ 5 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/packages/bundle/base/cordis.patch.yml b/packages/bundle/base/cordis.patch.yml
+index 8afe606..19e38a1 100644
+--- a/packages/bundle/base/cordis.patch.yml
++++ b/packages/bundle/base/cordis.patch.yml
+@@ -115,7 +115,7 @@
+       disabled: true
+       config:
+         apiKeyEnv: QWEN_VISION_API_KEY
+-        model: Qwen3.6-35B-A3B
++        model: Qwen3.8-Flash-Next-FP8
+         timeoutMs: 120000
+         maxImagesPerCall: 20
+         maxOutputTokens: 4096
+diff --git a/packages/vision/vision-bridge/README.i18n.yaml b/packages/vision/vision-bridge/README.i18n.yaml
+index 7fcc95f..178b1d4 100644
+--- a/packages/vision/vision-bridge/README.i18n.yaml
++++ b/packages/vision/vision-bridge/README.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write packages/vision/vision-bridge/README.md
+-README.md: e4996de8eee4f0660f53fe7200644101de02b9da
+-README.zh.md: f0326d39d8adfe89127d1377edc967d094ca2c66
++README.md: 1849575805b915ac0fec23f889a037673868b67b
++README.zh.md: f7017f6d3aab7530ce9f6e31e95184723e48a39d
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+index e4996de..1849575 100644
+--- a/packages/vision/vision-bridge/README.md
++++ b/packages/vision/vision-bridge/README.md
+@@ -16,7 +16,7 @@ Enable the existing base-bundle row in a later composition patch and restate its
+   config:
+     baseURL: !!js process.env.DSH_VISION_BASE_URL
+     apiKeyEnv: QWEN_VISION_API_KEY
+-    model: Qwen3.6-35B-A3B
++    model: Qwen3.8-Flash-Next-FP8
+     timeoutMs: 120000
+     maxImagesPerCall: 20
+     maxOutputTokens: 4096
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+index f0326d3..f7017f6 100644
+--- a/packages/vision/vision-bridge/README.zh.md
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -16,7 +16,7 @@
+   config:
+     baseURL: !!js process.env.DSH_VISION_BASE_URL
+     apiKeyEnv: QWEN_VISION_API_KEY
+-    model: Qwen3.6-35B-A3B
++    model: Qwen3.8-Flash-Next-FP8
+     timeoutMs: 120000
+     maxImagesPerCall: 20
+     maxOutputTokens: 4096
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+index f373810..9aa5547 100644
+--- a/packages/vision/vision-bridge/src/index.ts
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -41,7 +41,7 @@ export const DEFAULT_VISION_API_KEY_ENV = 'QWEN_VISION_API_KEY'
+ /** Default environment variable carrying the OpenAI-compatible endpoint base. */
+ export const DEFAULT_VISION_BASE_URL_ENV = 'DSH_VISION_BASE_URL'
+ /** Default remote visual sub-agent model. */
+-export const DEFAULT_VISION_MODEL = 'Qwen3.6-35B-A3B'
++export const DEFAULT_VISION_MODEL = 'Qwen3.8-Flash-Next-FP8'
+ /** Default cooperative call timeout. */
+ export const DEFAULT_VISION_TIMEOUT_MS = 120_000
+ /** Default image-count bound for one visual inspection, aligned with 0.1.1 attachment admission. */
+-- 
+2.50.1 (Apple Git-155)
+

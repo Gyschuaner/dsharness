@@ -12,6 +12,7 @@ interface PluginLocalView {
     source: string;
     spec: string;
     enabled: boolean;
+    managed: boolean;
     protected: boolean;
     repository: string | null;
     license: string | null;

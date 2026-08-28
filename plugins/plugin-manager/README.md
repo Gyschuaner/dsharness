@@ -18,7 +18,9 @@ GitHub 详情的受控插件市场。
 - `dsh-extension-manager` 只拥有主页“扩展”入口、全页壳和分区导航。
 - `dsh-plugin-manager` 独立拥有 Plugin 页面与 Host API。
 - `dsh-skill-manager` 不提供 Plugin 入口、占位或业务。
-- 页面管理的是 `web` profile 的直接 DSH 插件依赖，不把 Cordis 内部基础行伪装成用户插件。
+- 页面管理 `web` profile 的直接 DSH 插件依赖，并只读展示需要由用户确认状态的系统
+  Bundle 插件。当前 `@deepseek-ai/dsh-vision-bridge` 即使由 base bundle 提供、不能从页面
+  安全启停，也会显示真实 Loader 状态；其他 Cordis 内部基础行不会伪装成用户插件。
 
 ## 本地插件
 
@@ -32,6 +34,11 @@ GitHub 详情的受控插件市场。
 写入使用同目录临时文件再原子替换，并在 Host 生命周期内串行执行。用于维持页面的
 `dsh-extension-manager` 和 `dsh-plugin-manager` 是受保护依赖，不能从当前页面停用。
 所有组合变更都明确提示“重启 Web 后生效”。
+
+Host 同时读取 `pluginInventory` 的实时 Loader 快照，将 inventory-only 的
+`@deepseek-ai/dsh-vision-bridge` 合并为“系统 Bundle”条目。它的状态控件与详情操作均为
+只读，Host API 也以 `PLUGIN_SYSTEM_READ_ONLY` 拒绝写入；因此“显示存在”不会被误解为
+Plugin Manager 拥有系统组合的启停权限。
 
 ## 导入与市场
 

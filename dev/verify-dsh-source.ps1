@@ -145,7 +145,7 @@ if ((Test-Path -LiteralPath $ToolEventTypesPath -PathType Leaf) -and (Test-Path 
 }
 if (Test-Path -LiteralPath $BaseCordisPatchPath -PathType Leaf) {
     $BaseCordisPatch = Get-Content -LiteralPath $BaseCordisPatchPath -Raw -Encoding UTF8
-    Check ($BaseCordisPatch -match '(?s)id:\s*vision-bridge.*?disabled:\s*true.*?model:\s*Qwen3\.6-35B-A3B') 'vision-bridge 在 base bundle 中默认关闭'
+    Check ($BaseCordisPatch -match '(?s)id:\s*vision-bridge.*?disabled:\s*true.*?model:\s*Qwen3\.8-Flash-Next-FP8') 'vision-bridge 在 base bundle 中默认关闭并指向 Qwen3.8-Flash-Next-FP8'
 } else {
     Check $false 'Base Cordis 配置存在'
 }
@@ -155,7 +155,7 @@ if (Test-Path -LiteralPath $VisionGatewayOverlayPath -PathType Leaf) {
     $VisionGatewayOverlay = Get-Content -LiteralPath $VisionGatewayOverlayPath -Raw -Encoding UTF8
     Check ($VisionGatewayOverlay -match "baseURL:\s*'https://ai\.chuansgu\.top/v1'") '视觉桥固定通过 DP Gateway'
     Check ($VisionGatewayOverlay -match '(?m)^\s*apiKeyEnv:\s*DPGATEWAY_API_KEY\s*$') '视觉桥使用 DPGATEWAY_API_KEY 凭据引用'
-    Check ($VisionGatewayOverlay -match '(?m)^\s*model:\s*Qwen3\.6-35B-A3B\s*$') '视觉桥目标模型为 Qwen3.6-35B-A3B'
+    Check ($VisionGatewayOverlay -match '(?m)^\s*model:\s*Qwen3\.8-Flash-Next-FP8\s*$') '视觉桥目标模型为 Qwen3.8-Flash-Next-FP8'
 } else {
     Check $false 'DP Gateway profile 覆盖存在'
 }

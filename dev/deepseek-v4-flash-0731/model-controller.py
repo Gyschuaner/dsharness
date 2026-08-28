@@ -26,6 +26,7 @@ PORT = int(os.getenv("MODEL_CONTROL_PORT", "23340"))
 START_TIMEOUT = int(os.getenv("MODEL_CONTROL_START_TIMEOUT", "2700"))
 
 MODELS = (
+    "Qwen3.8-Flash-Next-FP8",
     "Qwen3.8-27B-FP8",
     "DeepSeek-V4-Flash-0731-Q4_K_XL",
     "DeepSeek-V4-Flash-0731-Q8_K_XL",
@@ -231,10 +232,36 @@ class Controller:
         deadline = time.monotonic() + START_TIMEOUT
         while time.monotonic() < deadline:
             detected = self._detect_model()
-            if detected == target_model:
+            if detected == target_model and self._probe_inference(target_model):
                 return
             time.sleep(3)
         raise TimeoutError(f"{target_model} did not become healthy within {START_TIMEOUT}s")
+
+    @staticmethod
+    def _probe_inference(target_model: str) -> bool:
+        """Require one real short-prompt forward before declaring readiness.
+
+        The models endpoint can become available before lazy kernels used by
+        the first business request have run.  The deliberately short prompt
+        also covers QSA's eager short-prefill path on RTX 4090.
+        """
+        payload = {
+            "model": target_model,
+            "messages": [{"role": "user", "content": "Reply with OK."}],
+            "max_tokens": 1,
+            "temperature": 0,
+        }
+        request = urllib.request.Request(
+            f"{MODEL_URL}/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                result = json.load(response)
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            return False
+        return bool(result.get("choices"))
 
     def _mark_ready(self, target_model: str, previous_model: str) -> None:
         self._set(
