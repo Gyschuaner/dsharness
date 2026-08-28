@@ -76,6 +76,31 @@ function Test-LinkTarget([string]$LinkPath, [string]$ExpectedDirectory) {
     return $false
 }
 
+function Ensure-CleanBuildWorktree([string]$SourceDirectory, [string]$SourceHead) {
+    $sourceParent = Split-Path -Parent $SourceDirectory
+    $sourceLeaf = Split-Path -Leaf $SourceDirectory
+    $buildDirectory = Join-Path $sourceParent "$sourceLeaf-runtime"
+    $gitMarker = Join-Path $buildDirectory '.git'
+    if (-not (Test-Path -LiteralPath $buildDirectory)) {
+        Write-Step "创建干净构建 worktree：$buildDirectory"
+        $null = Invoke-Native 'git' @('worktree', 'add', '--detach', $buildDirectory, $SourceHead) $SourceDirectory
+    } elseif (-not (Test-Path -LiteralPath $gitMarker)) {
+        throw "构建目录已存在但不是受 Git 管理的 worktree：$buildDirectory"
+    }
+
+    $RuntimeStatus = @(& git -C $buildDirectory status --porcelain=v1 --untracked-files=all)
+    $RuntimeTrackedDirty = @($RuntimeStatus | Where-Object { $_ -and $_ -notmatch '^\?\? ' })
+    if ($RuntimeTrackedDirty.Count -gt 0) {
+        throw "构建 worktree 存在已跟踪文件修改，拒绝覆盖：$($RuntimeTrackedDirty -join '; ')"
+    }
+    $RuntimeHead = (& git -C $buildDirectory rev-parse HEAD).Trim()
+    if ($RuntimeHead -ne $SourceHead) {
+        Write-Step "更新构建 worktree：$RuntimeHead -> $SourceHead"
+        $null = Invoke-Native 'git' @('checkout', '--detach', $SourceHead) $buildDirectory
+    }
+    return [IO.Path]::GetFullPath($buildDirectory)
+}
+
 Require-Command 'git'
 Require-Command 'node'
 Require-Command 'corepack'
@@ -110,16 +135,48 @@ if (-not (Test-Path -LiteralPath $SourceDirectory)) {
     throw "目标目录已存在但不是 Git 仓库：$SourceDirectory。脚本不会覆盖，请指定新的 -SourceDirectory。"
 }
 
-$Dirty = @(& git -C $SourceDirectory status --porcelain)
+$Status = @(& git -C $SourceDirectory status --porcelain=v1 --untracked-files=all)
 if ($LASTEXITCODE -ne 0) {
     throw "无法检查 $SourceDirectory 的工作区状态。"
 }
-if ($Dirty.Count -gt 0) {
-    throw "目标源码目录存在未提交修改：$SourceDirectory。脚本不会覆盖，请先处理修改或指定新目录。"
+$TrackedDirty = @($Status | Where-Object { $_ -and $_ -notmatch '^\?\? ' })
+if ($TrackedDirty.Count -gt 0) {
+    throw "目标源码目录存在已跟踪文件修改：$SourceDirectory。脚本不会覆盖，请先处理修改或指定新目录。"
+}
+$Untracked = @($Status | Where-Object { $_ -and $_ -match '^\?\? ' })
+if ($Untracked.Count -gt 0) {
+    Write-Step "保留源码目录中的未跟踪文件（不参与锁定 tree）：$($Untracked -join '; ')"
 }
 
 $CurrentTree = Get-GitTree $SourceDirectory
 if ($CurrentTree -eq $Lock.baseTree) {
+    foreach ($Patch in $Lock.patches) {
+        $PatchPath = Join-Path $RepoRoot $Patch.path
+        Write-Step "应用补丁 $($Patch.path)"
+        Invoke-Native 'git' @('-c', 'user.name=dsharness-bootstrap', '-c', 'user.email=dsharness@local.invalid', 'am', '--3way', $PatchPath) $SourceDirectory
+    }
+    $CurrentTree = Get-GitTree $SourceDirectory
+} elseif ($CurrentTree -ne $Lock.resultTree) {
+    # The lock may have moved to a newer official release. Move only a clean
+    # checkout to that exact upstream commit; checkout preserves untracked
+    # files and refuses to overwrite a colliding untracked path.
+    Write-Step "当前源码 tree $CurrentTree 不属于本次锁定链，准备切换到官方基线 $($Lock.baseCommit)"
+    $UpstreamUrl = (& git -C $SourceDirectory remote get-url upstream 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($UpstreamUrl)) {
+        Write-Step "添加 upstream remote：$($Lock.repository)"
+        Invoke-Native 'git' @('remote', 'add', 'upstream', $Lock.repository) $SourceDirectory
+    } elseif ($UpstreamUrl -ne $Lock.repository) {
+        throw "源码目录的 upstream remote 与锁文件不一致：$UpstreamUrl"
+    }
+    Write-Step "获取官方基线 $($Lock.baseCommit)"
+    Invoke-Native 'git' @('-c', 'http.version=HTTP/1.1', 'fetch', '--depth=1', 'upstream', $Lock.baseCommit) $SourceDirectory
+    $FetchedCommit = (& git -C $SourceDirectory rev-parse 'FETCH_HEAD').Trim()
+    if ($LASTEXITCODE -ne 0 -or $FetchedCommit -ne $Lock.baseCommit) {
+        throw "获取到的官方基线不匹配。预期 $($Lock.baseCommit)，实际 $FetchedCommit。"
+    }
+    Write-Step "切换干净源码 checkout 到官方基线（保留未跟踪文件）"
+    Invoke-Native 'git' @('checkout', '--detach', $Lock.baseCommit) $SourceDirectory
+    $CurrentTree = Get-GitTree $SourceDirectory
     foreach ($Patch in $Lock.patches) {
         $PatchPath = Join-Path $RepoRoot $Patch.path
         Write-Step "应用补丁 $($Patch.path)"
@@ -134,9 +191,16 @@ if ($CurrentTree -ne $Lock.resultTree) {
 }
 
 Write-Step "源码树已验证：$CurrentTree"
+$SourceHead = (& git -C $SourceDirectory rev-parse HEAD).Trim()
+$BuildDirectory = Ensure-CleanBuildWorktree $SourceDirectory $SourceHead
+$BuildTree = Get-GitTree $BuildDirectory
+if ($BuildTree -ne $Lock.resultTree) {
+    throw "构建 worktree tree 不符合锁定结果。预期 $($Lock.resultTree)，实际 $BuildTree。"
+}
+Write-Step "构建 worktree 已验证：$BuildTree"
 $PreviousLocation = Get-Location
 try {
-    Set-Location -LiteralPath $SourceDirectory
+    Set-Location -LiteralPath $BuildDirectory
     $PnpmVersion = (& corepack pnpm --version).Trim()
     if ($LASTEXITCODE -ne 0) {
         throw 'Corepack 无法启动 pnpm。'
@@ -153,15 +217,22 @@ Write-Step '安装锁定依赖'
 $PreviousCi = $env:CI
 try {
     $env:CI = 'true'
-    Invoke-Native 'corepack' @('pnpm', 'install', '--frozen-lockfile') $SourceDirectory
+    Invoke-Native 'corepack' @('pnpm', 'install', '--frozen-lockfile') $BuildDirectory
 } finally {
     $env:CI = $PreviousCi
 }
+Write-Step '清理 runtime 中与源码版本不一致的旧构建产物'
+Invoke-Native 'corepack' @('pnpm', 'run', 'clean') $BuildDirectory
 Write-Step '执行完整构建'
-Invoke-Native 'corepack' @('pnpm', 'run', 'build') $SourceDirectory
+Invoke-Native 'corepack' @('pnpm', 'run', 'build') $BuildDirectory
+Write-Step '校验源码 tree、alpha1 原生图片链路与视觉桥构建产物'
+& (Join-Path $RepoRoot 'dev\verify-dsh-source.ps1') -SourceDirectory $BuildDirectory -SkipCliVersion
+if ($LASTEXITCODE -ne 0) {
+    throw '源码与构建产物校验失败。'
+}
 
 if (-not $SkipRegister) {
-    $CliDirectory = [IO.Path]::GetFullPath((Join-Path $SourceDirectory 'apps\cli'))
+    $CliDirectory = [IO.Path]::GetFullPath((Join-Path $BuildDirectory 'apps\cli'))
     $NpmGlobalPrefix = (& npm prefix --global).Trim()
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($NpmGlobalPrefix)) {
         throw '无法读取 npm 全局安装目录。'
@@ -194,6 +265,11 @@ if (-not $SkipRegister) {
         throw "dsh 注册后版本异常，预期 $($Lock.dshVersion)，实际 $DshVersion。"
     }
     Write-Step "dsh $DshVersion 已注册"
+    Write-Step '校验已注册的 alpha1 CLI 与 web profile'
+    & (Join-Path $RepoRoot 'dev\verify-dsh-source.ps1') -SourceDirectory $BuildDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw '已注册 CLI 与 web profile 校验失败。'
+    }
 }
 
 if ($StartWeb) {
@@ -205,6 +281,7 @@ if ($StartWeb) {
 
 [pscustomobject]@{
     sourceDirectory = $SourceDirectory
+    buildDirectory = $BuildDirectory
     sourceTree = $CurrentTree
     dshVersion = $Lock.dshVersion
     nodeVersion = $NodeVersion

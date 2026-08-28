@@ -43,7 +43,60 @@
    - 只有确实会影响实现方向的关键信息不明确时，才向用户提出一个简洁问题；其他信息应根据上下文合理补全并说明假设。
 7. 如果是缺陷修复，则优先关联或创建对应 Bug，并记录复现方式、预期结果和实际结果。
 
-三、开发执行规则
+三、构建、启动与源码一致性（强制）
+
+1. 运行时只能从同一份锁定源码构建和启动，不能让构建目录、启动脚本和 profile 各自指向不同版本：
+   - `upstream.lock.json` 是官方源码基线、补丁顺序、Node/pnpm 版本和最终 Git tree 的唯一锁定来源。
+   - `D:\Pythonproject\deepseek-harness` 是源码 checkout；其同级的
+     `deepseek-harness-runtime` 是干净构建 worktree，只用于安装依赖、完整构建和启动。
+   - `restart-dsh-web.ps1` 是 Windows 本地启动的唯一标准入口；`restart-dsh-web.bat` 只负责调用它，
+     不得在 bat 文件中另维护一套启动参数或源码路径。
+   - `~/.dsh/profiles/web` 是运行配置，`~/.dsh/logs` 中的 build/PID 元数据和启动日志是运行态证据。
+
+2. 小改动不豁免一致性检查。只要改动会进入运行时，包括一个插件的 TypeScript/CSS、生成的 `lib`、
+   `package.json`、Cordis patch、profile、上游补丁、启动脚本或构建脚本，都必须重新构建对应产物，
+   并在交付前至少执行一次完整的本地重启验证。纯文档或不影响运行时的记录修改可以跳过构建，但
+   不得以此为理由跳过代码变更的构建检查。
+
+3. 每次启动前必须执行以下门禁，任何一项失败都停止启动，不得复用旧 `lib` 或旧 release 目录：
+   - 校验源码 checkout 的 `HEAD^{tree}` 等于 `upstream.lock.json` 的 `resultTree`；已跟踪文件有修改时
+     直接停止。未跟踪的临时检查文件可以保留，但构建必须在干净 runtime worktree 中进行。
+   - 校验 Node 和 pnpm 版本与锁文件一致，执行 `pnpm install --frozen-lockfile` 和完整的
+     `pnpm run build`。
+   - 校验 CLI、Gateway、Session Controller、ACP、attachment-local 和 vision-bridge 的
+     构建产物存在；确认 alpha1 原生 `readImageRequest`/`imageHostPath` 图片链路，以及
+     vision-bridge 的 `imageInputBridge` provider 仍在构建结果中。alpha1 已移除旧的
+     Host apiproxy，不能用旧路径或旧 bundle 作为启动门禁。
+   - 执行 `dsh --profile web --dump-config`，确认 vision-bridge 的 `disabled: false`、Qwen3.8
+     DP Gateway 配置和默认插件行存在，确认已退役的 `image-context-guard` 不存在。
+   - 从同一个 runtime worktree 启动 CLI。alpha1 默认启用 Web token 鉴权，必须同时校验匿名 HTTP 401、
+     一次性 token 换取会话后的认证 HTTP 200、监听 PID、实际命令行、skill-manager/plugin-manager
+     API 版本和构建元数据；一次性 token 必须立即从启动日志脱敏。只看到构建成功、没有看到实际
+     启动成功，不能声明本地服务可用。
+
+4. 不同改动的最小执行范围如下：
+   - 插件 Host、插件 Client、插件依赖或插件 profile：先在 `dsharness` 执行
+     `pnpm install --frozen-lockfile`、`pnpm run verify`，再运行 `.\restart-dsh-web.ps1`。
+     插件 `src` 是源码真相，`lib` 是生成产物，禁止手工编辑 `lib` 代替构建。
+   - 上游源码、上游补丁、锁文件或 DSH 核心构建配置：执行
+     `.\dev\install-dsh-source.ps1` 或完整的 `.\dev\verify-dsh-source.ps1`，命中锁定 tree 后再运行
+     `.\restart-dsh-web.ps1`。
+   - profile、插件 link/junction、构建脚本或启动脚本：除脚本解析测试外，必须完成一次真实启动，
+     并核对 `~/.dsh/logs/dsh-web-<port>.build.json` 与 PID 元数据中的源码 HEAD、tree、构建目录和 CLI 路径。
+
+5. 发生构建与启动不一致时，按以下顺序处理：
+   - 先查看 `git status`、`upstream.lock.json`、build/PID 元数据以及本次启动 stderr，确认实际使用的
+     源码、构建目录和 CLI 路径；不要凭文件时间或目录名称判断版本。
+   - 重新运行锁定源码校验、frozen install、完整构建和启动验证。若是插件加载失败，修复插件源码并重新
+     生成 `lib`，不得为了让服务启动而静默禁用插件或绕过 profile 门禁；临时禁用必须有明确授权和记录。
+   - 如果源码目录存在用户未提交修改，不得 reset、clean、覆盖或删除；使用新的干净 runtime worktree，
+     并在交付中说明这些未跟踪内容没有参与构建。
+
+6. 构建、启动脚本必须与源码和 profile 同步维护。修改其中任一项后，应同时检查另外两项的路径、参数、
+   版本校验、产物校验和错误处理，并补充相应的自动化测试；不得只修启动脚本而继续引用旧构建产物，
+   也不得只更新源码而保留旧的安装/启动命令。
+
+四、开发执行规则
 
 1. 开始实现时，在 DP 中建立或更新研发任务，设置总负责人和各阶段负责人，并同步真实研发状态。
 2. 分支名称应包含 DP 编号，例如：
@@ -70,7 +123,7 @@
    - 操作后重新查询验证
 8. 调用 dp.exe 时，供程序读取的输出统一使用 --json。参数不确定时先查看命令帮助，不猜测参数或状态值。
 
-四、测试与质量要求
+五、测试与质量要求
 
 1. 功能需求至少覆盖：
    - 正常流程
@@ -88,7 +141,7 @@
    - 剩余风险
 6. 不得在没有证据的情况下声称“测试通过”或“已经上线”。
 
-五、飞书文档与 DP 联动
+六、飞书文档与 DP 联动
 
 1. 为某个需求创建、查找或更新飞书文档时，必须取得：
    - 飞书文档标题
@@ -108,7 +161,7 @@
 7. 更新已有文档关联时，应保留原有人工填写的标题、摘要、分类、标签和其他关联。
 8. 飞书访问令牌、DP PAT、密码等敏感信息不得写入命令参数、代码、日志、DP 文档或飞书文档。
 
-六、研发记录与交付
+七、研发记录与交付
 
 1. 每次实现、排查或重要调整后，同步更新：
    D:\Obsidian\gysnote\项目训练\DSH
@@ -123,7 +176,7 @@
    - 部署及回滚记录
 3. 不要为了形式创建大量空文档；只维护对后续研发、测试、发布或交接确实有价值的内容。
 
-七、完成标准
+八、完成标准
 
 只有同时满足以下条件，才能声明本次研发完成：
 
@@ -139,7 +192,7 @@
    - 已记录部署版本、提交号、备份及回滚信息
 7. 没有被隐瞒的失败步骤或未说明风险。
 
-八、最终汇报格式
+九、最终汇报格式
 
 任务结束时，用简洁方式报告：
 

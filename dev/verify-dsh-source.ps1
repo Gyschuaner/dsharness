@@ -3,18 +3,19 @@
 param(
     [string]$SourceDirectory,
     [int]$Port = 3080,
-    [switch]$RequireWeb
+    [switch]$RequireWeb,
+    [switch]$SkipCliVersion
 )
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$Lock = Get-Content -LiteralPath (Join-Path $RepoRoot 'upstream.lock.json') -Raw | ConvertFrom-Json
+$Lock = Get-Content -LiteralPath (Join-Path $RepoRoot 'upstream.lock.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ([string]::IsNullOrWhiteSpace($SourceDirectory)) {
     $SourceDirectory = Join-Path (Split-Path -Parent $RepoRoot) 'deepseek-harness'
 }
 $SourceDirectory = [IO.Path]::GetFullPath($SourceDirectory)
 
-$Failures = New-Object System.Collections.Generic.List[string]
+$Failures = New-Object 'System.Collections.Generic.List[string]'
 function Check([bool]$Condition, [string]$Message) {
     if ($Condition) {
         Write-Host "[ok] $Message" -ForegroundColor Green
@@ -24,190 +25,206 @@ function Check([bool]$Condition, [string]$Message) {
     }
 }
 
-Check ((& node --version).Trim().TrimStart('v') -eq $Lock.nodeVersion) "Node $($Lock.nodeVersion)"
-$PreviousLocation = Get-Location
-try {
-    Set-Location -LiteralPath $SourceDirectory
-    $PnpmVersion = (& corepack pnpm --version).Trim()
+function Read-Text([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
+    return Get-Content -LiteralPath $Path -Raw -Encoding UTF8
 }
-finally {
-    Set-Location -LiteralPath $PreviousLocation
+
+function Get-GitTree([string]$Path) {
+    $tree = (& git -C $Path rev-parse 'HEAD^{tree}').Trim()
+    if ($LASTEXITCODE -ne 0) { return '' }
+    return $tree
+}
+
+function Get-HttpStatus([string]$Uri) {
+    $Client = [System.Net.Http.HttpClient]::new()
+    try {
+        $Client.Timeout = [TimeSpan]::FromSeconds(5)
+        $Response = $Client.GetAsync($Uri, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+        try { return [int]$Response.StatusCode } finally { $Response.Dispose() }
+    } finally {
+        $Client.Dispose()
+    }
+}
+
+$NodeCommand = Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+$NodeVersion = ''
+if ($NodeCommand) {
+    $NodeVersion = (& $NodeCommand.Source --version).Trim().TrimStart('v')
+}
+Check ($NodeVersion -eq $Lock.nodeVersion) "Node $($Lock.nodeVersion)"
+
+$PnpmVersion = ''
+if ($NodeCommand -and (Get-Command corepack -CommandType Application -ErrorAction SilentlyContinue)) {
+    $PreviousLocation = Get-Location
+    try {
+        Set-Location -LiteralPath $SourceDirectory
+        $PnpmVersion = (& corepack pnpm --version 2>$null).Trim()
+    } catch {
+        $PnpmVersion = ''
+    } finally {
+        Set-Location -LiteralPath $PreviousLocation
+    }
 }
 Check ($PnpmVersion -eq $Lock.pnpmVersion) "pnpm $($Lock.pnpmVersion)"
-Check (Test-Path -LiteralPath (Join-Path $SourceDirectory '.git')) "源码目录是 Git 仓库：$SourceDirectory"
 
-if (Test-Path -LiteralPath (Join-Path $SourceDirectory '.git')) {
-    $Tree = (& git -C $SourceDirectory rev-parse 'HEAD^{tree}').Trim()
-    Check ($Tree -eq $Lock.resultTree) "源码树 $($Lock.resultTree)"
-    $Dirty = @(& git -C $SourceDirectory status --porcelain)
-    Check ($Dirty.Count -eq 0) '源码工作区无未提交修改'
+$GitDirectory = Join-Path $SourceDirectory '.git'
+Check (Test-Path -LiteralPath $GitDirectory) "源码目录是 Git 仓库：$SourceDirectory"
+if (Test-Path -LiteralPath $GitDirectory) {
+    $Tree = Get-GitTree $SourceDirectory
+    Check ($Tree -eq $Lock.resultTree) "源码 tree $($Lock.resultTree)"
+    $Status = @(& git -C $SourceDirectory status --porcelain=v1 --untracked-files=all)
+    $TrackedDirty = @($Status | Where-Object { $_ -and $_ -notmatch '^\?\? ' })
+    Check ($TrackedDirty.Count -eq 0) '源码工作区无已跟踪文件修改'
+    $Untracked = @($Status | Where-Object { $_ -and $_ -match '^\?\? ' })
+    if ($Untracked.Count -gt 0) {
+        Write-Host "[warn] 忽略未跟踪文件（不参与锁定 tree）：$($Untracked -join '; ')" -ForegroundColor Yellow
+    }
 }
 
 foreach ($Patch in $Lock.patches) {
     $PatchPath = Join-Path $RepoRoot $Patch.path
-    $HashMatches = (Test-Path -LiteralPath $PatchPath -PathType Leaf) -and ((Get-FileHash -LiteralPath $PatchPath -Algorithm SHA256).Hash -eq $Patch.sha256)
+    $HashMatches = $false
+    if (Test-Path -LiteralPath $PatchPath -PathType Leaf) {
+        $ActualHash = (Get-FileHash -LiteralPath $PatchPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        $HashMatches = $ActualHash -eq $Patch.sha256.ToUpperInvariant()
+    }
     Check $HashMatches "补丁校验 $($Patch.path)"
 }
 
-$CompactionConfigPath = Join-Path $SourceDirectory 'packages/compaction/compaction-basic/src/config.ts'
-$CompactionBundlePath = Join-Path $SourceDirectory 'packages/compaction/compaction-basic/lib/index.js'
-if (Test-Path -LiteralPath $CompactionConfigPath -PathType Leaf) {
-    $CompactionConfig = Get-Content -LiteralPath $CompactionConfigPath -Raw -Encoding UTF8
-    Check ($CompactionConfig -match 'maxTokens:\s*config\.maxTokens\s*\?\?\s*32768') 'Compact 源码默认摘要预算为 32768 tokens'
-} else {
-    Check $false 'Compact 源码配置存在'
+$RootPackage = Read-Text (Join-Path $SourceDirectory 'package.json')
+Check ($RootPackage -match '"version"\s*:\s*"0\.1\.2-alpha\.1"') '源码版本 0.1.2-alpha.1'
+Check ($RootPackage -match '"packageManager"\s*:\s*"pnpm@11\.7\.0"') '源码 packageManager 为 pnpm@11.7.0'
+
+$CliEntry = Join-Path $SourceDirectory 'apps/cli/lib/bin.js'
+$GatewaySource = Join-Path $SourceDirectory 'packages/api/gateway/src/index.ts'
+$GatewayBundle = Join-Path $SourceDirectory 'packages/api/gateway/lib/index.js'
+$SessionControllerSource = Join-Path $SourceDirectory 'packages/api/session-controller/src/commands.ts'
+$SessionControllerBundle = Join-Path $SourceDirectory 'packages/api/session-controller/lib/index.js'
+$AcpSource = Join-Path $SourceDirectory 'packages/acp/acp/src/index.ts'
+$AcpBundle = Join-Path $SourceDirectory 'packages/acp/acp/lib/index.js'
+$AttachmentSource = Join-Path $SourceDirectory 'packages/attachment/attachment-local/src/index.ts'
+$AttachmentBundle = Join-Path $SourceDirectory 'packages/attachment/attachment-local/lib/index.js'
+$DeepSeekAdapterSource = Join-Path $SourceDirectory 'packages/llm/llm-deepseek/src/adapter.ts'
+$DeepSeekAdapterBundle = Join-Path $SourceDirectory 'packages/llm/llm-deepseek/lib/index.js'
+$VisionSourcePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/index.ts'
+$VisionBundlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/lib/index.js'
+$VisionRowPath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.tsx'
+$VisionStylePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.module.css'
+$VisionThrottlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts'
+$BaseCordisPath = Join-Path $SourceDirectory 'packages/bundle/base/cordis.patch.yml'
+$ToolTypesPath = Join-Path $SourceDirectory 'packages/core/tools/src/types.ts'
+$KnownEventsPath = Join-Path $SourceDirectory 'packages/core/session/src/known-event-types.ts'
+
+$Artifacts = [ordered]@{
+    'CLI' = $CliEntry
+    'Gateway' = $GatewayBundle
+    'Session Controller' = $SessionControllerBundle
+    'ACP' = $AcpBundle
+    'attachment-local' = $AttachmentBundle
+    'vision-bridge' = $VisionBundlePath
 }
-if (Test-Path -LiteralPath $CompactionBundlePath -PathType Leaf) {
-    $CompactionBundle = Get-Content -LiteralPath $CompactionBundlePath -Raw -Encoding UTF8
-    Check ($CompactionBundle -match 'maxTokens:\s*config\.maxTokens\s*\?\?\s*32768') 'Compact 构建产物默认摘要预算为 32768 tokens'
-} else {
-    Check $false 'Compact 构建产物存在'
+foreach ($Artifact in $Artifacts.GetEnumerator()) {
+    Check (Test-Path -LiteralPath $Artifact.Value -PathType Leaf) "$($Artifact.Key) 构建产物存在"
 }
 
-$QwenPresetDirectory = Join-Path $SourceDirectory 'apps/cli/config/agent-presets/qwen-native'
-$QwenCompositionPath = Join-Path $QwenPresetDirectory 'agent.cordis.yml'
-$QwenMetadataPath = Join-Path $QwenPresetDirectory 'preset.yml'
-Check (Test-Path -LiteralPath $QwenCompositionPath -PathType Leaf) '内置 qwen-native composition'
-Check (Test-Path -LiteralPath $QwenMetadataPath -PathType Leaf) '内置 qwen-native 元数据'
-if ((Test-Path -LiteralPath $QwenCompositionPath -PathType Leaf) -and (Test-Path -LiteralPath $QwenMetadataPath -PathType Leaf)) {
-    $QwenComposition = Get-Content -LiteralPath $QwenCompositionPath -Raw -Encoding UTF8
-    $QwenMetadata = Get-Content -LiteralPath $QwenMetadataPath -Raw -Encoding UTF8
-    Check ($QwenComposition -match 'You are Qwen' -and $QwenComposition -match '\{\{model\}\}' -and $QwenComposition -match '\{\{cwd\}\}') 'qwen-native persona 变量完整'
-    Check ($QwenMetadata -match '(?m)^name:\s*Qwen 原生模式\s*$') 'qwen-native 显示名称'
+$VisionSource = Read-Text $VisionSourcePath
+$VisionBundle = Read-Text $VisionBundlePath
+Check (Test-Path -LiteralPath $VisionSourcePath -PathType Leaf) 'vision-bridge 源码存在'
+Check ($VisionSource -match 'ctx\.provide\(''imageInputBridge''') 'vision-bridge 源码提供 imageInputBridge'
+Check ($VisionSource -match 'stream:\s*true' -and $VisionSource -match 'exec\.reportProgress\(') 'vision-bridge 源码使用 SSE progress'
+Check ($VisionSource -match 'vision/image-import' -and $VisionSource -match 'imageHostPath') 'vision-bridge 源码使用原生图片引用事件与路径'
+Check ($VisionSource -match 'Qwen3\.8-Flash-Next-FP8') 'vision-bridge 源码默认视觉模型为 Qwen3.8-Flash-Next-FP8'
+Check ($VisionBundle -match 'imageInputBridge' -and $VisionBundle -match 'reportProgress') 'vision-bridge 构建产物包含准入与 progress'
+Check ($VisionBundle -match 'vision/image-import' -and $VisionBundle -match 'Qwen3\.8-Flash-Next-FP8') 'vision-bridge 构建产物包含事件与模型'
+Check (Test-Path -LiteralPath $VisionRowPath -PathType Leaf) 'vision-bridge Look 行源码存在'
+Check (Test-Path -LiteralPath $VisionStylePath -PathType Leaf) 'vision-bridge Look 行样式存在'
+Check (Test-Path -LiteralPath $VisionThrottlePath -PathType Leaf) 'vision-bridge 流式更新节流源码存在'
+
+$AttachmentSourceText = Read-Text $AttachmentSource
+$AttachmentBundleText = Read-Text $AttachmentBundle
+Check ($AttachmentSourceText -match 'imageHostPath' -and $AttachmentSourceText -match 'readImageRequest') 'attachment-local 源码提供宿主路径与请求图片投影'
+Check ($AttachmentBundleText -match 'imageHostPath' -and $AttachmentBundleText -match 'readImageRequest') 'attachment-local 构建产物提供宿主路径与请求图片投影'
+$DeepSeekAdapterSourceText = Read-Text $DeepSeekAdapterSource
+$DeepSeekAdapterBundleText = Read-Text $DeepSeekAdapterBundle
+Check ($DeepSeekAdapterSourceText -match 'readImageRequest') 'DeepSeek 原生适配器源码接入请求图片投影'
+Check ($DeepSeekAdapterBundleText -match 'readImageRequest') 'DeepSeek 原生适配器构建产物接入请求图片投影'
+
+$SessionControllerSourceText = Read-Text $SessionControllerSource
+$SessionControllerBundleText = Read-Text $SessionControllerBundle
+Check ($SessionControllerSourceText -match 'MODEL_DOES_NOT_SUPPORT_IMAGES') 'Session Controller 源码保留模型图片能力拒绝原因'
+Check ($SessionControllerBundleText -match 'MODEL_DOES_NOT_SUPPORT_IMAGES') 'Session Controller 构建产物保留模型图片能力拒绝原因'
+Check ((Read-Text $GatewaySource) -match 'TypertRemote|TypertRemoteService|WebSocket|websocket') 'Gateway 源码为 alpha1 Typert Remote 入口'
+Check ((Read-Text $AcpSource) -match 'supportsAcpImagePrompts|PromptRequest') 'ACP 源码保留图片 prompt 能力'
+
+$ToolTypes = Read-Text $ToolTypesPath
+$KnownEvents = Read-Text $KnownEventsPath
+Check ($ToolTypes -match "'tool/progress'\s*:\s*ToolProgressEventData") 'Tool progress 事件类型已登记'
+Check ($KnownEvents -match "'tool/progress'" -and $KnownEvents -match "'vision/image-import'") 'Tool progress 与视觉导入事件已登记到持久化词表'
+
+$BaseCordis = Read-Text $BaseCordisPath
+$VisionRowMatch = [regex]::Match($BaseCordis, '(?ms)- id:\s*vision-bridge.*?(?=\r?\n\s*- id:|\z)')
+Check ($VisionRowMatch.Success) 'base bundle 包含 vision-bridge 行'
+if ($VisionRowMatch.Success) {
+    $VisionRow = $VisionRowMatch.Value
+    Check ($VisionRow -match 'disabled:\s*false') 'base bundle 默认启用 vision-bridge'
+    Check ($VisionRow -match 'Qwen3\.8-Flash-Next-FP8') 'base bundle 固定 Qwen3.8-Flash-Next-FP8'
+    Check ($VisionRow -match 'ai\.chuansgu\.top/v1') 'base bundle 包含 DP Gateway 默认地址'
+}
+Check (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'plugins/image-context-guard'))) 'image-context-guard 已从源码目录移除'
+Check ($BaseCordis -notmatch 'image-context-guard') 'base bundle 不再加载 image-context-guard'
+
+if (Test-Path -LiteralPath $CliEntry -PathType Leaf) {
+    $ConfigDump = (& $NodeCommand.Source $CliEntry --profile web --dump-config 2>&1 | Out-String)
+    $ConfigExitCode = $LASTEXITCODE
+    Check ($ConfigExitCode -eq 0) 'alpha1 CLI 可以读取 web profile 配置'
+    if ($ConfigExitCode -eq 0) {
+        Check ($ConfigDump -match '(?ms)- id:\s*vision-bridge.*?disabled:\s*false') 'web profile 默认启用 vision-bridge'
+        Check ($ConfigDump -match 'Qwen3\.8-Flash-Next-FP8') 'web profile 视觉模型为 Qwen3.8-Flash-Next-FP8'
+        Check ($ConfigDump -match 'ai\.chuansgu\.top/v1') 'web profile 视觉请求走 DP Gateway'
+        Check ($ConfigDump -notmatch 'image-context-guard') 'web profile 不包含 image-context-guard'
+        foreach ($PluginId in @('extension-manager', 'skill-manager', 'plugin-manager', 'mcp-manager', 'better-sidebar-smooth', 'vision-bridge')) {
+            Check ($ConfigDump -match "id:\s*$([regex]::Escape($PluginId))") "web profile 默认插件行 $PluginId"
+        }
+    }
 }
 
-$VisionBridgeSourcePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/index.ts'
-$VisionBridgeBundlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/lib/index.js'
-$VisionBridgeRowPath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.tsx'
-$VisionBridgeRowStylePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/VisionInspectRow.module.css'
-$VisionBridgeThrottlePath = Join-Path $SourceDirectory 'packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts'
-$AttachmentSessionViewPath = Join-Path $SourceDirectory 'packages/attachment/attachment-local/src/session-view.ts'
-$ToolCallTreeStylePath = Join-Path $SourceDirectory 'packages/client/ui-tool/src/client/tool/ToolCallTree.module.css'
-$ToolEventTypesPath = Join-Path $SourceDirectory 'packages/core/tools/src/types.ts'
-$KnownEventTypesPath = Join-Path $SourceDirectory 'packages/core/session/src/known-event-types.ts'
-$BaseCordisPatchPath = Join-Path $SourceDirectory 'packages/bundle/base/cordis.patch.yml'
-Check (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) 'DSH-005 vision-bridge 源码存在'
-Check (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) 'DSH-005 vision-bridge 构建产物存在'
-if (Test-Path -LiteralPath $VisionBridgeSourcePath -PathType Leaf) {
-    $VisionBridgeSource = Get-Content -LiteralPath $VisionBridgeSourcePath -Raw -Encoding UTF8
-    Check ($VisionBridgeSource -match 'stream:\s*true' -and $VisionBridgeSource -match 'exec\.reportProgress\(delta\)') 'DSH-020 视觉层使用 SSE 并上报流式进度'
-    Check ($VisionBridgeSource.Contains('Inspect conversation attachments or local image files with the configured vision model.') -and
-        $VisionBridgeSource.Contains('Image file paths to import into this conversation and inspect.') -and
-        $VisionBridgeSource -match "'vision/image-import'" -and
-        $VisionBridgeSource -match 'importPathImages') 'DSH-023 vision_inspect 支持本会话附件与本地路径'
-    Check ($VisionBridgeSource -match 'materializeImageForSession' -and
-        $VisionBridgeSource.Contains('local_path:') -and
-        $VisionBridgeSource.Contains('只输出简洁、任务导向的 Markdown 正文') -and
-        $VisionBridgeSource -match "schema:\s*\{\s*type:\s*'string'\s*\}") 'DSH-024 会话图片路径与 Markdown 视觉结果'
-}
-if (Test-Path -LiteralPath $VisionBridgeBundlePath -PathType Leaf) {
-    $VisionBridgeBundle = Get-Content -LiteralPath $VisionBridgeBundlePath -Raw -Encoding UTF8
-    Check ($VisionBridgeBundle.Contains('Inspect conversation attachments or local image files with the configured vision model.') -and
-        $VisionBridgeBundle.Contains('Image file paths to import into this conversation and inspect.') -and
-        $VisionBridgeBundle -match 'vision/image-import') 'DSH-023 构建产物包含路径导入逻辑'
-    Check ($VisionBridgeBundle -match 'materializeImageForSession' -and
-        $VisionBridgeBundle.Contains('local_path:') -and
-        $VisionBridgeBundle.Contains('只输出简洁、任务导向的 Markdown 正文')) 'DSH-024 构建产物包含会话路径与 Markdown 逻辑'
-}
-if (Test-Path -LiteralPath $VisionBridgeRowPath -PathType Leaf) {
-    $VisionBridgeRow = Get-Content -LiteralPath $VisionBridgeRowPath -Raw -Encoding UTF8
-    Check ($VisionBridgeRow -match 'title="Look"' -and $VisionBridgeRow -match 'progressText' -and $VisionBridgeRow -match '>ing<') 'DSH-020 Look ing 行消费视觉流式进度'
-    Check ($VisionBridgeRow -match 'latestLine\(model\.summary\)' -and $VisionBridgeRow -match 'data-follow-end' -and $VisionBridgeRow -match 'useThrottledVisualUpdate') 'BUG-374ECAE5 Looking 行跟随最新视觉文字'
-    Check ($VisionBridgeRow -match 'function latestLine' -and $VisionBridgeRow -match 'latestLine\(model\.summary\)') 'DSH-024 Looking 跟随最新 Markdown 行'
-} else {
-    Check $false 'DSH-020 vision-inspect 客户端呈现存在'
-}
-if ((Test-Path -LiteralPath $VisionBridgeRowStylePath -PathType Leaf) -and (Test-Path -LiteralPath $ToolCallTreeStylePath -PathType Leaf)) {
-    $VisionBridgeRowStyle = Get-Content -LiteralPath $VisionBridgeRowStylePath -Raw -Encoding UTF8
-    $ToolCallTreeStyle = Get-Content -LiteralPath $ToolCallTreeStylePath -Raw -Encoding UTF8
-    Check ($VisionBridgeRowStyle -match '(?s)\.root\s*\{.*?width:\s*100%;.*?min-width:\s*0;' -and $VisionBridgeRowStyle -match '(?s)\.summary\[data-follow-end\].*?text-overflow:\s*clip') 'BUG-374ECAE5 Looking 摘要具有独立裁剪窗口'
-    Check ($VisionBridgeRowStyle -notmatch 'dsh-vision-row-sweep' -and $ToolCallTreeStyle -match 'dsh-tool-row-sweep') 'BUG-374ECAE5 视觉运行态仅复用 Tool 单层扫光'
-    Check ($ToolCallTreeStyle -match "data-tool-activity-placement='inline'" -and $ToolCallTreeStyle -match '(?s)data-tool-activity-placement.*?data-tool-activity-state.*?display:\s*none') 'BUG-BA3AD2DC 内联 Look 计时抑制外层重复时长'
-} else {
-    Check $false 'BUG-374ECAE5 视觉与 Tool 行样式存在'
-}
-Check (Test-Path -LiteralPath $VisionBridgeThrottlePath -PathType Leaf) 'BUG-374ECAE5 视觉节流更新实现存在'
-if (Test-Path -LiteralPath $AttachmentSessionViewPath -PathType Leaf) {
-    $AttachmentSessionView = Get-Content -LiteralPath $AttachmentSessionViewPath -Raw -Encoding UTF8
-    Check ($AttachmentSessionView -match "join\(root, 'session-view', scope\)" -and
-        $AttachmentSessionView -match 'await link\(temporary, target\)' -and
-        $AttachmentSessionView -match 'await handle\.chmod\(0o400\)') 'DSH-024 会话图片视图隔离、独占发布且只读'
-} else {
-    Check $false 'DSH-024 会话图片视图源码存在'
-}
-if ((Test-Path -LiteralPath $ToolEventTypesPath -PathType Leaf) -and (Test-Path -LiteralPath $KnownEventTypesPath -PathType Leaf)) {
-    $ToolEventTypes = Get-Content -LiteralPath $ToolEventTypesPath -Raw -Encoding UTF8
-    $KnownEventTypes = Get-Content -LiteralPath $KnownEventTypesPath -Raw -Encoding UTF8
-    Check ($ToolEventTypes -match "'tool/progress':\s*ToolProgressEventData" -and $ToolEventTypes -match 'deriveMessages\(\).*ignores it' -and $KnownEventTypes -match "'tool/progress'") 'DSH-020 tool/progress 可回放且不进入模型消息'
-    Check ($KnownEventTypes -match "'vision/image-import'") 'DSH-023 vision/image-import 已登记为持久化事件'
-} else {
-    Check $false 'DSH-020 tool/progress 事件定义存在'
-}
-if (Test-Path -LiteralPath $BaseCordisPatchPath -PathType Leaf) {
-    $BaseCordisPatch = Get-Content -LiteralPath $BaseCordisPatchPath -Raw -Encoding UTF8
-    Check ($BaseCordisPatch -match '(?s)id:\s*vision-bridge.*?disabled:\s*true.*?model:\s*Qwen3\.8-Flash-Next-FP8') 'vision-bridge 在 base bundle 中默认关闭并指向 Qwen3.8-Flash-Next-FP8'
-} else {
-    Check $false 'Base Cordis 配置存在'
-}
-
-$VisionGatewayOverlayPath = Join-Path $RepoRoot 'dev/vision-bridge.dp-gateway.patch.yml'
-if (Test-Path -LiteralPath $VisionGatewayOverlayPath -PathType Leaf) {
-    $VisionGatewayOverlay = Get-Content -LiteralPath $VisionGatewayOverlayPath -Raw -Encoding UTF8
-    Check ($VisionGatewayOverlay -match "baseURL:\s*'https://ai\.chuansgu\.top/v1'") '视觉桥固定通过 DP Gateway'
-    Check ($VisionGatewayOverlay -match '(?m)^\s*apiKeyEnv:\s*DPGATEWAY_API_KEY\s*$') '视觉桥使用 DPGATEWAY_API_KEY 凭据引用'
-    Check ($VisionGatewayOverlay -match '(?m)^\s*model:\s*Qwen3\.8-Flash-Next-FP8\s*$') '视觉桥目标模型为 Qwen3.8-Flash-Next-FP8'
-} else {
-    Check $false 'DP Gateway profile 覆盖存在'
-}
-
-$WebAppPatchPath = Join-Path $SourceDirectory 'packages/bundle/web-app/cordis.patch.yml'
-if (Test-Path -LiteralPath $WebAppPatchPath -PathType Leaf) {
-    $WebAppPatch = Get-Content -LiteralPath $WebAppPatchPath -Raw -Encoding UTF8
-    Check ($WebAppPatch -match '(?s)id:\s*agent-presets.*?default:\s*standard') '默认 Agent preset 仍为 standard'
-} else {
-    Check $false 'Web App preset 默认配置存在'
-}
-
-$ContinuationSourcePath = Join-Path $SourceDirectory 'packages/guard/max-token-continuation/src/index.ts'
-$ContinuationBundlePath = Join-Path $SourceDirectory 'packages/guard/max-token-continuation/lib/index.js'
-$ConversationLocalePath = Join-Path $SourceDirectory 'packages/client/ui-conversation/src/client/locales.ts'
-$ContinuationReminder = '上一轮因输出 token 上限被截断，已有输出已保留，从停止的位置继续同一个任务。'
-if (Test-Path -LiteralPath $ContinuationSourcePath -PathType Leaf) {
-    $ContinuationSource = Get-Content -LiteralPath $ContinuationSourcePath -Raw -Encoding UTF8
-    Check ($ContinuationSource.Contains($ContinuationReminder) -and $ContinuationSource -match "reason\.kind\s*!==\s*'max-tokens'") 'Max-token 自动续跑源码与精确 reminder'
-} else {
-    Check $false 'Max-token 自动续跑源码存在'
-}
-if (Test-Path -LiteralPath $ContinuationBundlePath -PathType Leaf) {
-    $ContinuationBundle = Get-Content -LiteralPath $ContinuationBundlePath -Raw -Encoding UTF8
-    Check ($ContinuationBundle.Contains($ContinuationReminder)) 'Max-token 自动续跑构建产物包含精确 reminder'
-} else {
-    Check $false 'Max-token 自动续跑构建产物存在'
-}
-if (Test-Path -LiteralPath $ConversationLocalePath -PathType Leaf) {
-    $ConversationLocale = Get-Content -LiteralPath $ConversationLocalePath -Raw -Encoding UTF8
-    Check ($ConversationLocale.Contains('回答被截断，已有输出保留在对话中。') -and -not $ConversationLocale.Contains('发送“继续”可让模型接着输出。')) '截断提示无需手工发送继续'
-} else {
-    Check $false '会话界面 locale 源码存在'
-}
-
-if (Get-Command dsh -ErrorAction SilentlyContinue) {
-    Check ((& dsh --version).Trim() -eq $Lock.dshVersion) "dsh $($Lock.dshVersion)"
-} else {
-    Check $false 'dsh 命令已注册'
+if (-not $SkipCliVersion) {
+    $DshCommand = Get-Command dsh -ErrorAction SilentlyContinue
+    if ($DshCommand) {
+        $DshVersion = (& dsh --version).Trim()
+        Check ($DshVersion -eq $Lock.dshVersion) "dsh $($Lock.dshVersion)"
+    } else {
+        Check $false 'dsh 命令已注册'
+    }
 }
 
 if ($RequireWeb) {
     try {
-        $Response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$Port/" -TimeoutSec 5
-        Check ($Response.StatusCode -eq 200) "dsh web 端口 $Port 返回 HTTP 200"
+        $AnonymousStatus = Get-HttpStatus "http://127.0.0.1:$Port/"
+        Check ($AnonymousStatus -eq 401) "dsh web 端口 $Port 匿名访问返回 HTTP 401"
     } catch {
         Check $false "dsh web 端口 $Port 可访问"
+    }
+
+    $RuntimeMetadataPath = Join-Path $env:USERPROFILE ".dsh\logs\dsh-web-$Port.latest.json"
+    Check (Test-Path -LiteralPath $RuntimeMetadataPath -PathType Leaf) "dsh web 端口 $Port 运行元数据存在"
+    if (Test-Path -LiteralPath $RuntimeMetadataPath -PathType Leaf) {
+        $RuntimeMetadata = Get-Content -LiteralPath $RuntimeMetadataPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        Check ([int]$RuntimeMetadata.anonymousHttpStatus -eq 401) '运行元数据记录匿名 HTTP 401'
+        Check ([int]$RuntimeMetadata.authenticatedHttpStatus -eq 200) '运行元数据记录认证 HTTP 200'
+        Check ([int]$RuntimeMetadata.skillManagerApiVersion -ge 6) '运行元数据记录 skill-manager apiVersion >= 6'
+        Check ([int]$RuntimeMetadata.pluginManagerApiVersion -ge 1) '运行元数据记录 plugin-manager apiVersion >= 1'
+        Check ($RuntimeMetadata.sourceTree -eq $Lock.resultTree) '运行元数据源码 tree 与锁文件一致'
+        Check ($RuntimeMetadata.expectedTree -eq $Lock.resultTree) '运行元数据期望 tree 与锁文件一致'
+        Check ([IO.Path]::GetFullPath([string]$RuntimeMetadata.buildDirectory) -eq $SourceDirectory) '运行元数据构建目录与本次校验目录一致'
+        $Listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+        Check ($null -ne $Listener -and [int]$Listener.OwningProcess -eq [int]$RuntimeMetadata.pid) '运行元数据 PID 与监听进程一致'
     }
 }
 
 if ($Failures.Count -gt 0) {
-    throw "DSH 校验失败，共 $($Failures.Count) 项。"
+    throw "DSH alpha1 锁定源码、构建产物或运行入口校验失败，共 $($Failures.Count) 项。"
 }
 
-Write-Host 'DSH 锁定源码、工具链与运行入口校验通过。' -ForegroundColor Cyan
+Write-Host 'DSH 0.1.2-alpha.1 锁定源码、原生图片链路、插件组合与运行入口校验通过。' -ForegroundColor Cyan

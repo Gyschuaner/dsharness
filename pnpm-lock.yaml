@@ -25,11 +25,11 @@ importers:
 
   plugins/extension-manager: {}
 
-  plugins/image-context-guard: {}
-
   plugins/mcp-manager: {}
 
   plugins/plugin-manager: {}
+
+  plugins/shadow-billing: {}
 
   plugins/skill-manager: {}
 

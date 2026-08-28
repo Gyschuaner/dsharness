@@ -1,0 +1,2528 @@
+From 9d38dc9770dd03d9de186929d947f6c42f515845 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Fri, 28 Aug 2026 23:29:05 +0800
+Subject: [PATCH] feat(DSH-034): port vision bridge to alpha1 attachment APIs
+
+---
+ docs/persistence-catalog.i18n.yaml            |   4 +-
+ docs/persistence-catalog.md                   |  33 +-
+ docs/persistence-catalog.zh.md                |  33 +-
+ packages/bundle/base/cordis.patch.yml         |  14 +
+ packages/bundle/base/package.json             |   1 +
+ .../src/client/conversation-nodes/tool.ts     |  33 +-
+ .../src/client/contract/records.ts            |   4 +
+ .../ui-primitives/src/DisclosureRow.tsx       |   4 +
+ .../client/ui-primitives/src/ElapsedTime.tsx  |  34 ++
+ packages/client/ui-primitives/src/index.ts    |   2 +
+ .../core/session/src/known-event-types.ts     |   2 +
+ packages/core/tools/src/index.ts              |   9 +
+ packages/core/tools/src/types.ts              |  17 +
+ packages/core/tools/tests/tools.spec.ts       |  28 +
+ .../vision/vision-bridge/README.i18n.yaml     |   6 +
+ packages/vision/vision-bridge/README.md       | 100 +++
+ packages/vision/vision-bridge/README.zh.md    | 100 +++
+ packages/vision/vision-bridge/package.json    |  74 +++
+ .../src/client/VisionInspectIcon.tsx          |  27 +
+ .../src/client/VisionInspectRow.module.css    | 165 +++++
+ .../src/client/VisionInspectRow.tsx           | 192 ++++++
+ .../vision/vision-bridge/src/client/index.ts  |  16 +
+ .../src/client/use-throttled-visual-update.ts |  32 +
+ .../vision/vision-bridge/src/css-modules.d.ts |   4 +
+ packages/vision/vision-bridge/src/index.ts    | 575 ++++++++++++++++++
+ .../vision/vision-bridge/src/invariant.ts     |  23 +
+ .../vision/vision-bridge/src/tool-name.ts     |   2 +
+ .../vision-bridge/tests/vision-bridge.spec.ts | 198 ++++++
+ .../vision/vision-bridge/tsconfig.client.json |  24 +
+ .../vision/vision-bridge/tsconfig.host.json   |  23 +
+ packages/vision/vision-bridge/tsconfig.json   |   7 +
+ .../vision/vision-bridge/tsdown.config.ts     |   7 +
+ pnpm-lock.yaml                                | 129 +++-
+ tsconfig.base.json                            |   2 +
+ tsconfig.client.json                          |   1 +
+ tsconfig.host.json                            |   1 +
+ 36 files changed, 1895 insertions(+), 31 deletions(-)
+ create mode 100644 packages/client/ui-primitives/src/ElapsedTime.tsx
+ create mode 100644 packages/vision/vision-bridge/README.i18n.yaml
+ create mode 100644 packages/vision/vision-bridge/README.md
+ create mode 100644 packages/vision/vision-bridge/README.zh.md
+ create mode 100644 packages/vision/vision-bridge/package.json
+ create mode 100644 packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+ create mode 100644 packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+ create mode 100644 packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+ create mode 100644 packages/vision/vision-bridge/src/client/index.ts
+ create mode 100644 packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts
+ create mode 100644 packages/vision/vision-bridge/src/css-modules.d.ts
+ create mode 100644 packages/vision/vision-bridge/src/index.ts
+ create mode 100644 packages/vision/vision-bridge/src/invariant.ts
+ create mode 100644 packages/vision/vision-bridge/src/tool-name.ts
+ create mode 100644 packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+ create mode 100644 packages/vision/vision-bridge/tsconfig.client.json
+ create mode 100644 packages/vision/vision-bridge/tsconfig.host.json
+ create mode 100644 packages/vision/vision-bridge/tsconfig.json
+ create mode 100644 packages/vision/vision-bridge/tsdown.config.ts
+
+diff --git a/docs/persistence-catalog.i18n.yaml b/docs/persistence-catalog.i18n.yaml
+index 39462f81db..89b5044bbd 100644
+--- a/docs/persistence-catalog.i18n.yaml
++++ b/docs/persistence-catalog.i18n.yaml
+@@ -2,5 +2,5 @@
+ # side as of the last confirmed-consistent state. Both languages carry equal authority;
+ # after editing either side, bring the other along and re-record with:
+ #   pnpm run verify-translation-pairing --write docs/persistence-catalog.md
+-persistence-catalog.md: 2143f7881edad36a986869fcbb458ae464014a44
+-persistence-catalog.zh.md: abe6511a8ad9edbbc0e73ab77e02cf10d6346364
++persistence-catalog.md: 2cde38ed9ab82e6ae00957bdd6e8cc877f5c4e49
++persistence-catalog.zh.md: 33f805c03e05b14cd477c6e822af4a57b2fb1d0b
+diff --git a/docs/persistence-catalog.md b/docs/persistence-catalog.md
+index 2143f7881e..2cde38ed9a 100644
+--- a/docs/persistence-catalog.md
++++ b/docs/persistence-catalog.md
+@@ -873,7 +873,7 @@ Source: [`packages/core/session/src/types.ts:268`](../packages/core/session/src/
+ 'tool/code-dispatch': PtcDispatchEventData
+ ```
+ 
+-Source: [`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types.ts)
++Source: [`packages/core/tools/src/types.ts:73`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolcode-dispatch-start--log-only"></a>
+ 
+@@ -896,7 +896,23 @@ Source: [`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types
+ 'tool/code-dispatch-start': PtcDispatchStartEventData
+ ```
+ 
+-Source: [`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types.ts)
++Source: [`packages/core/tools/src/types.ts:57`](../packages/core/tools/src/types.ts)
++
++<a id="toolprogress--log-only"></a>
++
++#### `tool/progress` — log-only
++
++```ts persistence-catalog
++/**
++ * Replayable progress from a running Tool. This event is log-only:
++ * `deriveMessages()` ignores it, while clients concatenate `delta` by
++ * `callId` and update the already durable `tool/call` row. The final
++ * model-facing outcome remains the single paired `tool/result`.
++ */
++'tool/progress': ToolProgressEventData
++```
++
++Source: [`packages/core/tools/src/types.ts:43`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolresult--surface"></a>
+ 
+@@ -1040,6 +1056,19 @@ Source: [`packages/core/session/src/types.ts:228`](../packages/core/session/src/
+ 
+ Source: [`packages/core/session/src/types.ts:249`](../packages/core/session/src/types.ts)
+ 
++### `vision/*`
++
++<a id="visionimage-import--log-only"></a>
++
++#### `vision/image-import` — log-only
++
++```ts persistence-catalog
++/** Local images admitted by `vision_inspect`; log-only and absent from model history. */
++'vision/image-import': VisionImageImportEventData
++```
++
++Source: [`packages/vision/vision-bridge/src/index.ts:99`](../packages/vision/vision-bridge/src/index.ts)
++
+ ### `web/*`
+ 
+ <a id="webdeepseek-search-llm-request--log-only"></a>
+diff --git a/docs/persistence-catalog.zh.md b/docs/persistence-catalog.zh.md
+index abe6511a8a..33f805c03e 100644
+--- a/docs/persistence-catalog.zh.md
++++ b/docs/persistence-catalog.zh.md
+@@ -875,7 +875,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
+ 'tool/code-dispatch': PtcDispatchEventData
+ ```
+ 
+-来源：[`packages/core/tools/src/types.ts:56`](../packages/core/tools/src/types.ts)
++来源：[`packages/core/tools/src/types.ts:73`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolcode-dispatch-start--log-only"></a>
+ 
+@@ -898,7 +898,23 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
+ 'tool/code-dispatch-start': PtcDispatchStartEventData
+ ```
+ 
+-来源：[`packages/core/tools/src/types.ts:40`](../packages/core/tools/src/types.ts)
++来源：[`packages/core/tools/src/types.ts:57`](../packages/core/tools/src/types.ts)
++
++<a id="toolprogress--log-only"></a>
++
++#### `tool/progress` — log-only
++
++```ts persistence-catalog
++/**
++ * Replayable progress from a running Tool. This event is log-only:
++ * `deriveMessages()` ignores it, while clients concatenate `delta` by
++ * `callId` and update the already durable `tool/call` row. The final
++ * model-facing outcome remains the single paired `tool/result`.
++ */
++'tool/progress': ToolProgressEventData
++```
++
++来源：[`packages/core/tools/src/types.ts:43`](../packages/core/tools/src/types.ts)
+ 
+ <a id="toolresult--surface"></a>
+ 
+@@ -1042,6 +1058,19 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
+ 
+ 来源：[`packages/core/session/src/types.ts:247`](../packages/core/session/src/types.ts)
+ 
++### `vision/*`
++
++<a id="visionimage-import--log-only"></a>
++
++#### `vision/image-import` — log-only
++
++```ts persistence-catalog
++/** Local images admitted by `vision_inspect`; log-only and absent from model history. */
++'vision/image-import': VisionImageImportEventData
++```
++
++来源：[`packages/vision/vision-bridge/src/index.ts:99`](../packages/vision/vision-bridge/src/index.ts)
++
+ ### `web/*`
+ 
+ <a id="webdeepseek-search-llm-request--log-only"></a>
+diff --git a/packages/bundle/base/cordis.patch.yml b/packages/bundle/base/cordis.patch.yml
+index eaa8457e88..fa301f06dd 100644
+--- a/packages/bundle/base/cordis.patch.yml
++++ b/packages/bundle/base/cordis.patch.yml
+@@ -118,6 +118,20 @@
+     - id: attachment-local
+       name: '@deepseek-ai/dsh-attachment-local'
+ 
++    # Local policy keeps the visual sub-agent available alongside the native
++    # attachment path. The bridge consumes the same durable image references;
++    # it does not replace native multimodal serialization.
++    - id: vision-bridge
++      name: '@deepseek-ai/dsh-vision-bridge'
++      disabled: false
++      config:
++        baseURL: !!js process.env.DSH_VISION_BASE_URL ?? 'https://ai.chuansgu.top/v1'
++        apiKeyEnv: QWEN_VISION_API_KEY
++        model: Qwen3.8-Flash-Next-FP8
++        timeoutMs: 120000
++        maxImagesPerCall: 20
++        maxOutputTokens: 4096
++
+     # Full-text session search is opt-in. `openAt: never` keeps
+     # ctx.sessionQuery mounted — exact reads, titles, and lineage traces
+     # (session export, subagent-fork Workspace inheritance) stay available —
+diff --git a/packages/bundle/base/package.json b/packages/bundle/base/package.json
+index daef0bab99..70a80eb0ee 100644
+--- a/packages/bundle/base/package.json
++++ b/packages/bundle/base/package.json
+@@ -119,6 +119,7 @@
+     "@deepseek-ai/dsh-typert-registry": "workspace:^",
+     "@deepseek-ai/dsh-user-approval": "workspace:^",
+     "@deepseek-ai/dsh-user-questions": "workspace:^",
++    "@deepseek-ai/dsh-vision-bridge": "workspace:^",
+     "@deepseek-ai/dsh-web": "workspace:^",
+     "@deepseek-ai/dsh-web-fetch-http": "workspace:^",
+     "@deepseek-ai/dsh-web-search-deepseek": "workspace:^",
+diff --git a/packages/client/ui-chat/src/client/conversation-nodes/tool.ts b/packages/client/ui-chat/src/client/conversation-nodes/tool.ts
+index b1f675c4e4..bb9e31e425 100644
+--- a/packages/client/ui-chat/src/client/conversation-nodes/tool.ts
++++ b/packages/client/ui-chat/src/client/conversation-nodes/tool.ts
+@@ -63,10 +63,33 @@ function rootResult(match: ConversationMatch, previous?: RunningToolCall): ToolR
+     isError: result.isError === true,
+     ...match.event.data.error === undefined ? {} : { error: match.event.data.error },
+     meta: match.event.data.meta,
++    ...previous?.progressText === undefined ? {} : { progressText: previous.progressText },
+     subCalls: [],
+   }
+ }
+ 
++function appendProgress(block: ToolCallBlock, callId: string, delta: string): ToolCallBlock {
++  if (block.callId !== callId) return block
++  return { ...block, progressText: `${block.progressText ?? ''}${delta}` }
++}
++
++function updateProgress(state: ToolState, match: ConversationMatch): ToolState {
++  const event = match.event
++  if (event.type !== 'tool/progress') return state
++  const callId = String(event.data.callId)
++  const root = appendProgress(state.root, callId, event.data.delta)
++  let changedChildren: Map<string, readonly ToolCallBlock[]> | undefined
++  for (const [parentCallId, siblings] of state.children) {
++    const next = siblings.map(child => appendProgress(child, callId, event.data.delta))
++    if (sameReferences(siblings, next)) continue
++    changedChildren ??= new Map(state.children)
++    changedChildren.set(parentCallId, next)
++  }
++  return root === state.root && changedChildren === undefined
++    ? state
++    : { ...state, root, children: changedChildren ?? state.children }
++}
++
+ interface DispatchData {
+   readonly parentCallId: string
+   readonly subCallId: string
+@@ -100,6 +123,7 @@ function childResult(match: ConversationMatch, data: DispatchData, previous?: To
+     callTime: previous?.time ?? null,
+     content: data.content ?? [],
+     isError: data.isError === true,
++    ...previous?.progressText === undefined ? {} : { progressText: previous.progressText },
+     subCalls: [],
+   }
+ }
+@@ -199,6 +223,7 @@ function projectBlock(
+       content: [],
+       isError: true,
+       error: { name: 'Interrupted', code: 'interrupted' },
++      ...block.progressText === undefined ? {} : { progressText: block.progressText },
+       subCalls: children,
+     }
+   projectedBlocks.set(block, { children, interruptionSeq, interruptionTime, value: projected })
+@@ -223,7 +248,11 @@ function fallbackState(context: ConversationNodeContext<ToolState>): ToolState |
+   const root = match === undefined ? undefined : rootResult(match)
+   if (root === undefined) return undefined
+   let state: ToolState = { root, children: new Map(), parents: new Map() }
+-  for (const candidate of context.matches) state = updateDispatch(state, candidate)
++  for (const candidate of context.matches) {
++    state = candidate.event.type === 'tool/progress'
++      ? updateProgress(state, candidate)
++      : updateDispatch(state, candidate)
++  }
+   return state
+ }
+ 
+@@ -233,6 +262,7 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+   target: 'chat',
+   match: (event) => {
+     if (event.type === 'tool/call') return { id: String(event.data.callId), role: 'start' }
++    if (event.type === 'tool/progress') return { id: String(event.data.rootCallId), role: 'update' }
+     if (event.type === 'tool/result' && isAppendSurfaceEvent(event)) {
+       return { id: String(event.data.message.source.callId), role: 'update' }
+     }
+@@ -251,6 +281,7 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+       const result = rootResult(match, running)
+       return result === undefined ? context.state : { ...context.state, root: result }
+     }
++    if (match.event.type === 'tool/progress') return updateProgress(context.state, match)
+     return updateDispatch(context.state, match)
+   },
+   buildViewNode: (context) => {
+diff --git a/packages/client/ui-conversation/src/client/contract/records.ts b/packages/client/ui-conversation/src/client/contract/records.ts
+index 0b43e1fa55..4585232076 100644
+--- a/packages/client/ui-conversation/src/client/contract/records.ts
++++ b/packages/client/ui-conversation/src/client/contract/records.ts
+@@ -168,6 +168,8 @@ export interface ToolResultNode {
+   isError: boolean
+   error?: { name: string; code: string }
+   meta?: unknown
++  /** Replayable model-invisible progress emitted before this result settled. */
++  progressText?: string
+   /** Child calls owned by this call, in dispatch order. */
+   subCalls: readonly ToolCallBlock[]
+ }
+@@ -271,6 +273,8 @@ export interface RunningToolCall {
+   step: number
+   /** Unix epoch ms when the tool/call event was logged. */
+   time: number
++  /** Replayable model-invisible progress accumulated for this call. */
++  progressText?: string
+   /** Child calls owned by this call, in dispatch order. */
+   subCalls: readonly ToolCallBlock[]
+ }
+diff --git a/packages/client/ui-primitives/src/DisclosureRow.tsx b/packages/client/ui-primitives/src/DisclosureRow.tsx
+index f04ad8986a..47334f57b9 100644
+--- a/packages/client/ui-primitives/src/DisclosureRow.tsx
++++ b/packages/client/ui-primitives/src/DisclosureRow.tsx
+@@ -7,6 +7,8 @@ import css from './DisclosureRow.module.css'
+ export interface DisclosureRowProps {
+   icon: ReactNode
+   title: string
++  /** Inline material immediately following the title. */
++  titleSuffix?: ReactNode
+   open: boolean
+   expandable: boolean
+   onToggle: () => void
+@@ -33,6 +35,7 @@ export interface DisclosureRowProps {
+ export function DisclosureRow({
+   icon,
+   title,
++  titleSuffix,
+   open,
+   expandable,
+   onToggle,
+@@ -96,6 +99,7 @@ export function DisclosureRow({
+           </span>
+         )}
+         <span className={clsx(css.title, titleClassName)}>{title}</span>
++        {titleSuffix}
+         {(keepContentWhenOpen || !open) && collapsedContent}
+       </div>
+       {open && children}
+diff --git a/packages/client/ui-primitives/src/ElapsedTime.tsx b/packages/client/ui-primitives/src/ElapsedTime.tsx
+new file mode 100644
+index 0000000000..3135a74712
+--- /dev/null
++++ b/packages/client/ui-primitives/src/ElapsedTime.tsx
+@@ -0,0 +1,34 @@
++/** Live or frozen elapsed-time text shared by compact activity rows. */
++import { useEffect, useState } from 'react'
++
++export interface ElapsedTimeProps {
++  readonly startedTime: number
++  readonly finishedTime?: number | undefined
++  readonly className?: string | undefined
++}
++
++/** Format an elapsed duration for compact activity rows. */
++export function formatElapsedDuration(milliseconds: number): string {
++  const elapsed = Math.max(0, milliseconds)
++  if (elapsed < 1_000) return `${Math.floor(elapsed)}ms`
++  const seconds = Math.floor(elapsed / 1_000)
++  if (seconds < 60) return `${seconds}s`
++  const minutes = Math.floor(seconds / 60)
++  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
++}
++
++/** Render a live duration, freezing it at an optional completion timestamp. */
++export function ElapsedTime({ startedTime, finishedTime, className }: ElapsedTimeProps) {
++  const [now, setNow] = useState(() => Date.now())
++  const live = finishedTime === undefined
++  useEffect(() => {
++    if (!live) return undefined
++    const interval = globalThis.setInterval(() => { setNow(Date.now()) }, 250)
++    return () => { globalThis.clearInterval(interval) }
++  }, [live])
++  return (
++    <span className={className} data-elapsed-time>
++      {formatElapsedDuration((finishedTime ?? now) - startedTime)}
++    </span>
++  )
++}
+diff --git a/packages/client/ui-primitives/src/index.ts b/packages/client/ui-primitives/src/index.ts
+index 8415fcf059..e1e42ca960 100644
+--- a/packages/client/ui-primitives/src/index.ts
++++ b/packages/client/ui-primitives/src/index.ts
+@@ -4,6 +4,8 @@
+ 
+ export { StateDot } from './StateDot.tsx'
+ export type { StateDotState } from './StateDot.tsx'
++export { ElapsedTime, formatElapsedDuration } from './ElapsedTime.tsx'
++export type { ElapsedTimeProps } from './ElapsedTime.tsx'
+ export { DisclosureRow } from './DisclosureRow.tsx'
+ export type { DisclosureRowProps } from './DisclosureRow.tsx'
+ export { Button } from './Button.tsx'
+diff --git a/packages/core/session/src/known-event-types.ts b/packages/core/session/src/known-event-types.ts
+index f97c8d4846..bbcefabc6f 100644
+--- a/packages/core/session/src/known-event-types.ts
++++ b/packages/core/session/src/known-event-types.ts
+@@ -62,9 +62,11 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
+   'tool/call',
+   'tool/code-dispatch',
+   'tool/code-dispatch-start',
++  'tool/progress',
+   'tool/result',
+   'turn/end',
+   'turn/start',
+   'user/message',
++  'vision/image-import',
+   'web/deepseek-search-llm-request',
+ ])
+diff --git a/packages/core/tools/src/index.ts b/packages/core/tools/src/index.ts
+index 9513fe0a3c..4d78c14e11 100644
+--- a/packages/core/tools/src/index.ts
++++ b/packages/core/tools/src/index.ts
+@@ -403,6 +403,11 @@ export interface ToolDispatchExecution extends Omit<ToolExecution, 'signal'> {
+  * `tool/result`.
+  */
+ export interface ToolRunContext extends ToolExecution {
++  /**
++   * Append replayable UI progress for this call without adding a model-facing
++   * message. Empty fragments are ignored; the final result remains authoritative.
++   */
++  reportProgress(delta: string): void
+   /**
+    * Defer one context — typically a nested-dispatch context ferried by a
+    * composite tool, or a fresh plugin-sourced instruction — until this tool's
+@@ -1387,6 +1392,10 @@ export class ToolRuntime extends Service {
+       signal,
+       ...agent !== undefined ? { agent } : {},
+       ...parent !== undefined ? { parent } : {},
++      reportProgress(delta: string): void {
++        if (delta === '' || agent === undefined) return
++        agent.session.append('tool/progress', { rootCallId, callId, delta })
++      },
+       deferContext(context: UserMessage): void {
+         deferredContexts.push(context)
+       },
+diff --git a/packages/core/tools/src/types.ts b/packages/core/tools/src/types.ts
+index 84052261ab..282d046a78 100644
+--- a/packages/core/tools/src/types.ts
++++ b/packages/core/tools/src/types.ts
+@@ -22,8 +22,25 @@ export interface PtcDispatchEventData extends PtcDispatchStartEventData {
+   content: ContentBlock[]
+ }
+ 
++/** One append-only, model-invisible progress fragment emitted by a running Tool. */
++export interface ToolProgressEventData {
++  /** Root model-requested call whose conversation row owns this progress. */
++  rootCallId: ToolCallId
++  /** Exact root or nested call producing the fragment. */
++  callId: ToolCallId
++  /** Verbatim non-empty text appended to the call's replayable progress buffer. */
++  delta: string
++}
++
+ declare module '@deepseek-ai/dsh-session/types' {
+   interface SessionEventMap {
++    /**
++     * Replayable progress from a running Tool. This event is log-only:
++     * `deriveMessages()` ignores it, while clients concatenate `delta` by
++     * `callId` and update the already durable `tool/call` row. The final
++     * model-facing outcome remains the single paired `tool/result`.
++     */
++    'tool/progress': ToolProgressEventData
+     /**
+      * One sub-dispatch STARTING inside a `run_code` program: the parent
+      * `run_code` call id, the deterministic sub-call id (`<parent>:code:<n>`,
+diff --git a/packages/core/tools/tests/tools.spec.ts b/packages/core/tools/tests/tools.spec.ts
+index 15f7203cfa..d623f48f49 100644
+--- a/packages/core/tools/tests/tools.spec.ts
++++ b/packages/core/tools/tests/tools.spec.ts
+@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
+ import { createUserMessage, ToolCallId, HarnessError, type ContentBlock  } from '@deepseek-ai/dsh-llm'
+ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+ import type { Agent } from '@deepseek-ai/dsh-agent'
++import { Session, SessionId } from '@deepseek-ai/dsh-session'
+ import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
+ import ToolRuntime, {
+   defineContentToolFixture, defineTool, JsonSchemaError, parameterSchemaSpecToJsonSchema, validateArgs, ToolArgsError, ToolNotFoundError,
+@@ -93,6 +94,33 @@ describe('ToolRuntime', () => {
+     expect(observed).toEqual(result)
+   })
+ 
++  it('logs replayable progress by call id without adding model-visible messages', async () => {
++    const ctx = await setup()
++    ctx.tools.register(defineContentToolFixture({
++      name: 'progressing', description: 'reports progress', parameters: {},
++      async execute(_args, exec) {
++        exec.reportProgress('first')
++        exec.reportProgress('')
++        exec.reportProgress(' second')
++        return [{ type: 'text', text: 'done' }]
++      },
++    }))
++    const session = Session.create(SessionId('tool-progress'))
++    const agent = { session } as unknown as Agent
++    await expect(ctx.tools.execute({
++      signal: testToolSignal,
++      callId: ToolCallId('progress-1'),
++      name: 'progressing',
++      arguments: {},
++      agent,
++    })).resolves.toMatchObject({ isError: false })
++    expect(session.events).toMatchObject([
++      { type: 'tool/progress', data: { rootCallId: 'progress-1', callId: 'progress-1', delta: 'first' } },
++      { type: 'tool/progress', data: { rootCallId: 'progress-1', callId: 'progress-1', delta: ' second' } },
++    ])
++    expect(session.deriveMessages()).toEqual([])
++  })
++
+   it('projects presentation metadata from the canonical value', async () => {
+     const ctx = await setup()
+     ctx.tools.register({
+diff --git a/packages/vision/vision-bridge/README.i18n.yaml b/packages/vision/vision-bridge/README.i18n.yaml
+new file mode 100644
+index 0000000000..71406600e1
+--- /dev/null
++++ b/packages/vision/vision-bridge/README.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write packages/vision/vision-bridge/README.md
++README.md: 65db66f18af7f5b63e6702a19898fe83b5f17839
++README.zh.md: 27d071ff6551c468f9c9a52341dc55fb92aabe9a
+diff --git a/packages/vision/vision-bridge/README.md b/packages/vision/vision-bridge/README.md
+new file mode 100644
+index 0000000000..65db66f18a
+--- /dev/null
++++ b/packages/vision/vision-bridge/README.md
+@@ -0,0 +1,100 @@
++# @deepseek-ai/dsh-vision-bridge
++
++English | [中文](README.zh.md)
++
++A default-enabled visual sub-agent bridge for text-only main models. DSH stores each uploaded image through the existing attachment service, materializes a stable extension-bearing read-only view scoped to the owning session, persists one adjacent `<system-reminder>` for every new image-bearing human message, and exposes `vision_inspect` so the main model can delegate a complete visual question to an administrator-configured OpenAI-compatible vision model. The main model never receives image tokens: DSH's text-only projection replaces every image block with a stable text handle, while the durable reminder carries the full current-session `attachment_id` and `local_path`.
++
++The bridge is enabled in the base bundle. Leave it enabled for native multimodal routes; those routes continue using DSH's native image path without this reminder or tool.
++
++## Configuration
++
++The base-bundle row is enabled by default. A deployment may restate the complete config when it needs to override the local defaults:
++
++```yaml
++- id: vision-bridge
++  disabled: false
++  config:
++    baseURL: !!js process.env.DSH_VISION_BASE_URL ?? 'https://ai.chuansgu.top/v1'
++    apiKeyEnv: QWEN_VISION_API_KEY
++    model: Qwen3.8-Flash-Next-FP8
++    timeoutMs: 120000
++    maxImagesPerCall: 20
++    maxOutputTokens: 4096
++```
++
++`baseURL` falls back to the local DSH deployment endpoint and `/chat/completions` is appended unless it is already present. `apiKeyEnv` is a credential reference, resolved per call through `ctx.credentials` or the immutable launch environment. A literal `apiKey` is supported for controlled embedding but should not be committed. The numeric bounds fail loud unless they are positive integers.
++
++Loading the row is the enablement decision. It supplies the optional `imageInputBridge` admission capability, registers `vision_inspect`, and installs the durable reminder hook. There is no model preset or global prompt mutation.
++
++The package's browser half registers a dedicated `vision_inspect` Tool row at the same enablement boundary. It uses a compact eye icon and `Look` title instead of the generic Tool call label. The running row deliberately reads `Look ing <elapsed>` with a small visual gap between the title and activity suffix; the settled row reads `Look <duration>`. Because this keyed view owns its Think-shaped inline duration, it suppresses the generic trailing Tool duration. The row defines no private sweep and receives the one native in-flight sweep owned by the surrounding Tool call seat. The OpenAI-compatible request uses SSE and appends each visual-model Markdown fragment as a replayable `tool/progress` event keyed by the durable call id. While streaming, the one-line viewport follows the latest non-empty Markdown line and its newest text, then returns to the result's first line when settled. The final Markdown value lands once in the paired `tool/result`, and the disclosure retains the exact durable input and output. Progress is log-only and never enters model history, so it does not duplicate the result or change the request prefix. When the bridge is disabled, this keyed presentation is absent and the package exposes no visual Tool UI.
++
++## Durable history and KV cache
++
++The reminder is generated only while a newly claimed human message contains image blocks. Before insertion, the attachment backend may publish a verified copy below `attachments/v1/session-view/<session-hash>/<content-id>.<ext>`. The copy never links to the canonical object, its path does not contain the user-supplied filename, and the local backend publishes it read-only. The reminder is then inserted immediately after the message and appended by the ordinary agent loop as another durable `user/message`. Later turns replay that exact event; the plugin does not remove, regenerate, move, or re-inject old reminders. Thus the prior conversation remains an append-only request prefix and can reuse the same KV-cache entries as ordinary text history. A backend that cannot materialize a path, or a failed publication, records `local_path: unavailable` without blocking the image turn; attachment-id inspection remains available.
++
++Compaction may replace an old visible range with a summary according to the deployment's normal policy. The attachment authorization check still examines the complete session event log, including shadowed events, but the summary must preserve any `attachment_id` the main model may need later.
++
++## Session isolation and gateway contract
++
++`vision_inspect` accepts current-session `attachmentIds`, local image `paths`, or both. Before reading bytes, it resolves every requested id from uploaded image blocks or prior `vision/image-import` records in the calling agent's own session event stream. An unknown or cross-session id rejects the complete batch before any attachment or filesystem read and before any gateway request.
++
++Local paths resolve relative to the session workspace through the mounted `ctx.fs` backend; absolute paths use the same backend rules. The bridge accepts PNG/JPEG/WebP/GIF regular files, admits the complete path batch through the native attachment service, and appends only the resulting normalized references as one log-only `vision/image-import` event. It never stores source paths or image bytes in the session log. The combined references are content-id deduplicated and bounded by `maxImagesPerCall`, so later calls in this session may use the returned attachment ids without rereading the source files.
++
++The gateway receives one OpenAI-compatible chat-completions request containing the main model's complete delegated prompt, a stable label for each authorized attachment, and its data URL. The visual model is instructed to return concise task-directed Markdown: answer first, then visible evidence and necessary limitations. DSH preserves that Markdown without JSON parsing or field rewriting. Endpoint, credential, remote model, timing, and internal error bodies remain outside the result.
++
++## Model Experience
++
++### Upload reminder
++
++#### What the model sees
++
++Each newly uploaded image message is followed by one durable notice containing full current-session `attachment_id`, media type, and session-scoped `local_path` values. No notice is added after a tool result.
++
++##### Reminder template
++
++```markdown
++<system-reminder>
++本条用户消息包含图片，已保存到当前对话：
++- attachment_id: <full attachment id>，name: <optional escaped name>，media_type: <image media type>，local_path: <session path or unavailable>
++可使用 local_path 配合现有工具做确定性文件或像素分析；需要视觉理解时调用 vision_inspect。
++</system-reminder>
++```
++
++#### Token effect
++
++One bounded text notice is added for each image-bearing human message; each image contributes one identifier/path line. Image bytes do not enter main-model history. Old notices remain ordinary durable history and are not generated again.
++
++#### KV Cache effect
++
++Append-only: the new user message and notice extend the reusable request prefix. Subsequent turns replay the exact stored events without mutation or reordering.
++
++### vision_inspect tool
++
++#### What the model sees
++
++The model sees the `vision_inspect` tool with optional `attachmentIds`, optional `paths`, and a required complete delegated `prompt`. At least one image source is required. The concise descriptions are:
++
++##### Tool definition
++
++```markdown
++Tool: Inspect conversation attachments or local image files with the configured vision model.
++attachmentIds: Current-conversation attachment IDs to inspect.
++paths: Image file paths to import into this conversation and inspect.
++prompt: The complete visual question or inspection task.
++```
++
++#### Token effect
++
++The stable tool definition is present whenever the plugin is loaded. A path call additionally adds one model-invisible import record containing normalized attachment references. Each successful call adds one Markdown tool result; source image bytes and data URLs never enter model history and exist only in the separate vision-gateway request.
++
++#### KV Cache effect
++
++The stable tool definition is part of the reusable request prefix. Each new tool call and result is appended normally, without rewriting earlier reminders or observations.
++
++## Known Limitations and Deferred Work
++
++- **Compaction depends on identifier-preserving summaries** — the attachment remains authorized from the full event log, but the main model cannot choose a shadowed image if its compact summary drops the full `attachment_id`.
++- **One configured visual backend** — routing among multiple vision models, health-based failover, and per-workspace overrides are deferred.
++- **OpenAI-compatible transport only** — provider-native upload APIs and server-side image caches are not implemented.
++- **No automatic visual call** — the main model decides whether the user's task needs pixels; the bridge does not invoke the vision backend merely because an image was uploaded.
++- **The bridge is enabled by default in this DSH composition** — native multimodal routes still own their native image path, and a deployment may disable the bridge only when it intentionally does not want the reminder/tool experience.
+diff --git a/packages/vision/vision-bridge/README.zh.md b/packages/vision/vision-bridge/README.zh.md
+new file mode 100644
+index 0000000000..27d071ff65
+--- /dev/null
++++ b/packages/vision/vision-bridge/README.zh.md
+@@ -0,0 +1,100 @@
++# @deepseek-ai/dsh-vision-bridge
++
++[English](README.md) | 中文
++
++这是一个面向纯文本主模型、默认开启的视觉子智能体桥。DSH 仍通过现有 attachment 服务保存用户上传的图片，并生成当前会话专属、带正确扩展名的稳定只读副本；每条新出现且包含图片的人类消息后，系统会持久化一条相邻的 `<system-reminder>`；主模型需要视觉证据时，再通过 `vision_inspect` 把完整视觉问题委托给管理员配置的 OpenAI 兼容视觉模型。主模型不会收到图片 token：DSH 的纯文本投影会把所有图片块替换为稳定文本句柄，而持久 reminder 会提供当前对话内完整的 `attachment_id` 和 `local_path`。
++
++基础 bundle 中该桥默认启用。原生多模态路由应继续保持启用，沿用 DSH 原生图片路径，不需要本插件的 reminder 和工具。
++
++## 配置
++
++基础 bundle 已默认启用该配置行；只有需要覆盖本地默认值时，部署才需要重述完整 config：
++
++```yaml
++- id: vision-bridge
++  disabled: false
++  config:
++    baseURL: !!js process.env.DSH_VISION_BASE_URL ?? 'https://ai.chuansgu.top/v1'
++    apiKeyEnv: QWEN_VISION_API_KEY
++    model: Qwen3.8-Flash-Next-FP8
++    timeoutMs: 120000
++    maxImagesPerCall: 20
++    maxOutputTokens: 4096
++```
++
++`baseURL` 默认使用本地 DSH 部署端点；若结尾不是 `/chat/completions`，插件会自动追加。`apiKeyEnv` 是 credential reference，每次调用时通过 `ctx.credentials` 或不可变启动环境解析。受控嵌入场景可以使用字面量 `apiKey`，但不应提交到仓库。所有数值上限必须是正整数，否则加载时直接失败。
++
++是否加载该配置行就是功能开关。插件会提供可选的 `imageInputBridge` 准入能力、注册 `vision_inspect`，并安装持久 reminder hook；不会修改模型 preset，也不会增加全局 system prompt。
++
++该包的浏览器侧会在同一个启用边界注册 `vision_inspect` 专属工具行。它使用简洁的眼睛图标与 `Look` 标题，不再显示通用 Tool call 标识；运行态有意显示为 `Look ing <耗时>`，在标题与活动后缀之间保留一小段视觉间距，完成态显示 `Look <耗时>`。该 keyed 视图已经自行提供 Think 形态的内联计时，因此会抑制通用工具行末尾的重复计时。视觉行本身不再定义私有扫光，只接收外层工具调用容器统一提供的一层原生运行态扫光。OpenAI 兼容请求使用 SSE，并把视觉模型的每段 Markdown 按持久 call id 追加成可回放的 `tool/progress` 事件。流式期间单行视口跟随最新一条非空 Markdown 行及其最新文字，完成后回到结果第一行。最终 Markdown 只通过配对的 `tool/result` 落地一次，disclosure 保留完整持久输入与输出。progress 只是日志事件，不进入模型历史，因此不会重复结果或改变请求前缀。视觉桥禁用时，这个 keyed 呈现不会注册，页面也不会暴露该包的视觉工具界面。
++
++## 持久历史与 KV cache
++
++只有新领取的人类消息中确实存在图片块时，插件才生成 reminder。生成前，附件后端可以把已经校验的图片副本发布到 `attachments/v1/session-view/<session-hash>/<content-id>.<ext>`；副本不与全局内容对象建立链接，路径不拼接用户文件名，本地实现按只读权限发布。随后 reminder 紧跟原用户消息，并由普通 agent loop 作为另一条持久化 `user/message` 追加。后续轮次只重放这条既有事件；插件不会删除、重新生成、移动或再次注入旧 reminder。因而既有对话仍是仅追加的请求前缀，可以像普通文本历史一样复用 KV cache。后端不支持物化或发布失败时写入 `local_path: unavailable`，不会阻断图片消息，仍可按 attachment id 调用视觉工具。
++
++压缩可能按照部署的通用策略，用摘要替换旧的可见区间。attachment 鉴权仍会检查完整 session event log，包括已被遮蔽的事件；但摘要必须保留未来仍可能使用的完整 `attachment_id`，主模型才能主动选择那张历史图片。
++
++## 对话隔离与网关契约
++
++`vision_inspect` 可以接收当前会话的 `attachmentIds`、本地图片 `paths`，也可以混用。读取任何图片字节前，它会先从调用 agent 自己的 session event stream 中解析全部请求 id，来源包括用户上传的图片块和先前的 `vision/image-import` 记录。未知 id 或其他对话中的 id 会让整批请求在 attachment、文件系统读取和网关调用之前失败。
++
++本地相对路径通过挂载的 `ctx.fs` 后端按 session workspace 解析，绝对路径也遵循同一后端规则。插件只接受 PNG/JPEG/WebP/GIF 普通文件，整批图片通过原生 attachment 服务准入，并且只把规范化后的引用作为一条仅日志的 `vision/image-import` 事件追加到会话；源路径与图片字节都不会写入 session log。合并后的引用按内容 id 去重并受 `maxImagesPerCall` 限制，之后同一会话可以直接使用工具返回的 attachment id，不必重新读取源文件。
++
++网关收到一条 OpenAI 兼容 chat-completions 请求，其中包含主模型给出的完整委托 prompt、每张已授权图片的稳定标识和 data URL。视觉模型被要求直接输出简洁、面向任务的 Markdown：先回答问题，再按需列出可见证据和必要限制。DSH 不再解析 JSON 或重组字段。endpoint、credential、远端 model、耗时和内部错误正文仍不会进入结果。
++
++## Model Experience
++
++### Upload reminder
++
++#### What the model sees
++
++每条新上传图片的消息之后，模型会看到一条持久 notice，其中包含当前对话内完整的 `attachment_id`、媒体类型和会话级 `local_path`。工具结果之后不会再增加 notice。
++
++##### Reminder template
++
++```markdown
++<system-reminder>
++本条用户消息包含图片，已保存到当前对话：
++- attachment_id: <full attachment id>，name: <optional escaped name>，media_type: <image media type>，local_path: <session path or unavailable>
++可使用 local_path 配合现有工具做确定性文件或像素分析；需要视觉理解时调用 vision_inspect。
++</system-reminder>
++```
++
++#### Token effect
++
++每条包含图片的人类消息只增加一条有界文本 notice；每张图片增加一行标识和路径，图片字节不会进入主模型历史。旧 notice 会保留为普通持久历史，不会再次生成。
++
++#### KV Cache effect
++
++仅追加：新用户消息和 notice 只扩展可复用请求前缀。后续轮次原样重放已存事件，不修改也不重排。
++
++### vision_inspect tool
++
++#### What the model sees
++
++模型会看到 `vision_inspect` 工具：`attachmentIds` 与 `paths` 均为可选图片来源，`prompt` 为必填的完整视觉任务，且至少要给出一种图片来源。精简后的定义为：
++
++##### Tool definition
++
++```markdown
++Tool: Inspect conversation attachments or local image files with the configured vision model.
++attachmentIds: Current-conversation attachment IDs to inspect.
++paths: Image file paths to import into this conversation and inspect.
++prompt: The complete visual question or inspection task.
++```
++
++#### Token effect
++
++插件加载期间，稳定工具定义始终存在。路径调用会额外增加一条仅含规范化附件引用、对模型不可见的导入记录。每次成功调用只增加一条 Markdown 工具结果；源图片字节和 data URL 都不会进入模型历史，只存在于独立的视觉网关请求中。
++
++#### KV Cache effect
++
++稳定工具定义属于可复用请求前缀。新的工具调用与结果按普通方式追加，不会改写之前的 reminder 或 observation。
++
++## Known Limitations and Deferred Work
++
++- **压缩依赖摘要保留标识符**：attachment 仍可通过完整事件日志鉴权，但如果 compact summary 丢失了完整 `attachment_id`，主模型就无法主动选择已被遮蔽的历史图片。
++- **只支持一个已配置视觉后端**：多视觉模型路由、基于健康状态的 failover，以及工作区级覆盖暂缓实现。
++- **只支持 OpenAI 兼容传输**：尚未实现 provider 原生上传 API 和服务端图片缓存。
++- **不会自动调用视觉模型**：是否需要像素证据由主模型判断；插件不会仅因用户上传了图片就调用视觉后端。
++- **本 DSH composition 默认启用视觉桥**：原生多模态路由仍由自己的原生图片链路负责；只有明确不需要 reminder/工具体验的部署才应禁用视觉桥。
+diff --git a/packages/vision/vision-bridge/package.json b/packages/vision/vision-bridge/package.json
+new file mode 100644
+index 0000000000..1a8690305f
+--- /dev/null
++++ b/packages/vision/vision-bridge/package.json
+@@ -0,0 +1,74 @@
++{
++  "name": "@deepseek-ai/dsh-vision-bridge",
++  "description": "Default-enabled visual sub-agent bridge for text-only DeepSeek Harness routes",
++  "version": "0.1.2-alpha.1",
++  "publishConfig": { "access": "public" },
++  "repository": {
++    "type": "git",
++    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
++    "directory": "packages/vision/vision-bridge"
++  },
++  "type": "module",
++  "main": "lib/index.js",
++  "types": "lib/types/index.d.ts",
++  "exports": {
++    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
++    "./invariant": { "types": "./lib/types/invariant.d.ts", "default": "./lib/invariant.js" },
++    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" },
++    "./src/*": "./src/*",
++    "./package.json": "./package.json"
++  },
++  "dsh": {
++    "client": {
++      "inject": [
++        "@deepseek-ai/dsh-client-ui-renderer",
++        "@deepseek-ai/dsh-client-ui-tool"
++      ],
++      "platform": "web"
++    }
++  },
++  "scripts": {
++    "bundle": "tsdown",
++    "watch": "tsdown --watch"
++  },
++  "files": ["lib/index.js", "lib/invariant.js", "lib/client.js", "lib/types/**/*.d.ts"],
++  "license": "MIT",
++  "dependencies": { "@deepseek-ai/schemastery": "workspace:^" },
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-agent": "workspace:^",
++    "@deepseek-ai/dsh-attachment": "workspace:^",
++    "@deepseek-ai/dsh-credentials": "workspace:^",
++    "@deepseek-ai/dsh-fs": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^",
++    "@deepseek-ai/dsh-launch-environment": "workspace:^",
++    "@deepseek-ai/dsh-llm": "workspace:^",
++    "@deepseek-ai/dsh-session": "workspace:^",
++    "@deepseek-ai/dsh-tools": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-renderer": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-tool": "workspace:^"
++  },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-agent": "workspace:^",
++    "@deepseek-ai/dsh-agent-loop": "workspace:^",
++    "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
++    "@deepseek-ai/dsh-attachment": "workspace:^",
++    "@deepseek-ai/dsh-credentials": "workspace:^",
++    "@deepseek-ai/dsh-fs": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^",
++    "@deepseek-ai/dsh-launch-environment": "workspace:^",
++    "@deepseek-ai/dsh-llm": "workspace:^",
++    "@deepseek-ai/dsh-session": "workspace:^",
++    "@deepseek-ai/dsh-tools": "workspace:^",
++    "@deepseek-ai/dsh-client-test-runtime": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-renderer": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-tool": "workspace:^",
++    "@testing-library/react": "^16.1.0",
++    "@types/react": "~18.3.1",
++    "react": "^18.2.0",
++    "react-dom": "^18.2.0"
++  }
++}
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx b/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+new file mode 100644
+index 0000000000..15ee9f3fe0
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/VisionInspectIcon.tsx
+@@ -0,0 +1,27 @@
++/** Compact eye glyph for the visual sub-agent Tool row. */
++export function VisionInspectIcon({ size = 14, className }: {
++  readonly size?: number
++  readonly className?: string | undefined
++}) {
++  return (
++    <svg
++      width={size}
++      height={size}
++      className={className}
++      viewBox="0 0 14 14"
++      fill="none"
++      xmlns="http://www.w3.org/2000/svg"
++      aria-hidden
++      data-icon="look"
++    >
++      <path
++        d="M1.4 7C2.75 4.75 4.64 3.6 7 3.6S11.25 4.75 12.6 7C11.25 9.25 9.36 10.4 7 10.4S2.75 9.25 1.4 7Z"
++        stroke="currentColor"
++        strokeWidth="1.15"
++        strokeLinecap="round"
++        strokeLinejoin="round"
++      />
++      <circle cx="7" cy="7" r="1.35" fill="currentColor" />
++    </svg>
++  )
++}
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+new file mode 100644
+index 0000000000..9c671165c9
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.module.css
+@@ -0,0 +1,165 @@
++/* Dedicated visual Tool row. Geometry and activity motion intentionally match Think. */
++
++.root {
++  display: flex;
++  flex-direction: column;
++  width: 100%;
++  min-width: 0;
++}
++
++/* This keyed row renders the activity counter beside Look, so the generic Tool counter is redundant. */
++.root + [data-tool-activity-state] {
++  display: none;
++}
++
++.leading {
++  flex-shrink: 0;
++}
++
++.chevron {
++  color: var(--dsw-alias-label-secondary);
++}
++
++.title {
++  font-weight: 400;
++}
++
++.activity {
++  display: inline-flex;
++  flex: none;
++  align-items: center;
++  gap: 5px;
++  margin-left: 5px;
++  color: var(--dsw-alias-label-caption);
++  font-size: 14px;
++  line-height: 24px;
++  font-variant-numeric: tabular-nums;
++  white-space: nowrap;
++}
++
++.timer {
++  min-width: 20px;
++}
++
++.separator {
++  flex: none;
++  width: 2px;
++  height: 2px;
++  margin: 0 8px;
++  border-radius: 1px;
++  background: var(--dsw-alias-label-caption);
++}
++
++.summary {
++  min-width: 0;
++  overflow: hidden;
++  flex: 1 1 auto;
++  color: var(--dsw-alias-label-tertiary);
++  font-size: 14px;
++  line-height: 24px;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.summary[data-follow-end] {
++  text-overflow: clip;
++}
++
++.errorSummary {
++  color: var(--dsw-alias-state-error-primary);
++}
++
++.bodyWrap {
++  display: flex;
++  flex-direction: column;
++}
++
++.ioCard {
++  display: flex;
++  flex-direction: column;
++  max-height: 260px;
++  margin: 4px 0 4px 4px;
++  overflow: hidden;
++  border: 1px solid var(--dsw-alias-border-l1);
++  border-radius: 12px;
++  background: var(--dsw-alias-markdown-code-block);
++  font: var(--dsw-font-markdown-code-block-small);
++}
++
++.ioSection {
++  display: grid;
++  grid-template-columns: max-content minmax(0, 1fr);
++  column-gap: 14px;
++  align-items: baseline;
++  min-height: 0;
++  padding: 10px 12px;
++  overflow: auto;
++}
++
++.ioLabel {
++  color: var(--dsw-alias-label-caption);
++  font-size: 10px;
++  font-weight: 500;
++  letter-spacing: 0.04em;
++}
++
++.ioText {
++  min-width: 0;
++  margin: 0;
++  color: var(--dsw-alias-label-secondary);
++  font: inherit;
++  overflow-wrap: anywhere;
++  white-space: pre-wrap;
++}
++
++.ioText[data-error] {
++  color: var(--dsw-alias-state-error-primary);
++}
++
++.ioDivider {
++  height: 1px;
++  background: var(--dsw-alias-border-l2);
++}
++
++.inspectButton {
++  display: inline-flex;
++  align-self: flex-start;
++  align-items: center;
++  gap: 4px;
++  margin: 4px 0 2px 4px;
++  padding: 2px 8px;
++  border: 1px solid var(--dsw-alias-border-l2);
++  border-radius: 999px;
++  background: var(--dsw-alias-bg-base);
++  color: var(--dsw-alias-label-secondary);
++  font-size: 11px;
++  line-height: 16px;
++  cursor: pointer;
++  opacity: 0;
++  transition: opacity 100ms ease;
++}
++
++.root:hover .inspectButton,
++.inspectButton:focus-visible {
++  opacity: 1;
++}
++
++.inspectButton:hover {
++  background: var(--dsw-alias-interactive-bg-hover-solid);
++  color: var(--dsw-alias-label-primary);
++}
++
++.visuallyHidden {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  overflow: hidden;
++  clip: rect(0 0 0 0);
++  white-space: nowrap;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .inspectButton {
++    transition: none;
++  }
++}
+diff --git a/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+new file mode 100644
+index 0000000000..1debf2819b
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/VisionInspectRow.tsx
+@@ -0,0 +1,192 @@
++/** Dedicated `vision_inspect` presentation: visual identity plus replay-stable evidence disclosure. */
++import { useEffect, useRef, useState, type ReactNode } from 'react'
++import {
++  DisclosureRow, ElapsedTime, IconInspectOutline12, StateDot,
++} from '@deepseek-ai/dsh-client-ui-primitives'
++import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
++import { VisionInspectIcon } from './VisionInspectIcon.tsx'
++import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
++import css from './VisionInspectRow.module.css'
++
++type VisionState = 'running' | 'ok' | 'error' | 'stopped'
++
++interface VisionModel {
++  readonly argsRaw: string
++  readonly output: string | null
++  readonly summary: string
++  readonly state: VisionState
++}
++function compactMarkdownLine(text: string): string {
++  return text
++    .replace(/^#{1,6}\s+/, '')
++    .replace(/^[-+*]\s+/, '')
++    .replace(/\*\*([^*]+)\*\*/g, '$1')
++    .replace(/__([^_]+)__/g, '$1')
++    .trim()
++}
++
++function firstLine(text: string): string {
++  return compactMarkdownLine(text.trim().split(/\r?\n/, 1)[0] ?? '')
++}
++
++function latestLine(text: string): string {
++  const lines = text.trimEnd().split(/\r?\n/)
++  for (let index = lines.length - 1; index >= 0; index -= 1) {
++    const line = lines[index]?.trim()
++    if (line !== undefined && line !== '') return compactMarkdownLine(line)
++  }
++  return ''
++}
++
++function resultText(block: ToolCallViewProps['block']): string | null {
++  if (!('kind' in block)) return null
++  const parts = block.content.map(item => item.type === 'text' ? item.text : JSON.stringify(item, null, 2))
++  if (parts.length === 0 && block.error !== undefined) parts.push(`${block.error.name}: ${block.error.code}`)
++  return parts.join('\n') || null
++}
++
++function promptSummary(argsRaw: string, callId: string): string {
++  try {
++    const parsed = JSON.parse(argsRaw) as unknown
++    if (typeof parsed === 'object' && parsed !== null) {
++      const prompt = (parsed as Record<string, unknown>).prompt
++      if (typeof prompt === 'string' && prompt.trim() !== '') return firstLine(prompt.trim())
++    }
++  } catch {
++    // Streaming arguments may be an incomplete JSON prefix.
++  }
++  return argsRaw === '' ? callId : firstLine(argsRaw)
++}
++
++function visionModel(block: ToolCallViewProps['block']): VisionModel {
++  const settled = 'kind' in block
++  const argsRaw = (settled ? block.call?.argsRaw : block.argsRaw) ?? ''
++  const output = resultText(block)
++  const progress = block.progressText?.trim() ?? ''
++  const state: VisionState = !settled
++    ? 'running'
++    : block.error?.code === 'interrupted'
++      ? 'stopped'
++      : block.isError ? 'error' : 'ok'
++  return {
++    argsRaw,
++    output,
++    summary: state === 'error' && output !== null
++      ? firstLine(output)
++      : state === 'ok' && output !== null
++        ? firstLine(output) || firstLine(progress) || promptSummary(argsRaw, block.callId)
++        : progress || promptSummary(argsRaw, block.callId),
++    state,
++  }
++}
++
++function leadingFor(state: VisionState): ReactNode {
++  switch (state) {
++    case 'error': return <StateDot state="error" />
++    case 'stopped': return <StateDot state="warning" />
++    default: return <VisionInspectIcon />
++  }
++}
++
++function accessibleState(state: VisionState): string | null {
++  switch (state) {
++    case 'running': return 'Vision inspection running'
++    case 'error': return 'Vision inspection failed'
++    case 'stopped': return 'Vision inspection stopped'
++    default: return null
++  }
++}
++
++/** Render a visual inspection with a domain icon and Think-shaped activity title. */
++export function VisionInspectRow({ block, inspect }: ToolCallViewProps) {
++  const model = visionModel(block)
++  const [expanded, setExpanded] = useState(false)
++  const summaryRef = useRef<HTMLSpanElement>(null)
++  const startedTime = 'kind' in block ? block.callTime : block.time
++  const finishedTime = 'kind' in block ? block.time : undefined
++  const presentingRunning = model.state === 'running'
++  const expandable = model.output !== null || model.argsRaw !== ''
++  const open = expanded && expandable
++  const status = accessibleState(model.state)
++  const summary = presentingRunning ? latestLine(model.summary) : firstLine(model.summary)
++  const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
++    const element = summaryRef.current
++    if (element === null) return
++    element.scrollLeft = presentingRunning ? element.scrollWidth - element.clientWidth : 0
++  })
++  useEffect(() => {
++    scheduleSummaryScroll()
++  }, [presentingRunning, scheduleSummaryScroll, summary])
++  return (
++    <div
++      className={css.root}
++      data-tool="vision_inspect"
++      data-state={model.state}
++      data-tool-activity-placement="inline"
++    >
++      {status !== null && <span className={css.visuallyHidden}>{status}</span>}
++      <DisclosureRow
++        rowClassName={css.row}
++        leadingClassName={css.leading}
++        titleClassName={css.title}
++        chevronClassName={css.chevron}
++        icon={leadingFor(model.state)}
++        title="Look"
++        titleSuffix={presentingRunning || startedTime !== null ? (
++          <span className={css.activity} data-look-activity>
++            {presentingRunning && <span data-look-status aria-hidden>ing</span>}
++            {startedTime !== null && (
++              <ElapsedTime
++                className={css.timer}
++                startedTime={startedTime}
++                finishedTime={finishedTime}
++              />
++            )}
++          </span>
++        ) : undefined}
++        open={open}
++        expandable={expandable}
++        expandOnRowClick
++        keepContentWhenOpen
++        onToggle={() => { setExpanded(value => !value) }}
++        collapsedContent={(
++          <>
++            <span className={css.separator} aria-hidden />
++            <span
++              ref={summaryRef}
++              className={model.state === 'error' ? `${css.summary} ${css.errorSummary}` : css.summary}
++              data-follow-end={presentingRunning || undefined}
++              data-vision-summary
++            >
++              {summary}
++            </span>
++          </>
++        )}
++      >
++        <div className={css.bodyWrap}>
++          <div className={css.ioCard}>
++            {model.argsRaw !== '' && (
++              <section className={css.ioSection}>
++                <span className={css.ioLabel}>IN</span>
++                <pre className={css.ioText}>{model.argsRaw}</pre>
++              </section>
++            )}
++            {model.argsRaw !== '' && model.output !== null && <span className={css.ioDivider} aria-hidden />}
++            {model.output !== null && (
++              <section className={css.ioSection}>
++                <span className={css.ioLabel}>OUT</span>
++                <pre className={css.ioText} data-error={model.state === 'error' || undefined}>{model.output}</pre>
++              </section>
++            )}
++          </div>
++          {inspect !== undefined && (
++            <button type="button" className={css.inspectButton} onClick={inspect}>
++              <IconInspectOutline12 />
++              Inspect
++            </button>
++          )}
++        </div>
++      </DisclosureRow>
++    </div>
++  )
++}
+diff --git a/packages/vision/vision-bridge/src/client/index.ts b/packages/vision/vision-bridge/src/client/index.ts
+new file mode 100644
+index 0000000000..d2d816dcc8
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/index.ts
+@@ -0,0 +1,16 @@
++/** Browser half: default-enabled keyed presentation for the Host-owned visual Tool. */
++import type { Context as ClientContext } from '@deepseek-ai/cordis'
++import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
++import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
++import { VISION_INSPECT_TOOL_NAME } from '../tool-name.ts'
++import { VisionInspectRow } from './VisionInspectRow.tsx'
++
++export const inject = ['slots']
++
++/** Register the visual Tool row; the plugin fiber owns teardown and HMR disposal. */
++export function apply(ctx: ClientContext): void {
++  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
++    { name: 'tool.call.toolview', key: VISION_INSPECT_TOOL_NAME },
++    VisionInspectRow,
++  ))
++}
+diff --git a/packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts b/packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts
+new file mode 100644
+index 0000000000..0f0b0750aa
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/client/use-throttled-visual-update.ts
+@@ -0,0 +1,32 @@
++/** Frame-throttled scheduling for the visual stream's non-essential DOM alignment. */
++import { useCallback, useLayoutEffect, useRef } from 'react'
++
++const INTERVAL_FRAMES = 3
++
++/** Coalesce streamed summary scrolling and apply only the latest alignment. */
++export function useThrottledVisualUpdate(update: () => void): () => void {
++  const updateRef = useRef(update)
++  updateRef.current = update
++  const pendingFrameRef = useRef<number | null>(null)
++
++  useLayoutEffect(() => () => {
++    if (pendingFrameRef.current === null) return
++    cancelAnimationFrame(pendingFrameRef.current)
++    pendingFrameRef.current = null
++  }, [])
++
++  return useCallback(() => {
++    if (pendingFrameRef.current !== null) return
++    let remainingFrames = INTERVAL_FRAMES
++    const advance = (): void => {
++      remainingFrames -= 1
++      if (remainingFrames > 0) {
++        pendingFrameRef.current = requestAnimationFrame(advance)
++        return
++      }
++      pendingFrameRef.current = null
++      updateRef.current()
++    }
++    pendingFrameRef.current = requestAnimationFrame(advance)
++  }, [])
++}
+diff --git a/packages/vision/vision-bridge/src/css-modules.d.ts b/packages/vision/vision-bridge/src/css-modules.d.ts
+new file mode 100644
+index 0000000000..8811db1264
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/css-modules.d.ts
+@@ -0,0 +1,4 @@
++declare module '*.module.css' {
++  const classes: Record<string, string>
++  export default classes
++}
+diff --git a/packages/vision/vision-bridge/src/index.ts b/packages/vision/vision-bridge/src/index.ts
+new file mode 100644
+index 0000000000..e97d6559de
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/index.ts
+@@ -0,0 +1,575 @@
++/**
++ * Default-enabled visual sub-agent bridge for text-only main-model routes.
++ *
++ * New image-bearing user messages receive one durable adjacent reminder. The
++ * bridge tool resolves only images referenced by the current session and sends
++ * their bytes to an administrator-configured OpenAI-compatible vision model.
++ * @module @deepseek-ai/dsh-vision-bridge
++ */
++
++import { basename, extname } from 'node:path'
++import type { Context } from '@deepseek-ai/cordis'
++import z from '@deepseek-ai/schemastery'
++import type {
++  ImageAttachmentRef,
++  ImageMediaType,
++  SaveImageAttachment,
++  StoredImageAttachment,
++} from '@deepseek-ai/dsh-attachment'
++import { credentialRef } from '@deepseek-ai/dsh-credentials'
++import { FsError } from '@deepseek-ai/dsh-fs'
++import type { FsInfo, FsTarget } from '@deepseek-ai/dsh-fs'
++import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
++import { createUserMessage } from '@deepseek-ai/dsh-llm'
++import type { UserMessage } from '@deepseek-ai/dsh-llm'
++import type { SessionEvent } from '@deepseek-ai/dsh-session'
++import { defineTool } from '@deepseek-ai/dsh-tools'
++import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
++import type {} from '@deepseek-ai/dsh-agent'
++import { VISION_INSPECT_TOOL_NAME } from './tool-name.ts'
++
++export { VISION_INSPECT_TOOL_NAME } from './tool-name.ts'
++
++/** Cordis plugin name used in durable reminder provenance. */
++export const name = 'vision-bridge'
++
++/** Services required for durable image resolution and tool registration. */
++export const inject = ['attachments', 'tools']
++
++/** Default environment reference for the vision gateway credential. */
++export const DEFAULT_VISION_API_KEY_ENV = 'QWEN_VISION_API_KEY'
++/** Default environment variable carrying the OpenAI-compatible endpoint base. */
++export const DEFAULT_VISION_BASE_URL_ENV = 'DSH_VISION_BASE_URL'
++/** Default remote visual sub-agent model. */
++export const DEFAULT_VISION_MODEL = 'Qwen3.8-Flash-Next-FP8'
++/** Default cooperative call timeout. */
++export const DEFAULT_VISION_TIMEOUT_MS = 120_000
++/** Default image-count bound for one visual inspection, aligned with 0.1.1 attachment admission. */
++export const DEFAULT_VISION_MAX_IMAGES = 20
++/** Default generated-token bound for one visual inspection. */
++export const DEFAULT_VISION_MAX_OUTPUT_TOKENS = 4096
++
++/** Deployment configuration. The base composition loads this plugin by default. */
++export interface Config {
++  /** OpenAI-compatible endpoint base; `/chat/completions` is appended when absent. */
++  baseURL?: string
++  /** Literal gateway key; prefer {@link apiKeyEnv}. */
++  apiKey?: string
++  /** Credential reference resolved once per call. */
++  apiKeyEnv?: string
++  /** Visual sub-agent model id. */
++  model?: string
++  /** Cooperative timeout budget for `vision_inspect`. */
++  timeoutMs?: number
++  /** Maximum number of current-session images accepted by one call. */
++  maxImagesPerCall?: number
++  /** Maximum output tokens requested from the visual sub-agent. */
++  maxOutputTokens?: number
++}
++export const Config: z<Config> = z.object({
++  baseURL: z.string(),
++  apiKey: z.string().role('secret'),
++  apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_VISION_API_KEY_ENV),
++  model: z.string().default(DEFAULT_VISION_MODEL),
++  timeoutMs: z.number().step(1).min(1).default(DEFAULT_VISION_TIMEOUT_MS),
++  maxImagesPerCall: z.number().step(1).min(1).default(DEFAULT_VISION_MAX_IMAGES),
++  maxOutputTokens: z.number().step(1).min(1).default(DEFAULT_VISION_MAX_OUTPUT_TOKENS),
++})
++
++/** Fully resolved, secret-bearing runtime options. */
++export interface VisionBridgeOptions {
++  readonly baseURL: string
++  readonly apiKey?: string
++  readonly apiKeyEnv: string
++  readonly model: string
++  readonly timeoutMs: number
++  readonly maxImagesPerCall: number
++  readonly maxOutputTokens: number
++}
++
++/** Model-invisible durable record of local files imported for this session. */
++export interface VisionImageImportEventData {
++  readonly attachments: ImageAttachmentRef[]
++}
++
++declare module '@deepseek-ai/dsh-session/types' {
++  interface SessionEventMap {
++    /** Local images admitted by `vision_inspect`; log-only and absent from model history. */
++    'vision/image-import': VisionImageImportEventData
++  }
++}
++
++type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
++
++/** Escape untrusted attachment metadata embedded in the XML-shaped reminder. */
++function escapeXml(value: string): string {
++  return value
++    .replaceAll('&', '&amp;')
++    .replaceAll('<', '&lt;')
++    .replaceAll('>', '&gt;')
++    .replaceAll('"', '&quot;')
++    .replaceAll("'", '&apos;')
++}
++
++/**
++ * Render the one durable reminder paired with an image-bearing user message.
++ * @param refs - durable image references from that one human message.
++ * @returns the XML-shaped reminder text stored in the adjacent user event.
++ */
++export function renderImageReminder(
++  refs: readonly ImageAttachmentRef[],
++  localPaths: ReadonlyMap<string, string | undefined> = new Map(),
++): string {
++  const items = refs.map((ref) => {
++    const displayName = ref.name === undefined ? '' : `，name: ${escapeXml(ref.name)}`
++    const localPath = localPaths.get(String(ref.attachmentId))
++    const renderedPath = localPath === undefined ? 'unavailable' : escapeXml(localPath)
++    return `- attachment_id: ${escapeXml(String(ref.attachmentId))}${displayName}，media_type: ${ref.mediaType}，local_path: ${renderedPath}`
++  }).join('\n')
++  return `<system-reminder>\n本条用户消息包含图片，已保存到当前对话：\n${items}\n可使用 local_path 配合现有工具做确定性文件或像素分析；需要视觉理解时调用 ${VISION_INSPECT_TOOL_NAME}。\n</system-reminder>`
++}
++
++/** Collect only top-level durable image references from one uploaded user message. */
++function imageRefs(message: UserMessage): ImageAttachmentRef[] {
++  return message.content.flatMap(block => block.type === 'image' ? [block.attachment] : [])
++}
++
++/**
++ * Insert a reminder immediately after each newly claimed human image message.
++ * Existing history is not inspected or regenerated: once the returned pair is
++ * appended by the agent loop, future requests replay the exact durable prefix.
++ * @param messages - newly claimed messages returned by downstream pre-step hooks.
++ * @returns the messages with one notice adjacent to each human image message.
++ */
++export function addImageReminders(
++  messages: readonly UserMessage[],
++  localPaths: ReadonlyMap<string, string | undefined> = new Map(),
++): UserMessage[] {
++  const expanded: UserMessage[] = []
++  for (const message of messages) {
++    expanded.push(message)
++    if (message.source.kind !== 'user') continue
++    const refs = imageRefs(message)
++    if (refs.length === 0) continue
++    expanded.push(createUserMessage({
++      content: [{ type: 'text', text: renderImageReminder(refs, localPaths) }],
++      source: {
++        kind: 'plugin',
++        plugin: name,
++        form: 'notice',
++        summary: `用户上传了 ${String(refs.length)} 张图片`,
++      },
++    }))
++  }
++  return expanded
++}
++
++/** Find an uploaded or locally imported image reference in the complete current-session event log. */
++function findSessionImage(events: readonly SessionEvent[], attachmentId: string): ImageAttachmentRef | undefined {
++  for (const event of events) {
++    if (event.type === 'user/message') {
++      for (const block of event.data.content) {
++        if (block.type === 'image' && String(block.attachment.attachmentId) === attachmentId) {
++          return block.attachment
++        }
++      }
++      continue
++    }
++    if (event.type === 'vision/image-import') {
++      const ref = event.data.attachments.find(item => String(item.attachmentId) === attachmentId)
++      if (ref !== undefined) return ref
++    }
++  }
++  return undefined
++}
++
++const IMAGE_MEDIA_TYPES: Readonly<Record<string, ImageMediaType>> = {
++  '.png': 'image/png',
++  '.jpg': 'image/jpeg',
++  '.jpeg': 'image/jpeg',
++  '.webp': 'image/webp',
++  '.gif': 'image/gif',
++}
++
++interface ResolvedPathImage {
++  readonly target: FsTarget
++  readonly info: FsInfo
++  readonly mediaType: ImageMediaType
++}
++
++/** Resolve and admit local image paths through the mounted filesystem and attachment services. */
++async function importPathImages(
++  ctx: Context,
++  paths: readonly string[],
++  exec: ToolRunContext,
++): Promise<ImageAttachmentRef[]> {
++  if (paths.length === 0) return []
++  const fs = ctx.get('fs')
++  if (fs === undefined) throw new Error('vision_inspect cannot import local paths: no filesystem service is mounted')
++  const candidates: Array<{ requestedPath: string; mediaType: ImageMediaType }> = []
++  for (const rawPath of paths) {
++    const requestedPath = rawPath.trim()
++    if (requestedPath.length === 0) throw new Error('vision_inspect paths must contain non-empty strings')
++    const mediaType = IMAGE_MEDIA_TYPES[extname(requestedPath).toLowerCase()]
++    if (mediaType === undefined) {
++      throw new Error(`cannot inspect "${requestedPath}": vision_inspect only accepts PNG/JPEG/WebP/GIF paths`)
++    }
++    if (!ctx.attachments.imageLimits.mediaTypes.includes(mediaType)) {
++      throw new Error(`cannot inspect "${requestedPath}": ${mediaType} images are not accepted by this deployment`)
++    }
++    candidates.push({ requestedPath, mediaType })
++  }
++
++  // Resolve and stat the whole batch before reading bytes. Canonical target ids
++  // dedupe aliases while preserving first-seen order and filename metadata.
++  const resolved: ResolvedPathImage[] = []
++  const targetKeys = new Set<string>()
++  const cwd = exec.agent?.session.header.cwd
++  for (const candidate of candidates) {
++    const target = await fs.resolve(candidate.requestedPath, {
++      ...cwd === undefined ? {} : { cwd },
++      signal: exec.signal,
++    })
++    const info = await fs.stat(target, exec.signal)
++    if (info === undefined) {
++      ctx.emit('fs/observed', target, { kind: 'absent' }, exec)
++      throw new FsError(`cannot inspect "${target.displayPath}": not found`, 'FS_NOT_FOUND')
++    }
++    if (info.type !== 'file') {
++      throw new FsError(`cannot inspect "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
++    }
++    const targetKey = String(target.targetKey)
++    if (targetKeys.has(targetKey)) continue
++    targetKeys.add(targetKey)
++    resolved.push({ target, info, mediaType: candidate.mediaType })
++  }
++  if (resolved.length > ctx.attachments.imageLimits.maxImagesPerMessage) {
++    throw new Error(`vision_inspect accepts at most ${String(ctx.attachments.imageLimits.maxImagesPerMessage)} local image paths per call`)
++  }
++
++  const byteCap = Math.min(
++    ctx.attachments.imageLimits.maxImageBytes,
++    ctx.attachments.imageLimits.maxMessageImageBytes,
++  )
++  const inputs: SaveImageAttachment[] = []
++  for (const item of resolved) {
++    inputs.push({
++      data: await fs.readBytes(item.target, exec.signal, byteCap),
++      mediaType: item.mediaType,
++      name: basename(item.target.displayPath),
++    })
++  }
++  const refs = [...await ctx.attachments.saveImages(inputs)]
++  for (const item of resolved) {
++    ctx.emit('fs/observed', item.target, { kind: 'present', version: item.info.version }, exec)
++  }
++  return refs
++}
++
++/** Normalize an endpoint base without leaking it into model-visible errors. */
++function chatCompletionsURL(baseURL: string): string {
++  const trimmed = baseURL.replace(/\/+$/, '')
++  return trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`
++}
++
++/** Extract text from OpenAI-compatible string or text-part response content. */
++function responseText(payload: unknown): string | undefined {
++  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return undefined
++  const choices = (payload as { choices?: unknown }).choices
++  if (!Array.isArray(choices) || choices.length === 0) return undefined
++  const first = (choices as unknown[])[0]
++  if (typeof first !== 'object' || first === null || Array.isArray(first)) return undefined
++  const message = (first as { message?: unknown }).message
++  if (typeof message !== 'object' || message === null || Array.isArray(message)) return undefined
++  const content = (message as { content?: unknown }).content
++  if (typeof content === 'string') return content
++  if (!Array.isArray(content)) return undefined
++  const parts = content.flatMap((part) => {
++    if (typeof part !== 'object' || part === null || Array.isArray(part)) return []
++    const record = part as { type?: unknown; text?: unknown }
++    return record.type === 'text' && typeof record.text === 'string' ? [record.text] : []
++  })
++  return parts.length === 0 ? undefined : parts.join('')
++}
++
++/** Extract one OpenAI-compatible streamed assistant text fragment. */
++function responseDeltaText(payload: unknown): string | undefined {
++  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return undefined
++  const choices = (payload as { choices?: unknown }).choices
++  if (!Array.isArray(choices) || choices.length === 0) return undefined
++  const first = (choices as unknown[])[0]
++  if (typeof first !== 'object' || first === null || Array.isArray(first)) return undefined
++  const delta = (first as { delta?: unknown }).delta
++  if (typeof delta !== 'object' || delta === null || Array.isArray(delta)) return undefined
++  const content = (delta as { content?: unknown }).content
++  if (typeof content === 'string') return content
++  if (!Array.isArray(content)) return undefined
++  const parts = content.flatMap((part) => {
++    if (typeof part !== 'object' || part === null || Array.isArray(part)) return []
++    const record = part as { type?: unknown; text?: unknown }
++    return record.type === 'text' && typeof record.text === 'string' ? [record.text] : []
++  })
++  return parts.length === 0 ? undefined : parts.join('')
++}
++
++/** Return the earliest complete SSE record and retain the unconsumed suffix. */
++function takeSseRecord(buffer: string): { record: string; rest: string } | undefined {
++  const boundaries = ['\r\n\r\n', '\n\n', '\r\r']
++    .map(marker => ({ marker, index: buffer.indexOf(marker) }))
++    .filter(candidate => candidate.index >= 0)
++    .sort((left, right) => left.index - right.index)
++  const boundary = boundaries[0]
++  if (boundary === undefined) return undefined
++  return {
++    record: buffer.slice(0, boundary.index),
++    rest: buffer.slice(boundary.index + boundary.marker.length),
++  }
++}
++
++/** Parse and publish one SSE record, returning its assistant text fragment. */
++function readSseRecord(record: string): string {
++  const data = record.split(/\r\n|\r|\n/)
++    .filter(line => line.startsWith('data:'))
++    .map(line => line.slice(5).replace(/^ /, ''))
++    .join('\n')
++  if (data === '' || data === '[DONE]') return ''
++  let payload: unknown
++  try {
++    payload = JSON.parse(data)
++  } catch (error: unknown) {
++    throw new Error('vision service returned invalid streaming JSON', { cause: error })
++  }
++  return responseDeltaText(payload) ?? ''
++}
++
++/** Consume either an SSE stream or a compatibility non-streaming JSON response. */
++async function readResponseText(response: Response, onDelta: (delta: string) => void): Promise<string> {
++  if (!response.headers.get('content-type')?.toLowerCase().includes('text/event-stream')) {
++    let payload: unknown
++    try {
++      payload = await response.json()
++    } catch (error: unknown) {
++      throw new Error('vision service returned invalid JSON', { cause: error })
++    }
++    const text = responseText(payload)
++    if (text === undefined) throw new Error('vision service response did not contain assistant text')
++    return text
++  }
++  if (response.body === null) throw new Error('vision service response did not contain assistant text')
++  const reader = response.body.getReader()
++  const decoder = new TextDecoder()
++  let buffer = ''
++  let text = ''
++  const accept = (record: string) => {
++    const delta = readSseRecord(record)
++    if (delta === '') return
++    text += delta
++    onDelta(delta)
++  }
++  while (true) {
++    const chunk = await reader.read()
++    buffer += decoder.decode(chunk.value, { stream: !chunk.done })
++    let next = takeSseRecord(buffer)
++    while (next !== undefined) {
++      accept(next.record)
++      buffer = next.rest
++      next = takeSseRecord(buffer)
++    }
++    if (chunk.done) break
++  }
++  if (buffer.trim() !== '') accept(buffer)
++  if (text === '') throw new Error('vision service response did not contain assistant text')
++  return text
++}
++
++/** Resolve the configured credential for one request. */
++async function resolveApiKey(ctx: Context, options: VisionBridgeOptions): Promise<string | undefined> {
++  if (options.apiKey !== undefined && options.apiKey.length > 0) return options.apiKey
++  const ref = credentialRef(options.apiKeyEnv)
++  const credentials = ctx.get('credentials')
++  if (credentials !== undefined) return (await credentials.resolve(ref))?.value
++  const ambient = launchEnvironmentOf(ctx).get(ref)?.value
++  return ambient !== undefined && ambient.length > 0 ? ambient : undefined
++}
++
++/** Run one authorized inspection against the configured OpenAI-compatible visual sub-agent. */
++async function inspect(
++  ctx: Context,
++  options: VisionBridgeOptions,
++  attachmentIds: readonly string[] | undefined,
++  paths: readonly string[] | undefined,
++  prompt: string,
++  exec: ToolRunContext,
++  fetchImpl: FetchLike,
++): Promise<string> {
++  const agent = exec.agent
++  if (agent === undefined) throw new Error('vision_inspect requires an active agent session')
++  const uniqueAttachmentIds = [...new Set(attachmentIds ?? [])]
++  const requestedPaths = paths ?? []
++  if (uniqueAttachmentIds.length === 0 && requestedPaths.length === 0) {
++    throw new Error('vision_inspect requires at least one attachmentId or path')
++  }
++  if (uniqueAttachmentIds.length > options.maxImagesPerCall) {
++    throw new Error(`vision_inspect accepts at most ${String(options.maxImagesPerCall)} images per call`)
++  }
++
++  // Authorize every referenced attachment before reading any file bytes or
++  // contacting the gateway. Imported refs are recorded in a log-only event.
++  const existingRefs = uniqueAttachmentIds.map((attachmentId) => {
++    const ref = findSessionImage(agent.session.events, attachmentId)
++    if (ref === undefined) throw new Error(`attachment "${attachmentId}" is not available in the current session`)
++    return ref
++  })
++  const importedRefs = await importPathImages(ctx, requestedPaths, exec)
++  const refsById = new Map(existingRefs.map(ref => [String(ref.attachmentId), ref]))
++  for (const ref of importedRefs) refsById.set(String(ref.attachmentId), refsById.get(String(ref.attachmentId)) ?? ref)
++  const refs = [...refsById.values()]
++  if (refs.length > options.maxImagesPerCall) {
++    throw new Error(`vision_inspect accepts at most ${String(options.maxImagesPerCall)} images per call`)
++  }
++  const newlyImported = importedRefs.filter(ref => findSessionImage(agent.session.events, String(ref.attachmentId)) === undefined)
++  if (newlyImported.length > 0) {
++    agent.session.append('vision/image-import', { attachments: newlyImported })
++  }
++  const stored: StoredImageAttachment[] = []
++  for (const ref of refs) stored.push(await ctx.attachments.readImage(ref, exec.signal))
++  const apiKey = await resolveApiKey(ctx, options)
++  exec.signal.throwIfAborted()
++  let response: Response
++  try {
++    response = await fetchImpl(chatCompletionsURL(options.baseURL), {
++      method: 'POST',
++      headers: {
++        'content-type': 'application/json',
++        ...apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` },
++      },
++      body: JSON.stringify({
++        model: options.model,
++        stream: true,
++        temperature: 0,
++        max_tokens: options.maxOutputTokens,
++        // vLLM's Qwen chat template accepts this OpenAI-compatible extension;
++        // visual observation should spend tokens on evidence, not a hidden CoT.
++        chat_template_kwargs: { enable_thinking: false },
++        messages: [{
++          role: 'system',
++          content: '你是视觉子智能体。结合用户给出的完整任务检查所有图片，只输出简洁、任务导向的 Markdown 正文。'
++            + '先直接回答问题，再按需列出可见证据和必要限制。不要输出 JSON 或 Markdown 代码围栏，不要猜测不可见内容。',
++        }, {
++          role: 'user',
++          content: [
++            { type: 'text', text: prompt },
++            ...stored.flatMap((image, index) => [{
++              type: 'text',
++              text: `图片 ${String(index + 1)}：attachment_id=${String(image.ref.attachmentId)}${image.ref.name === undefined ? '' : `，name=${image.ref.name}`}`,
++            }, {
++              type: 'image_url',
++              image_url: { url: `data:${image.ref.mediaType};base64,${Buffer.from(image.data).toString('base64')}` },
++            }]),
++          ],
++        }],
++      }),
++      signal: exec.signal,
++    })
++  } catch (error: unknown) {
++    if (exec.signal.aborted) throw exec.signal.reason
++    throw new Error('vision service request failed', { cause: error })
++  }
++  if (!response.ok) throw new Error(`vision service request failed with HTTP ${String(response.status)}`)
++  const text = await readResponseText(response, (delta) => {
++    exec.reportProgress(delta)
++  })
++  const markdown = text.trim()
++  if (markdown.length === 0) throw new Error('vision service response did not contain usable assistant text')
++  return markdown
++}
++
++/**
++ * Build the model-facing tool; injectable fetch keeps gateway tests network-free.
++ * @param ctx - Cordis context used to resolve attachments and credentials.
++ * @param options - validated deployment route and request limits.
++ * @param fetchImpl - OpenAI-compatible transport implementation.
++ * @returns the registered `vision_inspect` definition.
++ */
++export function createVisionInspectTool(
++  ctx: Context,
++  options: VisionBridgeOptions,
++  fetchImpl: FetchLike = globalThis.fetch,
++): ToolDefinition {
++  return defineTool({
++    name: VISION_INSPECT_TOOL_NAME,
++    description: 'Inspect conversation attachments or local image files with the configured vision model.',
++    parameters: {
++      attachmentIds: {
++        type: 'array',
++        items: { type: 'string' },
++        description: 'Current-conversation attachment IDs to inspect.',
++      },
++      paths: {
++        type: 'array',
++        items: { type: 'string' },
++        description: 'Image file paths to import into this conversation and inspect.',
++      },
++      prompt: {
++        type: 'string',
++        required: true,
++        description: 'The complete visual question or inspection task.',
++      },
++    },
++    output: {
++      schema: { type: 'string' },
++      render: (_args, value) => [{ type: 'text', text: value }],
++    },
++    timeoutMs: options.timeoutMs,
++    isConcurrencySafe: () => true,
++    execute: (args, exec) => inspect(ctx, options, args.attachmentIds, args.paths, args.prompt, exec, fetchImpl),
++  })
++}
++
++/** Resolve and validate deployment options without exposing secrets. */
++function resolveOptions(ctx: Context, config: Config): VisionBridgeOptions {
++  const resolved = Config(config) as Required<Omit<Config, 'baseURL' | 'apiKey'>> & Pick<Config, 'baseURL' | 'apiKey'>
++  // A workspace-controlled project .env must never redirect a managed gateway
++  // credential. Composition config is operator-owned; the environment fallback
++  // therefore accepts only the inherited process and Harness-user layers.
++  const baseURL = resolved.baseURL
++    ?? launchEnvironmentOf(ctx).getFrom(DEFAULT_VISION_BASE_URL_ENV, ['process', 'user-env'])?.value
++  if (baseURL === undefined || baseURL.trim().length === 0) {
++    throw new Error(`vision-bridge: baseURL or ${DEFAULT_VISION_BASE_URL_ENV} is required when the plugin is enabled`)
++  }
++  credentialRef(resolved.apiKeyEnv)
++  return {
++    baseURL: baseURL.trim(),
++    ...resolved.apiKey === undefined ? {} : { apiKey: resolved.apiKey },
++    apiKeyEnv: resolved.apiKeyEnv,
++    model: resolved.model,
++    timeoutMs: resolved.timeoutMs,
++    maxImagesPerCall: resolved.maxImagesPerCall,
++    maxOutputTokens: resolved.maxOutputTokens,
++  }
++}
++
++/** Enable bridged admission, durable reminders, and the visual inspection tool. */
++export function apply(ctx: Context, config: Config): void {
++  const options = resolveOptions(ctx, config)
++  ctx.provide('imageInputBridge', { canHandle: () => true })
++  ctx.tools.register(createVisionInspectTool(ctx, options))
++  ctx.on('agent/pre-step', async ({ agent, signal }, next) => {
++    const downstream = await next()
++    if (downstream.kind === 'reject') return downstream
++    const localPaths = new Map<string, string | undefined>()
++    const refs = downstream.messages.flatMap(imageRefs)
++    for (const ref of refs) {
++      const attachmentId = String(ref.attachmentId)
++      if (localPaths.has(attachmentId)) continue
++      try {
++        localPaths.set(attachmentId, ctx.attachments.imageHostPath(ref))
++      } catch (error) {
++        if (signal.aborted) throw signal.reason
++        ctx.logger.warn(`vision-bridge: could not resolve ${attachmentId} for session ${String(agent.session.id)}: ${String(error)}`)
++        localPaths.set(attachmentId, undefined)
++      }
++    }
++    return { kind: 'enter' as const, messages: addImageReminders(downstream.messages, localPaths) }
++  })
++}
+diff --git a/packages/vision/vision-bridge/src/invariant.ts b/packages/vision/vision-bridge/src/invariant.ts
+new file mode 100644
+index 0000000000..32ab05b608
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/invariant.ts
+@@ -0,0 +1,23 @@
++/** Package-owned invariant companion for `@deepseek-ai/dsh-vision-bridge`. @module */
++
++/* jscpd:ignore-start */
++import type { Context } from '@deepseek-ai/cordis'
++import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
++
++const PACKAGE_NAME = '@deepseek-ai/dsh-vision-bridge'
++
++/** Cordis companion plugin name. */
++export const name = 'vision-bridge-invariant'
++/** Service required before the companion can reserve package ownership. */
++export const inject = ['invariants']
++
++/** Runtime behavior is covered at the path admission, durable-event, and tool boundaries. */
++const install: InvariantInstaller = () => {
++  // No relational runtime invariant: imported refs are attachment-service output
++  // and the log-only event does not participate in turn or model-surface state.
++}
++
++/** Register this package's invariant companion. */
++export const apply = (ctx: Context): Promise<() => void> =>
++  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
++/* jscpd:ignore-end */
+diff --git a/packages/vision/vision-bridge/src/tool-name.ts b/packages/vision/vision-bridge/src/tool-name.ts
+new file mode 100644
+index 0000000000..a86825b71a
+--- /dev/null
++++ b/packages/vision/vision-bridge/src/tool-name.ts
+@@ -0,0 +1,2 @@
++/** Stable wire name shared by the Host tool and its optional browser presentation. */
++export const VISION_INSPECT_TOOL_NAME = 'vision_inspect'
+diff --git a/packages/vision/vision-bridge/tests/vision-bridge.spec.ts b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+new file mode 100644
+index 0000000000..a79b799b8d
+--- /dev/null
++++ b/packages/vision/vision-bridge/tests/vision-bridge.spec.ts
+@@ -0,0 +1,198 @@
++import { describe, expect, it, vi } from 'vitest'
++import { Context } from '@deepseek-ai/cordis'
++import { AttachmentId } from '@deepseek-ai/dsh-attachment'
++import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import { createUserMessage } from '@deepseek-ai/dsh-llm'
++import type { SessionEvent } from '@deepseek-ai/dsh-session'
++import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
++import * as VisionBridge from '@deepseek-ai/dsh-vision-bridge'
++import type { VisionBridgeOptions } from '@deepseek-ai/dsh-vision-bridge'
++
++const ID = `sha256:${'1'.repeat(64)}`
++const REF: ImageAttachmentRef = {
++  attachmentId: AttachmentId(ID),
++  mediaType: 'image/png',
++  bytes: 1,
++  width: 1,
++  height: 1,
++  name: 'screen<&>.png',
++}
++
++const OPTIONS: VisionBridgeOptions = {
++  baseURL: 'http://vision.test/v1',
++  apiKey: 'secret',
++  apiKeyEnv: 'QWEN_VISION_API_KEY',
++  model: 'qwen-vision',
++  timeoutMs: 30_000,
++  maxImagesPerCall: 3,
++  maxOutputTokens: 1024,
++}
++
++function eventWithImage(): SessionEvent {
++  return {
++    type: 'user/message',
++    seq: 1,
++    at: 1,
++    data: createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } }),
++    meta: { surfaceOp: 'append' },
++  } as unknown as SessionEvent
++}
++
++function execution(events: readonly SessionEvent[], signal = new AbortController().signal): ToolRunContext {
++  return {
++    signal,
++    agent: { session: { events } },
++    reportProgress: vi.fn(),
++  } as unknown as ToolRunContext
++}
++
++function context(readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })) {
++  return {
++    attachments: {
++      imageLimits: {
++        maxImageBytes: 4,
++        maxImagesPerMessage: 20,
++        maxMessageImageBytes: 4,
++        maxImagePixels: 4,
++        maxImageDimension: 2000,
++        mediaTypes: ['image/png'],
++      },
++      readImage,
++    },
++    get: () => undefined,
++  } as unknown as Context
++}
++
++function jsonResponse(payload: unknown, status = 200): Response {
++  return new Response(JSON.stringify(payload), {
++    status,
++    headers: { 'content-type': 'application/json' },
++  })
++}
++
++describe('durable image reminder', () => {
++  it('renders full attachment ids and escapes untrusted metadata', () => {
++    const reminder = VisionBridge.renderImageReminder([REF], new Map([[ID, 'D:/session/<image>.png']]))
++    expect(reminder).toContain(`attachment_id: ${ID}`)
++    expect(reminder).toContain('name: screen&lt;&amp;&gt;.png')
++    expect(reminder).toContain('media_type: image/png')
++    expect(reminder).toContain('local_path: D:/session/&lt;image&gt;.png')
++    expect(reminder).toContain('需要视觉理解时调用 vision_inspect。')
++  })
++
++  it('adds one adjacent reminder only for human image messages', () => {
++    const image = createUserMessage({ content: [{ type: 'image', attachment: REF }], source: { kind: 'user' } })
++    const humanText = createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } })
++    const pluginImage = createUserMessage({
++      content: [{ type: 'image', attachment: REF }],
++      source: { kind: 'plugin', plugin: 'fixture', form: 'notice', summary: 'fixture' },
++    })
++    const expanded = VisionBridge.addImageReminders([image, humanText, pluginImage])
++    expect(expanded).toHaveLength(4)
++    expect(expanded[0]).toBe(image)
++    expect(expanded[1]?.source).toMatchObject({ kind: 'plugin', plugin: VisionBridge.name, form: 'notice' })
++    expect(expanded[2]).toBe(humanText)
++    expect(expanded[3]).toBe(pluginImage)
++  })
++})
++
++describe('vision_inspect', () => {
++  it('authorizes the current session before reading bytes or calling the gateway', async () => {
++    const readImage = vi.fn().mockResolvedValue({ ref: REF, data: Uint8Array.of(1) })
++    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
++      expect(input).toBe('http://vision.test/v1/chat/completions')
++      expect((init?.headers as Record<string, string>).authorization).toBe('Bearer secret')
++      const body = JSON.parse(String(init?.body)) as { model: string; stream: boolean; messages: unknown[] }
++      expect(body.model).toBe('qwen-vision')
++      expect(body.stream).toBe(true)
++      expect(JSON.stringify(body.messages)).toContain(`attachment_id=${ID}`)
++      expect(JSON.stringify(body.messages)).toContain('data:image/png;base64,AQ==')
++      return jsonResponse({ choices: [{ message: { content: '一张界面截图' } }] })
++    })
++    const tool = VisionBridge.createVisionInspectTool(context(readImage), OPTIONS, fetchImpl)
++
++    await expect(tool.execute({ attachmentIds: [ID], prompt: '检查按钮' }, execution([eventWithImage()])))
++      .resolves.toBe('一张界面截图')
++    expect(readImage).toHaveBeenCalledOnce()
++    expect(fetchImpl).toHaveBeenCalledOnce()
++
++    await expect(tool.execute(
++      { attachmentIds: [`sha256:${'2'.repeat(64)}`], prompt: '读取其他会话' },
++      execution([eventWithImage()]),
++    )).rejects.toThrow(/not available in the current session/)
++    expect(readImage).toHaveBeenCalledOnce()
++    expect(fetchImpl).toHaveBeenCalledOnce()
++  })
++
++  it('streams Markdown deltas through reportProgress and returns the exact result', async () => {
++    const pieces = ['结论：', '顶部有一个按钮', '\n- 颜色为蓝色']
++    const wire = pieces.map(content => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\r\n\r\n`).join('')
++      + 'data: [DONE]\r\n\r\n'
++    const stream = new ReadableStream<Uint8Array>({
++      start(controller) {
++        const encoded = new TextEncoder().encode(wire)
++        controller.enqueue(encoded.slice(0, 11))
++        controller.enqueue(encoded.slice(11))
++        controller.close()
++      },
++    })
++    const reportProgress = vi.fn<(delta: string) => void>()
++    const exec = { ...execution([eventWithImage()]), reportProgress } as never
++    const fetchImpl = vi.fn().mockResolvedValue(new Response(stream, {
++      status: 200,
++      headers: { 'content-type': 'text/event-stream; charset=utf-8' },
++    }))
++    const tool = VisionBridge.createVisionInspectTool(context(), OPTIONS, fetchImpl)
++
++    await expect(tool.execute({ attachmentIds: [ID], prompt: '识别按钮' }, exec))
++      .resolves.toBe(pieces.join(''))
++    expect(reportProgress.mock.calls.map(call => call[0])).toEqual(pieces)
++  })
++
++  it('imports local paths through the native filesystem and attachment services', async () => {
++    const importedId = `sha256:${'2'.repeat(64)}`
++    const importedRef: ImageAttachmentRef = { ...REF, attachmentId: AttachmentId(importedId), name: 'local.png' }
++    const resolve = vi.fn().mockResolvedValue({ targetKey: 'file:local', displayPath: 'D:/workspace/local.png' })
++    const stat = vi.fn().mockResolvedValue({ type: 'file', version: 'v1' })
++    const readBytes = vi.fn().mockResolvedValue(Uint8Array.of(2))
++    const saveImages = vi.fn().mockResolvedValue([importedRef])
++    const readImage = vi.fn(async (ref: ImageAttachmentRef) => ({ ref, data: Uint8Array.of(2) }))
++    const events: SessionEvent[] = [eventWithImage()]
++    const session = {
++      header: { cwd: 'D:/workspace' },
++      get events() { return events },
++      append(type: string, data: unknown) {
++        const event = { type, seq: events.length, time: 1, data } as unknown as SessionEvent
++        events.push(event)
++        return event
++      },
++    }
++    const fs = { resolve, stat, readBytes }
++    const ctx = {
++      attachments: {
++        imageLimits: {
++          maxImageBytes: 4,
++          maxImagesPerMessage: 20,
++          maxMessageImageBytes: 4,
++          maxImagePixels: 4,
++          maxImageDimension: 2000,
++          mediaTypes: ['image/png'],
++        },
++        saveImages,
++        readImage,
++      },
++      get: (key: string) => key === 'fs' ? fs : undefined,
++      emit: vi.fn(),
++    } as unknown as Context
++    const exec = { signal: new AbortController().signal, agent: { session }, reportProgress: vi.fn() } as never
++    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ choices: [{ message: { content: 'local' } }] }))
++    const tool = VisionBridge.createVisionInspectTool(ctx, OPTIONS, fetchImpl)
++
++    await expect(tool.execute({ paths: ['local.png'], prompt: '检查本地图片' }, exec)).resolves.toBe('local')
++    expect(resolve).toHaveBeenCalledWith('local.png', { cwd: 'D:/workspace', signal: expect.any(AbortSignal) })
++    expect(readBytes).toHaveBeenCalledOnce()
++    expect(saveImages).toHaveBeenCalledWith([{ data: Uint8Array.of(2), mediaType: 'image/png', name: 'local.png' }])
++    expect(events.some(event => event.type === 'vision/image-import')).toBe(true)
++    expect(fetchImpl).toHaveBeenCalledOnce()
++  })
++})
+diff --git a/packages/vision/vision-bridge/tsconfig.client.json b/packages/vision/vision-bridge/tsconfig.client.json
+new file mode 100644
+index 0000000000..4737a81b75
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsconfig.client.json
+@@ -0,0 +1,24 @@
++{
++  "extends": "../../../tsconfig.base.client.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types",
++    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
++  },
++  "files": [
++    "src/css-modules.d.ts",
++    "src/client/index.ts",
++    "src/client/VisionInspectIcon.tsx",
++    "src/client/VisionInspectRow.tsx",
++    "src/client/use-throttled-visual-update.ts",
++    "src/tool-name.ts"
++  ],
++  "references": [
++    { "path": "../../../vendor/cordis" },
++    { "path": "../../client/ui-primitives" },
++    { "path": "../../client/ui-renderer" },
++    { "path": "../../client/ui-slots" },
++    { "path": "../../client/ui-tool" },
++    { "path": "../../runtime-diagnostics/invariants" }
++  ]
++}
+diff --git a/packages/vision/vision-bridge/tsconfig.host.json b/packages/vision/vision-bridge/tsconfig.host.json
+new file mode 100644
+index 0000000000..f994189f37
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsconfig.host.json
+@@ -0,0 +1,23 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types",
++    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
++  },
++  "files": ["src/index.ts", "src/invariant.ts", "src/tool-name.ts"],
++  "references": [
++    { "path": "../../../vendor/cosmokit" },
++    { "path": "../../../vendor/cordis" },
++    { "path": "../../../vendor/schemastery" },
++    { "path": "../../attachment/attachment" },
++    { "path": "../../credentials/credentials" },
++    { "path": "../../fs/fs" },
++    { "path": "../../util/launch-environment" },
++    { "path": "../../llm/llm" },
++    { "path": "../../core/session" },
++    { "path": "../../core/agent" },
++    { "path": "../../core/tools" },
++    { "path": "../../runtime-diagnostics/invariants" }
++  ]
++}
+diff --git a/packages/vision/vision-bridge/tsconfig.json b/packages/vision/vision-bridge/tsconfig.json
+new file mode 100644
+index 0000000000..2a0b0e33f7
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsconfig.json
+@@ -0,0 +1,7 @@
++{
++  "files": [],
++  "references": [
++    { "path": "./tsconfig.host.json" },
++    { "path": "./tsconfig.client.json" }
++  ]
++}
+diff --git a/packages/vision/vision-bridge/tsdown.config.ts b/packages/vision/vision-bridge/tsdown.config.ts
+new file mode 100644
+index 0000000000..2f6c970db1
+--- /dev/null
++++ b/packages/vision/vision-bridge/tsdown.config.ts
+@@ -0,0 +1,7 @@
++import { clientBundle } from '../../client/tsdown.client.ts'
++
++export default clientBundle(
++  '@deepseek-ai/dsh-vision-bridge',
++  ['lib/types/index.js', 'lib/types/invariant.js'],
++  { hostPhase: true },
++)
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 06d5d75a10..d461ad56da 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -1271,6 +1271,9 @@ importers:
+       '@deepseek-ai/dsh-user-questions':
+         specifier: workspace:^
+         version: link:../../interaction/user-questions
++      '@deepseek-ai/dsh-vision-bridge':
++        specifier: workspace:^
++        version: link:../../vision/vision-bridge
+       '@deepseek-ai/dsh-web':
+         specifier: workspace:^
+         version: link:../../web/web
+@@ -1625,7 +1628,7 @@ importers:
+         version: 15.0.0
+       open:
+         specifier: ^11.0.0
+-        version: 11.0.0
++        version: 11.0.1
+     devDependencies:
+       '@deepseek-ai/cordis':
+         specifier: workspace:^
+@@ -5939,7 +5942,7 @@ importers:
+         version: 1.8.1
+       negotiator:
+         specifier: ^1.0.0
+-        version: 1.0.0
++        version: 1.1.0
+     devDependencies:
+       '@deepseek-ai/cordis':
+         specifier: workspace:^
+@@ -9472,6 +9475,76 @@ importers:
+         specifier: workspace:^
+         version: link:../../runtime-diagnostics/invariants
+ 
++  packages/vision/vision-bridge:
++    dependencies:
++      '@deepseek-ai/schemastery':
++        specifier: link:../../../vendor/schemastery
++        version: link:../../../vendor/schemastery
++    devDependencies:
++      '@deepseek-ai/cordis':
++        specifier: workspace:^
++        version: link:../../../vendor/cordis
++      '@deepseek-ai/dsh-agent':
++        specifier: workspace:^
++        version: link:../../core/agent
++      '@deepseek-ai/dsh-agent-loop':
++        specifier: workspace:^
++        version: link:../../core/agent-loop
++      '@deepseek-ai/dsh-agent-loop-testkit':
++        specifier: workspace:^
++        version: link:../../test-support/agent-loop-testkit
++      '@deepseek-ai/dsh-attachment':
++        specifier: workspace:^
++        version: link:../../attachment/attachment
++      '@deepseek-ai/dsh-client-test-runtime':
++        specifier: workspace:^
++        version: link:../../test-support/client-runtime
++      '@deepseek-ai/dsh-client-ui-primitives':
++        specifier: workspace:^
++        version: link:../../client/ui-primitives
++      '@deepseek-ai/dsh-client-ui-renderer':
++        specifier: workspace:^
++        version: link:../../client/ui-renderer
++      '@deepseek-ai/dsh-client-ui-slots':
++        specifier: workspace:^
++        version: link:../../client/ui-slots
++      '@deepseek-ai/dsh-client-ui-tool':
++        specifier: workspace:^
++        version: link:../../client/ui-tool
++      '@deepseek-ai/dsh-credentials':
++        specifier: workspace:^
++        version: link:../../credentials/credentials
++      '@deepseek-ai/dsh-fs':
++        specifier: workspace:^
++        version: link:../../fs/fs
++      '@deepseek-ai/dsh-invariants':
++        specifier: workspace:^
++        version: link:../../runtime-diagnostics/invariants
++      '@deepseek-ai/dsh-launch-environment':
++        specifier: workspace:^
++        version: link:../../util/launch-environment
++      '@deepseek-ai/dsh-llm':
++        specifier: workspace:^
++        version: link:../../llm/llm
++      '@deepseek-ai/dsh-session':
++        specifier: workspace:^
++        version: link:../../core/session
++      '@deepseek-ai/dsh-tools':
++        specifier: workspace:^
++        version: link:../../core/tools
++      '@testing-library/react':
++        specifier: ^16.1.0
++        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
++      '@types/react':
++        specifier: ~18.3.1
++        version: 18.3.31
++      react:
++        specifier: ^18.2.0
++        version: 18.3.1
++      react-dom:
++        specifier: ^18.2.0
++        version: 18.3.1(react@18.3.1)
++
+   packages/web/tool-web:
+     dependencies:
+       '@deepseek-ai/schemastery':
+@@ -13638,8 +13711,8 @@ packages:
+     resolution: {integrity: sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA==}
+     engines: {node: '>= 0.6'}
+ 
+-  content-type@2.0.0:
+-    resolution: {integrity: sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==}
++  content-type@2.1.0:
++    resolution: {integrity: sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==}
+     engines: {node: '>=18'}
+ 
+   convert-source-map@2.0.0:
+@@ -14904,8 +14977,8 @@ packages:
+   mdn-data@2.27.1:
+     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
+ 
+-  media-typer@1.1.0:
+-    resolution: {integrity: sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw==}
++  media-typer@1.1.1:
++    resolution: {integrity: sha512-yz3xRaG20c6/BOzvYoDaGtPmGscs7YivItZEEqe6GbwNfHuxu9YNmvnEkMzKldAGY4/80pRcQRZSEnhquk9XuQ==}
+     engines: {node: '>= 0.8'}
+ 
+   merge-descriptors@2.0.0:
+@@ -15062,9 +15135,9 @@ packages:
+     resolution: {integrity: sha512-myRT3DiWPHqho5PrJaIRyaMv2kgYf0mUVgBNOYMuCH5Ki1yEiQaf/ZJuQ62nvpc44wL5WDbTX7yGJi1Neevw8w==}
+     engines: {node: '>= 0.6'}
+ 
+-  negotiator@1.0.0:
+-    resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
+-    engines: {node: '>= 0.6'}
++  negotiator@1.1.0:
++    resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
++    engines: {node: '>=18'}
+ 
+   node-addon-api@7.1.1:
+     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
+@@ -15176,8 +15249,8 @@ packages:
+   oniguruma-to-es@4.3.6:
+     resolution: {integrity: sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==}
+ 
+-  open@11.0.0:
+-    resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
++  open@11.0.1:
++    resolution: {integrity: sha512-NzwMUB6C1D0+Kd+9iMS/H4k+Ck3cTX6Ckyfr/gAGlmvSE1LUQZnEZvWBi4PYmMwH/S5SMeTXnE+9uAz8uF+pWw==}
+     engines: {node: '>=20'}
+ 
+   openai@6.40.0:
+@@ -15342,6 +15415,10 @@ packages:
+     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
+     engines: {node: '>=20'}
+ 
++  powershell-utils@0.2.0:
++    resolution: {integrity: sha512-ZlsFlG7MtSFCoc5xreOvBAozCJ6Pf06opgJjh9ONEv418xpZSAzNjstD36C6+JwOnfSqOW/9uDkqKjezTdxZhw==}
++    engines: {node: '>=20'}
++
+   preact@10.29.7:
+     resolution: {integrity: sha512-DCHYrK/B10yUD3ZjLfhZ3WIE/9Vf9VFUODcRE2dRomTYDpJk6z6L9wecSfhfE6M9ZTHUdyQkoC46arIDhEV84Q==}
+     peerDependencies:
+@@ -16229,8 +16306,8 @@ packages:
+       utf-8-validate:
+         optional: true
+ 
+-  wsl-utils@0.3.1:
+-    resolution: {integrity: sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg==}
++  wsl-utils@1.0.0:
++    resolution: {integrity: sha512-Hl0ZOAs672vg+06kfujwRhoS6/jehvULrlFkuF2dRu6pHgA8U06h3xqNIqNNU1LTXPcedxByAR4GS6pwQK0mgA==}
+     engines: {node: '>=20'}
+ 
+   xml-name-validator@5.0.0:
+@@ -18924,7 +19001,7 @@ snapshots:
+   accepts@2.0.0:
+     dependencies:
+       mime-types: 3.0.2
+-      negotiator: 1.0.0
++      negotiator: 1.1.0
+ 
+   acorn-jsx@5.3.2(acorn@8.17.0):
+     dependencies:
+@@ -19034,7 +19111,7 @@ snapshots:
+   body-parser@2.3.0:
+     dependencies:
+       bytes: 3.1.2
+-      content-type: 2.0.0
++      content-type: 2.1.0
+       debug: 4.4.3
+       http-errors: 2.0.1
+       iconv-lite: 0.7.3
+@@ -19161,7 +19238,7 @@ snapshots:
+ 
+   content-type@1.0.5: {}
+ 
+-  content-type@2.0.0: {}
++  content-type@2.1.0: {}
+ 
+   convert-source-map@2.0.0: {}
+ 
+@@ -20618,7 +20695,7 @@ snapshots:
+ 
+   mdn-data@2.27.1: {}
+ 
+-  media-typer@1.1.0: {}
++  media-typer@1.1.1: {}
+ 
+   merge-descriptors@2.0.0: {}
+ 
+@@ -20887,7 +20964,9 @@ snapshots:
+ 
+   negotiator@0.6.4: {}
+ 
+-  negotiator@1.0.0: {}
++  negotiator@1.1.0:
++    dependencies:
++      content-type: 2.1.0
+ 
+   node-addon-api@7.1.1: {}
+ 
+@@ -20992,14 +21071,14 @@ snapshots:
+       regex: 6.1.0
+       regex-recursion: 6.0.2
+ 
+-  open@11.0.0:
++  open@11.0.1:
+     dependencies:
+       default-browser: 5.5.0
+       define-lazy-prop: 3.0.0
+       is-in-ssh: 1.0.0
+       is-inside-container: 1.0.0
+-      powershell-utils: 0.1.0
+-      wsl-utils: 0.3.1
++      powershell-utils: 0.2.0
++      wsl-utils: 1.0.0
+ 
+   openai@6.40.0(ws@8.21.0)(zod@4.4.3):
+     optionalDependencies:
+@@ -21195,6 +21274,8 @@ snapshots:
+ 
+   powershell-utils@0.1.0: {}
+ 
++  powershell-utils@0.2.0: {}
++
+   preact@10.29.7: {}
+ 
+   prelude-ls@1.2.1: {}
+@@ -21774,8 +21855,8 @@ snapshots:
+ 
+   type-is@2.1.0:
+     dependencies:
+-      content-type: 2.0.0
+-      media-typer: 1.1.0
++      content-type: 2.1.0
++      media-typer: 1.1.1
+       mime-types: 3.0.2
+ 
+   typebox@1.3.7: {}
+@@ -22166,7 +22247,7 @@ snapshots:
+ 
+   ws@8.21.0: {}
+ 
+-  wsl-utils@0.3.1:
++  wsl-utils@1.0.0:
+     dependencies:
+       is-wsl: 3.1.1
+       powershell-utils: 0.1.0
+diff --git a/tsconfig.base.json b/tsconfig.base.json
+index 661a546bf8..19c6b5e949 100644
+--- a/tsconfig.base.json
++++ b/tsconfig.base.json
+@@ -541,6 +541,8 @@
+       "@deepseek-ai/dsh-user-approval/invariant": ["./packages/interaction/user-approval/src/invariant.ts"],
+       "@deepseek-ai/dsh-user-questions": ["./packages/interaction/user-questions/src"],
+       "@deepseek-ai/dsh-user-questions/invariant": ["./packages/interaction/user-questions/src/invariant.ts"],
++      "@deepseek-ai/dsh-vision-bridge": ["./packages/vision/vision-bridge/src"],
++      "@deepseek-ai/dsh-vision-bridge/invariant": ["./packages/vision/vision-bridge/src/invariant.ts"],
+       "@deepseek-ai/dsh-web": ["./packages/web/web/src"],
+       "@deepseek-ai/dsh-web/invariant": ["./packages/web/web/src/invariant.ts"],
+       "@deepseek-ai/dsh-web-app": ["./packages/bundle/web-app/src"],
+diff --git a/tsconfig.client.json b/tsconfig.client.json
+index ddeb2e84b7..baf5fe8f99 100644
+--- a/tsconfig.client.json
++++ b/tsconfig.client.json
+@@ -49,6 +49,7 @@
+     { "path": "./packages/client/store" },
+     { "path": "./packages/client/ui-slots" },
+     { "path": "./packages/client/ui-attachment" },
++    { "path": "./packages/vision/vision-bridge/tsconfig.client.json" },
+     { "path": "./packages/client/ui-primitives" },
+     { "path": "./packages/client/modules" },
+     { "path": "./packages/experimental/inspector/tsconfig.client.json" },
+diff --git a/tsconfig.host.json b/tsconfig.host.json
+index 561cee9b17..502e6a3af1 100644
+--- a/tsconfig.host.json
++++ b/tsconfig.host.json
+@@ -137,6 +137,7 @@
+     { "path": "./packages/util/atomic-write" },
+     { "path": "./packages/attachment/attachment" },
+     { "path": "./packages/attachment/attachment-local" },
++    { "path": "./packages/vision/vision-bridge/tsconfig.host.json" },
+     { "path": "./packages/llm/llm" },
+     { "path": "./packages/llm/deepseek-llm-api-extensions" },
+     { "path": "./packages/llm/token-meter" },
+-- 
+2.51.2.windows.1
+

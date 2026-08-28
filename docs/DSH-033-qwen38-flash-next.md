@@ -1,5 +1,9 @@
 # DSH-033 Qwen3.8-Flash-Next 接入与插件可见性
 
+> 历史说明：本文记录 DSH-033 实施时的“显式启用”策略。DSH-034 同步
+> `dsh-v0.1.2-alpha.1` 后，Vision Bridge 已改为 base bundle 默认启用；本文中的
+> `disabled: true` 仅用于回溯和人工故障回退，不再是当前默认配置。
+
 ## 目标
 
 DP-035 已将 `Qwen3.8-Flash-Next-FP8` 发布到 DP AI Relay。DSH-033 在不保存或改写

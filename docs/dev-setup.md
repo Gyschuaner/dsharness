@@ -58,9 +58,12 @@ git push
 - 在 `plugins/<name>/` 下改代码 = 改运行时加载的文件（junction 透传）。
 - 改 **client**：保存后浏览器刷新页面即可看到。
 - 改 **host**：保存后运行 `.\restart-dsh-web.ps1` 重启（会短暂打断当前 Web GUI，
-  会话持久化在磁盘，浏览器重连后恢复）。脚本直接使用同级
-  `deepseek-harness\apps\cli\lib\bin.js`，默认以隐藏后台进程启动；标准输出、错误输出
-  和最新 PID 元数据写入 `~/.dsh/logs`。如源码目录不在默认位置，传入
+  会话持久化在磁盘，浏览器重连后恢复）。脚本启动前会校验 `upstream.lock.json` 的源码
+  tree、Node/pnpm 版本，执行 `pnpm install --frozen-lockfile` 和完整 `pnpm run build`，
+  再校验 alpha1 的 Gateway/Session Controller/ACP/attachment-local 原生图片链路、
+  vision-bridge `imageInputBridge` provider 和 web profile 默认启用 vision-bridge，
+  最后才使用同级 `deepseek-harness\apps\cli\lib\bin.js` 启动。标准输出、错误输出、
+  构建元数据和最新 PID 元数据写入 `~/.dsh/logs`。如源码目录不在默认位置，传入
   `-DshSourceDirectory <路径>`；排障时直接查看日志文件，不需要保留承载服务的终端窗口。
 - `list` 响应的 `apiVersion` 是插件 host 的能力版本，client 用它判断运行中的 host
   是否已加载较新操作；升级 host 功能后应递增并在 client 侧处理兼容。
@@ -69,21 +72,17 @@ git push
 
 DSH-003 已把上游源码接入方式改为可复现构建：
 
-- `upstream.lock.json` 锁定官方 `dsh-v0.1.1-rc.2` 提交 `b150a55`、DSH `0.1.1-rc.2`、
+- `upstream.lock.json` 锁定官方 `dsh-v0.1.2-alpha.1` 提交 `cd5ef81`、DSH `0.1.2-alpha.1`、
   Node `24.11.1`、pnpm `11.7.0`、本地补丁哈希和最终源码 tree；
-- `upstream-patches/` 保存需要叠加到官方源码的本地改动，当前包含 DSH-009
-  流式活动保活、DSH-012 Qwen 原生 preset、BUG-B0EE8D2D 无效 Think 工具调用的
-  持久历史恢复与重试流 JSDoc、DSH-011 Compact 32K 摘要预算，以及 DSH-014
-  工具调用即时进度反馈、BUG-449804CF 工具耗时与行内状态布局修复，以及
-  BUG-5F3BF25D 快速工具运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015
-  Code 子工具计划提前展示、DSH-016 Think 独立计时和工具活动状态布局，以及
-  DSH-018 输出 token 上限自动持续续跑、DSH-019 的 0.1.1 兼容调整、
-  BUG-C393119A 静态门禁修复，以及默认关闭的 DSH-005 视觉桥、发布门禁和
-  `vision_inspect` 专属工具图标与 Think 同款计时；
+- `upstream-patches/` 保存需要叠加到官方源码的本地改动，当前 active chain 为
+  `0027-feat-DSH-034-port-vision-bridge-to-alpha1.patch`，负责把视觉桥及其
+  progress/Look 展示迁移到 alpha1 的新 Remote/Attachment API；旧 RC2 补丁文件
+  保留为历史审计材料，不再参与 alpha1 构建；
 - `dev/install-dsh-source.ps1` 在空目录拉取源码、应用补丁、执行 frozen install、
   完整构建并注册 `dsh`；
-- `dev/verify-dsh-source.ps1` 独立校验工具链、源码 tree、补丁、CLI 版本和 Web
-  冒烟。
+- `dev/verify-dsh-source.ps1` 独立校验工具链、源码 tree、补丁、alpha1 原生图片链路、
+  CLI/profile 版本和 Web 冒烟；Web 门禁要求匿名 401、标准重启记录的认证 200、插件 API
+  版本、监听 PID 和构建目录全部一致。
 
 新电脑不再依赖 tarball 快照，也不用复制现有 `~/.dsh`。安装与升级锁定版本的
 完整方法见 [`reproducible-build.md`](reproducible-build.md)。本仓库插件继续通过
@@ -91,8 +90,9 @@ junction 接入运行时；是否安装和启用某个插件属于每台电脑�
 
 ## 6. 原生图片策略
 
-DSH-022 已取消 DSH-004 的 9 图临时裁剪，`plugins/image-context-guard` 不再安装或加载。
-图片由 0.1.1 原生附件服务准入和持久化：单条消息默认最多 20 张、单图 20 MiB、合计
+DSH-022 已取消 DSH-004 的 9 图临时裁剪，`image-context-guard` 已从仓库和本机 profile
+清理，不再安装或加载。
+图片由 0.1.2-alpha.1 原生附件服务准入和持久化：单条消息默认最多 20 张、单图 20 MiB、合计
 200 MiB。纯文本主模型启用视觉桥时，`vision_inspect` 同样默认最多读取当前会话内
 20 张唯一图片；未知或跨会话引用仍在读取字节前整批拒绝。完整迁移和回退边界见
 [`DSH-022-native-image-policy.md`](DSH-022-native-image-policy.md)。

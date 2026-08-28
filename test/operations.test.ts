@@ -39,7 +39,7 @@ function quotePowerShellLiteral(value: string): string {
 test('PowerShell operations scripts parse and never delegate interpolated commands to another shell', async (t) => {
 	const powershell = await powershellExecutable();
 	if (powershell === null) return t.skip('PowerShell is unavailable');
-	for (const relativePath of ['restart-dsh-web.ps1', 'dev/setup-plugin-junction.ps1']) {
+	for (const relativePath of ['restart-dsh-web.ps1', 'dev/install-dsh-source.ps1', 'dev/verify-dsh-source.ps1', 'dev/setup-plugin-junction.ps1']) {
 		const path = join(repositoryRoot, relativePath);
 		const command = [
 			'$tokens = $null; $errors = $null;',
@@ -63,6 +63,42 @@ test('restart scripts verify listener ownership before stopping a process', asyn
 	assert.match(macSource, /if ! command_line="\$\(is_dsh_web_pid "\$pid"\)"; then/);
 	assert.match(macSource, /kill "\$pid"/);
 	assert.doesNotMatch(macSource, /\*dsh\*" web/);
+});
+
+test('Windows startup rebuilds and validates the locked latest source before launch', async () => {
+	const source = await readFile(join(repositoryRoot, 'restart-dsh-web.ps1'), 'utf8');
+	const installSource = await readFile(join(repositoryRoot, 'dev', 'install-dsh-source.ps1'), 'utf8');
+	const verifySource = await readFile(join(repositoryRoot, 'dev', 'verify-dsh-source.ps1'), 'utf8');
+	assert.match(source, /upstream\.lock\.json/);
+	assert.match(source, /rev-parse 'HEAD\^\{tree\}'/);
+	assert.match(source, /pnpm.*install.*--frozen-lockfile/);
+	assert.match(source, /pnpm.*run.*clean[\s\S]*pnpm.*run.*build/);
+	assert.match(installSource, /pnpm.*install.*--frozen-lockfile[\s\S]*pnpm.*run.*clean[\s\S]*pnpm.*run.*build/);
+	assert.match(source, /packages\\api\\gateway\\lib\\index\.js/);
+	assert.match(source, /packages\\api\\session-controller\\lib\\index\.js/);
+	assert.match(source, /packages\\attachment\\attachment-local\\lib\\index\.js/);
+	assert.doesNotMatch(source, /packages\\host\\apiproxy/);
+	assert.match(source, /imageInputBridge/);
+	assert.match(source, /readImageRequest/);
+	assert.match(source, /imageHostPath/);
+	assert.match(source, /--no-open/);
+	assert.match(source, /FileShare\]::ReadWrite/);
+	assert.match(source, /Protect-StartupLog/);
+	assert.match(source, /token=.*redacted/);
+	assert.match(source, /anonymousStatus.*401/);
+	assert.match(source, /ResponseHeadersRead/);
+	assert.match(source, /认证 HTTP 200/);
+	assert.match(source, /runtimeErrors[\s\S]*Stop-Process[\s\S]*本地运行门禁失败/);
+	assert.match(source, /anonymousHttpStatus[\s\S]*authenticatedHttpStatus[\s\S]*skillManagerApiVersion[\s\S]*pluginManagerApiVersion/);
+	assert.match(verifySource, /Get-HttpStatus[\s\S]*AnonymousStatus.*401/);
+	assert.match(verifySource, /authenticatedHttpStatus.*200/);
+	assert.match(verifySource, /skillManagerApiVersion.*6/);
+	assert.match(verifySource, /pluginManagerApiVersion.*1/);
+	assert.doesNotMatch(verifySource, /Invoke-WebRequest/);
+	assert.match(source, /vision-bridge.*disabled: false/);
+	assert.match(source, /Qwen3\.8-Flash-Next-FP8/);
+	assert.match(source, /image-context-guard/);
+	assert.match(source, /buildMetadata/);
 });
 
 test('junction setup rejects unsafe names and restore paths outside the runtime plugin directory', async (t) => {

@@ -25,7 +25,7 @@ dsharness/
 │   │   ├── src/              # TypeScript Host、导入事务与 Client 源码
 │   │   ├── lib/              # tsc 生成的运行时产物
 │   │   └── test/             # TypeScript Host 事务与 Client DOM 回归
-│   └── image-context-guard/  # 已退役的 DSH-004 临时保护源码，仅供历史回溯
+│   └── better-sidebar-smooth/ # better-sidebar 会话头动画修复（仅 client）
 ├── dev/
 │   ├── install-dsh-source.ps1     # 拉取、打补丁、构建并注册 dsh
 │   ├── verify-dsh-source.ps1      # 校验工具链、源码 tree、补丁和 Web
@@ -55,13 +55,14 @@ Git 还原相同构建。`dsharness` 现在同时管理两类内容：仓库内�
 - 官方源码基线、Node/pnpm 版本、本地补丁和最终源码 tree 有明确校验值；
 - 新电脑可从空目录完成 frozen install、完整构建和 `dsh` 命令注册。
 
-`image-context-guard` 已由 DSH-022 退役，不再安装或加载。0.1.1 原生附件服务负责图片
-准入、持久存储和模型投影：默认单条消息最多 20 张、单图最多 20 MiB、单条消息合计
-最多 200 MiB；仓库保留旧插件源码只用于历史回溯，不应重新接入 profile。
+`image-context-guard` 已由 DSH-022 退役，并已从仓库与本机 web profile 清理。0.1.2-alpha.1
+原生附件服务负责图片准入、持久存储和模型投影：默认单条消息最多 20 张、单图最多
+20 MiB、单条消息合计最多 200 MiB。
 
-DSH-005 的视觉桥作为上游源码补丁交付，并保持默认关闭。纯文本主模型需要视觉辅助时，
-按 [`docs/DSH-005-vision-bridge.md`](docs/DSH-005-vision-bridge.md) 使用 DP Gateway
-覆盖；DSH 不直连视觉模型机。
+DSH-005 的视觉桥作为上游源码补丁交付，当前 Windows web profile 默认通过 DP Gateway
+启用；其余仓库插件也默认挂载。纯文本主模型的视觉调用按
+[`docs/DSH-005-vision-bridge.md`](docs/DSH-005-vision-bridge.md) 走 DP Gateway，
+DSH 不直连视觉模型机。
 
 ## 快速开始（构建 DSH）
 
@@ -108,37 +109,19 @@ pnpm run verify
 
 ## 上游源码（deepseek-harness）
 
-当前锁定官方标签 `dsh-v0.1.1-rc.2` 提交 `b150a55`，随后依次应用 DSH-009 的
-流式活动保活补丁、DSH-012 的 Qwen 原生 Agent preset 补丁，以及
-BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compact 32K
-摘要预算补丁、DSH-014 的工具调用即时进度反馈补丁，以及 BUG-449804CF 的工具耗时
-与行内状态布局修复、BUG-5F3BF25D 的快速工具运行态可感知性修复、亚秒耗时的毫秒
-精度展示修复、DSH-015 的 Code 子工具计划提前展示，以及 DSH-016 的 Think 独立计时
-和工具活动状态布局，再叠加 DSH-018 的输出 token 上限自动持续续跑，以及 DSH-019
-针对 0.1.1 新结构的兼容调整、BUG-C393119A 静态门禁修复和 DSH-005 可选视觉桥。
-视觉桥的后续补丁补齐发布门禁，并为 `vision_inspect` 增加专属眼睛图标、`Look ing`
-标题、Think 同款运行计时，以及可回放但不进入模型消息的流式视觉进度；正式
-`tool/call` 与 `tool/result` 在运行态交接和页面刷新后保持同一条持久记录。第 20 个
-补丁让 Looking 行只复用 Tool 外层的一层扫光，并像 Think 一样在流式期间持续跟随最新
-文字尾部；第 21 个补丁让 summary 结束后继续投影最新 observation，并在 Look 已拥有
-内联计时时隐藏外层重复时长；第 22 个补丁退役 9 图裁剪，并把视觉桥默认调用上限与
-0.1.1 原生单消息上限统一为 20；第 23 个补丁允许同一个 `vision_inspect` 同时接收
-本会话附件 ID 与本地图片路径，路径会先经原生附件服务准入并持久化为本会话附件。
-第 24 个补丁为上传图片生成只属于当前会话的稳定、带扩展名只读路径，并把路径写入
-同一条持久 `system-reminder`；视觉子模型与 `vision_inspect` 改为直接流式返回
-Markdown，不再强制 JSON、region 或 confidence。第 25 个补丁把 DSH-015 的 Code
-子工具识别从模型声明的 `plannedTools` 迁移到流式源码，首次识别 `tools.name(...)`
-时即显示子工具并沿用同一感知计时起点。第 26 个补丁将视觉桥默认模型、base bundle
-默认关闭行和双语文档统一切换到 DP-035 已发布的 `Qwen3.8-Flash-Next-FP8`。最终源码
-tree 为 `6951f3e071adf9bd6662c3e13687205718469d52`。
+当前锁定官方标签 `dsh-v0.1.2-alpha.1` 提交
+`cd5ef8148158c3a752a658978873241fdf8e2bbc`，官方基线 tree 为
+`a712eec535b48badc4fefb4df5176a7002e4280b`。本仓库用一个可校验的 DSH-034
+补丁把本地视觉桥、原生附件引用、`tool/progress` 持久进度和 `Look` 展示迁移到
+alpha1 的 Gateway/Session Controller/ACP 架构，最终源码 tree 为
+`d6f183595a69d77b6d08b4b980825147bf8dd4c2`。旧 RC2 补丁文件仍保留作历史审计，
+但不再放入 active lock chain，避免把已删除的 Host apiproxy 代码误套到 alpha1。
+alpha1 自带原生图片上传、附件持久化和模型能力准入；视觉桥默认启用并通过 DP Gateway
+调用 `Qwen3.8-Flash-Next-FP8`，不直连视觉模型机。
 `dev/install-dsh-source.ps1`
-只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
+只接受官方基线或最终锁定 tree；升级锁文件时会在源码无已跟踪修改的前提下切换到精确
+官方基线，保留未跟踪文件并拒绝覆盖冲突路径。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。
-
-DSH-012 随构建交付系统级 `qwen-native`（界面名称“Qwen 原生模式”）。它完整继承
-标准模式的工具与工作流，只替换 Qwen3.8 定向 persona；安装脚本不会把它设为默认，
-也不会改写 `~/.dsh/settings.yaml`。重新拉取本仓库并执行安装构建后即可在 Agent 预设
-列表中选择，无需复制原电脑的个人 preset。
 
 BUG-B0EE8D2D 的恢复逻辑不解析或执行 Think 中的 XML。仅当一次正常结束的响应只含
 私有推理且出现 Qwen 风格工具标签时，Agent 才通过现有重试策略恢复一次，并仅在该次

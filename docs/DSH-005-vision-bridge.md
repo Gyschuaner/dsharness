@@ -22,7 +22,8 @@ DSH 不直连模型机，也不在会话、工具结果、日志或 Git 中保�
 
 可复用覆盖文件位于
 [`dev/vision-bridge.dp-gateway.patch.yml`](../dev/vision-bridge.dp-gateway.patch.yml)。
-管理员确认健康检查通过后，把该条目合并到目标 profile 的 `cordis.patch.yml`：
+管理员确认健康检查通过后，把该条目合并到目标 profile 的 `cordis.patch.yml`。当前 Windows
+3080 已完成该合并，因此普通 `restart-dsh-web.ps1` 启动即默认启用视觉桥：
 
 ```yaml
 - id: vision-bridge
@@ -40,7 +41,7 @@ DSH 不直连模型机，也不在会话、工具结果、日志或 Git 中保�
 该条目只用于纯文本主模型进程。使用原生多模态模型时不要加载视觉桥，继续走 DSH
 原生图片通道。
 
-DSH-022 起不再加载 `image-context-guard`。视觉桥的默认 20 图边界与 0.1.1 原生
+DSH-022 起不再加载 `image-context-guard`。视觉桥的默认 20 图边界与 0.1.2-alpha.1 原生
 `attachment-local` 单条消息数量一致；它只限制一次工具调用，不删除会话附件。
 
 DSH-023 起，`vision_inspect` 可接收本会话 `attachmentIds`、本地图片 `paths`，或两者
@@ -57,15 +58,14 @@ PNG/JPEG/WebP/GIF、文件类型与部署限额，内容寻址保存后再调用
    `chat_template_kwargs.enable_thinking=false` 和结构化文本输出均受支持。
 4. 再启用 profile 覆盖并执行 DSH 会话隔离、历史图片回看和失败脱敏冒烟测试。
 
-## 2026-08-28 Qwen3.8-Flash-Next 切换
+## 2026-08-28 Qwen3.8-Flash-Next 与 alpha1 迁移
 
 DP-035 已把 `Qwen3.8-Flash-Next-FP8` 发布到 AI Relay，并验证 262,144 上下文、思考、
-工具调用和视觉输入。DSH-033 将视觉桥默认值、base bundle 默认关闭行和 profile 覆盖
-统一切换到该精确模型 ID；本机 DSH 模型列表同时保留旧 Qwen3.8-27B 与 DeepSeek Q4/Q8，
-默认主模型继续使用 DeepSeek 纯文本路由，Flash Next 仅作为视觉桥后端。本机 profile
-不再覆盖视觉桥行，启动时继承 base bundle 的 `disabled: true`。Plugin Manager 0.2.1
-起会把 base bundle 提供的 `@deepseek-ai/dsh-vision-bridge` 显示为“系统 Bundle / 只读”，
-即使处于关闭状态也不会从插件库消失。
+工具调用和视觉输入。DSH-034 将视觉桥迁移到 DSH `0.1.2-alpha.1` 的 Gateway、Session
+Controller、ACP 和原生 Attachment API，并把 base bundle 与 Windows web profile 统一
+设为 `disabled: false`；默认主模型继续使用 DeepSeek 纯文本路由，Flash Next 仅作为
+视觉桥后端。Plugin Manager 0.2.1 起会把 `@deepseek-ai/dsh-vision-bridge` 显示为
+“系统 Bundle / 只读”，不依赖 `plugins/` 目录。
 
 ## 2026-08-22 生产部署事实
 

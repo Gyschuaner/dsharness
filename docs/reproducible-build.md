@@ -10,29 +10,19 @@
 
 `upstream.lock.json` 是构建事实来源，当前锁定内容包括：
 
-- DeepSeek Harness 官方标签 `dsh-v0.1.1-rc.2`，提交 `b150a55`；
+- DeepSeek Harness 官方标签 `dsh-v0.1.2-alpha.1`，提交 `cd5ef8148158c3a752a658978873241fdf8e2bbc`；
 - Node `24.11.1` 与 pnpm `11.7.0`；
-- `upstream-patches/` 中按顺序应用的 DSH-009 流式活动保活补丁、DSH-012
-  Qwen 原生 Agent preset 补丁、BUG-B0EE8D2D Think 伪工具调用持久历史恢复与
-  重试流 JSDoc 补丁、DSH-011 Compact 32K 摘要预算补丁、DSH-014 工具调用即时
-  进度反馈补丁、BUG-449804CF 工具耗时与行内状态布局修复、BUG-5F3BF25D 快速工具
-  运行态可感知性修复、亚秒耗时毫秒精度展示、DSH-015 Code 子工具计划提前展示、
-  DSH-016 Think 独立计时和工具活动状态布局、DSH-018 输出 token 上限自动持续续跑，
-  DSH-019 的 0.1.1 兼容调整、BUG-C393119A 静态门禁修复，以及 DSH-005 可选视觉桥
-  及其发布门禁、`vision_inspect` 专属视觉工具呈现、流式视觉输出与持久交接、单层
-  扫光、流式尾部跟随、observation 持续投影与重复计时抑制补丁，以及 DSH-022 原生
-  图片策略恢复、DSH-023 本地路径导入和 DSH-024 会话图片路径与 Markdown 视觉结果
-  补丁、DSH-015 从流式源码识别 Code 子工具并连续计时的 RC2 迁移补丁，以及 DSH-033
-  将视觉桥路由切换到 Qwen3.8-Flash-Next-FP8 的补丁，并包含
-  各自的 SHA-256；
-- 应用补丁后的 Git tree `6951f3e071adf9bd6662c3e13687205718469d52`。
+- `upstream-patches/0027-feat-DSH-034-port-vision-bridge-to-alpha1.patch`，将本地
+  视觉桥、原生附件引用、`tool/progress` 持久进度和 `Look` 展示迁移到 alpha1 的
+  Gateway/Session Controller/ACP 架构，并包含对应 SHA-256；旧 RC2 补丁仍保留作
+  历史审计，但不再参与当前 lock chain；
+- 应用补丁后的 Git tree `d6f183595a69d77b6d08b4b980825147bf8dd4c2`。
 
 脚本同时校验补丁哈希和最终源码树。上游提交相同但补丁被修改、漏应用或顺序变化时，构建会在安装依赖前停止。
 
-DSH-012 的 `qwen-native` 是构建产物中的系统级 preset，不存放在个人
-`~/.dsh/.agent-presets`。因此新电脑重新拉取本仓库并执行安装脚本后会自动包含它；
-该 preset 不会被设为默认，安装流程也不会读取或修改 `~/.dsh/settings.yaml` 中的
-模型、推理强度或 preset 默认值。
+alpha1 的原生图片上传、附件持久化、模型图片能力准入和 ACP 图片 prompt 均属于官方
+构建内容；本地视觉桥由 active patch 提供，并按本机策略默认启用。安装流程不会读取或
+复制 `~/.dsh` 中的凭据、会话、附件和个人设置。
 
 ## 三、新电脑安装
 
@@ -57,9 +47,11 @@ cd dsharness
 安装脚本不会对既有目录执行 `reset`、清空或覆盖操作。目标目录只有以下两种状态可以继续：
 
 - 空路径，由脚本新建并拉取锁定源码；
-- 工作区干净，且 Git tree 已经等于官方基线或最终锁定结果。
+- 没有已跟踪文件修改，且 Git tree 已经等于官方基线或最终锁定结果；未跟踪临时文件会被保留。
 
-目录不是 Git 仓库、存在未提交修改或源码树不匹配时，脚本直接停止。保留原目录，改用新的 `-SourceDirectory` 即可，不需要删除已有文件。
+目录不是 Git 仓库、存在已跟踪文件修改或源码树不匹配时，脚本直接停止。未跟踪的临时
+检查脚本会保留并忽略，不会改变锁定 tree；保留原目录，改用新的 `-SourceDirectory`
+即可，不需要删除已有文件。
 
 ## 五、验证与更新
 
@@ -70,10 +62,15 @@ cd dsharness
 ```
 
 日常重启使用仓库根目录的 `.\restart-dsh-web.ps1`。脚本不依赖全局 `dsh` 的当前指向，
-而是直接启动同级 `deepseek-harness` 的构建产物；默认隐藏后台运行并将日志写入
-`~/.dsh/logs`，启动成功后同时校验 HTTP、监听 PID 与实际 CLI 命令行。
+每次启动前都会对同级 `deepseek-harness` 执行 frozen install 和完整 `pnpm run build`，
+并拒绝非锁定 tree、缺少 alpha1 Gateway/Session Controller/ACP/attachment-local
+图片链路或未启用 vision-bridge 的 profile；随后才启动刚构建的 CLI。默认隐藏后台运行并
+将日志写入 `~/.dsh/logs`。alpha1 默认启用 Web token 鉴权：启动成功后要求匿名访问返回
+HTTP 401、一次性 token 换取会话后返回认证 HTTP 200，并同时校验监听 PID、实际 CLI 命令行、
+源码 tree、插件 API 和构建元数据；一次性 token 会立即从启动日志脱敏。插件 API 校验失败
+属于启动门禁失败，脚本会关闭刚启动的进程，不会带病宣布重启完成。
 
-升级官方 DSH 或新增上游补丁时，需要同步更新 `upstream.lock.json` 中的基线提交、补丁哈希和最终 tree，并从空目录重新执行安装脚本。只有干净构建、完整构建和 Web 冒烟都通过后，新的锁定结果才能合入 `main`。
+升级官方 DSH 或新增上游补丁时，需要同步更新 `upstream.lock.json` 中的基线提交、补丁哈希和最终 tree。安装脚本会在源码没有已跟踪修改时自动切换到锁定的官方基线，保留未跟踪文件，并在路径冲突时停止；只有干净构建、完整构建和 Web 冒烟都通过后，新的锁定结果才能合入 `main`。
 
 2026-08-17 已在一条全新目录链路上完成验证：官方源码浅拉取、DSH-009 补丁应用、923 个锁定依赖安装和完整 `build:lib + build:web` 均通过，总耗时约 166 秒；补丁涉及的 `adapter.spec.ts` 与 `convert.spec.ts` 共 119 条测试全部通过。随后直接使用新源码树启动 3083 验证实例，首页返回 HTTP 200；验证完成后仅关闭该实例，现有 3080 运行环境未被修改。
 
