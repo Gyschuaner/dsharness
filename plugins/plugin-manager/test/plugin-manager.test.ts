@@ -93,7 +93,7 @@ test('lists profile plugins plus the inventory-only vision bridge with managemen
 	const f = await fixture();
 	const manager = createPluginManager({ profileDir: f.profile, deps: { inventory: { list: () => ({ entries: [
 		{ entryId: 'better-sidebar', moduleName: 'dsh-better-sidebar', enabled: true, fiberPhase: 'active' },
-		{ entryId: 'vision-bridge', moduleName: '@deepseek-ai/dsh-vision-bridge', enabled: true, fiberPhase: 'active' },
+		{ entryId: 'vision-bridge', moduleName: '@deepseek-ai/dsh-vision-bridge', enabled: false },
 		{ entryId: 'attachment-local', moduleName: '@deepseek-ai/dsh-attachment-local', enabled: true, fiberPhase: 'active' },
 	] }) } } });
 	const value = await manager.call('list');
@@ -110,9 +110,9 @@ test('lists profile plugins plus the inventory-only vision bridge with managemen
 	assert.equal(vision.source, '系统 Bundle');
 	assert.equal(vision.spec, '@deepseek-ai/dsh-base');
 	assert.equal(vision.managed, false);
-	assert.equal(vision.enabled, true);
-	assert.equal(vision.runtimeEnabled, true);
-	assert.equal(vision.runtimePhase, 'active');
+	assert.equal(vision.enabled, false);
+	assert.equal(vision.runtimeEnabled, false);
+	assert.equal(vision.runtimePhase, null);
 	assert.equal(vision.version, '0.1.1-rc.2');
 	assert.equal(value.plugins.some((item) => item.name === '@deepseek-ai/dsh-attachment-local'), false);
 	const better = value.plugins[1];

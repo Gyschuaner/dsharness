@@ -27,8 +27,9 @@
 
 `@deepseek-ai/dsh-vision-bridge` 已进入 DSH-005 锁定源码和 base bundle，但 base 行默认
 `disabled: true`；Plugin Manager 0.2.1 起仍会将它显示为系统 Bundle 只读条目。当前
-macOS profile 已按 [`DSH-005-vision-bridge.md`](DSH-005-vision-bridge.md) 启用，并由
-DSH-033 将 DP Gateway 路由更新为 `Qwen3.8-Flash-Next-FP8`。
+macOS profile 不再覆盖该行，启动时保持关闭；需要时可按
+[`DSH-005-vision-bridge.md`](DSH-005-vision-bridge.md) 显式启用，并通过
+`Qwen3.8-Flash-Next-FP8` 提供视觉能力。
 
 ## 宿主差异（2026-08-17）
 
@@ -70,9 +71,10 @@ DSH-033 将 DP Gateway 路由更新为 `Qwen3.8-Flash-Next-FP8`。
 
 - **2026-08-28（DSH-033 / BUG-F3AF6354）**：DSH 模型列表新增 Relay 的
   `Qwen3.8-Flash-Next-FP8`，默认主模型保持 DeepSeek 纯文本路由；视觉桥默认值、base
-  bundle 默认关闭行和 profile 覆盖同步使用 Flash Next。Plugin Manager 0.2.1 将 `pluginInventory` 中的 vision-bridge 合并到
-  本地插件列表，标记为“系统 Bundle / 只读”，显示真实 Loader 状态，并在 Host API
-  拒绝从管理页写启停覆盖。
+  bundle 默认关闭行和显式启用模板同步使用 Flash Next。本机移除 profile 启用覆盖，
+  启动时继承 `disabled: true`。Plugin Manager 0.2.1 将 `pluginInventory` 中的
+  vision-bridge 合并到本地插件列表，标记为“系统 Bundle / 只读”，显示真实 Loader
+  状态，并在 Host API 拒绝从管理页写启停覆盖。
 
 - **2026-08-24（macOS 宿主，DSH-005 部署）**：启用 `@deepseek-ai/dsh-vision-bridge`。
   将 `dev/vision-bridge.dp-gateway.patch.yml` 覆盖行（`disabled: false` +

@@ -62,9 +62,10 @@ PNG/JPEG/WebP/GIF、文件类型与部署限额，内容寻址保存后再调用
 DP-035 已把 `Qwen3.8-Flash-Next-FP8` 发布到 AI Relay，并验证 262,144 上下文、思考、
 工具调用和视觉输入。DSH-033 将视觉桥默认值、base bundle 默认关闭行和 profile 覆盖
 统一切换到该精确模型 ID；本机 DSH 模型列表同时保留旧 Qwen3.8-27B 与 DeepSeek Q4/Q8，
-默认主模型继续使用 DeepSeek 纯文本路由，Flash Next 仅作为视觉桥后端。Plugin Manager 0.2.1 起会把 base bundle 提供的
-`@deepseek-ai/dsh-vision-bridge` 显示为“系统 Bundle / 只读”，状态来自实时 Loader，
-不会因为不能安全运行时启停而从插件库消失。
+默认主模型继续使用 DeepSeek 纯文本路由，Flash Next 仅作为视觉桥后端。本机 profile
+不再覆盖视觉桥行，启动时继承 base bundle 的 `disabled: true`。Plugin Manager 0.2.1
+起会把 base bundle 提供的 `@deepseek-ai/dsh-vision-bridge` 显示为“系统 Bundle / 只读”，
+即使处于关闭状态也不会从插件库消失。
 
 ## 2026-08-22 生产部署事实
 

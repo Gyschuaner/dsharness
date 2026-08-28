@@ -30,7 +30,8 @@ Relay 密钥的前提下完成两项接入：把模型加入 DSH 可选列表，
 `dpgateway`，`reasoningEffort` 为 `xhigh`。旧 Qwen3.8-27B、DeepSeek Q4/Q8 条目不删除。
 
 视觉桥使用 [`../dev/vision-bridge.dp-gateway.patch.yml`](../dev/vision-bridge.dp-gateway.patch.yml)
-中的受管覆盖；base bundle 行继续保持 `disabled: true`，只有目标 profile 显式覆盖才启用。
+作为受管的显式启用模板；base bundle 行继续保持 `disabled: true`。本机 web profile 不
+覆盖该行，因此 DSH 启动时视觉桥保持关闭，只有目标 profile 主动合入模板并重启才启用。
 
 ## vision-bridge 为什么此前不在插件库
 
@@ -48,9 +49,10 @@ Plugin Manager 0.2.1 将该 inventory-only 条目合并为“系统 Bundle / 只
 
 ## 验证与回退
 
-启用前必须用受管凭据确认 Relay `/v1/models` 暴露精确模型 ID，并完成最小文本与图片
-请求。随后检查 `--dump-config` 中 vision-bridge 为 `disabled: false` 且模型正确，重启
-Web 后执行 `vision_inspect` 和插件库浏览器回归。
+默认启动验收应确认 `--dump-config` 中 vision-bridge 为 `disabled: true`，重启后插件库
+仍显示该系统插件且状态为已停用。启用前必须用受管凭据确认 Relay `/v1/models` 暴露
+精确模型 ID，并完成最小图片请求；显式合入模板后再确认 `disabled: false`、执行
+`vision_inspect` 和插件库浏览器回归。
 
 主模型没有随 DSH-033 切换，因此视觉桥启停和回退不应改写 `agent-default-model`。
 回退视觉模型时将 profile 覆盖恢复为 `Qwen3.6-35B-A3B`；也可将 vision-bridge 设为

@@ -265,7 +265,7 @@ test('Plugin loading exits to a retryable error and retry restores the real list
 
 test('real Plugin contribution renders without shell business placeholders and shows the denoised local page', async (t) => {
 	let plugins = [
-		localPlugin('@deepseek-ai/dsh-vision-bridge', { rowId: 'vision-bridge', source: '系统 Bundle', spec: '@deepseek-ai/dsh-base', managed: false, runtimeEnabled: true, runtimePhase: 'active' }),
+		localPlugin('@deepseek-ai/dsh-vision-bridge', { rowId: 'vision-bridge', source: '系统 Bundle', spec: '@deepseek-ai/dsh-base', enabled: false, managed: false, runtimeEnabled: false, runtimePhase: null }),
 		localPlugin('dsh-extension-manager', { protected: true }),
 		localPlugin('dsh-plugin-manager', { protected: true }),
 		localPlugin('dsh-skill-manager'),
@@ -294,7 +294,7 @@ test('real Plugin contribution renders without shell business placeholders and s
 	const visionRow = [...h.dom.window.document.querySelectorAll('.pm-row')].find((item) => item.textContent.includes('@deepseek-ai/dsh-vision-bridge'));
 	assert.ok(visionRow.textContent.includes('系统 Bundle'));
 	assert.ok(visionRow.textContent.includes('只读'));
-	assert.equal(visionRow.querySelector('[role="switch"]').getAttribute('aria-checked'), 'true');
+	assert.equal(visionRow.querySelector('[role="switch"]').getAttribute('aria-checked'), 'false');
 	assert.equal(visionRow.querySelector('[role="switch"]').disabled, true);
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'Plugin']);
 
