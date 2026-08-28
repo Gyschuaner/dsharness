@@ -1,5 +1,5 @@
 import { type MarketplaceEntry } from './marketplace.js';
-export declare const API_VERSION = 1;
+export declare const API_VERSION = 2;
 export declare const OVERRIDE_START = "# plugin-manager:overrides:start";
 export declare const OVERRIDE_END = "# plugin-manager:overrides:end";
 export declare const MOUNT_START = "# plugin-manager:mounts:start";
@@ -40,6 +40,7 @@ export interface LocalPlugin {
     source: string;
     spec: string;
     enabled: boolean;
+    managed: boolean;
     protected: boolean;
     repository: string | null;
     license: string | null;

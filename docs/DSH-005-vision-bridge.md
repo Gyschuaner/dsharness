@@ -10,7 +10,7 @@ DeepSeek 主模型
   -> DSH vision-bridge
   -> https://ai.chuansgu.top/v1/chat/completions
   -> DP Gateway / Relay
-  -> Qwen3.6-35B-A3B
+  -> Qwen3.8-Flash-Next-FP8
 ```
 
 DSH 不直连模型机，也不在会话、工具结果、日志或 Git 中保存网关密钥。插件通过
@@ -31,7 +31,7 @@ DSH 不直连模型机，也不在会话、工具结果、日志或 Git 中保�
   config:
     baseURL: 'https://ai.chuansgu.top/v1'
     apiKeyEnv: DPGATEWAY_API_KEY
-    model: Qwen3.6-35B-A3B
+    model: Qwen3.8-Flash-Next-FP8
     timeoutMs: 900000
     maxImagesPerCall: 20
     maxOutputTokens: 4096
@@ -52,10 +52,19 @@ PNG/JPEG/WebP/GIF、文件类型与部署限额，内容寻址保存后再调用
 ## 启用前健康检查
 
 1. 以受管凭据请求 `GET https://ai.chuansgu.top/v1/models`。
-2. 响应中必须存在精确模型 id `Qwen3.6-35B-A3B`。
+2. 响应中必须存在精确模型 id `Qwen3.8-Flash-Next-FP8`。
 3. 通过 DP Gateway 对该模型发起一条最小图片 `chat/completions` 请求，确认图片输入、
    `chat_template_kwargs.enable_thinking=false` 和结构化文本输出均受支持。
 4. 再启用 profile 覆盖并执行 DSH 会话隔离、历史图片回看和失败脱敏冒烟测试。
+
+## 2026-08-28 Qwen3.8-Flash-Next 切换
+
+DP-035 已把 `Qwen3.8-Flash-Next-FP8` 发布到 AI Relay，并验证 262,144 上下文、思考、
+工具调用和视觉输入。DSH-033 将视觉桥默认值、base bundle 默认关闭行和 profile 覆盖
+统一切换到该精确模型 ID；本机 DSH 模型列表同时保留旧 Qwen3.8-27B 与 DeepSeek Q4/Q8，
+主模型默认切到 Flash Next 试用。Plugin Manager 0.2.1 起会把 base bundle 提供的
+`@deepseek-ai/dsh-vision-bridge` 显示为“系统 Bundle / 只读”，状态来自实时 Loader，
+不会因为不能安全运行时启停而从插件库消失。
 
 ## 2026-08-22 生产部署事实
 
@@ -87,5 +96,6 @@ TTFT/TPS；凭据只从 `BENCHMARK_API_KEY` 环境变量读取。
 - 项目目录内 `.env` 不能覆盖受管凭据对应的网关地址；插件只接受 composition 中的
   运维配置，或进程/用户级 `DSH_VISION_BASE_URL`。
 - 任何未知或跨会话 `attachment_id` 都必须在读取图片和访问网关之前整批拒绝。
-- 回退时移除 profile 中的 `vision-bridge` 覆盖条目，或将其设为 `disabled: true`；原生
-  多模态路径和不带图的纯文本路径不受影响。
+- 回退视觉模型时可把 profile 覆盖的 `model` 恢复为 `Qwen3.6-35B-A3B`；完全停用时移除
+  `vision-bridge` 覆盖条目或将其设为 `disabled: true`。主模型可独立恢复为
+  `DeepSeek-V4-Flash-0731-Q8_K_XL`；原生多模态路径和不带图的纯文本路径不受影响。

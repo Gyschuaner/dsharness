@@ -100,7 +100,7 @@ def main() -> None:
         for item in (models.json().get("data") or [])
         if isinstance(item, dict) and item.get("id")
     ]
-    if "Qwen3.6-35B-A3B" not in model_ids:
+    if "Qwen3.8-Flash-Next-FP8" not in model_ids:
         raise RuntimeError("Relay key works, but the static vision model is not published")
     print(
         "DP_VISION_KEY_CONFIGURED "

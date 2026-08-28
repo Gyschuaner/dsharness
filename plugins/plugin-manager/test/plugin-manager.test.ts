@@ -64,6 +64,18 @@ async function fixture() {
 		'',
 	].join('\n');
 	await writeFile(join(profile, 'cordis.patch.yml'), patch, 'utf8');
+	const visionDir = join(profile, 'node_modules', '@deepseek-ai', 'dsh-vision-bridge');
+	await mkdir(visionDir, { recursive: true });
+	await json(join(visionDir, 'package.json'), {
+		name: '@deepseek-ai/dsh-vision-bridge',
+		version: '0.1.1-rc.2',
+		description: 'Opt-in visual sub-agent bridge for text-only DeepSeek Harness routes.',
+		main: './lib/index.js',
+		exports: { './client': './lib/client.js', './package.json': './package.json' },
+		repository: 'https://github.com/deepseek-ai/deepseek-harness.git',
+		license: 'MIT',
+		dsh: { client: { platform: 'web' } },
+	});
 	return { root, profile, patch };
 }
 
@@ -77,18 +89,33 @@ function response(value, status = 200, headers = {}) {
 	};
 }
 
-test('lists only DSH plugins with source, row identity, protected and live runtime state', async () => {
+test('lists profile plugins plus the inventory-only vision bridge with management and runtime state', async () => {
 	const f = await fixture();
-	const manager = createPluginManager({ profileDir: f.profile, deps: { inventory: { list: () => ({ entries: [{ entryId: 'better-sidebar', moduleName: 'dsh-better-sidebar', enabled: true, fiberPhase: 'active' }] }) } } });
+	const manager = createPluginManager({ profileDir: f.profile, deps: { inventory: { list: () => ({ entries: [
+		{ entryId: 'better-sidebar', moduleName: 'dsh-better-sidebar', enabled: true, fiberPhase: 'active' },
+		{ entryId: 'vision-bridge', moduleName: '@deepseek-ai/dsh-vision-bridge', enabled: true, fiberPhase: 'active' },
+		{ entryId: 'attachment-local', moduleName: '@deepseek-ai/dsh-attachment-local', enabled: true, fiberPhase: 'active' },
+	] }) } } });
 	const value = await manager.call('list');
-	assert.equal(value.apiVersion, 1);
+	assert.equal(value.apiVersion, 2);
 	assert.deepEqual(value.plugins.map((item) => item.name), [
+		'@deepseek-ai/dsh-vision-bridge',
 		'dsh-better-sidebar',
 		'dsh-extension-manager',
 		'dsh-plugin-manager',
 		'dsh-skill-manager',
 	]);
-	const better = value.plugins[0];
+	const vision = value.plugins[0];
+	assert.equal(vision.rowId, 'vision-bridge');
+	assert.equal(vision.source, '系统 Bundle');
+	assert.equal(vision.spec, '@deepseek-ai/dsh-base');
+	assert.equal(vision.managed, false);
+	assert.equal(vision.enabled, true);
+	assert.equal(vision.runtimeEnabled, true);
+	assert.equal(vision.runtimePhase, 'active');
+	assert.equal(vision.version, '0.1.1-rc.2');
+	assert.equal(value.plugins.some((item) => item.name === '@deepseek-ai/dsh-attachment-local'), false);
+	const better = value.plugins[1];
 	assert.equal(better.rowId, 'better-sidebar');
 	assert.equal(better.source, 'npm');
 	assert.equal(better.repository, 'omdsh-dev/DSH-better-sidebar');
@@ -96,8 +123,19 @@ test('lists only DSH plugins with source, row identity, protected and live runti
 	assert.equal(better.runtimePhase, 'active');
 	assert.equal(better.runtimeEnabled, true);
 	assert.equal(better.description, 'dsh-better-sidebar description.');
+	assert.equal(better.managed, true);
 	assert.equal(value.plugins.find((item) => item.name === 'dsh-extension-manager').protected, true);
 	assert.equal(value.plugins.find((item) => item.name === 'dsh-skill-manager').protected, false);
+});
+
+test('system bundle plugins reject state writes and preserve the profile patch', async () => {
+	const f = await fixture();
+	const manager = createPluginManager({ profileDir: f.profile });
+	await assert.rejects(
+		manager.call('setEnabled', { name: '@deepseek-ai/dsh-vision-bridge', enabled: false }),
+		(error) => error instanceof ApiError && error.status === 409 && error.code === 'PLUGIN_SYSTEM_READ_ONLY',
+	);
+	assert.equal(await readFile(join(f.profile, 'cordis.patch.yml'), 'utf8'), f.patch);
 });
 
 test('disable and enable write only the managed override block', async () => {

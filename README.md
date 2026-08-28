@@ -33,6 +33,7 @@ dsharness/
 └── docs/
     ├── dev-setup.md          # 本地 DSH 开发链路说明
     ├── DSH-005-vision-bridge.md # 视觉桥与 DP Gateway 部署覆盖
+    ├── DSH-033-qwen38-flash-next.md # Qwen3.8 Flash Next 接入与系统插件可见性
     ├── reproducible-build.md # 新电脑可复现构建与更新方法
     └── installed-plugins.md  # web profile 已安装插件台账（版本/通道/回退，DSH-007）
 ```
@@ -127,8 +128,9 @@ BUG-B0EE8D2D 的 Think 伪工具调用恢复与 JSDoc 补丁、DSH-011 的 Compa
 同一条持久 `system-reminder`；视觉子模型与 `vision_inspect` 改为直接流式返回
 Markdown，不再强制 JSON、region 或 confidence。第 25 个补丁把 DSH-015 的 Code
 子工具识别从模型声明的 `plannedTools` 迁移到流式源码，首次识别 `tools.name(...)`
-时即显示子工具并沿用同一感知计时起点。最终源码 tree 为
-`56611cffc170612bc5defd0c6040f6beca8a14db`。
+时即显示子工具并沿用同一感知计时起点。第 26 个补丁将视觉桥默认模型、base bundle
+默认关闭行和双语文档统一切换到 DP-035 已发布的 `Qwen3.8-Flash-Next-FP8`。最终源码
+tree 为 `6951f3e071adf9bd6662c3e13687205718469d52`。
 `dev/install-dsh-source.ps1`
 只接受官方基线或最终锁定 tree，不会覆盖其他源码目录或未提交修改。完整机制见
 [`docs/reproducible-build.md`](docs/reproducible-build.md)。
