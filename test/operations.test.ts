@@ -98,6 +98,8 @@ test('Windows startup rebuilds and validates the locked latest source before lau
 	assert.match(source, /ui-tool 构建产物未把工具耗时恢复为标题\/摘要后的内联布局/);
 	assert.match(source, /callHead[\s\S]*column-gap:8px[\s\S]*justify-content:flex-start[\s\S]*data-has-tool-timer/);
 	assert.match(source, /--no-open/);
+	assert.match(source, /function Enable-GitHubApiCredential[\s\S]*GIT_TERMINAL_PROMPT[\s\S]*GCM_INTERACTIVE[\s\S]*gitCommand\.Source credential fill/);
+	assert.match(source, /Enable-GitHubApiCredential[\s\S]*Start-Process[\s\S]*Remove-Item Env:GITHUB_TOKEN/);
 	assert.match(source, /FileShare\]::ReadWrite/);
 	assert.match(source, /Protect-StartupLog/);
 	assert.match(source, /token=.*redacted/);

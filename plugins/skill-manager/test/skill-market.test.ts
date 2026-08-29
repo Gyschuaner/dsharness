@@ -179,6 +179,29 @@ test('marketplace: sorts trusted repositories by GitHub popularity and recency',
 	await assert.rejects(market.list(undefined, false, 'unknown'), /Skill 市场排序无效/);
 });
 
+test('marketplace: uses owner avatars without API metadata and opens a rate-limit circuit', async () => {
+	let apiCalls = 0;
+	const entry = { id: 'acme/demo#skills/demo', name: 'demo', repository: 'acme/demo', path: 'skills/demo', ref: 'main', description: 'Fallback metadata.', tags: [], marketSource: 'featured' };
+	const fetch = async (url) => {
+		if (url.includes('/anthropics/skills/main/.claude-plugin/marketplace.json')) return responseJson({ plugins: [] });
+		if (url === 'https://api.github.com/repos/acme/demo') {
+			apiCalls += 1;
+			return { ok: false, status: 403, headers: { get(name) { return name.toLowerCase() === 'x-ratelimit-remaining' ? '0' : name.toLowerCase() === 'x-ratelimit-reset' ? String(Math.floor(Date.now() / 1000) + 3600) : null; } } };
+		}
+		throw new Error(`unexpected GitHub URL: ${url}`);
+	};
+	const market = internals.createMarketplace({ entries: [entry], fetch, logger: { warn() {} } });
+	const relevance = await market.list(undefined, false, 'relevance');
+	assert.equal(relevance.items[0].iconUrl, 'https://github.com/acme.png?size=80');
+	assert.equal(apiCalls, 0, 'default listing does not spend GitHub REST quota');
+
+	const popular = await market.list(undefined, false, 'popular');
+	assert.match(popular.items[0].iconUrl, /^https:\/\/github\.com\/acme\.png/);
+	assert.equal(apiCalls, 1);
+	await market.list(undefined, true, 'popular');
+	assert.equal(apiCalls, 1, 'rate-limit circuit prevents repeated API requests before reset');
+});
+
 test('marketplace: installs disabled, records provenance, and detects updates', async (t) => {
 	const remote = makeRemote();
 	const env = await makeEnv(remote);

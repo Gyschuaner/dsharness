@@ -39,6 +39,35 @@ param(
 $ErrorActionPreference = 'Stop'
 function Write-Step($m) { Write-Host "[restart] $m" -ForegroundColor Cyan }
 
+function Enable-GitHubApiCredential {
+	if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN) -or -not [string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+		Write-Step 'GitHub API 认证：使用现有环境变量'
+		return $false
+	}
+
+	$gitCommand = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+	if (-not $gitCommand) { return $false }
+	$previousTerminalPrompt = $env:GIT_TERMINAL_PROMPT
+	$previousInteractive = $env:GCM_INTERACTIVE
+	try {
+		$env:GIT_TERMINAL_PROMPT = '0'
+		$env:GCM_INTERACTIVE = 'Never'
+		$credentialLines = @('protocol=https', 'host=github.com', '') | & $gitCommand.Source credential fill 2>$null
+		if ($LASTEXITCODE -ne 0) { return $false }
+		$password = $null
+		foreach ($line in $credentialLines) {
+			if ($line -match '^password=(.+)$') { $password = $Matches[1]; break }
+		}
+		if ([string]::IsNullOrWhiteSpace($password)) { return $false }
+		$env:GITHUB_TOKEN = $password
+		Write-Step 'GitHub API 认证：临时使用 Git Credential Manager 凭据（不写入日志或磁盘）'
+		return $true
+	} finally {
+		$env:GIT_TERMINAL_PROMPT = $previousTerminalPrompt
+		$env:GCM_INTERACTIVE = $previousInteractive
+	}
+}
+
 $RepoRoot = $PSScriptRoot
 $LockPath = Join-Path $RepoRoot 'upstream.lock.json'
 if (-not (Test-Path -LiteralPath $LockPath -PathType Leaf)) {
@@ -600,14 +629,19 @@ if ($EnableVisionBridge) {
 }
 $arguments += @('--host', $HostAddr, '--port', [string]$Port, '--no-open')
 
+$removeInjectedGitHubToken = Enable-GitHubApiCredential
 Write-Step "隐藏启动本地源码 dsh web：$cliEntry"
-$startedProcess = Start-Process -FilePath $nodePath `
-	-ArgumentList $arguments `
-	-WorkingDirectory $buildSourceDirectory `
-	-WindowStyle Hidden `
-	-RedirectStandardOutput $stdoutLog `
-	-RedirectStandardError $stderrLog `
-	-PassThru
+try {
+	$startedProcess = Start-Process -FilePath $nodePath `
+		-ArgumentList $arguments `
+		-WorkingDirectory $buildSourceDirectory `
+		-WindowStyle Hidden `
+		-RedirectStandardOutput $stdoutLog `
+		-RedirectStandardError $stderrLog `
+		-PassThru
+} finally {
+	if ($removeInjectedGitHubToken) { Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue }
+}
 
 $runtimeMetadata = [ordered]@{
 	pid = $startedProcess.Id

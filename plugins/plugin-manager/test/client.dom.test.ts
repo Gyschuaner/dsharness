@@ -349,7 +349,7 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon').length, 2);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketFallback').length, 1);
 	assert.match(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-marketIcon').getAttribute('src') || '', /^https:\/\//);
-	assert.ok(h.dom.window.document.body.textContent.includes('自动搜索 npm 与 DSH Registry'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('自动搜索 npm 与 DSH Registry'), 'discovery help stays out of the market home');
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-rowMeta').length, 3, 'market home identifies each discovery source');
 
 	const remoteImages = h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon');
@@ -364,6 +364,7 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	assert.ok(calls.some((call) => call.op === 'marketplace.detail'));
 	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"]'), listNode);
 	assert.ok(h.dom.window.document.querySelector('.pm-drawer .pm-marketIcon'));
+	assert.ok(h.dom.window.document.body.textContent.includes('自动搜索 npm 与 DSH Registry'), 'discovery help is available in the item drawer');
 	assert.ok(h.dom.window.document.querySelector('.pm-versionDecision').textContent.includes('0.12.3'));
 	assert.equal(h.dom.window.document.querySelectorAll('.pm-disclosure').length, 2);
 	assert.ok(!h.dom.window.document.body.textContent.includes('./lib/index.js'), 'technical rows stay collapsed by default');
@@ -398,13 +399,14 @@ test('marketplace unifies featured, DSH Registry, and npm discovery sources', as
 	await h.flush();
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 2);
 	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-rowTitle').textContent, 'omdsh-dev/DSH-better-sidebar');
-	assert.ok(h.dom.window.document.body.textContent.includes('Registry 已更新'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('Registry 已更新'), 'fresh registry status stays out of the market home');
 
 	const rows = h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row');
 	assert.equal(rows[1].querySelector('.pm-rowTitle').textContent, 'SiriLee/dsh-rewind');
 	assert.equal(rows[1].querySelector('.pm-status').textContent, '仅查看');
 	await h.click(rows[1]);
 	await h.flush(); await h.flush();
+	assert.ok(h.dom.window.document.body.textContent.includes('Registry 已更新'), 'registry status is available in the item drawer');
 	assert.ok(calls.some((call) => call.op === 'marketplace.detail' && call.id === 'SiriLee/dsh-rewind'));
 	const installButton = h.dom.window.document.querySelector('.pm-drawerFoot button[disabled]');
 	assert.equal(installButton.textContent, '仅查看');

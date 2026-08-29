@@ -142,6 +142,7 @@ interface LocalDrawerProps {
 interface PluginMarketDrawerProps {
     item: PluginMarketItem;
     detail: PluginMarketDetail | null;
+    registry: PluginRegistryInfo;
     loading: boolean;
     busy: boolean;
     onClose(): void;

@@ -277,9 +277,11 @@ test('market stays flat, uses received icons, opens metadata drawer, and install
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .mm-marketRow').length, 2);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] img').length, 1);
 	assert.ok(!h.dom.window.document.body.textContent.includes('可靠来源'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('实时搜索官方 MCP Registry'), 'discovery help stays out of the market home');
 	await h.click(h.dom.window.document.querySelector('.mm-marketRow')); await h.flush(); await h.flush();
 	assert.ok(calls.some((call) => call.op === 'marketplace.detail'));
 	assert.ok(h.dom.window.document.body.textContent.includes('32,445 Stars · 4,840 Forks'));
+	assert.ok(h.dom.window.document.body.textContent.includes('实时搜索官方 MCP Registry'), 'discovery help is available in the item drawer');
 	assert.ok(h.dom.window.document.body.textContent.includes('v1.10.1'));
 	await h.click(h.button('安装为停用配置')); await h.flush(); await h.flush();
 	assert.ok(calls.some((call) => call.op === 'marketplace.install'));

@@ -243,7 +243,6 @@ type ApiPayload = Record<string, DynamicValue>;
 				'.sk-marketSearch{min-width:180px}',
 				'.sk-marketSort{box-sizing:border-box;flex:none;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;padding:0 30px 0 10px;cursor:pointer}',
 				'.sk-marketSort:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px;border-color:transparent}',
-				'.sk-marketHelper{flex:none;margin:0 0 9px;color:var(--dsw-alias-label-quaternary);font-size:11px;line-height:1.5}',
 				'.sk-marketNotice{flex:none;margin:0 0 9px;padding:7px 9px;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 35%,var(--dsw-alias-border-l2));border-radius:8px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5}',
 				'.sk-marketList{display:flex;flex:1;min-height:0;overflow-y:auto;flex-direction:column;padding:7px 0 26px}',
 				'.sk-marketRow{appearance:none;box-sizing:border-box;width:100%;min-height:88px;border:0;border-top:1px solid var(--dsw-alias-border-l2);background:transparent;color:inherit;text-align:left;font:inherit;padding:14px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:center;cursor:pointer}',
@@ -694,7 +693,6 @@ type ApiPayload = Record<string, DynamicValue>;
 						h('button', { type: 'button', className: 'sk-chip', disabled: project === null, onClick: function () { setGithubOpen(true); setGithubError(null); } }, h(P.IconPlusOutline16), '从 GitHub 安装'),
 						h('button', { type: 'button', className: 'sk-chip', disabled: loading, onClick: function () { setAttempt(function (value: DynamicValue) { return value + 1; }); } }, h(P.IconRefreshOutline16), loading ? '刷新中…' : '刷新')
 					),
-					h('p', { className: 'sk-marketHelper' }, '自动同步可信 Skill Registry，也支持任意公开 GitHub 仓库 · 安装阶段不执行第三方代码'),
 					marketWarning ? h('p', { className: 'sk-marketNotice', role: 'status' }, '远程 Registry 暂时不可用，正在显示可用缓存和精选条目：' + marketWarning) : null,
 					message ? h('p', { className: 'sk-marketNotice', role: 'status' }, message) : null,
 					error ? h('div', { className: 'sk-marketLoadError', role: 'alert' }, h('p', { className: 'sk-error' }, '加载 Skill 市场失败：' + error), h(Button, { variant: 'outline', onClick: function () { setAttempt(function (value: DynamicValue) { return value + 1; }); } }, '重试')) : null,
@@ -716,6 +714,7 @@ type ApiPayload = Record<string, DynamicValue>;
 								detailLoading ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 GitHub Skill 信息…') : null,
 								activeDetail.description ? h('p', { className: 'sk-descFull' }, activeDetail.description) : null,
 								activeDetail.metadataError ? h('p', { className: 'sk-marketMetaNotice' }, '部分远程信息暂不可用：' + activeDetail.metadataError) : null,
+								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '发现与安装'), h('p', { className: 'sk-slimNote' }, '自动同步可信 Skill Registry，也支持任意公开 GitHub 仓库；安装阶段只校验并写入文件，不执行第三方代码。')),
 								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '仓库信息'), h('div', { className: 'sk-marketFacts' }, h('span', null, '作者：' + (activeDetail.author || '—')), h('span', null, '许可证：' + (activeDetail.license || '—')), h('span', null, 'Stars：' + (activeDetail.stars === null || activeDetail.stars === undefined ? '—' : activeDetail.stars)), h('span', null, '文件：' + (activeDetail.fileCount === null || activeDetail.fileCount === undefined ? '—' : activeDetail.fileCount)))) ,
 								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '当前状态'), h('div', { className: 'sk-marketState' }, marketStatusLabel(detailStatus), project ? ' · 安装到 ' + project.title : ' · 请选择安装目标项目')),
 								activeDetail.files && activeDetail.files.length > 0 ? h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, 'Skill 文件'), h('div', { className: 'sk-marketFiles' }, activeDetail.files.map(function (file: DynamicValue) { return h('code', { key: file }, file); }))) : null,

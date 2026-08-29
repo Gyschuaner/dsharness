@@ -452,6 +452,7 @@ test('Skill market uses the shared page chrome and opens a safe repository detai
 					name: 'demo',
 					repository: 'acme/demo',
 					description: 'A demo remote skill.',
+					iconUrl: 'https://github.com/acme.png?size=80',
 					repositoryUrl: 'https://github.com/acme/demo',
 					status: 'not-installed',
 				}],
@@ -483,11 +484,14 @@ test('Skill market uses the shared page chrome and opens a safe repository detai
 	await h.flush(); await h.flush();
 	assert.ok(calls.some((call) => call.op === 'marketplace' && call.sort === 'popular'));
 	assert.ok(h.dom.window.document.querySelector('[data-testid="skill-market-list"]'));
+	assert.ok(h.dom.window.document.querySelector('[data-testid="skill-market-list"] .sk-marketIcon'));
 	assert.ok(h.dom.window.document.body.textContent.includes('demo'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('自动同步可信 Skill Registry'), 'discovery help stays out of the market home');
 	await h.click(h.dom.window.document.querySelector('.sk-marketRow'));
 	await h.flush();
 	assert.ok(h.dom.window.document.querySelector('.sk-marketDrawer'));
+	assert.ok(h.dom.window.document.body.textContent.includes('自动同步可信 Skill Registry'), 'discovery help is available in the item drawer');
 	assert.ok(h.dom.window.document.body.textContent.includes('安装校验'));
 });
 

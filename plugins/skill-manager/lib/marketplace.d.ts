@@ -84,7 +84,7 @@ export declare function createMarketplace(options?: {}): {
             ref: any;
             description: any;
             iconUrl: any;
-            iconSource: string;
+            iconSource: any;
             repositoryUrl: any;
             author: any;
             license: any;

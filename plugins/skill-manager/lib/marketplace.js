@@ -241,6 +241,12 @@ function safeAvatar(value) {
         return null;
     }
 }
+function githubAvatarUrl(repository) {
+    const owner = String(repository || '').split('/')[0] || '';
+    if (!/^[A-Za-z0-9_.-]+$/.test(owner))
+        return null;
+    return `https://github.com/${owner}.png?size=80`;
+}
 function cleanTopics(value) {
     return Array.isArray(value) ? value.filter((item) => typeof item === 'string' && item.trim() !== '').slice(0, 12) : [];
 }
@@ -249,7 +255,8 @@ function repoFallback(entry) {
         url: safeRepositoryUrl(entry.repository),
         description: entry.description,
         author: entry.repository.split('/')[0] ?? null,
-        iconUrl: null,
+        iconUrl: githubAvatarUrl(entry.repository),
+        iconSource: 'github-avatar',
         stars: null,
         forks: null,
         language: null,
@@ -274,12 +281,18 @@ export function createMarketplace(options = {}) {
     const cache = new Map();
     const requests = new Map();
     const discoveredEntries = new Map();
+    let githubBlockedUntil = 0;
+    let githubBlockMessage = null;
     function findEntry(id) {
         return entries.find((entry) => entry.id === id) || discoveredEntries.get(id) || null;
     }
     async function request(url, { optional = false, limit = 2 * 1024 * 1024 } = {}) {
         if (typeof fetchImpl !== 'function')
             throw new Error('Host 未提供 fetch，无法读取 GitHub 市场');
+        const githubApi = String(url).startsWith('https://api.github.com/');
+        if (githubApi && githubBlockedUntil > Date.now()) {
+            throw new Error(githubBlockMessage || 'GitHub API 暂时限流，当前使用缓存或仓库信息兜底');
+        }
         const signal = globalThis.AbortSignal && typeof globalThis.AbortSignal.timeout === 'function'
             ? globalThis.AbortSignal.timeout(8_000)
             : undefined;
@@ -294,8 +307,18 @@ export function createMarketplace(options = {}) {
         });
         if (optional && response.status === 404)
             return null;
-        if (!response.ok)
+        if (!response.ok) {
+            const header = (name) => response.headers && typeof response.headers.get === 'function' ? response.headers.get(name) : null;
+            const remaining = header('x-ratelimit-remaining');
+            if (githubApi && (response.status === 429 || (response.status === 403 && remaining === '0'))) {
+                const resetSeconds = Number(header('x-ratelimit-reset'));
+                githubBlockedUntil = Number.isFinite(resetSeconds) && resetSeconds * 1000 > Date.now() ? resetSeconds * 1000 : Date.now() + 60_000;
+                const resetLabel = new Date(githubBlockedUntil).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                githubBlockMessage = `GitHub API ${token ? '认证' : '匿名'}额度已用尽，将于 ${resetLabel} 后恢复；当前使用缓存或仓库信息兜底`;
+                throw new Error(githubBlockMessage);
+            }
             throw new Error(`GitHub 请求失败（HTTP ${response.status}）`);
+        }
         return response;
     }
     async function requestJson(url, options = {}) {
@@ -416,7 +439,8 @@ export function createMarketplace(options = {}) {
                 url: typeof repo.html_url === 'string' ? repo.html_url : safeRepositoryUrl(entry.repository),
                 description: typeof repo.description === 'string' && repo.description.trim() !== '' ? repo.description.trim() : entry.description,
                 author: typeof owner.login === 'string' ? owner.login : entry.repository.split('/')[0] ?? null,
-                iconUrl: safeAvatar(owner.avatar_url),
+                iconUrl: safeAvatar(owner.avatar_url) || githubAvatarUrl(entry.repository),
+                iconSource: safeAvatar(owner.avatar_url) ? 'github' : 'github-avatar',
                 stars: Number.isFinite(repo.stargazers_count) ? repo.stargazers_count : null,
                 forks: Number.isFinite(repo.forks_count) ? repo.forks_count : null,
                 language: typeof repo.language === 'string' ? repo.language : null,
@@ -704,14 +728,14 @@ export function createMarketplace(options = {}) {
             for (const entry of discovery.entries)
                 if (!representatives.has(entry.repository))
                     representatives.set(entry.repository, entry);
-            await Promise.all([...representatives.values()].map(async (entry) => {
+            for (const entry of representatives.values()) {
                 try {
                     sortedRepositoryMeta.set(entry.repository, await repositorySummary(entry, force));
                 }
                 catch {
                     sortedRepositoryMeta.set(entry.repository, null);
                 }
-            }));
+            }
         }
         let projectRoot = null;
         let state = null;
@@ -721,9 +745,11 @@ export function createMarketplace(options = {}) {
         }
         const items = await Promise.all(discovery.entries.map(async (entry, relevanceIndex) => {
             const sortedMeta = sortedRepositoryMeta.get(entry.repository);
-            const meta = entry.marketSource === 'trusted-registry'
-                ? (sortedMeta && sortedMeta.value ? { ...repoFallback(entry), ...sortedMeta.value, stale: sortedMeta.stale === true, metadataError: sortedMeta.error || null } : repoFallback(entry))
-                : await metadata(entry, force);
+            const meta = sortedMeta && sortedMeta.value
+                ? { ...repoFallback(entry), ...sortedMeta.value, stale: sortedMeta.stale === true, metadataError: sortedMeta.error || null }
+                : state && marketSelection(state, entry) !== null
+                    ? await metadata(entry, force)
+                    : repoFallback(entry);
             const local = projectRoot && state ? await projectItemState(projectRoot, state, entry, meta).catch((error) => ({ status: 'error', existing: null, selection: null, metadataError: errorMessage(error) })) : { status: 'project-required', existing: null, selection: null };
             return {
                 id: entry.id,
@@ -733,7 +759,7 @@ export function createMarketplace(options = {}) {
                 ref: entry.ref,
                 description: meta.description || entry.description,
                 iconUrl: meta.iconUrl,
-                iconSource: meta.iconUrl ? 'github' : 'generic',
+                iconSource: meta.iconSource || (meta.iconUrl ? 'github' : 'generic'),
                 repositoryUrl: meta.url,
                 author: meta.author,
                 license: meta.license,

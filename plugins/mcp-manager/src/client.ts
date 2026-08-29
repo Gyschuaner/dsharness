@@ -350,7 +350,6 @@ interface MarketDrawerProps {
 					'.mm-btn{height:38px;border-radius:8px;padding:0 13px}',
 					'.mm-btnPrimary{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary)}',
 					'.mm-btnPrimary:hover:not(:disabled){background:var(--dsw-alias-brand-primary-hover,var(--dsw-alias-brand-primary))}',
-					'.mm-helper{flex:none;margin:0;padding:0 8px 10px;color:var(--dsw-alias-label-quaternary);font-size:12px}',
 					'.mm-filters{padding:0 8px 10px;gap:4px}',
 					'.mm-filter{height:30px;border-radius:7px;padding:0 10px}',
 					'.mm-list{min-height:0;flex:1;overflow:auto;padding:0 8px 32px}',
@@ -392,7 +391,7 @@ interface MarketDrawerProps {
 					'.mm-sectionTitle{margin-bottom:13px;font-weight:600}',
 					'.mm-topic{border:0;border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);padding:3px 8px}',
 					'.mm-dialog{border-radius:16px}',
-					'@media(max-width:680px){.mm-root{margin:0}.mm-head{padding-left:0}.mm-tabs,.mm-toolbar,.mm-helper,.mm-filters,.mm-list{padding-left:0;padding-right:0}.mm-toolbar{flex-wrap:wrap}.mm-search{flex-basis:100%}.mm-drawer{top:61px;width:calc(100vw - 12px);max-width:none}.mm-row{padding-left:6px;padding-right:6px}.mm-rowMeta{gap:6px}.mm-formGrid{grid-template-columns:1fr}.mm-fieldWide{grid-column:auto}}'
+					'@media(max-width:680px){.mm-root{margin:0}.mm-head{padding-left:0}.mm-tabs,.mm-toolbar,.mm-filters,.mm-list{padding-left:0;padding-right:0}.mm-toolbar{flex-wrap:wrap}.mm-search{flex-basis:100%}.mm-drawer{top:61px;width:calc(100vw - 12px);max-width:none}.mm-row{padding-left:6px;padding-right:6px}.mm-rowMeta{gap:6px}.mm-formGrid{grid-template-columns:1fr}.mm-fieldWide{grid-column:auto}}'
 				].join('');
 			if (!existingStyle) document.head.appendChild(style);
 
@@ -611,6 +610,7 @@ interface MarketDrawerProps {
 					h('div', { className: 'mm-drawerBody' },
 						props.loading ? h('p', { className: 'mm-loading', role: 'status' }, '正在读取 GitHub 与 MCP Registry…') : null,
 						detail && detail.metadataError ? h('p', { className: 'mm-metaNotice' }, detail.stale ? '远程元数据暂不可用，正在显示缓存。' : '部分远程元数据暂不可用。') : null,
+						h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, '发现与安装'), h('p', { className: 'mm-metaNotice' }, '实时搜索官方 MCP Registry；仅当配置可以唯一、安全推导时允许安装，安装后默认停用。')),
 						rows.length ? h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, '仓库信息'), h('dl', { className: 'mm-kv' }, rows.flatMap(function (row, index) { return [h('dt', { key: 'dt' + index }, row[0]), h('dd', { key: 'dd' + index }, row[1])]; }))) : null,
 						detail && detail.topics && detail.topics.length ? h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, 'Topics'), h('div', { className: 'mm-topics' }, detail.topics.map(function (topic) { return h('span', { key: topic, className: 'mm-topic' }, topic); }))) : null,
 						detail && detail.latestVersion ? h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, '最新发布'), h('dl', { className: 'mm-kv' }, h('dt', null, '版本'), h('dd', null, detail.latestVersion), detail.releasePublishedAt ? h(React.Fragment, null, h('dt', null, '发布时间'), h('dd', null, formatDate(detail.releasePublishedAt))) : null), detail.releaseUrl ? h('a', { className: 'mm-drawerLink', href: detail.releaseUrl, target: '_blank', rel: 'noreferrer' }, '查看 Release', h(P.IconRightUpOutline14)) : null) : null,
@@ -807,7 +807,6 @@ interface MarketDrawerProps {
 							serverBody
 						) : h(React.Fragment, null,
 							h('div', { className: 'mm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: '搜索 MCP Server' }), h('select', { className: 'mm-sort', 'aria-label': 'MCP 市场排序', value: marketSort, onChange: function (event: React.ChangeEvent<HTMLSelectElement>) { setMarketSort(event.target.value as McpMarketSort); } }, h('option', { value: 'relevance' }, '综合排序'), h('option', { value: 'popular' }, '热度优先'), h('option', { value: 'recent' }, '最新优先'))),
-							h('p', { className: 'mm-helper' }, '实时搜索官方 MCP Registry · 仅在配置可唯一、安全推导时允许安装'),
 							marketBody
 						),
 					selectedServer ? h(ServerDrawer, { server: selectedServer, busy: busy === selectedServer.id, onClose: function () { setSelectedServer(null); }, onReconnect: function () { if (selectedServer) reconnect(selectedServer); }, onEdit: function () { if (selectedServer) setEditor(selectedServer); }, onDelete: function () { if (selectedServer) setDeleting(selectedServer); } }) : null,
