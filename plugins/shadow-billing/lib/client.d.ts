@@ -1,13 +1,8 @@
 /**
  * dsh-shadow-billing — Client half（DSH-032）。
  *
- * 三个 Slot：
- * - conversation.session.header.utilities：会话头部徽标（累计 token + 估算费用，点击弹详情）；
- * - conversation.view：与「对话 / 轨迹」并列的「用量」页签（统计卡 + 趋势 + 排行 + 明细）；
- * - settings.section：设置页（价目表与口径说明）。
- *
- * 动效：数字滚动（300ms ease-out）、趋势面积图路径绘制入场（800ms）、
- * 统计卡淡入上移（200ms）；prefers-reduced-motion 下全部降级为瞬时。
+ * Billing 只出现在扩展管理器与设置页。仪表盘沿用 DSH-032 最终确认的
+ * 收据标题、三项总览、Token/费用组合图、模型构成和调用明细布局。
  */
 interface SummaryValue {
     days: number;
@@ -52,14 +47,11 @@ interface RequestsValue {
     total: number;
     rows: RequestRow[];
 }
-interface SessionValue {
-    requests: number;
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadTokens: number;
-    costNano: number;
-    firstAt: number | null;
-    lastAt: number | null;
+interface BillingData {
+    summary: SummaryValue;
+    models: ModelRow[];
+    daily: DailyRow[];
+    requests: RequestsValue;
 }
 interface ApiEnvelope<T> {
     ok: boolean;
@@ -73,10 +65,9 @@ interface ShadowBillingSlots {
     register(config: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown): unknown;
     inject(name: string, effect: () => unknown): void;
 }
-declare function fmtTokens(n: number): string;
+declare function fmtTokens(value: number): string;
 declare function fmtCost(costNano: number): string;
-declare function fmtTime(ts: number): string;
-declare function apiGet<T>(url: string): Promise<T | null>;
-/** 尊重 prefers-reduced-motion。 */
-declare function prefersReducedMotion(): boolean;
+declare function fmtDay(day: string): string;
+declare function fmtTime(timestamp: number): string;
+declare function apiGet<T>(url: string): Promise<T>;
 //# sourceMappingURL=client.d.ts.map

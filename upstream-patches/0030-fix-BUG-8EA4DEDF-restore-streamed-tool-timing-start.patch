@@ -1,0 +1,445 @@
+From ac97beb1070e7a981ee354cc49d8fda3ee9e1337 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 29 Aug 2026 11:35:03 +0800
+Subject: [PATCH] fix(BUG-8EA4DEDF): restore streamed tool timing start
+
+---
+ .../ui-chat/src/client/contract/chat-nodes.ts |   2 +
+ .../src/client/conversation-nodes/register.ts |   2 +
+ .../conversation-nodes/tool-activity.ts       | 164 ++++++++++++++++++
+ .../src/client/conversation-nodes/tool.ts     |  26 ++-
+ ...nversation-node-definitions.client.spec.ts |  32 ++++
+ .../ui-tool/src/client/tool/ToolCallTree.tsx  |  16 +-
+ .../tests/tool-call-tree.client.spec.tsx      |  10 +-
+ 7 files changed, 242 insertions(+), 10 deletions(-)
+ create mode 100644 packages/client/ui-chat/src/client/conversation-nodes/tool-activity.ts
+
+diff --git a/packages/client/ui-chat/src/client/contract/chat-nodes.ts b/packages/client/ui-chat/src/client/contract/chat-nodes.ts
+index d04bdfd90e..159102e3b1 100644
+--- a/packages/client/ui-chat/src/client/contract/chat-nodes.ts
++++ b/packages/client/ui-chat/src/client/contract/chat-nodes.ts
+@@ -45,6 +45,8 @@ export type FinalAssistantChatData = AssistantChatData & {
+ /** Root Tool row payload; the root lifecycle owns all recursive subcalls. */
+ export interface ToolChatData {
+   readonly root: ToolCallBlock
++  /** Earliest loaded streamed Tool-call boundary; absent in legacy snapshots. */
++  readonly startedTime?: number
+ }
+ 
+ /** One manual command and its correlated compaction transaction. */
+diff --git a/packages/client/ui-chat/src/client/conversation-nodes/register.ts b/packages/client/ui-chat/src/client/conversation-nodes/register.ts
+index 0754aeb6a0..232f2b37bf 100644
+--- a/packages/client/ui-chat/src/client/conversation-nodes/register.ts
++++ b/packages/client/ui-chat/src/client/conversation-nodes/register.ts
+@@ -8,6 +8,7 @@ import { registerInboxConversationNodes } from './inbox.ts'
+ import { registerMessageConversationNode } from './message.ts'
+ import { registerRequestPromptConversationNode } from './request-prompt.ts'
+ import { registerRetryConversationNode } from './retry.ts'
++import { registerToolActivityConversationNode } from './tool-activity.ts'
+ import { registerToolConversationNode } from './tool.ts'
+ import { registerTurnErrorConversationNode } from './turn-error.ts'
+ import { registerTurnMaxTokensConversationNode } from './turn-max-tokens.ts'
+@@ -24,6 +25,7 @@ export function registerConversationNodes(ctx: Context): void {
+   registerRequestPromptConversationNode(ctx)
+   registerAssistantConversationNode(ctx)
+   registerTurnProcess(ctx)
++  registerToolActivityConversationNode(ctx)
+   registerToolConversationNode(ctx)
+   registerCommandConversationNode(ctx)
+   registerCompactionConversationNode(ctx)
+diff --git a/packages/client/ui-chat/src/client/conversation-nodes/tool-activity.ts b/packages/client/ui-chat/src/client/conversation-nodes/tool-activity.ts
+new file mode 100644
+index 0000000000..b00dec4d04
+--- /dev/null
++++ b/packages/client/ui-chat/src/client/conversation-nodes/tool-activity.ts
+@@ -0,0 +1,164 @@
++import type { Context } from '@deepseek-ai/cordis'
++import type { ChunkRowEvent } from '@deepseek-ai/dsh-api-session-controller/types'
++import type {
++  ConversationMatch, ConversationNodeDefinition,
++} from '@deepseek-ai/dsh-client-ui-conversation/client'
++import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
++
++/** Earliest streamed boundary retained for one formal Tool lifecycle. */
++export interface ToolActivityStart {
++  readonly seq: number
++  readonly time: number
++}
++
++interface PendingToolActivity extends ToolActivityStart {
++  readonly callId: string
++  readonly name: string
++}
++
++/** Per-step streamed Tool state read by the later formal Tool Definition. */
++export interface ToolActivityState {
++  readonly turn: number
++  readonly step: number
++  readonly pending: ReadonlyMap<number, PendingToolActivity>
++  readonly starts: ReadonlyMap<string, ToolActivityStart>
++}
++
++function initialState(turn: number, step: number): ToolActivityState {
++  return { turn, step, pending: new Map(), starts: new Map() }
++}
++
++function rememberStart(
++  starts: ReadonlyMap<string, ToolActivityStart>,
++  callId: string,
++  value: ToolActivityStart,
++): ReadonlyMap<string, ToolActivityStart> {
++  if (callId === '' || starts.has(callId)) return starts
++  const next = new Map(starts)
++  next.set(callId, value)
++  return next
++}
++
++function updatePending(
++  state: ToolActivityState,
++  index: number,
++  callId: string,
++  name: string,
++  boundary: ToolActivityStart,
++): ToolActivityState {
++  const previous = state.pending.get(index)
++  const activity = previous === undefined
++    ? { callId, name, ...boundary }
++    : previous.callId === callId && previous.name === name
++      ? previous
++      : { ...previous, callId, name }
++  const pending = previous === activity ? state.pending : new Map(state.pending).set(index, activity)
++  const starts = rememberStart(state.starts, callId, activity)
++  return pending === state.pending && starts === state.starts ? state : { ...state, pending, starts }
++}
++
++function updateDelta(state: ToolActivityState, match: ConversationMatch): ToolActivityState {
++  if (match.event.type !== 'assistant/chunk' || match.event.data.chunk.type !== 'tool-call-delta') return state
++  const chunk = match.event.data.chunk
++  const previous = state.pending.get(chunk.index)
++  return updatePending(
++    state,
++    chunk.index,
++    previous?.callId || String(chunk.id),
++    chunk.name ?? previous?.name ?? '',
++    { seq: match.event.seq, time: match.event.time },
++  )
++}
++
++function updateChunkRun(state: ToolActivityState, event: ChunkRowEvent): ToolActivityState {
++  if (event.type !== 'chunkrow/tool-call-chunks') return state
++  const previous = state.pending.get(event.data.index)
++  return updatePending(
++    state,
++    event.data.index,
++    previous?.callId || String(event.data.id),
++    Object.hasOwn(event.data, 'name') ? event.data.name as string : previous?.name ?? '',
++    { seq: event.seq, time: event.time },
++  )
++}
++
++function updateFinalMessage(state: ToolActivityState, match: ConversationMatch): ToolActivityState {
++  if (match.event.type !== 'assistant/message') return state
++  let pending: ReadonlyMap<number, PendingToolActivity> = state.pending
++  let starts = state.starts
++  for (const [index, activity] of state.pending) {
++    const block = match.event.data.message.content[index]
++    if (block?.type !== 'tool-call') continue
++    const callId = String(block.id)
++    const name = block.name
++    if (activity.callId !== callId || activity.name !== name) {
++      pending = new Map(pending).set(index, { ...activity, callId, name })
++    }
++    starts = rememberStart(starts, callId, activity)
++  }
++  return pending === state.pending && starts === state.starts ? state : { ...state, pending, starts }
++}
++
++function updateFormalCall(state: ToolActivityState, match: ConversationMatch): ToolActivityState {
++  if (match.event.type !== 'tool/call') return state
++  const callId = String(match.event.data.callId)
++  const name = match.event.data.name
++  const exact = [...state.pending].find(([, activity]) => activity.callId === callId)
++  const candidate = exact
++    ?? [...state.pending].find(([, activity]) => activity.callId === '' && activity.name === name)
++    ?? (state.pending.size === 1 ? [...state.pending][0] : undefined)
++  if (candidate === undefined) return state
++  const [index, activity] = candidate
++  const pending = new Map(state.pending)
++  pending.delete(index)
++  const starts = rememberStart(state.starts, callId, activity)
++  return { ...state, pending, starts }
++}
++
++function updateState(state: ToolActivityState, match: ConversationMatch): ToolActivityState {
++  if (match.event.type === 'chunkrow/tool-call-chunks') return updateChunkRun(state, match.event)
++  if (match.event.type === 'assistant/chunk') return updateDelta(state, match)
++  if (match.event.type === 'assistant/message') return updateFinalMessage(state, match)
++  if (match.event.type === 'tool/call') return updateFormalCall(state, match)
++  if (match.event.type === 'llm/retry') {
++    return state.pending.size === 0 && state.starts.size === 0
++      ? state
++      : { ...state, pending: new Map(), starts: new Map() }
++  }
++  if (match.event.type === 'step/end') {
++    return state.pending.size === 0 ? state : { ...state, pending: new Map() }
++  }
++  return state
++}
++
++/** State-only bridge from streamed Tool deltas to the later formal Tool row. */
++export const toolActivityDefinition: ConversationNodeDefinition<ToolActivityState> = {
++  kind: 'tool-activity',
++  match: (event) => {
++    if (event.type === 'step/start') return { id: `${event.data.turn}:${event.data.step}`, role: 'start' }
++    if (event.type === 'assistant/chunk' && event.data.chunk.type === 'tool-call-delta') {
++      return { id: `${event.data.turn}:${event.data.step}`, role: 'update' }
++    }
++    if (event.type === 'chunkrow/tool-call-chunks') {
++      return { id: `${event.data.turn}:${event.data.step}`, role: 'update' }
++    }
++    if ((event.type === 'assistant/message' && isAppendSurfaceEvent(event))
++      || event.type === 'tool/call'
++      || event.type === 'llm/retry'
++      || event.type === 'step/end') {
++      return { id: `${event.data.turn}:${event.data.step}`, role: 'update' }
++    }
++    return null
++  },
++  start: (_context, match) => {
++    if (match.event.type !== 'step/start') throw new Error('tool-activity start requires step/start')
++    return initialState(match.event.data.turn, match.event.data.step)
++  },
++  update: (context, match) => updateState(context.state, match),
++  publication: () => 'none',
++}
++
++/** Register streamed Tool timing before the formal Tool lifecycle. */
++export function registerToolActivityConversationNode(ctx: Context): void {
++  ctx.uiConversation.events.register(toolActivityDefinition)
++}
+diff --git a/packages/client/ui-chat/src/client/conversation-nodes/tool.ts b/packages/client/ui-chat/src/client/conversation-nodes/tool.ts
+index bb9e31e425..c25149697b 100644
+--- a/packages/client/ui-chat/src/client/conversation-nodes/tool.ts
++++ b/packages/client/ui-chat/src/client/conversation-nodes/tool.ts
+@@ -7,6 +7,7 @@ import type {} from '@deepseek-ai/dsh-tools/types'
+ import type { ToolChatData } from '../contract/chat-nodes.ts'
+ import type { RunningToolCall, ToolCallBlock, ToolResultNode } from '../contract/snapshot.ts'
+ import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
++import type { ToolActivityState } from './tool-activity.ts'
+ 
+ declare module '../contract/chat-nodes.ts' {
+   interface ChatNodeDataMap {
+@@ -21,6 +22,7 @@ interface ToolState {
+   readonly root: ToolCallBlock
+   readonly children: ReadonlyMap<string, readonly ToolCallBlock[]>
+   readonly parents: ReadonlyMap<string, string>
++  readonly activityStartTime: number
+ }
+ 
+ interface ProjectedBlockCache {
+@@ -247,7 +249,12 @@ function fallbackState(context: ConversationNodeContext<ToolState>): ToolState |
+   const match = context.matches.find(candidate => candidate.event.type === 'tool/result')
+   const root = match === undefined ? undefined : rootResult(match)
+   if (root === undefined) return undefined
+-  let state: ToolState = { root, children: new Map(), parents: new Map() }
++  let state: ToolState = {
++    root,
++    children: new Map(),
++    parents: new Map(),
++    activityStartTime: root.callTime ?? root.time,
++  }
+   for (const candidate of context.matches) {
+     state = candidate.event.type === 'tool/progress'
+       ? updateProgress(state, candidate)
+@@ -274,7 +281,17 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+     }
+     return null
+   },
+-  start: (_context, match) => ({ root: rootCall(match), children: new Map(), parents: new Map() }),
++  start: (_context, match, reader) => {
++    if (match.event.type !== 'tool/call') throw new Error('tool-call start requires tool/call')
++    const activity = reader.previous<ToolActivityState>('tool-activity')?.state.starts
++      .get(String(match.event.data.callId))
++    return {
++      root: rootCall(match),
++      children: new Map(),
++      parents: new Map(),
++      activityStartTime: activity?.time ?? match.event.time,
++    }
++  },
+   update: (context, match) => {
+     if (match.event.type === 'tool/result') {
+       const running = 'kind' in context.state.root ? undefined : context.state.root
+@@ -290,7 +307,10 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
+     const projected = projectBlock(state.root, state, interruption(context))
+     const anchor = context.start?.event.seq
+       ?? ('kind' in state.root ? state.root.seq : context.matches[0]?.event.seq ?? 0)
+-    return chatNode(context, 'tool-call', anchor, { root: projected } satisfies ToolChatData)
++    return chatNode(context, 'tool-call', anchor, {
++      root: projected,
++      startedTime: state.activityStartTime,
++    } satisfies ToolChatData)
+   },
+ }
+ 
+diff --git a/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts b/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts
+index 5315045237..53d42b00f5 100644
+--- a/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts
++++ b/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts
+@@ -27,6 +27,7 @@ import { messageDefinition } from '../src/client/conversation-nodes/message.ts'
+ import { inspectRequestPrompt } from '@deepseek-ai/dsh-client-ui-conversation/client'
+ import { requestPromptDefinition } from '../src/client/conversation-nodes/request-prompt.ts'
+ import { retryDefinition } from '../src/client/conversation-nodes/retry.ts'
++import { toolActivityDefinition } from '../src/client/conversation-nodes/tool-activity.ts'
+ import { toolDefinition } from '../src/client/conversation-nodes/tool.ts'
+ import { turnErrorDefinition } from '../src/client/conversation-nodes/turn-error.ts'
+ import { turnMaxTokensDefinition } from '../src/client/conversation-nodes/turn-max-tokens.ts'
+@@ -43,6 +44,7 @@ const DEFINITIONS: readonly ConversationNodeDefinition[] = [
+   requestPromptDefinition(inspectRequestPrompt),
+   assistantDefinition,
+   turnProcessDefinition,
++  toolActivityDefinition,
+   toolDefinition,
+   commandDefinition,
+   compactionDefinition,
+@@ -952,6 +954,36 @@ describe('built-in conversation node Definitions', () => {
+     expect((withSecondChild?.data as ToolChatData).root.subCalls[0]).toBe(firstChild)
+   })
+ 
++  it('carries the earliest streamed Tool activity time into scalar and packed formal Tool rows', () => {
++    const history = [
++      at(1, 'turn/start', { turn: 1 }),
++      at(2, 'step/start', { turn: 1, step: 1 }),
++      at(3, 'assistant/chunk', {
++        turn: 1, step: 1,
++        chunk: { type: 'tool-call-delta', index: 0, id: 'streamed', name: 'read', argumentsDelta: '{' },
++      }, { time: 4_000 }),
++      at(4, 'assistant/chunk', {
++        turn: 1, step: 1,
++        chunk: { type: 'tool-call-delta', index: 0, id: 'streamed', argumentsDelta: '}' },
++      }, { time: 4_250 }),
++      at(5, 'assistant/message', {
++        turn: 1,
++        step: 1,
++        message: {
++          ...assistantMessage('tool-final', ''),
++          content: [{ type: 'tool-call', id: 'streamed', name: 'read', arguments: '{}' }],
++        },
++      }, { surfaceOp: 'append', time: 4_500 }),
++      at(6, 'tool/call', {
++        turn: 1, step: 1, callId: 'streamed', name: 'read', arguments: '{}',
++      }, { time: 5_000 }),
++    ]
++    const scalar = snapshot(assembler(history))
++    const packed = snapshot(assembler(packedInputs(history)))
++    expect(packed).toEqual(scalar)
++    expect((node(scalar, 'tool-call')?.data as ToolChatData).startedTime).toBe(4_000)
++  })
++
+   it('prepends an older turn without replacing already materialized nodes', () => {
+     const value = assembler([
+       at(20, 'turn/start', { turn: 2 }),
+diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
+index 9122335db0..d831cbda60 100644
+--- a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
++++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
+@@ -12,27 +12,28 @@ function callName(node: ToolCallBlock): string {
+ }
+ 
+ /** Pair one Tool row with its authoritative Session-event timing. */
+-function callTiming(node: ToolCallBlock): {
++function callTiming(node: ToolCallBlock, activityStartedTime?: number): {
+   startedTime: number | null
+   finishedTime: number | undefined
+ } {
+   return 'kind' in node
+-    ? { startedTime: node.callTime, finishedTime: node.time }
+-    : { startedTime: node.time, finishedTime: undefined }
++    ? { startedTime: activityStartedTime ?? node.callTime, finishedTime: node.time }
++    : { startedTime: activityStartedTime ?? node.time, finishedTime: undefined }
+ }
+ 
+ /** One atomic call dispatched through the Tool-owned keyed slot. */
+ const ToolCall = memo(function ToolCall({
+-  renderSlot, callId, toolName, block, openFile, selected, cwd, home, inspectCall, t, children,
++  renderSlot, callId, toolName, block, activityStartedTime, openFile, selected, cwd, home, inspectCall, t, children,
+ }: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 't'> & {
+   callId: string
+   toolName: string
+   block: ToolCallBlock
++  activityStartedTime?: number | undefined
+   selected: boolean
+   home?: string | undefined
+   children?: ReactNode
+ }) {
+-  const timing = callTiming(block)
++  const timing = callTiming(block, activityStartedTime)
+   const owner: ToolCallOwnerProps = useMemo(() => ({
+     callId,
+     toolName,
+@@ -72,9 +73,10 @@ const ToolCall = memo(function ToolCall({
+ })
+ 
+ const ToolCallBranch = memo(function ToolCallBranch({
+-  renderSlot, block, selectedCallId, cwd, home, openFile, inspectCall, t,
++  renderSlot, block, activityStartedTime, selectedCallId, cwd, home, openFile, inspectCall, t,
+ }: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 't'> & {
+   block: ToolCallBlock
++  activityStartedTime?: number | undefined
+   home?: string | undefined
+ }) {
+   return (
+@@ -83,6 +85,7 @@ const ToolCallBranch = memo(function ToolCallBranch({
+       callId={block.callId}
+       toolName={callName(block)}
+       block={block}
++      activityStartedTime={activityStartedTime}
+       openFile={openFile}
+       selected={block.callId === selectedCallId}
+       cwd={cwd}
+@@ -126,6 +129,7 @@ export function ToolCallTree({
+     <ToolCallBranch
+       renderSlot={renderSlot}
+       block={block}
++      activityStartedTime={node.data.startedTime}
+       selectedCallId={selectedCallId}
+       cwd={cwd}
+       home={home}
+diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+index 121f58fd4e..a82bb80921 100644
+--- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+@@ -25,6 +25,7 @@ function props(
+   selectedCallId?: string,
+   generation?: ConnectionGeneration,
+   owners?: ToolCallOwnerProps[],
++  startedTime?: number,
+ ): ToolTreeProps {
+   const snapshot = {} as SessionSnapshot
+   const useSession = ((selector: (value: SessionSnapshot) => unknown) => selector(snapshot)) as ToolTreeProps['useSession']
+@@ -43,7 +44,7 @@ function props(
+       anchorSeq: block.seq,
+       location: { kind: 'session' },
+       visibility: 'visible',
+-      data: { root: block },
++      data: { root: block, ...startedTime === undefined ? {} : { startedTime } },
+     },
+     selectedCallId,
+     openFile: vi.fn(),
+@@ -75,6 +76,13 @@ describe('ToolCallTree', () => {
+     expect(timer?.getAttribute('data-state')).toBe('settled')
+   })
+ 
++  it('includes streamed argument generation in the root Tool duration', () => {
++    const block = root('streamed', { name: 'grep', argsRaw: '{"pattern":"needle"}' })
++    const view = render(<ToolCallTree {...props(block, undefined, undefined, undefined, 1_000)} />)
++    const timer = view.container.querySelector('[data-chat-call-id="streamed"] [data-tool-timer]')
++    expect(timer?.textContent).toBe('2s')
++  })
++
+   it('recursively renders a selected leaf without selecting its ancestors', () => {
+     const owners: ToolCallOwnerProps[] = []
+     const leaf = {
+-- 
+2.51.2.windows.1
+

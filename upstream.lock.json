@@ -4,7 +4,7 @@
   "baseBranch": "master",
   "baseCommit": "cd5ef8148158c3a752a658978873241fdf8e2bbc",
   "baseTree": "a712eec535b48badc4fefb4df5176a7002e4280b",
-  "resultTree": "3c507de8928ae7f0ead43a997a52b5020f4a8a9c",
+  "resultTree": "e5f02d2d0e69c48722f817b12274356c2136e40a",
   "dshVersion": "0.1.2-alpha.1",
   "nodeVersion": "24.11.1",
   "pnpmVersion": "11.7.0",
@@ -20,6 +20,18 @@
     {
       "path": "upstream-patches/0029-fix-BUG-046F63F9-restore-alpha1-tool-durations.patch",
       "sha256": "4FCB78083B53712C00F638362421A5F456718925832DE5FABC44246B344CB821"
+    },
+    {
+      "path": "upstream-patches/0030-fix-BUG-8EA4DEDF-restore-streamed-tool-timing-start.patch",
+      "sha256": "9BD6D6E62769367A7AC513949018572D4C168062A987449CDCFA9C8AE9B363C7"
+    },
+    {
+      "path": "upstream-patches/0031-fix-BUG-8EA4DEDF-restore-inline-tool-duration.patch",
+      "sha256": "651822A8EA13CEF525D1EA7130B73FBC791A269DB04633970007C273EEC84B0C"
+    },
+    {
+      "path": "upstream-patches/0032-fix-BUG-8EA4DEDF-restore-reasoning-duration.patch",
+      "sha256": "BB60BB18B4120C8C58826415B9D5994D26558D8D5A9086775F97B27DC8529AD2"
     }
   ]
 }

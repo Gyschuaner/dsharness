@@ -78,6 +78,10 @@ test('Windows startup rebuilds and validates the locked latest source before lau
 	assert.match(source, /Invoke-Native \$corepack\.Source @\('pnpm', 'run', 'clean'\) \$RepoRoot[\s\S]*Invoke-Native \$corepack\.Source @\('pnpm', 'run', 'build'\) \$RepoRoot/);
 	assert.match(source, /localPluginArtifacts[\s\S]*Get-FileHash/);
 	assert.match(source, /shadow-billing Host 产物未包含 alpha1 unknown 修复链路/);
+	assert.match(source, /shadow-billing Client 产物必须只把 Billing 注册到扩展区/);
+	assert.match(source, /extension\\\.manager\\\.section[\s\S]*conversation\\\.session\\\.header\\\.utilities\|conversation\\\.view\|sb-badge/);
+	assert.match(source, /shadow-billing Client 产物未包含 DSH-032 定稿仪表盘或当前价目/);
+	assert.match(source, /billing-dashboard[\s\S]*Token 用量[\s\S]*bl-chartTooltip[\s\S]*data-billing-bar[\s\S]*¥1\\\.50[\s\S]*¥4\\\.50/);
 	assert.match(source, /api\/shadow-billing\/status[\s\S]*repaired/);
 	assert.match(installSource, /pnpm.*install.*--frozen-lockfile[\s\S]*pnpm.*run.*clean[\s\S]*pnpm.*run.*build/);
 	assert.match(source, /packages\\api\\gateway\\lib\\index\.js/);
@@ -87,6 +91,12 @@ test('Windows startup rebuilds and validates the locked latest source before lau
 	assert.match(source, /imageInputBridge/);
 	assert.match(source, /readImageRequest/);
 	assert.match(source, /imageHostPath/);
+	assert.match(source, /ui-chat\\lib\\client\.js[\s\S]*tool-activity[\s\S]*activityStartTime/);
+	assert.match(source, /ui-chat 构建产物未包含思考读秒与流式时序投影/);
+	assert.match(source, /data-reasoning-activity[\s\S]*reasoningTimings/);
+	assert.match(source, /ui-tool\\lib\\client\.js[\s\S]*activityStartedTime[\s\S]*node\\\.data\\\.startedTime/);
+	assert.match(source, /ui-tool 构建产物未把工具耗时恢复为标题\/摘要后的内联布局/);
+	assert.match(source, /callHead[\s\S]*column-gap:8px[\s\S]*justify-content:flex-start[\s\S]*data-has-tool-timer/);
 	assert.match(source, /--no-open/);
 	assert.match(source, /FileShare\]::ReadWrite/);
 	assert.match(source, /Protect-StartupLog/);

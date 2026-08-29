@@ -402,10 +402,20 @@ if (-not $NoLaunch) {
 	}
 	$shadowBillingHostBundle = Join-Path $RepoRoot 'plugins\shadow-billing\lib\index.js'
 	$shadowBillingFoldBundle = Join-Path $RepoRoot 'plugins\shadow-billing\lib\fold.js'
+	$shadowBillingClientBundle = Join-Path $RepoRoot 'plugins\shadow-billing\lib\client.js'
 	$shadowBillingHostText = Get-Content -LiteralPath $shadowBillingHostBundle -Raw -Encoding UTF8
 	$shadowBillingFoldText = Get-Content -LiteralPath $shadowBillingFoldBundle -Raw -Encoding UTF8
+	$shadowBillingClientText = Get-Content -LiteralPath $shadowBillingClientBundle -Raw -Encoding UTF8
 	if ($shadowBillingHostText -notmatch 'repaired' -or $shadowBillingFoldText -notmatch 'repairUnknownUsage') {
 		throw "shadow-billing Host 产物未包含 alpha1 unknown 修复链路：$shadowBillingHostBundle / $shadowBillingFoldBundle"
+	}
+	if (($shadowBillingClientText -notmatch 'extension\.manager\.section') -or ($shadowBillingClientText -notmatch "id:\s*'billing'") -or ($shadowBillingClientText -match 'conversation\.session\.header\.utilities|conversation\.view|sb-badge')) {
+		throw "shadow-billing Client 产物必须只把 Billing 注册到扩展区：$shadowBillingClientBundle"
+	}
+	if (($shadowBillingClientText -notmatch 'billing-dashboard') -or ($shadowBillingClientText -notmatch 'Token 用量') -or
+		($shadowBillingClientText -notmatch 'bl-chartTooltip') -or ($shadowBillingClientText -notmatch 'data-billing-bar') -or
+		($shadowBillingClientText -notmatch '¥1\.50') -or ($shadowBillingClientText -notmatch '¥4\.50')) {
+		throw "shadow-billing Client 产物未包含 DSH-032 定稿仪表盘或当前价目：$shadowBillingClientBundle"
 	}
 
 	$resolvedLogDirectory = [IO.Path]::GetFullPath($LogDirectory)
@@ -429,7 +439,9 @@ if (-not $NoLaunch) {
 	$acpBundle = Join-Path $buildSourceDirectory 'packages\acp\acp\lib\index.js'
 	$attachmentLocalBundle = Join-Path $buildSourceDirectory 'packages\attachment\attachment-local\lib\index.js'
 	$visionBundle = Join-Path $buildSourceDirectory 'packages\vision\vision-bridge\lib\index.js'
-	foreach ($artifact in @($cliEntry, $gatewayBundle, $sessionControllerBundle, $acpBundle, $attachmentLocalBundle, $visionBundle)) {
+	$uiChatBundle = Join-Path $buildSourceDirectory 'packages\client\ui-chat\lib\client.js'
+	$uiToolBundle = Join-Path $buildSourceDirectory 'packages\client\ui-tool\lib\client.js'
+	foreach ($artifact in @($cliEntry, $gatewayBundle, $sessionControllerBundle, $acpBundle, $attachmentLocalBundle, $visionBundle, $uiChatBundle, $uiToolBundle)) {
 		if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
 			throw "构建完成但缺少产物：$artifact"
 		}
@@ -439,6 +451,8 @@ if (-not $NoLaunch) {
 	$acpBundleText = Get-Content -LiteralPath $acpBundle -Raw -Encoding UTF8
 	$attachmentLocalBundleText = Get-Content -LiteralPath $attachmentLocalBundle -Raw -Encoding UTF8
 	$visionBundleText = Get-Content -LiteralPath $visionBundle -Raw -Encoding UTF8
+	$uiChatBundleText = Get-Content -LiteralPath $uiChatBundle -Raw -Encoding UTF8
+	$uiToolBundleText = Get-Content -LiteralPath $uiToolBundle -Raw -Encoding UTF8
 	if ($gatewayBundleText -notmatch 'TypertRemote|TypertRemoteService') {
 		throw "Gateway 构建产物未包含 alpha1 Typert Remote 入口：$gatewayBundle"
 	}
@@ -453,6 +467,19 @@ if (-not $NoLaunch) {
 	}
 	if ($visionBundleText -notmatch 'imageInputBridge' -or $visionBundleText -notmatch 'reportProgress') {
 		throw "vision-bridge 构建产物未包含 imageInputBridge provider 与 progress：$visionBundle"
+	}
+	if ($uiChatBundleText -notmatch 'tool-activity' -or $uiChatBundleText -notmatch 'activityStartTime') {
+		throw "ui-chat 构建产物未包含流式工具计时起点桥接：$uiChatBundle"
+	}
+	if ($uiChatBundleText -notmatch 'data-reasoning-activity' -or $uiChatBundleText -notmatch 'reasoningTimings') {
+		throw "ui-chat 构建产物未包含思考读秒与流式时序投影：$uiChatBundle"
+	}
+	if ($uiToolBundleText -notmatch 'activityStartedTime' -or $uiToolBundleText -notmatch 'node\.data\.startedTime') {
+		throw "ui-tool 构建产物未从流式活动起点计算耗时：$uiToolBundle"
+	}
+	if ($uiToolBundleText -notmatch 'callHead' -or $uiToolBundleText -notmatch 'column-gap:8px' -or
+		$uiToolBundleText -notmatch 'justify-content:flex-start' -or $uiToolBundleText -match 'data-has-tool-timer') {
+		throw "ui-tool 构建产物未把工具耗时恢复为标题/摘要后的内联布局：$uiToolBundle"
 	}
 
 	$configDumpArguments = @('--profile', 'web')

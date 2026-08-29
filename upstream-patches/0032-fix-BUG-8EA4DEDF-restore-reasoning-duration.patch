@@ -1,0 +1,437 @@
+From 224f13fba4cf06b9a80d524efd6fed7964623d78 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 29 Aug 2026 12:21:16 +0800
+Subject: [PATCH] fix(BUG-8EA4DEDF): restore reasoning duration
+
+---
+ .../src/client/chat/AssistantMarkdown.tsx     | 11 ++-
+ .../src/client/chat/AssistantNodeView.tsx     |  1 +
+ .../src/client/chat/ReasoningRow.module.css   | 16 +++++
+ .../ui-chat/src/client/chat/ReasoningRow.tsx  | 20 +++++-
+ .../ui-chat/src/client/contract/chat-nodes.ts |  8 +++
+ .../client/conversation-nodes/assistant.ts    | 71 ++++++++++++++++++-
+ .../tests/chat-snapshot-fixture.client.ts     |  1 +
+ ...nversation-node-definitions.client.spec.ts |  5 ++
+ .../tests/reasoning-row.client.spec.tsx       | 35 ++++++++-
+ 9 files changed, 160 insertions(+), 8 deletions(-)
+
+diff --git a/packages/client/ui-chat/src/client/chat/AssistantMarkdown.tsx b/packages/client/ui-chat/src/client/chat/AssistantMarkdown.tsx
+index c517f9d0c2..93ac16398f 100644
+--- a/packages/client/ui-chat/src/client/chat/AssistantMarkdown.tsx
++++ b/packages/client/ui-chat/src/client/chat/AssistantMarkdown.tsx
+@@ -4,6 +4,7 @@ import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
+ import type { AssistantBlock } from '../contract/snapshot.ts'
++import type { ReasoningTiming } from '../contract/chat-nodes.ts'
+ import { markdownLabels } from '../markdown-labels.ts'
+ import { ReasoningRow } from './ReasoningRow.tsx'
+ import { useSearchableHidden } from './searchable-hidden.ts'
+@@ -11,6 +12,7 @@ import css from './AssistantMarkdown.module.css'
+ 
+ export interface AssistantMarkdownProps {
+   blocks: readonly AssistantBlock[]
++  reasoningTimings?: readonly (ReasoningTiming | null)[] | undefined
+   streaming: boolean
+   /** Frozen partial of an aborted turn: rendered with a stopped marker. */
+   interrupted?: boolean | undefined
+@@ -28,7 +30,7 @@ export interface AssistantMarkdownProps {
+ 
+ /** Reasoning block as the Think variant summary row (figma 39:28304). */
+ export const AssistantMarkdown = memo(function AssistantMarkdown({
+-  blocks, streaming, interrupted, renderMessageImages,
++  blocks, reasoningTimings = [], streaming, interrupted, renderMessageImages,
+   reasoningHidden = false, revealProcess, mentions, t,
+ }: AssistantMarkdownProps) {
+   // Stable per locale revision (t identity changes on switch): a fresh object
+@@ -65,7 +67,12 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
+             hidden={reasoningHidden}
+             reveal={revealProcess}
+           >
+-            <ReasoningRow text={block.text} running={streaming && i === last} t={t} />
++            <ReasoningRow
++              text={block.text}
++              running={streaming && i === last}
++              timing={reasoningTimings[i] ?? undefined}
++              t={t}
++            />
+           </ProcessReasoning>,
+         )
+         break
+diff --git a/packages/client/ui-chat/src/client/chat/AssistantNodeView.tsx b/packages/client/ui-chat/src/client/chat/AssistantNodeView.tsx
+index 399897a9b5..f7d3c38c51 100644
+--- a/packages/client/ui-chat/src/client/chat/AssistantNodeView.tsx
++++ b/packages/client/ui-chat/src/client/chat/AssistantNodeView.tsx
+@@ -29,6 +29,7 @@ export const AssistantNodeView = memo(function AssistantNodeView({
+   return (
+     <AssistantMarkdown
+       blocks={data.blocks}
++      reasoningTimings={data.reasoningTimings}
+       streaming={data.status === 'running'}
+       interrupted={data.status === 'interrupted'}
+       renderMessageImages={renderMessageImages}
+diff --git a/packages/client/ui-chat/src/client/chat/ReasoningRow.module.css b/packages/client/ui-chat/src/client/chat/ReasoningRow.module.css
+index 2d7cbe8f07..3c623c99f1 100644
+--- a/packages/client/ui-chat/src/client/chat/ReasoningRow.module.css
++++ b/packages/client/ui-chat/src/client/chat/ReasoningRow.module.css
+@@ -41,6 +41,22 @@
+   font-weight: 400;
+ }
+ 
++.activity {
++  display: inline-flex;
++  flex: none;
++  align-items: center;
++  margin-left: 5px;
++  color: var(--dsw-alias-label-caption);
++  font-size: 14px;
++  line-height: 24px;
++  font-variant-numeric: tabular-nums;
++  white-space: nowrap;
++}
++
++.timer {
++  min-width: 20px;
++}
++
+ .separator {
+   flex: none;
+   width: 2px;
+diff --git a/packages/client/ui-chat/src/client/chat/ReasoningRow.tsx b/packages/client/ui-chat/src/client/chat/ReasoningRow.tsx
+index 1f5fba56b8..e390096d95 100644
+--- a/packages/client/ui-chat/src/client/chat/ReasoningRow.tsx
++++ b/packages/client/ui-chat/src/client/chat/ReasoningRow.tsx
+@@ -1,7 +1,8 @@
+ /** Assistant reasoning disclosure, independent of Tool-call presentation. */
+ import { useEffect, useRef, useState } from 'react'
+-import { DisclosureRow, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
++import { DisclosureRow, ElapsedTime, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { ChatViewSlotProps } from '../contract/slots.ts'
++import type { ReasoningTiming } from '../contract/chat-nodes.ts'
+ import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
+ import a11yCss from './accessibility.module.css'
+ import css from './ReasoningRow.module.css'
+@@ -21,10 +22,16 @@ function latestLine(text: string): string {
+  * Render one assistant reasoning block as the Think disclosure row.
+  * @param props.text - complete or streaming reasoning text.
+  * @param props.running - whether this block is the streaming tail.
++ * @param props.timing - streamed start and optional completion time.
+  * @param props.t - conversation locale seat for the running status.
+  * @returns the reasoning disclosure.
+  */
+-export function ReasoningRow({ text, running, t }: { text: string; running: boolean; t: ChatViewSlotProps['t'] }) {
++export function ReasoningRow({ text, running, timing, t }: {
++  text: string
++  running: boolean
++  timing?: ReasoningTiming | undefined
++  t: ChatViewSlotProps['t']
++}) {
+   const [expanded, setExpanded] = useState(false)
+   const summaryRef = useRef<HTMLSpanElement>(null)
+   const summary = running ? latestLine(text) : firstLine(text)
+@@ -47,6 +54,15 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
+         chevronClassName={css.chevron}
+         icon={<IconThinkOutline14 size={14} />}
+         title={t('message.think')}
++        titleSuffix={timing === undefined ? undefined : (
++          <span className={css.activity} data-reasoning-activity>
++            <ElapsedTime
++              className={css.timer}
++              startedTime={timing.startedTime}
++              finishedTime={timing.finishedTime}
++            />
++          </span>
++        )}
+         open={expanded}
+         expandable
+         expandOnRowClick
+diff --git a/packages/client/ui-chat/src/client/contract/chat-nodes.ts b/packages/client/ui-chat/src/client/contract/chat-nodes.ts
+index 159102e3b1..ec3c1674f0 100644
+--- a/packages/client/ui-chat/src/client/contract/chat-nodes.ts
++++ b/packages/client/ui-chat/src/client/contract/chat-nodes.ts
+@@ -32,11 +32,19 @@ export interface AssistantChatData {
+   readonly turn: number
+   readonly step: number
+   readonly blocks: readonly AssistantBlock[]
++  /** Per-block reasoning duration derived from streamed Session event times. */
++  readonly reasoningTimings: readonly (ReasoningTiming | null)[]
+   readonly time: number
+   readonly usage?: unknown
+   readonly finalNode?: AssistantMessageNode
+ }
+ 
++/** Reliable start and optional completion time for one reasoning block. */
++export interface ReasoningTiming {
++  readonly startedTime: number
++  readonly finishedTime?: number | undefined
++}
++
+ /** Settled or interrupted Assistant payload with its durable presentation node. */
+ export type FinalAssistantChatData = AssistantChatData & {
+   readonly finalNode: AssistantMessageNode
+diff --git a/packages/client/ui-chat/src/client/conversation-nodes/assistant.ts b/packages/client/ui-chat/src/client/conversation-nodes/assistant.ts
+index a6a460f0ea..3f1ad9d2e2 100644
+--- a/packages/client/ui-chat/src/client/conversation-nodes/assistant.ts
++++ b/packages/client/ui-chat/src/client/conversation-nodes/assistant.ts
+@@ -5,7 +5,7 @@ import type {
+ } from '@deepseek-ai/dsh-client-ui-conversation/client'
+ import type {} from '@deepseek-ai/dsh-llm-retry/types'
+ import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
+-import type { AssistantChatData } from '../contract/chat-nodes.ts'
++import type { AssistantChatData, ReasoningTiming } from '../contract/chat-nodes.ts'
+ import type { AssistantBlock, AssistantMessageNode } from '../contract/snapshot.ts'
+ import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
+ import {
+@@ -30,6 +30,7 @@ interface AssistantState {
+   readonly turn: number
+   readonly step: number
+   readonly blocks: readonly (AssistantBlock | undefined)[]
++  readonly reasoningTimings: readonly (ReasoningTiming | undefined)[]
+   readonly visibleBlocks: number
+   readonly firstVisibleSeq: number | undefined
+   readonly firstVisibleTime: number | undefined
+@@ -50,6 +51,7 @@ function initialState(turn: number, step: number): AssistantState {
+     turn,
+     step,
+     blocks: [],
++    reasoningTimings: [],
+     visibleBlocks: 0,
+     firstVisibleSeq: undefined,
+     firstVisibleTime: undefined,
+@@ -60,10 +62,48 @@ function initialState(turn: number, step: number): AssistantState {
+   }
+ }
+ 
++function finishReasoning(
++  timings: readonly (ReasoningTiming | undefined)[],
++  time: number,
++  exceptIndex?: number,
++): readonly (ReasoningTiming | undefined)[] {
++  let next: (ReasoningTiming | undefined)[] | undefined
++  for (let index = 0; index < timings.length; index++) {
++    const timing = timings[index]
++    if (index === exceptIndex || timing === undefined || timing.finishedTime !== undefined) continue
++    next ??= [...timings]
++    next[index] = { ...timing, finishedTime: time }
++  }
++  return next ?? timings
++}
++
++function startReasoning(
++  timings: readonly (ReasoningTiming | undefined)[],
++  index: number,
++  time: number,
++): readonly (ReasoningTiming | undefined)[] {
++  const closed = finishReasoning(timings, time, index)
++  if (closed[index] !== undefined) return closed
++  const next = [...closed]
++  next[index] = { startedTime: time }
++  return next
++}
++
+ function compactBlocks(blocks: readonly (AssistantBlock | undefined)[]): AssistantBlock[] {
+   return blocks.filter((block): block is AssistantBlock => block !== undefined)
+ }
+ 
++function compactReasoningTimings(
++  blocks: readonly (AssistantBlock | undefined)[],
++  timings: readonly (ReasoningTiming | undefined)[],
++): readonly (ReasoningTiming | undefined)[] {
++  const compacted: (ReasoningTiming | undefined)[] = []
++  for (let index = 0; index < blocks.length; index++) {
++    if (blocks[index] !== undefined) compacted.push(timings[index])
++  }
++  return compacted
++}
++
+ function blockIsVisible(block: AssistantBlock | undefined): boolean {
+   if (block === undefined || block.kind === 'tool-call') return false
+   if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
+@@ -99,6 +139,9 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
+   if (match.event.type !== 'assistant/chunk') return state
+   const chunk = match.event.data.chunk
+   const blocks = [...state.blocks]
++  const reasoningTimings = chunk.type === 'reasoning-delta'
++    ? startReasoning(state.reasoningTimings, chunk.index, match.event.time)
++    : finishReasoning(state.reasoningTimings, match.event.time)
+   let changedIndex = -1
+   let previousVisible = false
+   switch (chunk.type) {
+@@ -142,9 +185,9 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
+       blocks[chunk.index] = toAssistantBlock(chunk.block)
+       break
+     case 'usage':
+-      return { ...state, usage: chunk.usage }
++      return { ...state, usage: chunk.usage, reasoningTimings }
+     default:
+-      return state
++      return reasoningTimings === state.reasoningTimings ? state : { ...state, reasoningTimings }
+   }
+   const visibleBlocks = state.visibleBlocks
+     - Number(previousVisible)
+@@ -153,6 +196,7 @@ function updateChunk(state: AssistantState, match: ConversationMatch): Assistant
+   return {
+     ...state,
+     blocks,
++    reasoningTimings,
+     visibleBlocks,
+     hidden: visibleBlocks > 0 ? false : state.hidden,
+     ...visibleBlocks > 0 && state.firstVisibleSeq === undefined
+@@ -234,6 +278,9 @@ function updateChunkRun(state: AssistantState, event: ChunkRowEvent): AssistantS
+   return {
+     ...state,
+     blocks,
++    reasoningTimings: event.type === 'chunkrow/reasoning-chunks'
++      ? startReasoning(state.reasoningTimings, event.data.index, event.time)
++      : finishReasoning(state.reasoningTimings, event.time),
+     visibleBlocks,
+     hidden: visibleBlocks > 0 ? false : state.hidden,
+     ...(boundaries.firstVisible === undefined ? {} : {
+@@ -313,9 +360,14 @@ function fallbackState(context: ConversationNodeContext<AssistantState>): Assist
+     if (match.event.type === 'assistant/message') {
+       state ??= initialState(match.event.data.turn, match.event.data.step)
+       const blocks = toAssistantBlocks(match.event.data.message.content)
++      const reasoningTimings = compactReasoningTimings(
++        state.blocks,
++        finishReasoning(state.reasoningTimings, match.event.time),
++      )
+       state = {
+         ...state,
+         blocks,
++        reasoningTimings,
+         visibleBlocks: countVisibleBlocks(blocks),
+         hidden: false,
+         final: match,
+@@ -348,6 +400,10 @@ function projectAssistant(context: ConversationNodeContext<AssistantState>): Ass
+     : settled === undefined ? 'running' : 'settled'
+   const anchorSeq = settled?.seq ?? state.firstVisibleSeq ?? context.matches[0]?.event.seq ?? 0
+   const time = settled?.time ?? state.firstVisibleTime ?? context.matches[0]?.event.time ?? 0
++  const sparseReasoningTimings = status === 'running'
++    ? state.reasoningTimings
++    : finishReasoning(state.reasoningTimings, time)
++  const reasoningTimings = compactReasoningTimings(state.blocks, sparseReasoningTimings)
+   return {
+     anchorSeq,
+     visible,
+@@ -357,6 +413,10 @@ function projectAssistant(context: ConversationNodeContext<AssistantState>): Ass
+       turn: state.turn,
+       step: state.step,
+       blocks,
++      reasoningTimings: Array.from(
++        { length: blocks.length },
++        (_, index) => reasoningTimings[index] ?? null,
++      ),
+       time,
+       ...state.usage === undefined ? {} : { usage: state.usage },
+       ...settled === undefined ? {} : { finalNode: settled },
+@@ -393,9 +453,14 @@ export const assistantDefinition: ConversationNodeDefinition<AssistantState> = {
+     if (match.event.type === 'assistant/chunk') return updateChunk(context.state, match)
+     if (match.event.type === 'assistant/message') {
+       const blocks = toAssistantBlocks(match.event.data.message.content)
++      const reasoningTimings = compactReasoningTimings(
++        context.state.blocks,
++        finishReasoning(context.state.reasoningTimings, match.event.time),
++      )
+       return {
+         ...context.state,
+         blocks,
++        reasoningTimings,
+         visibleBlocks: countVisibleBlocks(blocks),
+         hidden: false,
+         final: match,
+diff --git a/packages/client/ui-chat/tests/chat-snapshot-fixture.client.ts b/packages/client/ui-chat/tests/chat-snapshot-fixture.client.ts
+index 39920f0201..0245b48aeb 100644
+--- a/packages/client/ui-chat/tests/chat-snapshot-fixture.client.ts
++++ b/packages/client/ui-chat/tests/chat-snapshot-fixture.client.ts
+@@ -138,6 +138,7 @@ function assistantData(node: AssistantMessageNode): FinalAssistantChatData {
+     turn: node.turn,
+     step: node.step,
+     blocks: node.blocks,
++    reasoningTimings: node.blocks.map(() => null),
+     time: node.time,
+     finalNode: node,
+   }
+diff --git a/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts b/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts
+index 53d42b00f5..3094069f0b 100644
+--- a/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts
++++ b/packages/client/ui-chat/tests/conversation-node-definitions.client.spec.ts
+@@ -780,6 +780,11 @@ describe('built-in conversation node Definitions', () => {
+         { kind: 'reasoning', text: 'thinking' },
+         { kind: 'tool-call', callId: 'call-1', name: '', argsRaw: '{"x":1}' },
+       ],
++      reasoningTimings: [
++        null,
++        { startedTime: 1_700_000_000_007, finishedTime: 1_700_000_000_010 },
++        null,
++      ],
+     })
+ 
+     for (const value of [scalar, packed]) {
+diff --git a/packages/client/ui-chat/tests/reasoning-row.client.spec.tsx b/packages/client/ui-chat/tests/reasoning-row.client.spec.tsx
+index 3867d2a14c..58eed8fdfe 100644
+--- a/packages/client/ui-chat/tests/reasoning-row.client.spec.tsx
++++ b/packages/client/ui-chat/tests/reasoning-row.client.spec.tsx
+@@ -1,6 +1,6 @@
+ // @vitest-environment jsdom
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+-import { cleanup, fireEvent, render } from '@testing-library/react'
++import { act, cleanup, fireEvent, render } from '@testing-library/react'
+ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+ import { zh } from '../src/client/locale.ts'
+@@ -18,6 +18,8 @@ function flushAnimationFrames(count: number): void {
+ }
+ 
+ beforeEach(() => {
++  vi.useFakeTimers()
++  vi.setSystemTime(10_000)
+   nextAnimationFrameId = 1
+   animationFrames = new Map()
+   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+@@ -34,12 +36,43 @@ beforeEach(() => {
+ afterEach(() => {
+   cleanup()
+   vi.unstubAllGlobals()
++  vi.useRealTimers()
+ })
+ 
+ const t = makeTranslate(zh, commonZh)
+ const renderMessageImages: AssistantMarkdownProps['renderMessageImages'] = () => null
+ 
+ describe('ReasoningRow', () => {
++  it('shows a live reasoning timer and freezes it at the streamed completion time', () => {
++    const view = render(
++      <AssistantMarkdown
++        t={t}
++        blocks={[{ kind: 'reasoning', text: 'Inspect the session' }]}
++        reasoningTimings={[{ startedTime: 8_000 }]}
++        streaming
++        renderMessageImages={renderMessageImages}
++      />,
++    )
++    expect(view.getByText('2s')).toBeTruthy()
++    expect(view.container.querySelector('[data-reasoning-activity]')).not.toBeNull()
++
++    act(() => { vi.advanceTimersByTime(1_000) })
++    expect(view.getByText('3s')).toBeTruthy()
++
++    view.rerender(
++      <AssistantMarkdown
++        t={t}
++        blocks={[{ kind: 'reasoning', text: 'Inspect the session' }]}
++        reasoningTimings={[{ startedTime: 8_000, finishedTime: 8_350 }]}
++        streaming={false}
++        renderMessageImages={renderMessageImages}
++      />,
++    )
++    expect(view.getByText('350ms')).toBeTruthy()
++    act(() => { vi.advanceTimersByTime(5_000) })
++    expect(view.getByText('350ms')).toBeTruthy()
++  })
++
+   it('follows the latest streaming line, scrolls to its end, then restores the settled first line', () => {
+     const view = render(
+       <AssistantMarkdown
+-- 
+2.51.2.windows.1
+

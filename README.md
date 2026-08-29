@@ -25,6 +25,7 @@ dsharness/
 │   │   ├── src/              # TypeScript Host、导入事务与 Client 源码
 │   │   ├── lib/              # tsc 生成的运行时产物
 │   │   └── test/             # TypeScript Host 事务与 Client DOM 回归
+│   ├── shadow-billing/       # 扩展 → Billing：本地 Token 用量与影子计费（DSH-032）
 │   └── better-sidebar-smooth/ # better-sidebar 会话头动画修复（仅 client）
 ├── dev/
 │   ├── install-dsh-source.ps1     # 拉取、打补丁、构建并注册 dsh
@@ -111,10 +112,12 @@ pnpm run verify
 
 当前锁定官方标签 `dsh-v0.1.2-alpha.1` 提交
 `cd5ef8148158c3a752a658978873241fdf8e2bbc`，官方基线 tree 为
-`a712eec535b48badc4fefb4df5176a7002e4280b`。本仓库用一个可校验的 DSH-034
-补丁把本地视觉桥、原生附件引用、`tool/progress` 持久进度和 `Look` 展示迁移到
-alpha1 的 Gateway/Session Controller/ACP 架构，最终源码 tree 为
-`d6f183595a69d77b6d08b4b980825147bf8dd4c2`。旧 RC2 补丁文件仍保留作历史审计，
+`a712eec535b48badc4fefb4df5176a7002e4280b`。本仓库用可校验的补丁链把本地视觉桥、
+原生附件引用、`tool/progress` 持久进度和 `Look` 展示迁移到 alpha1 的
+Gateway/Session Controller/ACP 架构，并恢复工具从参数流开始计时的兼容语义；
+同时把工具耗时恢复为紧跟标题或摘要的内联布局，并恢复每个思考块从首个流式
+reasoning 增量开始、在下一类事件到达时冻结的读秒。最终源码 tree 为
+`e5f02d2d0e69c48722f817b12274356c2136e40a`。旧 RC2 补丁文件仍保留作历史审计，
 但不再放入 active lock chain，避免把已删除的 Host apiproxy 代码误套到 alpha1。
 alpha1 自带原生图片上传、附件持久化和模型能力准入；视觉桥默认启用并通过 DP Gateway
 调用 `Qwen3.8-Flash-Next-FP8`，不直连视觉模型机。
