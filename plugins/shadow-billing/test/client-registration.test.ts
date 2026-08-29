@@ -18,6 +18,11 @@ test('registers Billing only inside Extensions while preserving pricing settings
 	assert.match(clientBundle, /调用明细/);
 	assert.match(clientBundle, /bl-chartTooltip/);
 	assert.match(clientBundle, /data-billing-bar/);
+	assert.match(clientBundle, /deepseek-v4-flash-0731/);
+	assert.match(clientBundle, /bl-modelBrandGeneric/);
+	assert.match(clientBundle, /['"]aria-label['"]:\s*provider/);
+	assert.match(clientBundle, /bl-modelBrand svg/);
+	assert.doesNotMatch(clientBundle, /kind\.slice\(0,\s*1\)/);
 	assert.match(clientBundle, /¥1\.50/);
 	assert.match(clientBundle, /¥4\.50/);
 });
