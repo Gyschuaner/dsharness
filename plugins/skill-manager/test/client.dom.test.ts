@@ -337,6 +337,9 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 	assert.match(pluginCss, /\.sk-root\{[^}]*max-width:980px/, 'Skill uses the shared centered page width');
 	assert.match(pluginCss, /\.sk-tabs\{height:40px/, 'Skill uses the shared tab rhythm');
 	assert.match(pluginCss, /\.sk-row\{box-sizing:border-box;min-height:72px/, 'Skill uses the shared flat row rhythm');
+	assert.match(pluginCss, /\.sk-marketRow\{min-height:82px/, 'Skill market rows keep enough vertical breathing room');
+	assert.match(pluginCss, /\.sk-marketFoot\{display:grid;grid-template-columns:/, 'Skill market actions use a balanced footer grid');
+	assert.match(pluginCss, /\.sk-githubButton\{[^}]*background:#24292f/, 'GitHub action uses the GitHub button treatment');
 	assert.match(pluginCss, /\.sk-drawer\{position:fixed;top:66px/, 'Skill uses the shared fixed drawer geometry');
 	assert.equal(h.dom.window.document.querySelector('.sk-rowDesc').textContent, '列表只保留第一句话。');
 	assert.equal([...h.dom.window.document.querySelectorAll('.sk-row .sk-badge')].filter((item) => item.textContent === '未启用').length, 0, 'disabled state is communicated by the switch instead of a repeated badge');
@@ -493,6 +496,14 @@ test('Skill market uses the shared page chrome and opens a safe repository detai
 	assert.ok(h.dom.window.document.querySelector('.sk-marketDrawer'));
 	assert.ok(h.dom.window.document.body.textContent.includes('自动同步可信 Skill Registry'), 'discovery help is available in the item drawer');
 	assert.ok(h.dom.window.document.body.textContent.includes('安装校验'));
+	const githubLink = h.dom.window.document.querySelector('.sk-githubButton');
+	assert.ok(githubLink, 'drawer exposes a dedicated GitHub action');
+	assert.equal(githubLink.getAttribute('href'), 'https://github.com/acme/demo');
+	assert.equal(githubLink.getAttribute('target'), '_blank');
+	assert.ok(githubLink.querySelector('.sk-githubMark'), 'GitHub action has a GitHub mark');
+	assert.ok(githubLink.querySelector('.sk-githubArrow'), 'GitHub action has a dedicated larger external arrow');
+	assert.ok(githubLink.textContent.includes('在 GitHub 中查看'));
+	assert.ok(h.dom.window.document.querySelector('.sk-marketInstallBtn'), 'install action stays visually separate');
 });
 
 test('Skill market installs an arbitrary GitHub Skill through inspect, preview, and confirm', async (t) => {
