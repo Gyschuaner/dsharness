@@ -335,23 +335,24 @@ test('marketplace fetches Registry without GitHub detail, then caches the GitHub
 	const fetch = async (url) => {
 		calls += 1;
 		if (url.includes('/plugin-registry.json')) return response({ schemaVersion: 1, generatedAt: '2026-08-24T03:00:00Z', items: [] });
+		if (url.includes('/-/v1/search')) return response({ objects: [], total: 0 });
 		if (url.endsWith('/releases/latest')) return response({ tag_name: 'v0.15.2', html_url: 'https://github.com/release' });
 		if (url.includes('raw.githubusercontent.com')) return response({ name: 'dsh-better-sidebar', version: '0.15.2', main: './lib/index.js', exports: { './client': './lib/client.js' }, engines: { dsh: '>=0.0.1' }, dsh: { client: { platform: 'web' } } });
 		return response({ html_url: 'https://github.com/omdsh-dev/DSH-better-sidebar', description: 'Better sidebar.', owner: { login: 'omdsh-dev', avatar_url: 'http://evil.example/avatar.png' }, stargazers_count: 2710, forks_count: 215, language: 'TypeScript', license: { spdx_id: 'MIT' }, pushed_at: '2026-08-24T00:00:00Z', topics: ['deepseek-harness'], default_branch: 'main' });
 	};
 	const manager = createPluginManager({ profileDir: f.profile, registryUrl: 'https://registry.example/plugin-registry.json', deps: { fetch: fetch as any } });
 	const market = await manager.call('marketplace');
-	assert.equal(calls, 1);
+	assert.equal(calls, 2);
 	assert.equal(market.items.length, 3);
 	assert.equal(market.registry.status, 'fresh');
-	assert.deepEqual(market.page, { offset: 0, limit: 3, total: 3, hasMore: false, nextCursor: null });
+	assert.deepEqual(market.page, { offset: 0, limit: 24, total: 0, hasMore: false, nextCursor: null });
 	assert.equal(market.items[0].status, 'update-available');
 	assert.equal(market.items[0].iconUrl, 'https://github.com/omdsh-dev.png?size=64');
 	assert.equal(market.items[0].iconSource, 'github-avatar');
 	assert.equal(market.items[0].marketSource, 'featured');
 	assert.equal(market.items[0].installable, true);
 	const detail = await manager.call('marketplace.detail', { id: 'omdsh-dev/DSH-better-sidebar' });
-	assert.equal(calls, 4);
+	assert.equal(calls, 5);
 	assert.equal(detail.status, 'update-available');
 	assert.equal(detail.iconUrl, 'https://github.com/omdsh-dev.png?size=64');
 	assert.equal(detail.iconSource, 'github-avatar');
@@ -362,7 +363,7 @@ test('marketplace fetches Registry without GitHub detail, then caches the GitHub
 	installedManifest.version = '0.15.2';
 	await json(installedManifestPath, installedManifest);
 	const cached = await manager.call('marketplace.detail', { id: 'omdsh-dev/DSH-better-sidebar' });
-	assert.equal(calls, 4);
+	assert.equal(calls, 5);
 	assert.equal(cached.cached, true);
 	assert.equal(cached.installedVersion, '0.15.2');
 	assert.equal(cached.status, 'installed');
@@ -382,6 +383,7 @@ test('Registry entries are validated, deduplicated and kept view-only with stale
 		],
 	};
 	const fetch = async (url) => {
+		if (url.includes('/-/v1/search')) return response({ objects: [], total: 0 });
 		if (url.includes('/plugin-registry.json')) {
 			registryCalls += 1;
 			if (fail) throw new Error('offline');
@@ -399,7 +401,7 @@ test('Registry entries are validated, deduplicated and kept view-only with stale
 	assert.equal(discovered.installable, false);
 	await assert.rejects(
 		manager.call('marketplace.install', { id: 'SiriLee/dsh-rewind' }),
-		(error: unknown) => error instanceof ApiError && error.code === 'MARKET_REGISTRY_READ_ONLY',
+		(error: unknown) => error instanceof ApiError && error.code === 'MARKET_ENTRY_NOT_INSTALLABLE',
 	);
 
 	fail = true;
@@ -408,6 +410,36 @@ test('Registry entries are validated, deduplicated and kept view-only with stale
 	assert.equal(stale.registry.status, 'stale');
 	assert.match(stale.registry.warning, /Registry 请求失败：offline/);
 	assert.equal(stale.items.length, 4, 'stale cache keeps the last valid discovery list');
+});
+
+test('npm discovery exposes only packages with a valid DSH manifest and pins the install version', async () => {
+	const f = await fixture();
+	const fetch = async (url) => {
+		if (url.includes('/plugin-registry.json')) return response({ schemaVersion: 1, generatedAt: '2026-08-29T00:00:00Z', items: [] });
+		if (url.includes('/-/v1/search')) return response({ objects: [
+			{ package: { name: 'dsh-valid-market-plugin' } },
+			{ package: { name: 'ordinary-package' } },
+		], total: 2 });
+		if (url.includes('registry.npmjs.org/dsh-valid-market-plugin')) return response({ name: 'dsh-valid-market-plugin', version: '1.4.2', description: 'Valid remote plugin.', repository: { url: 'https://github.com/example/dsh-valid-market-plugin.git' }, main: './lib/index.js', exports: { './client': './lib/client.js' }, engines: { dsh: '>=0.1.2' }, dsh: { client: { platform: 'web' } } });
+		if (url.includes('registry.npmjs.org/ordinary-package')) return response({ name: 'ordinary-package', version: '9.0.0', repository: { url: 'https://github.com/example/ordinary-package.git' } });
+		if (url.endsWith('/releases/latest')) return response({}, 404);
+		if (url.includes('raw.githubusercontent.com/example/dsh-valid-market-plugin')) return response({ name: 'monorepo-root', version: '0.0.0' });
+		if (url.includes('api.github.com/repos/example/dsh-valid-market-plugin')) return response({ html_url: 'https://github.com/example/dsh-valid-market-plugin', description: 'Repository root differs from the published npm package.', owner: { login: 'example' }, default_branch: 'main' });
+		throw new Error(`unexpected URL ${url}`);
+	};
+	const manager = createPluginManager({ profileDir: f.profile, registryUrl: 'https://registry.example/plugin-registry.json', deps: { fetch: fetch as any } });
+	const market = await manager.call('marketplace', { query: 'market', limit: 12 });
+	const npmItems = market.items.filter((item) => item.marketSource === 'npm');
+	assert.equal(npmItems.length, 1);
+	assert.equal(npmItems[0].id, 'npm:dsh-valid-market-plugin');
+	assert.equal(npmItems[0].latestVersion, '1.4.2');
+	assert.equal(npmItems[0].installable, true);
+	const detail = await manager.call('marketplace.detail', { id: 'npm:dsh-valid-market-plugin' });
+	assert.equal(detail.installable, true);
+	assert.equal(detail.latestVersion, '1.4.2');
+	assert.equal(detail.manifest.valid, true, 'the exact npm manifest remains authoritative when the GitHub root is a monorepo manifest');
+	assert.equal(detail.manifest.packageName, 'dsh-valid-market-plugin');
+	assert.equal(detail.manifest.clientEntry, './lib/client.js');
 });
 
 test('Registry schema rejects unsafe or malformed data', () => {

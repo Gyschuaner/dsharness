@@ -537,6 +537,7 @@ type ApiPayload = Record<string, DynamicValue>;
 				var [loaded, setLoaded] = React.useState(false);
 				var [loading, setLoading] = React.useState(false);
 				var [error, setError] = React.useState<string | null>(null);
+				var [marketWarning, setMarketWarning] = React.useState<string | null>(null);
 				var [query, setQuery] = React.useState('');
 				var [selected, setSelected] = React.useState<DynamicValue>(null);
 				var [detail, setDetail] = React.useState<DynamicValue>(null);
@@ -562,6 +563,7 @@ type ApiPayload = Record<string, DynamicValue>;
 						function (value: DynamicValue) {
 							var next = Array.isArray(value && value.items) ? value.items : [];
 							setItems(next);
+							setMarketWarning(value && value.warning ? String(value.warning) : null);
 							setLoaded(true);
 							setSelected(function (current: DynamicValue) { return current ? (next.find(function (item: DynamicValue) { return item.id === current.id; }) || current) : null; });
 						},
@@ -688,7 +690,8 @@ type ApiPayload = Record<string, DynamicValue>;
 						h('button', { type: 'button', className: 'sk-chip', disabled: project === null, onClick: function () { setGithubOpen(true); setGithubError(null); } }, h(P.IconPlusOutline16), '从 GitHub 安装'),
 						h('button', { type: 'button', className: 'sk-chip', disabled: loading, onClick: function () { setAttempt(function (value: DynamicValue) { return value + 1; }); } }, h(P.IconRefreshOutline16), loading ? '刷新中…' : '刷新')
 					),
-					h('p', { className: 'sk-marketHelper' }, '精选或任意公开 GitHub 仓库 · 安装阶段不执行第三方代码；Skill 被调用后仍可能请求执行仓库脚本，并受 Agent 权限与审批约束'),
+					h('p', { className: 'sk-marketHelper' }, '自动同步可信 Skill Registry，也支持任意公开 GitHub 仓库 · 安装阶段不执行第三方代码'),
+					marketWarning ? h('p', { className: 'sk-marketNotice', role: 'status' }, '远程 Registry 暂时不可用，正在显示可用缓存和精选条目：' + marketWarning) : null,
 					message ? h('p', { className: 'sk-marketNotice', role: 'status' }, message) : null,
 					error ? h('div', { className: 'sk-marketLoadError', role: 'alert' }, h('p', { className: 'sk-error' }, '加载 Skill 市场失败：' + error), h(Button, { variant: 'outline', onClick: function () { setAttempt(function (value: DynamicValue) { return value + 1; }); } }, '重试')) : null,
 					h('div', { className: 'sk-marketList', 'data-testid': 'skill-market-list' },
@@ -696,7 +699,7 @@ type ApiPayload = Record<string, DynamicValue>;
 						!loading && visible.length === 0 ? h('p', { className: 'sk-empty' }, '没有匹配的 Skill。') : null,
 						visible.map(function (item: DynamicValue) {
 							return h('button', { type: 'button', key: item.id, className: 'sk-marketRow' + (selected && selected.id === item.id ? ' sk-marketRowActive' : ''), onClick: function () { openItem(item); } },
-								h('span', { className: 'sk-marketMain' }, h(MarketIcon, { src: item.iconUrl }), h('span', { className: 'sk-marketCopy' }, h('span', { className: 'sk-marketTitle' }, item.name), h('span', { className: 'sk-marketDesc' }, item.description), h('span', { className: 'sk-marketMeta' }, item.repository, item.license ? ' · ' + item.license : ''))),
+								h('span', { className: 'sk-marketMain' }, h(MarketIcon, { src: item.iconUrl }), h('span', { className: 'sk-marketCopy' }, h('span', { className: 'sk-marketTitle' }, item.name), h('span', { className: 'sk-marketDesc' }, item.description), h('span', { className: 'sk-marketMeta' }, item.marketSource === 'trusted-registry' ? '可信 Registry · ' : '精选 · ', item.repository, item.license ? ' · ' + item.license : ''))),
 								h('span', { className: 'sk-marketSide' }, h('span', { className: 'sk-marketStatus sk-marketStatus-' + item.status }, marketStatusLabel(item.status)), h(P.IconChevronRightOutline14))
 							);
 						})

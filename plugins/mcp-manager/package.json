@@ -1,7 +1,7 @@
 {
   "name": "dsh-mcp-manager",
-  "version": "0.1.1",
-  "description": "DeepSeek Harness MCP server manager and curated MCP marketplace.",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness MCP server manager with official Registry discovery and safe disabled-config installs.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

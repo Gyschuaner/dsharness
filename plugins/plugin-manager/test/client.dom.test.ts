@@ -344,8 +344,8 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon').length, 2);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketFallback').length, 1);
 	assert.match(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-marketIcon').getAttribute('src') || '', /^https:\/\//);
-	assert.ok(h.dom.window.document.body.textContent.includes('精选自 GitHub · Registry 只读发现 · 安装前校验 DSH 插件清单'));
-	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-rowMeta').length, 0, 'market home omits metadata columns');
+	assert.ok(h.dom.window.document.body.textContent.includes('自动搜索 npm 与 DSH Registry'));
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-rowMeta').length, 3, 'market home identifies each discovery source');
 
 	const remoteImages = h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon');
 	await act(async () => { remoteImages[1].dispatchEvent(new h.dom.window.Event('error', { bubbles: false })); });
@@ -371,7 +371,7 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	assert.ok(h.dom.window.document.querySelector('.ext-page'), 'Esc closes only the inner drawer');
 });
 
-test('marketplace switches between featured and Registry discovery sources', async (t) => {
+test('marketplace unifies featured, DSH Registry, and npm discovery sources', async (t) => {
 	const market = [
 		{ id: 'omdsh-dev/DSH-better-sidebar', repository: 'omdsh-dev/DSH-better-sidebar', description: '精选插件。', iconUrl: 'https://github.com/omdsh-dev.png?size=64', iconSource: 'github-avatar', marketSource: 'featured', installable: true, status: 'not-installed', installedVersion: null },
 		{ id: 'SiriLee/dsh-rewind', repository: 'SiriLee/dsh-rewind', description: '会话回退插件。', iconUrl: 'https://github.com/SiriLee.png?size=64', iconSource: 'github-avatar', marketSource: 'registry', installable: false, status: 'not-installed', installedVersion: null },
@@ -391,17 +391,14 @@ test('marketplace switches between featured and Registry discovery sources', asy
 	await h.openPlugin();
 	await h.click(h.button('插件市场'));
 	await h.flush();
-	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 1);
+	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 2);
 	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-rowTitle').textContent, 'omdsh-dev/DSH-better-sidebar');
 	assert.ok(h.dom.window.document.body.textContent.includes('Registry 已更新'));
 
-	await h.click(h.button('发现'));
-	await h.flush();
-	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 1);
-	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-rowTitle').textContent, 'SiriLee/dsh-rewind');
-	assert.equal(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-status').textContent, '仅查看');
-
-	await h.click(h.dom.window.document.querySelector('[data-testid="market-list"] .pm-row'));
+	const rows = h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row');
+	assert.equal(rows[1].querySelector('.pm-rowTitle').textContent, 'SiriLee/dsh-rewind');
+	assert.equal(rows[1].querySelector('.pm-status').textContent, '仅查看');
+	await h.click(rows[1]);
 	await h.flush(); await h.flush();
 	assert.ok(calls.some((call) => call.op === 'marketplace.detail' && call.id === 'SiriLee/dsh-rewind'));
 	const installButton = h.dom.window.document.querySelector('.pm-drawerFoot button[disabled]');

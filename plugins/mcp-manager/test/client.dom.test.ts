@@ -255,13 +255,13 @@ test('market stays flat, uses received icons, opens metadata drawer, and install
 	const calls = [];
 	let installed = false;
 	const items = [
-		{ id: 'github/github-mcp-server', repository: 'github/github-mcp-server', description: "GitHub's official MCP Server", iconUrl: 'https://avatars.githubusercontent.com/u/9919', iconSource: 'github', installable: true, status: 'not-installed' },
-		{ id: 'awslabs/mcp', repository: 'awslabs/mcp', description: 'Open source MCP Servers for AWS', iconUrl: null, iconSource: 'generic', installable: false, status: 'not-installed' },
+		{ id: 'github/github-mcp-server', name: 'GitHub MCP Server', repository: 'github/github-mcp-server', repositoryUrl: 'https://github.com/github/github-mcp-server', registryName: 'io.github.github/github-mcp-server', version: '1.2.3', source: 'featured', description: "GitHub's official MCP Server", iconUrl: 'https://avatars.githubusercontent.com/u/9919', iconSource: 'github', installable: true, installReason: null, status: 'not-installed' },
+		{ id: 'awslabs/mcp', name: 'AWS Labs MCP', repository: 'awslabs/mcp', repositoryUrl: 'https://github.com/awslabs/mcp', registryName: null, version: null, source: 'featured', description: 'Open source MCP Servers for AWS', iconUrl: null, iconSource: 'generic', installable: false, installReason: '包含多个 Server', status: 'not-installed' },
 	];
 	const router = async (body) => {
 		calls.push(body);
 		if (body.op === 'list') return { apiVersion: 1, profile: 'web', connected: 0, servers: installed ? [server({ id: 'mcp-manager-github', serverName: 'github', enabled: false, status: 'disabled' })] : [] };
-		if (body.op === 'marketplace') return { apiVersion: 1, items: items.map((item) => item.id === 'github/github-mcp-server' && installed ? { ...item, status: 'installed' } : item) };
+		if (body.op === 'marketplace') return { apiVersion: 1, items: items.map((item) => item.id === 'github/github-mcp-server' && installed ? { ...item, status: 'installed' } : item), page: { limit: 24, nextCursor: null, hasMore: false } };
 		if (body.op === 'marketplace.detail') return { id: body.id, repository: body.id, url: 'https://github.com/' + body.id, description: "GitHub's official MCP Server", iconUrl: items[0].iconUrl, author: 'github', stars: 32445, forks: 4840, language: 'Go', license: 'MIT', lastPushedAt: '2026-08-21T00:00:00Z', topics: ['github', 'mcp', 'mcp-server'], latestVersion: 'v1.10.1', releasePublishedAt: '2026-08-20T00:00:00Z', releaseUrl: 'https://github.com/github/github-mcp-server/releases/tag/v1.10.1', installable: true, status: installed ? 'installed' : 'not-installed' };
 		if (body.op === 'marketplace.install') { installed = true; return { changed: true, installedDisabled: true, server: server({ enabled: false, status: 'disabled' }) }; }
 		throw new Error(`unexpected op ${body.op}`);
@@ -276,7 +276,7 @@ test('market stays flat, uses received icons, opens metadata drawer, and install
 	assert.ok(calls.some((call) => call.op === 'marketplace.detail'));
 	assert.ok(h.dom.window.document.body.textContent.includes('32,445 Stars · 4,840 Forks'));
 	assert.ok(h.dom.window.document.body.textContent.includes('v1.10.1'));
-	await h.click(h.button('安装')); await h.flush(); await h.flush();
+	await h.click(h.button('安装为停用配置')); await h.flush(); await h.flush();
 	assert.ok(calls.some((call) => call.op === 'marketplace.install'));
 	assert.ok(h.dom.window.document.body.textContent.includes('已安装为停用配置'));
 });

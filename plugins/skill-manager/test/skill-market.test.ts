@@ -124,7 +124,7 @@ test('marketplace: lists real repository metadata and previews a safe install', 
 	t.after(env.cleanup);
 	const listed = await env.api('marketplace', { cwd: env.project });
 	assert.equal(listed.status, 200);
-	assert.equal(listed.value.source, 'curated-github');
+	assert.equal(listed.value.source, 'featured+trusted-registries');
 	assert.equal(listed.value.items[0].repositoryUrl, 'https://github.com/acme/demo');
 	assert.equal(listed.value.items[0].status, 'not-installed');
 
@@ -139,6 +139,25 @@ test('marketplace: lists real repository metadata and previews a safe install', 
 	assert.equal(preview.value.canInstall, true);
 	assert.deepEqual(preview.value.incoming.files, ['references/guide.md', 'SKILL.md']);
 	assert.equal(preview.value.checks.thirdPartyCodeExecuted, false);
+});
+
+test('marketplace: synchronizes trusted remote Skill indexes and deduplicates featured entries', async () => {
+	const remote = makeRemote();
+	const fetch = async (url) => {
+		if (url.includes('/anthropics/skills/main/.claude-plugin/marketplace.json')) return responseJson({
+			plugins: [{ name: 'examples', description: 'Official examples.', skills: ['./skills/xlsx', './skills/new-example'] }],
+		});
+		return remote.fetch(url);
+	};
+	const market = internals.createMarketplace({ entries: [
+		remote.entry,
+		{ id: 'anthropics/skills#skills/xlsx', name: 'xlsx', repository: 'anthropics/skills', path: 'skills/xlsx', ref: 'main', description: 'Featured xlsx.', tags: ['Featured'], marketSource: 'featured' },
+	], fetch, logger: { warn() {} } });
+	const listed = await market.list(undefined, false);
+	assert.equal(listed.items.filter((item) => item.id === 'anthropics/skills#skills/xlsx').length, 1);
+	const discovered = listed.items.find((item) => item.id === 'anthropics/skills#skills/new-example');
+	assert.equal(discovered.marketSource, 'trusted-registry');
+	assert.equal(discovered.status, 'project-required');
 });
 
 test('marketplace: installs disabled, records provenance, and detects updates', async (t) => {

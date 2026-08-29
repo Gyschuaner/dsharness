@@ -62,11 +62,22 @@ interface McpDraft {
 }
 interface McpMarketItem {
     id: string;
-    repository: string;
+    name: string;
+    repository: string | null;
+    repositoryUrl: string;
+    registryName: string | null;
+    version: string | null;
     description: string;
     iconUrl: string | null;
+    source: 'featured' | 'mcp-registry';
     installable: boolean;
+    installReason: string | null;
     status: 'installed' | 'not-installed';
+}
+interface McpMarketPage {
+    limit: number;
+    nextCursor: string | null;
+    hasMore: boolean;
 }
 interface McpMarketDetail {
     url?: string;
@@ -83,6 +94,8 @@ interface McpMarketDetail {
     releasePublishedAt?: string | null;
     releaseUrl?: string | null;
     metadataError?: string | null;
+    installReason?: string | null;
+    installable?: boolean;
     stale?: boolean;
 }
 interface McpApi {
@@ -92,8 +105,13 @@ interface McpApi {
     }>;
     call(op: 'marketplace', payload: {
         force: boolean;
+        query?: string;
+        cursor?: string;
+        limit?: number;
     }): Promise<{
         items: McpMarketItem[];
+        page: McpMarketPage;
+        warning?: string | null;
     }>;
     call(op: 'marketplace.detail', payload: {
         id: string;

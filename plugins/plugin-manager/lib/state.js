@@ -450,11 +450,34 @@ function validateRepository(value) {
     return String(value);
 }
 function githubHeaders() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
     return {
         accept: 'application/vnd.github+json',
-        'user-agent': 'dsh-plugin-manager/0.1',
+        'user-agent': 'dsh-plugin-manager/0.3',
         'x-github-api-version': '2022-11-28',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
     };
+}
+async function fetchRemoteJson(url, deps, label) {
+    const fetchImpl = deps.fetch || globalThis.fetch;
+    if (typeof fetchImpl !== 'function')
+        throw new ApiError(503, '当前运行时不支持网络请求', 'FETCH_UNAVAILABLE');
+    let response;
+    try {
+        response = await fetchImpl(url, {
+            headers: { accept: 'application/json', 'user-agent': 'dsh-plugin-manager/0.3' },
+            signal: AbortSignal.timeout(deps.githubTimeoutMs || 8000),
+        });
+    }
+    catch (error) {
+        throw new ApiError(503, `${label} 请求失败：${error instanceof Error ? error.message : String(error)}`, 'REMOTE_UNAVAILABLE');
+    }
+    if (!response.ok)
+        throw new ApiError(503, `${label} 返回 ${response.status}`, 'REMOTE_RESPONSE_ERROR');
+    const length = Number(response.headers?.get?.('content-length') || 0);
+    if (Number.isFinite(length) && length > 5 * 1024 * 1024)
+        throw new ApiError(413, `${label} 响应过大`, 'REMOTE_RESPONSE_TOO_LARGE');
+    return response.json();
 }
 async function fetchJson(url, deps, optional = false) {
     const fetchImpl = deps.fetch || globalThis.fetch;
@@ -569,7 +592,16 @@ async function fetchGithubDetail(entry, deps) {
     const ownerIconUrl = safeOptionalIconUrl(owner.avatar_url);
     const iconUrl = ownerIconUrl || githubAvatarUrl(entry.repository);
     const license = isRecord(repo.license) ? repo.license : {};
-    const dshManifest = isDshPluginManifest(pkg) ? pkg : null;
+    const dshManifest = isDshPluginManifest(pkg) && (!entry.packageName || pkg.name === entry.packageName) ? pkg : null;
+    const manifest = dshManifest ? {
+        valid: true,
+        packageName: dshManifest.name || entry.packageName,
+        version: dshManifest.version || null,
+        dshRequirement: dshManifest.engines?.dsh || dshManifest.peerDependencies?.['@deepseek-ai/dsh-agent'] || null,
+        hostEntry: typeof dshManifest.main === 'string' ? dshManifest.main : null,
+        clientEntry: exportClientEntry(dshManifest),
+        bundlePatch: dshManifest.dsh.bundle?.patch || null,
+    } : entry.verifiedManifest || { valid: false };
     return {
         id: entry.id,
         repository: entry.repository,
@@ -584,17 +616,9 @@ async function fetchGithubDetail(entry, deps) {
         license: typeof license.spdx_id === 'string' ? license.spdx_id : null,
         lastPushedAt: typeof repo.pushed_at === 'string' ? repo.pushed_at : null,
         topics: Array.isArray(repo.topics) ? repo.topics.filter((topic) => typeof topic === 'string').slice(0, 8) : [],
-        latestVersion: release && typeof release.tag_name === 'string' ? release.tag_name : typeof pkg?.version === 'string' ? pkg.version : null,
+        latestVersion: entry.verifiedManifest?.version || (release && typeof release.tag_name === 'string' ? release.tag_name : typeof pkg?.version === 'string' ? pkg.version : null),
         releaseUrl: release && typeof release.html_url === 'string' ? release.html_url : null,
-        manifest: dshManifest ? {
-            valid: true,
-            packageName: dshManifest.name || entry.packageName,
-            version: dshManifest.version || null,
-            dshRequirement: dshManifest.engines?.dsh || dshManifest.peerDependencies?.['@deepseek-ai/dsh-agent'] || null,
-            hostEntry: typeof dshManifest.main === 'string' ? dshManifest.main : null,
-            clientEntry: exportClientEntry(dshManifest),
-            bundlePatch: dshManifest.dsh.bundle?.patch || null,
-        } : { valid: false },
+        manifest,
     };
 }
 export function validateImportSource(source) {
@@ -753,9 +777,13 @@ export function createPluginManager(options = {}) {
     const deps = options.deps || {};
     const detailCache = new Map();
     const registryUrl = validateRegistryUrl(options.registryUrl || process.env.DSH_PLUGIN_REGISTRY_URL || DEFAULT_REGISTRY_URL);
+    const npmRegistryUrl = validateRegistryUrl(options.npmRegistryUrl || process.env.DSH_PLUGIN_NPM_REGISTRY_URL || 'https://registry.npmjs.org/').replace(/\/$/, '');
+    const npmSearchUrl = validateRegistryUrl(options.npmSearchUrl || process.env.DSH_PLUGIN_NPM_SEARCH_URL || 'https://registry.npmjs.org/-/v1/search');
     const registryCacheMs = options.registryCacheMs ?? 10 * 60 * 1000;
     let registryCache = null;
     let registryRequest = null;
+    const npmEntryCache = new Map();
+    const npmDiscoveredEntries = new Map();
     let mutationTail = Promise.resolve();
     function enqueueMutation(work) {
         const run = mutationTail.then(work, work);
@@ -834,6 +862,82 @@ export function createPluginManager(options = {}) {
         });
         return registryRequest;
     }
+    async function npmEntry(packageName, id = `npm:${packageName}`, force = false) {
+        if (!PACKAGE_NAME_RE.test(packageName))
+            return null;
+        const hit = npmEntryCache.get(packageName);
+        if (!force && hit && Date.now() - hit.at < registryCacheMs) {
+            const entry = { ...hit.entry, id };
+            npmDiscoveredEntries.set(id, entry);
+            return entry;
+        }
+        const value = await fetchRemoteJson(`${npmRegistryUrl}/${encodeURIComponent(packageName)}/latest`, deps, 'npm Registry');
+        if (!isDshPluginManifest(value) || value.name !== packageName || typeof value.version !== 'string' || value.version.trim() === '')
+            return null;
+        const repository = repositorySlug(value.repository);
+        if (repository === null)
+            return null;
+        const entry = {
+            id,
+            repository,
+            packageName,
+            installSource: `${packageName}@${value.version}`,
+            latestHint: value.version,
+            description: firstSentence(value.description) || `${packageName} DSH 插件`,
+            verifiedManifest: {
+                valid: true,
+                packageName,
+                version: value.version,
+                dshRequirement: value.engines?.dsh || value.peerDependencies?.['@deepseek-ai/dsh-agent'] || null,
+                hostEntry: typeof value.main === 'string' ? value.main : null,
+                clientEntry: exportClientEntry(value),
+                bundlePatch: value.dsh.bundle?.patch || null,
+            },
+        };
+        npmEntryCache.set(packageName, { at: Date.now(), entry: { ...entry, id: `npm:${packageName}` } });
+        npmDiscoveredEntries.set(id, entry);
+        return entry;
+    }
+    async function npmMarketplacePage(query, cursor, limit, force = false) {
+        const offset = cursor === '' ? 0 : Number(cursor);
+        if (!Number.isInteger(offset) || offset < 0 || offset > 10_000)
+            throw new ApiError(400, 'Plugin 市场分页游标无效', 'MARKET_CURSOR_INVALID');
+        const params = new URLSearchParams({
+            text: [query, 'keywords:deepseek-harness'].filter(Boolean).join(' '),
+            size: String(limit),
+            from: String(offset),
+        });
+        const value = await fetchRemoteJson(`${npmSearchUrl}?${params.toString()}`, deps, 'npm 搜索');
+        const document = isRecord(value) ? value : {};
+        const rows = Array.isArray(document.objects) ? document.objects : [];
+        const entries = (await Promise.all(rows.map(async (row) => {
+            const pkg = isRecord(row) && isRecord(row.package) ? row.package : {};
+            const name = typeof pkg.name === 'string' ? pkg.name : '';
+            if (!PACKAGE_NAME_RE.test(name))
+                return null;
+            try {
+                return await npmEntry(name, `npm:${name}`, force);
+            }
+            catch {
+                return null;
+            }
+        }))).filter((entry) => entry !== null);
+        const total = Number.isFinite(document.total) ? Number(document.total) : offset + rows.length;
+        const next = offset + limit < total ? String(offset + limit) : null;
+        return { entries, total, nextCursor: next };
+    }
+    async function verifiedRegistryEntry(item, force = false) {
+        const base = registryEntry(item);
+        if (item.packageName === null)
+            return base;
+        try {
+            const verified = await npmEntry(item.packageName, item.id, force);
+            return verified ? { ...verified, description: item.description || verified.description, iconUrl: item.iconUrl } : base;
+        }
+        catch {
+            return base;
+        }
+    }
     function registryEntry(item) {
         const entry = {
             id: item.id,
@@ -845,45 +949,88 @@ export function createPluginManager(options = {}) {
             return Object.assign(entry, { latestHint: item.latestHint });
         return entry;
     }
-    function mergeMarketplaceEntries(document) {
-        const result = MARKETPLACE.map((entry) => ({ entry, marketSource: 'featured' }));
-        const seen = new Set(result.map(({ entry }) => entry.repository.toLowerCase()));
-        for (const item of document?.items || []) {
-            const key = item.repository.toLowerCase();
-            if (seen.has(key))
-                continue;
-            seen.add(key);
-            result.push({ entry: registryEntry(item), marketSource: 'registry' });
-        }
-        return result;
-    }
-    async function resolveMarketplaceEntry(id, cacheOnly = false) {
+    async function resolveMarketplaceEntry(id, force = false) {
         const featured = findMarketplaceEntry(id);
         if (featured)
             return { entry: featured, marketSource: 'featured' };
-        const registry = cacheOnly && registryCache
-            ? { document: registryCache.document, status: 'fresh', warning: null, generatedAt: registryCache.document.generatedAt }
-            : await readRegistry();
+        if (id.startsWith('npm:')) {
+            const discovered = npmDiscoveredEntries.get(id);
+            if (discovered && !force)
+                return { entry: discovered, marketSource: 'npm' };
+            const packageName = id.slice('npm:'.length);
+            const entry = await npmEntry(packageName, id, force);
+            if (!entry)
+                throw new ApiError(404, 'npm 包不是可识别的 DSH 插件', 'MARKET_ENTRY_NOT_FOUND');
+            return { entry, marketSource: 'npm' };
+        }
+        const cachedRegistryItem = !force ? registryCache?.document.items.find((candidate) => candidate.id === id || candidate.repository.toLowerCase() === id.toLowerCase()) : undefined;
+        if (cachedRegistryItem)
+            return { entry: await verifiedRegistryEntry(cachedRegistryItem, false), marketSource: 'registry' };
+        const registry = await readRegistry(force);
         const item = registry.document?.items.find((candidate) => candidate.id === id || candidate.repository.toLowerCase() === id.toLowerCase());
         if (!item)
             throw new ApiError(404, '市场中不存在这个插件', 'MARKET_ENTRY_NOT_FOUND');
-        return { entry: registryEntry(item), marketSource: 'registry' };
+        return { entry: await verifiedRegistryEntry(item, force), marketSource: 'registry' };
     }
-    async function marketplace() {
+    async function marketplace(input = {}) {
+        const query = String(input.query || '').trim();
+        if (query.length > 120)
+            throw new ApiError(400, '搜索词不能超过 120 个字符', 'MARKET_QUERY_INVALID');
+        const cursor = String(input.cursor || '').trim();
+        if (cursor.length > 20)
+            throw new ApiError(400, '分页游标无效', 'MARKET_CURSOR_INVALID');
+        const requestedLimit = Number(input.limit);
+        const limit = Number.isInteger(requestedLimit) ? Math.min(50, Math.max(5, requestedLimit)) : 24;
+        const force = input.force === true;
         const local = await listLocalPlugins(profileDir);
-        const registry = await readRegistry();
-        const entries = mergeMarketplaceEntries(registry.document);
+        const registry = await readRegistry(force);
+        let npmPage = { entries: [], total: 0, nextCursor: null };
+        let npmWarning = null;
+        try {
+            npmPage = await npmMarketplacePage(query, cursor, limit, force);
+        }
+        catch (error) {
+            npmWarning = error instanceof Error ? error.message : String(error);
+        }
+        const needle = query.toLowerCase();
+        const matches = (entry) => needle === '' || entry.repository.toLowerCase().includes(needle) || String(entry.packageName || '').toLowerCase().includes(needle) || entry.description.toLowerCase().includes(needle);
+        const entries = [];
+        if (cursor === '') {
+            for (const entry of MARKETPLACE.filter(matches))
+                entries.push({ entry, marketSource: 'featured' });
+            const registryEntries = await Promise.all((registry.document?.items || []).map((item) => verifiedRegistryEntry(item, force)));
+            for (const entry of registryEntries.filter(matches))
+                entries.push({ entry, marketSource: 'registry' });
+        }
+        for (const entry of npmPage.entries)
+            entries.push({ entry, marketSource: 'npm' });
+        const unique = [];
+        const seenRepositories = new Set();
+        const seenPackages = new Set();
+        for (const resolved of entries) {
+            const repositoryKey = resolved.entry.repository.toLowerCase();
+            const packageKey = String(resolved.entry.packageName || '').toLowerCase();
+            if (seenRepositories.has(repositoryKey) || (packageKey !== '' && seenPackages.has(packageKey)))
+                continue;
+            seenRepositories.add(repositoryKey);
+            if (packageKey !== '')
+                seenPackages.add(packageKey);
+            unique.push(resolved);
+        }
         return {
             apiVersion: API_VERSION,
+            source: 'featured+dsh-registry+npm-registry',
+            query,
+            warning: npmWarning,
             registry: {
                 status: registry.status,
                 generatedAt: registry.generatedAt,
                 warning: registry.warning,
             },
-            page: { offset: 0, limit: entries.length, total: entries.length, hasMore: false, nextCursor: null },
-            items: entries.map(({ entry, marketSource }) => {
+            page: { offset: cursor === '' ? 0 : Number(cursor), limit, total: npmPage.total, hasMore: npmPage.nextCursor !== null, nextCursor: npmPage.nextCursor },
+            items: unique.map(({ entry, marketSource }) => {
                 const registryIcon = safeOptionalIconUrl((registry.document?.items.find((item) => item.id === entry.id)?.iconUrl) || '');
-                const iconUrl = registryIcon || githubAvatarUrl(entry.repository);
+                const iconUrl = safeOptionalIconUrl(entry.iconUrl) || registryIcon || githubAvatarUrl(entry.repository);
                 return Object.assign({
                     id: entry.id,
                     repository: entry.repository,
@@ -892,12 +1039,13 @@ export function createPluginManager(options = {}) {
                     iconSource: registryIcon ? 'registry' : iconUrl ? 'github-avatar' : 'generic',
                     marketSource,
                     installable: Boolean(entry.installSource),
+                    latestVersion: entry.latestHint || null,
                 }, marketplaceStatus(entry, local));
             }),
         };
     }
     async function detail(id, force = false) {
-        const resolved = await resolveMarketplaceEntry(id);
+        const resolved = await resolveMarketplaceEntry(id, force);
         const entry = resolved.entry;
         const cached = detailCache.get(id);
         const maxAge = options.githubCacheMs || 5 * 60 * 1000;
@@ -913,10 +1061,33 @@ export function createPluginManager(options = {}) {
                 detailCache.set(id, { at: Date.now(), value });
             }
             catch (error) {
-                if (!cached)
+                if (cached) {
+                    value = cached.value;
+                    cacheState = { cached: true, stale: true, warning: error instanceof Error ? error.message : String(error) };
+                }
+                else if (entry.packageName && entry.installSource) {
+                    value = {
+                        id: entry.id,
+                        repository: entry.repository,
+                        iconUrl: githubAvatarUrl(entry.repository),
+                        iconSource: 'github-avatar',
+                        url: `https://github.com/${entry.repository}`,
+                        description: entry.description,
+                        author: entry.repository.split('/')[0] || null,
+                        stars: null,
+                        forks: null,
+                        language: null,
+                        license: null,
+                        lastPushedAt: null,
+                        topics: ['deepseek-harness'],
+                        latestVersion: entry.latestHint || null,
+                        releaseUrl: null,
+                        manifest: { valid: true, packageName: entry.packageName, version: entry.latestHint || null },
+                    };
+                    cacheState = { cached: false, stale: true, warning: error instanceof Error ? error.message : String(error) };
+                }
+                else
                     throw error;
-                value = cached.value;
-                cacheState = { cached: true, stale: true, warning: error instanceof Error ? error.message : String(error) };
             }
         }
         const local = await listLocalPlugins(profileDir);
@@ -965,9 +1136,9 @@ export function createPluginManager(options = {}) {
         });
     }
     async function installMarket(id) {
-        const resolved = await resolveMarketplaceEntry(String(id || ''), true);
+        const resolved = await resolveMarketplaceEntry(String(id || ''), false);
         if (!resolved.entry.installSource)
-            throw new ApiError(409, 'Registry 发现条目当前仅支持查看，请使用手动导入', 'MARKET_REGISTRY_READ_ONLY');
+            throw new ApiError(409, '远程条目未通过 DSH manifest 校验，请使用手动导入并自行审查', 'MARKET_ENTRY_NOT_INSTALLABLE');
         return importPlugin(resolved.entry.installSource);
     }
     return {
@@ -976,11 +1147,11 @@ export function createPluginManager(options = {}) {
         // Dynamic operation dispatch intentionally exposes heterogeneous JSON shapes.
         async call(op, body = {}) {
             switch (op) {
-                case 'capabilities': return { apiVersion: API_VERSION, features: ['local-list', 'toggle', 'import', 'marketplace', 'github-detail'] };
+                case 'capabilities': return { apiVersion: API_VERSION, features: ['local-list', 'toggle', 'import', 'marketplace', 'github-detail', 'npm-discovery', 'remote-search', 'cursor-pagination', 'manifest-gated-install'] };
                 case 'list': return snapshot();
                 case 'setEnabled': return setEnabled(body.name, body.enabled);
                 case 'import': return importPlugin(body.source);
-                case 'marketplace': return marketplace();
+                case 'marketplace': return marketplace(body);
                 case 'marketplace.detail': return detail(String(body.id || ''), body.force === true);
                 case 'marketplace.install': return installMarket(body.id);
                 default: throw new ApiError(400, `未知操作：${String(op)}`, 'OP_UNKNOWN');

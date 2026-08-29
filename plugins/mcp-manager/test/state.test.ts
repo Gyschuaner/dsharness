@@ -21,6 +21,7 @@ async function fixture(t, options: any = {}) {
 		profileDir,
 		env: options.env ?? {},
 		cacheTtlMs: options.cacheTtlMs,
+		registryUrl: options.registryUrl,
 		deps: {
 			inventory: options.inventory,
 			tools: options.tools,
@@ -193,6 +194,7 @@ test('market uses Registry icon first, GitHub avatar fallback, cache, and disabl
 	const calls = new Map();
 	const fetch = async (url) => {
 		calls.set(url, (calls.get(url) || 0) + 1);
+		if (url.includes('/v0.1/servers?')) return response({ servers: [], metadata: {} });
 		if (url.includes('/repos/github/github-mcp-server/releases/latest')) return response({ tag_name: 'v1.2.3', published_at: '2026-08-20T00:00:00Z', html_url: 'https://github.com/github/github-mcp-server/releases/tag/v1.2.3' });
 		if (url.includes('/repos/')) {
 			const repository = url.split('/repos/')[1];
@@ -235,6 +237,32 @@ test('market uses Registry icon first, GitHub avatar fallback, cache, and disabl
 		manager.call('marketplace.install', { id: 'awslabs/mcp' }),
 		(error) => (error as any).code === 'MARKET_NOT_INSTALLABLE',
 	);
+});
+
+test('official Registry search paginates and installs only uniquely inferred disabled configurations', async (t) => {
+	const remote = {
+		server: {
+			name: 'io.example/weather', title: 'Weather', version: '1.2.3', description: 'Weather data',
+			repository: { url: 'https://github.com/example/weather-mcp' },
+			remotes: [{ type: 'streamable-http', url: 'https://mcp.example.com/', headers: [{ name: 'Authorization', isRequired: true }] }],
+		},
+	};
+	const fetch = async (url) => {
+		if (url.includes('/v0.1/servers?')) return response({ servers: [remote], metadata: { nextCursor: 'page-2' } });
+		if (url.includes('/servers/io.example%2Fweather/versions/latest')) return response(remote);
+		if (url.includes('/repos/')) return response({}, 404);
+		return response({}, 404);
+	};
+	const { manager } = await fixture(t, { fetch, registryUrl: 'https://registry.example' });
+	const market = await manager.call('marketplace', { query: 'weather', limit: 12 });
+	assert.equal(market.items.length, 1);
+	assert.equal(market.items[0].source, 'mcp-registry');
+	assert.equal(market.items[0].installable, true);
+	assert.equal(market.page.nextCursor, 'page-2');
+	const installed = await manager.call('marketplace.install', { id: market.items[0].id });
+	assert.equal(installed.installedDisabled, true);
+	assert.equal(installed.server.transport, 'streamable-http');
+	assert.deepEqual(installed.server.requiredEnv, ['MCP_WEATHER_AUTHORIZATION']);
 });
 
 test('empty args serialize as an explicit empty list', async (t) => {

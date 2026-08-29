@@ -51,11 +51,12 @@ dsh plugin --profile web add <source> --ignore-scripts --reporter=append-only
 不经过 shell 拼接。安装后必须在依赖清单中检测到唯一变化，并校验该包包含 DSH 声明；
 校验不通过时通过官方 remove 命令回滚。
 
-市场首页分为“精选”和“发现”两个只读来源：精选列表仍来自仓库内的受控清单；发现列表
-来自版本化 `marketplace/plugin-registry.json`，由 Host 通过 HTTPS 读取并校验 schema、
-仓库名、描述和图标 URL。Registry 条目在 Phase 1 只允许查看，不改变现有安装流程。
-Registry 使用 10 分钟内存缓存，首次请求失败时降级到精选列表，已有成功数据时优先显示
-旧缓存并标记状态。列表图标使用 Registry 的可信 HTTPS URL 或受控
+市场首页把精选、版本化 DSH Registry 和 npm Registry 合并成一个可搜索列表。Host 使用
+npm 搜索分页发现候选后，逐个读取精确版本 manifest；只有 `package.json` 含合法 `dsh.client`、
+`dsh.bundle` 或 `dsh.plugin` 声明且能解析到 GitHub 仓库时才显示为可安装，并把安装来源锁定为
+`package@version`。DSH Registry 中声明了 `packageName` 的条目也执行相同校验；未通过者保持
+“仅查看”。Registry 使用 10 分钟内存缓存，远程失败时保留精选和最近成功数据。
+列表图标使用 Registry 的可信 HTTPS URL 或受控
 `owner/repository` 推导的 GitHub owner 头像，Client 加载失败时回退为通用 Plugin 图标。
 用户打开详情时，Host 才读取 GitHub Repository、latest release 与根目录 `package.json`，
 结果在内存缓存 5 分钟；超时、限流或离线时本地管理不受影响。
@@ -66,7 +67,8 @@ Registry 默认地址为：
 https://raw.githubusercontent.com/Gyschuaner/dsharness/main/marketplace/plugin-registry.json
 ```
 
-开发或测试可通过 Host 选项 `registryUrl` 或环境变量 `DSH_PLUGIN_REGISTRY_URL` 覆盖。
+开发或测试可通过 Host 选项 `registryUrl` / `npmRegistryUrl` / `npmSearchUrl`，或环境变量
+`DSH_PLUGIN_REGISTRY_URL` / `DSH_PLUGIN_NPM_REGISTRY_URL` / `DSH_PLUGIN_NPM_SEARCH_URL` 覆盖。
 本机 `http://localhost` / `127.0.0.1` 仅用于本地测试，生产地址必须使用 HTTPS。
 
 ## 安装到开发 profile

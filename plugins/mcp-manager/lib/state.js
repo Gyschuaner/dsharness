@@ -10,7 +10,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { MARKETPLACE, findMarketplaceEntry } from './marketplace.js';
+import { MARKETPLACE, findMarketplaceEntry, normalizeRegistryMarketplaceEntry } from './marketplace.js';
 export const API_VERSION = 1;
 export const SERVERS_START = '# mcp-manager:servers:start';
 export const SERVERS_END = '# mcp-manager:servers:end';
@@ -464,6 +464,9 @@ export function createMcpManager(options = {}) {
     const fetchImpl = deps.fetch || globalThis.fetch;
     const cache = new Map();
     const cacheTtlMs = options.cacheTtlMs || 10 * 60_000;
+    const registryBaseUrl = String(options.registryUrl || 'https://registry.modelcontextprotocol.io').replace(/\/$/, '');
+    const discoveredEntries = new Map();
+    const discoveredRecords = new Map();
     let mutation = Promise.resolve();
     async function readState() {
         const patch = await readText(patchPath, '');
@@ -510,18 +513,30 @@ export function createMcpManager(options = {}) {
         const timeout = globalThis.AbortSignal && typeof globalThis.AbortSignal.timeout === 'function'
             ? globalThis.AbortSignal.timeout(8_000)
             : undefined;
+        const headers = {
+            accept: 'application/vnd.github+json, application/json',
+            'user-agent': 'dsh-mcp-manager/0.2.0',
+        };
+        const githubToken = env.GITHUB_TOKEN || env.GH_TOKEN;
+        if (githubToken && url.startsWith('https://api.github.com/'))
+            headers.authorization = `Bearer ${githubToken}`;
         const response = await fetchImpl(url, {
-            headers: {
-                accept: 'application/vnd.github+json, application/json',
-                'user-agent': 'dsh-mcp-manager/0.1.0',
-            },
+            headers,
             ...(timeout ? { signal: timeout } : {}),
         });
         if (optional && response.status === 404)
             return null;
-        if (!response.ok)
-            throw new Error(`远程元数据请求失败（HTTP ${response.status}）`);
-        return response.json();
+        if (!response.ok) {
+            const remaining = response.headers?.get?.('x-ratelimit-remaining');
+            throw new Error(`远程元数据请求失败（HTTP ${response.status}${remaining === '0' ? '，GitHub API 已限流' : ''}）`);
+        }
+        const length = Number(response.headers?.get?.('content-length') || 0);
+        if (Number.isFinite(length) && length > 5 * 1024 * 1024)
+            throw new Error('远程元数据响应超过 5 MiB 上限');
+        const value = await response.json();
+        if (Buffer.byteLength(JSON.stringify(value), 'utf8') > 5 * 1024 * 1024)
+            throw new Error('远程元数据响应超过 5 MiB 上限');
+        return value;
     }
     async function cached(key, force, load) {
         const hit = cache.get(key);
@@ -539,6 +554,8 @@ export function createMcpManager(options = {}) {
         }
     }
     async function githubRepository(entry, force) {
+        if (entry.repository === null)
+            throw new Error('该 Registry 条目没有 GitHub 仓库');
         const url = `https://api.github.com/repos/${entry.repository}`;
         return cached(`github:${entry.id}`, force, async () => {
             const repo = plainObject(await requestJson(url), 'GitHub repository response');
@@ -547,7 +564,7 @@ export function createMcpManager(options = {}) {
             return {
                 url: typeof repo.html_url === 'string' ? repo.html_url : safeRepositoryUrl(entry.repository),
                 description: typeof repo.description === 'string' && repo.description.trim() ? repo.description.trim() : entry.description,
-                author: typeof owner.login === 'string' ? owner.login : entry.repository.split('/')[0] ?? null,
+                author: typeof owner.login === 'string' ? owner.login : entry.repository?.split('/')[0] ?? null,
                 iconUrl: safeOptionalIconUrl(owner.avatar_url),
                 stars: Number.isFinite(repo.stargazers_count) ? repo.stargazers_count : null,
                 forks: Number.isFinite(repo.forks_count) ? repo.forks_count : null,
@@ -563,13 +580,15 @@ export function createMcpManager(options = {}) {
             return { value: null, stale: false };
         const encoded = encodeURIComponent(entry.registryName);
         return cached(`registry:${entry.id}`, force, async () => {
-            const answer = await requestJson(`https://registry.modelcontextprotocol.io/v0.1/servers/${encoded}/versions/latest`, true);
+            const answer = await requestJson(`${registryBaseUrl}/v0.1/servers/${encoded}/versions/latest`, true);
             if (!isRecord(answer))
                 return null;
             return isRecord(answer.server) ? answer.server : answer;
         });
     }
     async function githubRelease(entry, force) {
+        if (entry.repository === null)
+            return { value: null, stale: false };
         return cached(`release:${entry.id}`, force, async () => {
             const release = await requestJson(`https://api.github.com/repos/${entry.repository}/releases/latest`, true);
             if (!isRecord(release))
@@ -582,14 +601,15 @@ export function createMcpManager(options = {}) {
         });
     }
     async function marketSummary(entry, force = false) {
+        const repositoryUrl = entry.repositoryUrl || (entry.repository ? safeRepositoryUrl(entry.repository) : registryBaseUrl);
         const [githubResult, registryResult] = await Promise.allSettled([
-            githubRepository(entry, force),
+            entry.repository ? githubRepository(entry, force) : Promise.resolve({ value: null, stale: false }),
             registryDetail(entry, force),
         ]);
         const github = githubResult.status === 'fulfilled' ? githubResult.value.value : null;
         const registry = registryResult.status === 'fulfilled' ? registryResult.value.value : null;
         const registryRecord = isRecord(registry) ? registry : {};
-        const iconUrl = registryIcon(registry, github?.url || safeRepositoryUrl(entry.repository)) || github?.iconUrl || null;
+        const iconUrl = registryIcon(registry, github?.url || repositoryUrl) || entry.iconUrl || github?.iconUrl || null;
         const errors = [];
         if (githubResult.status === 'rejected')
             errors.push(errorMessage(githubResult.reason));
@@ -597,34 +617,144 @@ export function createMcpManager(options = {}) {
             errors.push(errorMessage(registryResult.reason));
         return {
             id: entry.id,
+            name: entry.name,
             repository: entry.repository,
-            repositoryUrl: github?.url || safeRepositoryUrl(entry.repository),
+            repositoryUrl: github?.url || repositoryUrl,
             description: github?.description || (typeof registryRecord.description === 'string' ? registryRecord.description : null) || entry.description,
             iconUrl,
-            iconSource: registryIcon(registry, github?.url || safeRepositoryUrl(entry.repository)) ? 'registry' : github?.iconUrl ? 'github' : 'generic',
+            iconSource: registryIcon(registry, github?.url || repositoryUrl) ? 'registry' : github?.iconUrl ? 'github' : 'generic',
             installable: entry.install !== null,
+            installReason: entry.installReason,
+            source: entry.source,
             registryName: entry.registryName,
-            registryVersion: typeof registryRecord.version === 'string' ? registryRecord.version : null,
+            registryVersion: typeof registryRecord.version === 'string' ? registryRecord.version : entry.version,
             stale: Boolean(githubResult.status === 'fulfilled' && githubResult.value.stale) || Boolean(registryResult.status === 'fulfilled' && registryResult.value.stale),
             metadataError: errors.length > 0 ? errors.join('；') : null,
             github,
             registry,
         };
     }
-    async function marketplace(force = false) {
+    async function officialRegistryPage(query, cursor, limit, force) {
+        const params = new URLSearchParams({ limit: String(limit), version: 'latest' });
+        if (query !== '')
+            params.set('search', query);
+        if (cursor !== '')
+            params.set('cursor', cursor);
+        return cached(`official-list:${query}:${cursor}:${limit}`, force, async () => {
+            const value = await requestJson(`${registryBaseUrl}/v0.1/servers?${params.toString()}`);
+            if (!isRecord(value) || !Array.isArray(value.servers))
+                throw new Error('MCP Registry 列表格式无效');
+            const entries = [];
+            for (const record of value.servers) {
+                const entry = normalizeRegistryMarketplaceEntry(record);
+                if (entry === null)
+                    continue;
+                discoveredEntries.set(entry.id, entry);
+                discoveredRecords.set(entry.id, record);
+                entries.push(entry);
+            }
+            const metadata = isRecord(value.metadata) ? value.metadata : {};
+            return { entries, nextCursor: typeof metadata.nextCursor === 'string' ? metadata.nextCursor : null };
+        });
+    }
+    function matchesMarket(entry, query) {
+        if (query === '')
+            return true;
+        const needle = query.toLowerCase();
+        return entry.name.toLowerCase().includes(needle)
+            || entry.description.toLowerCase().includes(needle)
+            || String(entry.repository || '').toLowerCase().includes(needle)
+            || String(entry.registryName || '').toLowerCase().includes(needle);
+    }
+    async function resolveMarketplaceEntry(id, force = false) {
+        const featured = findMarketplaceEntry(id);
+        if (featured)
+            return featured;
+        const discovered = discoveredEntries.get(id);
+        if (discovered && !force)
+            return discovered;
+        if (!id.startsWith('registry:'))
+            throw new ApiError(404, '市场条目不存在', 'MARKET_NOT_FOUND');
+        const registryName = id.slice('registry:'.length);
+        const value = await requestJson(`${registryBaseUrl}/v0.1/servers/${encodeURIComponent(registryName)}/versions/latest`);
+        const entry = normalizeRegistryMarketplaceEntry(value);
+        if (entry === null || entry.id !== id)
+            throw new ApiError(404, '市场条目不存在', 'MARKET_NOT_FOUND');
+        discoveredEntries.set(entry.id, entry);
+        discoveredRecords.set(entry.id, value);
+        return entry;
+    }
+    async function marketplace(input = {}) {
+        const query = cleanText(input.query, '搜索词', 120).trim();
+        const cursor = cleanText(input.cursor, '分页游标', 1000).trim();
+        const requestedLimit = Number(input.limit);
+        const limit = Number.isInteger(requestedLimit) ? Math.min(50, Math.max(5, requestedLimit)) : 24;
+        const force = input.force === true;
         const { servers } = await readState();
-        const summaries = await Promise.all(MARKETPLACE.map((entry) => marketSummary(entry, force)));
+        let registryResult = null;
+        let registryWarning = null;
+        try {
+            registryResult = await officialRegistryPage(query, cursor, limit, force);
+            registryWarning = registryResult.error || null;
+        }
+        catch (error) {
+            registryWarning = errorMessage(error);
+        }
+        const base = cursor === '' ? MARKETPLACE.filter((entry) => matchesMarket(entry, query)) : [];
+        const merged = [];
+        const seen = new Set();
+        for (const entry of [...base, ...(registryResult?.value.entries || [])]) {
+            const key = (entry.registryName || entry.repository || entry.id).toLowerCase();
+            if (seen.has(key))
+                continue;
+            seen.add(key);
+            merged.push(entry);
+        }
+        const summaries = await Promise.all(merged.map((entry) => entry.source === 'featured'
+            ? marketSummary(entry, force)
+            : Promise.resolve({
+                id: entry.id,
+                name: entry.name,
+                repository: entry.repository,
+                repositoryUrl: entry.repositoryUrl || registryBaseUrl,
+                description: entry.description,
+                iconUrl: registryIcon(discoveredRecords.get(entry.id), entry.repositoryUrl || registryBaseUrl) || entry.iconUrl,
+                iconSource: entry.iconUrl ? 'registry' : 'generic',
+                installable: entry.install !== null,
+                installReason: entry.installReason,
+                source: entry.source,
+                registryName: entry.registryName,
+                registryVersion: entry.version,
+                stale: registryResult?.stale === true,
+                metadataError: null,
+                github: null,
+                registry: discoveredRecords.get(entry.id),
+            })));
         return {
             apiVersion: API_VERSION,
+            source: 'featured+mcp-registry',
+            query,
+            warning: registryWarning,
+            page: {
+                limit,
+                nextCursor: registryResult?.value.nextCursor || null,
+                hasMore: Boolean(registryResult?.value.nextCursor),
+            },
             items: summaries.map((item) => {
-                const installed = servers.find((server) => server.marketId === item.id || server.repository === item.repository);
+                const installed = servers.find((server) => server.marketId === item.id || (item.repository !== null && server.repository === item.repository));
                 return {
                     id: item.id,
+                    name: item.name,
                     repository: item.repository,
+                    repositoryUrl: item.repositoryUrl,
+                    registryName: item.registryName,
+                    version: item.registryVersion,
                     description: item.description,
                     iconUrl: item.iconUrl,
                     iconSource: item.iconSource,
+                    source: item.source,
                     installable: item.installable,
+                    installReason: item.installReason,
                     status: installed ? 'installed' : 'not-installed',
                     serverId: installed?.id ?? null,
                     stale: item.stale,
@@ -634,19 +764,18 @@ export function createMcpManager(options = {}) {
         };
     }
     async function marketplaceDetail(id, force = false) {
-        const entry = findMarketplaceEntry(id);
-        if (!entry)
-            throw new ApiError(404, '市场条目不存在', 'MARKET_NOT_FOUND');
+        const entry = await resolveMarketplaceEntry(id, force);
         const [{ servers }, summary, releaseResult] = await Promise.all([
             readState(),
             marketSummary(entry, force),
             githubRelease(entry, force).catch((error) => ({ value: null, stale: false, error: errorMessage(error) })),
         ]);
-        const installed = servers.find((server) => server.marketId === entry.id || server.repository === entry.repository);
+        const installed = servers.find((server) => server.marketId === entry.id || (entry.repository !== null && server.repository === entry.repository));
         const github = summary.github;
         const release = releaseResult.value;
         return {
             id: entry.id,
+            name: entry.name,
             repository: entry.repository,
             url: summary.repositoryUrl,
             description: summary.description,
@@ -663,6 +792,8 @@ export function createMcpManager(options = {}) {
             releasePublishedAt: release?.publishedAt || null,
             releaseUrl: release?.url || null,
             registryName: summary.registryName,
+            source: summary.source,
+            installReason: summary.installReason,
             installable: summary.installable,
             status: installed ? 'installed' : 'not-installed',
             serverId: installed?.id ?? null,
@@ -754,14 +885,12 @@ export function createMcpManager(options = {}) {
         });
     }
     async function installMarket(id) {
-        const entry = findMarketplaceEntry(id);
-        if (!entry)
-            throw new ApiError(404, '市场条目不存在', 'MARKET_NOT_FOUND');
+        const entry = await resolveMarketplaceEntry(id, true);
         if (!entry.install)
-            throw new ApiError(409, '该仓库包含多个 MCP 服务器，无法安全推导单一安装配置；请在 GitHub 查看安装方式', 'MARKET_NOT_INSTALLABLE');
+            throw new ApiError(409, entry.installReason || 'Registry 元数据无法安全推导安装配置', 'MARKET_NOT_INSTALLABLE');
         return serialized(async () => {
             const state = await readState();
-            const existing = state.servers.find((server) => server.marketId === entry.id || server.repository === entry.repository);
+            const existing = state.servers.find((server) => server.marketId === entry.id || (entry.repository !== null && server.repository === entry.repository));
             if (existing)
                 return { changed: false, hotReload: false, server: projectServer(existing, runtimeFacts(deps), env) };
             const summary = await marketSummary(entry).catch(() => null);
@@ -784,16 +913,16 @@ export function createMcpManager(options = {}) {
         // Dynamic operation dispatch intentionally exposes heterogeneous JSON shapes.
         async call(op, body = {}) {
             switch (op) {
-                case 'capabilities': return { apiVersion: API_VERSION, features: ['server-list', 'server-mutate', 'hot-reload', 'tool-projection', 'marketplace', 'registry-icons', 'github-avatar-fallback'] };
+                case 'capabilities': return { apiVersion: API_VERSION, features: ['server-list', 'server-mutate', 'hot-reload', 'tool-projection', 'marketplace', 'official-registry', 'remote-search', 'cursor-pagination', 'safe-install-projection', 'registry-icons', 'github-avatar-fallback'] };
                 case 'list': return snapshot();
                 case 'create': return createServer(body.server);
                 case 'update': return updateServer(cleanText(body.id, '服务器 ID', 96, true), body.server);
                 case 'setEnabled': return setEnabled(cleanText(body.id, '服务器 ID', 96, true), body.enabled);
                 case 'reconnect': return reconnect(cleanText(body.id, '服务器 ID', 96, true));
                 case 'delete': return removeServer(cleanText(body.id, '服务器 ID', 96, true));
-                case 'marketplace': return marketplace(body.force === true);
-                case 'marketplace.detail': return marketplaceDetail(cleanText(body.id, '市场 ID', 200, true), body.force === true);
-                case 'marketplace.install': return installMarket(cleanText(body.id, '市场 ID', 200, true));
+                case 'marketplace': return marketplace(body);
+                case 'marketplace.detail': return marketplaceDetail(cleanText(body.id, '市场 ID', 512, true), body.force === true);
+                case 'marketplace.install': return installMarket(cleanText(body.id, '市场 ID', 512, true));
                 default: throw new ApiError(400, `不支持的操作：${String(op || '')}`, 'OP_NOT_SUPPORTED');
             }
         },

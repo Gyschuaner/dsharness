@@ -30,10 +30,11 @@ interface PluginMarketItem {
     description: string;
     iconUrl?: string | null;
     iconSource?: string;
-    marketSource?: 'featured' | 'registry';
+    marketSource?: 'featured' | 'registry' | 'npm';
     installable?: boolean;
     status: string;
     installedVersion: string | null;
+    latestVersion?: string | null;
 }
 interface PluginRegistryInfo {
     status: 'fresh' | 'stale' | 'unavailable';
@@ -50,13 +51,14 @@ interface PluginMarketplaceResponse {
         hasMore: boolean;
         nextCursor: string | null;
     };
+    warning?: string | null;
 }
 interface PluginMarketDetail {
     url?: string;
     description?: string;
     iconUrl?: string | null;
     iconSource?: string;
-    marketSource?: 'featured' | 'registry';
+    marketSource?: 'featured' | 'registry' | 'npm';
     installable?: boolean;
     status?: string;
     installedVersion?: string | null;
@@ -81,7 +83,12 @@ interface PluginApi {
     call(op: 'list'): Promise<{
         plugins: PluginLocalView[];
     }>;
-    call(op: 'marketplace'): Promise<PluginMarketplaceResponse>;
+    call(op: 'marketplace', payload?: {
+        query?: string;
+        cursor?: string;
+        limit?: number;
+        force?: boolean;
+    }): Promise<PluginMarketplaceResponse>;
     call(op: 'marketplace.detail', payload: {
         id: string;
         force?: boolean;

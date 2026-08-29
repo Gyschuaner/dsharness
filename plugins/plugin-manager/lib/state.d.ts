@@ -79,6 +79,8 @@ export interface PluginManagerOptions extends ProfileOptions {
     githubCacheMs?: number;
     registryCacheMs?: number;
     registryUrl?: string;
+    npmRegistryUrl?: string;
+    npmSearchUrl?: string;
 }
 interface GithubDetail extends UnknownRecord {
     id: string;

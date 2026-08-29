@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-manager",
-  "version": "0.2.2",
-  "description": "DeepSeek Harness local plugin manager and curated GitHub plugin marketplace.",
+  "version": "0.3.0",
+  "description": "DeepSeek Harness local plugin manager with DSH and npm Registry discovery plus manifest-gated installs.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

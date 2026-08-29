@@ -4,6 +4,15 @@
  * The marketplace home intentionally keeps only stable discovery facts. Live
  * repository, release and manifest metadata is fetched on demand by the Host.
  */
+export interface MarketplaceManifestHint {
+    readonly valid: true;
+    readonly packageName: string;
+    readonly version: string | null;
+    readonly dshRequirement: string | null;
+    readonly hostEntry: string | null;
+    readonly clientEntry: string | null;
+    readonly bundlePatch: string | null;
+}
 export interface MarketplaceEntry {
     readonly id: string;
     readonly repository: string;
@@ -11,6 +20,9 @@ export interface MarketplaceEntry {
     readonly installSource?: string;
     readonly latestHint?: string;
     readonly description: string;
+    readonly iconUrl?: string | null;
+    /** Manifest facts verified from the exact npm version used for installation. */
+    readonly verifiedManifest?: MarketplaceManifestHint;
 }
 export declare const FEATURED_MARKETPLACE: readonly (Readonly<{
     id: "omdsh-dev/DSH-better-sidebar";

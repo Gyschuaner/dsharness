@@ -66,11 +66,23 @@ interface McpDraft {
 
 interface McpMarketItem {
 	id: string;
-	repository: string;
+	name: string;
+	repository: string | null;
+	repositoryUrl: string;
+	registryName: string | null;
+	version: string | null;
 	description: string;
 	iconUrl: string | null;
+	source: 'featured' | 'mcp-registry';
 	installable: boolean;
+	installReason: string | null;
 	status: 'installed' | 'not-installed';
+}
+
+interface McpMarketPage {
+	limit: number;
+	nextCursor: string | null;
+	hasMore: boolean;
 }
 
 interface McpMarketDetail {
@@ -88,12 +100,14 @@ interface McpMarketDetail {
 	releasePublishedAt?: string | null;
 	releaseUrl?: string | null;
 	metadataError?: string | null;
+	installReason?: string | null;
+	installable?: boolean;
 	stale?: boolean;
 }
 
 interface McpApi {
 	call(op: 'list'): Promise<{ servers: McpServerView[]; connected: number }>;
-	call(op: 'marketplace', payload: { force: boolean }): Promise<{ items: McpMarketItem[] }>;
+	call(op: 'marketplace', payload: { force: boolean; query?: string; cursor?: string; limit?: number }): Promise<{ items: McpMarketItem[]; page: McpMarketPage; warning?: string | null }>;
 	call(op: 'marketplace.detail', payload: { id: string }): Promise<McpMarketDetail>;
 	call(op: string, payload?: Record<string, unknown>): Promise<unknown>;
 }
@@ -243,8 +257,11 @@ interface MarketDrawerProps {
 				'.mm-marketCopy{min-width:0;display:flex;flex-direction:column}',
 				'.mm-marketTitle{display:block;font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
 				'.mm-marketDesc{display:block;margin-top:6px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45}',
+				'.mm-marketMeta{display:block;margin-top:5px;color:var(--dsw-alias-label-quaternary);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
 				'.mm-marketSide{display:flex;align-items:center;gap:14px;color:var(--dsw-alias-label-secondary)}',
 				'.mm-installed{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
+				'.mm-marketWarning{margin:0;padding:0 2px 10px;color:var(--dsw-alias-status-warning,#9a6700);font-size:12px}',
+				'.mm-loadMore{display:flex;justify-content:center;padding:18px 0 4px}',
 				'.mm-empty,.mm-loading,.mm-error{margin:24px 0;padding:18px 2px;color:var(--dsw-alias-label-tertiary)}',
 				'.mm-error{color:var(--dsw-alias-status-error,#d33b3b)}',
 				'.mm-connectingState{flex:1;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:52px 24px;text-align:center}',
@@ -573,14 +590,16 @@ interface MarketDrawerProps {
 			function MarketDrawer(props: MarketDrawerProps): React.ReactNode {
 				var item = props.item;
 				var detail = props.detail;
+				var sourceUrl = (detail && detail.url) || item.repositoryUrl;
+				var sourceLabel = item.source === 'mcp-registry' ? 'MCP Registry' : 'GitHub';
 				var rows = (detail ? [
 					['作者', detail.author], ['语言', detail.language], ['许可证', detail.license],
 					['仓库', (detail.stars === null || detail.stars === undefined) && (detail.forks === null || detail.forks === undefined) ? null : (formatNumber(detail.stars) || '0') + ' Stars · ' + (formatNumber(detail.forks) || '0') + ' Forks'],
 					['最后推送', formatDate(detail.lastPushedAt)]
 				] as Array<[string, string | null | undefined]> : []).filter(function (row): row is [string, string] { return typeof row[1] === 'string' && row[1] !== ''; });
-				return h('aside', { className: 'mm-drawer', role: 'dialog', 'aria-modal': false, 'aria-label': item.repository + ' 详情' },
+				return h('aside', { className: 'mm-drawer', role: 'dialog', 'aria-modal': false, 'aria-label': item.name + ' 详情' },
 					h('header', { className: 'mm-drawerHead' },
-						h('div', { className: 'mm-drawerTitleRow' }, h(RemoteIcon, { src: (detail && detail.iconUrl) || item.iconUrl }), h('div', { className: 'mm-drawerIdentity' }, h('h3', { className: 'mm-drawerTitle' }, item.repository.split('/')[1]), h('a', { className: 'mm-drawerLink', href: (detail && detail.url) || ('https://github.com/' + item.repository), target: '_blank', rel: 'noreferrer' }, item.repository, h(P.IconRightUpOutline14))), h('button', { type: 'button', className: 'mm-close', 'aria-label': '关闭详情', onClick: props.onClose }, h(P.IconCloseOutline16))),
+						h('div', { className: 'mm-drawerTitleRow' }, h(RemoteIcon, { src: (detail && detail.iconUrl) || item.iconUrl }), h('div', { className: 'mm-drawerIdentity' }, h('h3', { className: 'mm-drawerTitle' }, item.name), h('a', { className: 'mm-drawerLink', href: sourceUrl, target: '_blank', rel: 'noreferrer' }, item.repository || item.registryName || sourceLabel, h(P.IconRightUpOutline14))), h('button', { type: 'button', className: 'mm-close', 'aria-label': '关闭详情', onClick: props.onClose }, h(P.IconCloseOutline16))),
 						h('p', { className: 'mm-drawerDesc' }, (detail && detail.description) || item.description)
 					),
 					h('div', { className: 'mm-drawerBody' },
@@ -588,9 +607,10 @@ interface MarketDrawerProps {
 						detail && detail.metadataError ? h('p', { className: 'mm-metaNotice' }, detail.stale ? '远程元数据暂不可用，正在显示缓存。' : '部分远程元数据暂不可用。') : null,
 						rows.length ? h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, '仓库信息'), h('dl', { className: 'mm-kv' }, rows.flatMap(function (row, index) { return [h('dt', { key: 'dt' + index }, row[0]), h('dd', { key: 'dd' + index }, row[1])]; }))) : null,
 						detail && detail.topics && detail.topics.length ? h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, 'Topics'), h('div', { className: 'mm-topics' }, detail.topics.map(function (topic) { return h('span', { key: topic, className: 'mm-topic' }, topic); }))) : null,
-						detail && detail.latestVersion ? h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, '最新发布'), h('dl', { className: 'mm-kv' }, h('dt', null, '版本'), h('dd', null, detail.latestVersion), detail.releasePublishedAt ? h(React.Fragment, null, h('dt', null, '发布时间'), h('dd', null, formatDate(detail.releasePublishedAt))) : null), detail.releaseUrl ? h('a', { className: 'mm-drawerLink', href: detail.releaseUrl, target: '_blank', rel: 'noreferrer' }, '查看 Release', h(P.IconRightUpOutline14)) : null) : null
+						detail && detail.latestVersion ? h('section', { className: 'mm-section' }, h('h4', { className: 'mm-sectionTitle' }, '最新发布'), h('dl', { className: 'mm-kv' }, h('dt', null, '版本'), h('dd', null, detail.latestVersion), detail.releasePublishedAt ? h(React.Fragment, null, h('dt', null, '发布时间'), h('dd', null, formatDate(detail.releasePublishedAt))) : null), detail.releaseUrl ? h('a', { className: 'mm-drawerLink', href: detail.releaseUrl, target: '_blank', rel: 'noreferrer' }, '查看 Release', h(P.IconRightUpOutline14)) : null) : null,
+						!item.installable ? h('p', { className: 'mm-metaNotice' }, (detail && detail.installReason) || item.installReason || '当前条目无法安全推导安装配置。') : h('p', { className: 'mm-metaNotice' }, '安装会写入停用配置，不会立即执行第三方 Server；检查环境变量后再启用。')
 					),
-					h('footer', { className: 'mm-drawerFoot' }, h(Button, { type: 'button', onClick: function () { window.open((detail && detail.url) || ('https://github.com/' + item.repository), '_blank', 'noopener,noreferrer'); } }, '在 GitHub 查看', h(P.IconRightUpOutline14)), h(Button, { type: 'button', primary: true, disabled: props.busy || !item.installable || item.status === 'installed', onClick: props.onInstall }, props.busy ? '安装中…' : item.status === 'installed' ? '已安装' : item.installable ? '安装' : '选择具体服务器'))
+					h('footer', { className: 'mm-drawerFoot' }, h(Button, { type: 'button', onClick: function () { window.open(sourceUrl, '_blank', 'noopener,noreferrer'); } }, '查看' + sourceLabel, h(P.IconRightUpOutline14)), h(Button, { type: 'button', primary: true, disabled: props.busy || !item.installable || item.status === 'installed', onClick: props.onInstall }, props.busy ? '安装中…' : item.status === 'installed' ? '已安装' : item.installable ? '安装为停用配置' : '仅查看'))
 				);
 			}
 
@@ -622,11 +642,14 @@ interface MarketDrawerProps {
 				var [market, setMarket] = React.useState<McpMarketItem[]>([]);
 				var [marketLoaded, setMarketLoaded] = React.useState(false);
 				var [marketLoading, setMarketLoading] = React.useState(false);
+				var [marketNextCursor, setMarketNextCursor] = React.useState<string | null>(null);
+				var [marketWarning, setMarketWarning] = React.useState('');
 				var [selectedMarket, setSelectedMarket] = React.useState<McpMarketItem | null>(null);
 				var [marketDetail, setMarketDetail] = React.useState<McpMarketDetail | null>(null);
 				var [detailLoading, setDetailLoading] = React.useState(false);
 				var [busy, setBusy] = React.useState('');
 				var [toast, setToast] = React.useState<{ message: string; error: boolean } | null>(null);
+				var marketRequest = React.useRef(0);
 
 				function notify(message: string, isError: boolean): void {
 					setToast({ message: message, error: isError });
@@ -641,12 +664,22 @@ interface MarketDrawerProps {
 					setRefreshing(true);
 					return loadServers().catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setRefreshing(false); });
 				}
-				function loadMarket(force: boolean): Promise<void> {
+				function loadMarket(force: boolean, search = query, cursor = '', append = false): Promise<void> {
+					var request = ++marketRequest.current;
 					setMarketLoading(true);
-					return api.call('marketplace', { force: force === true }).then(function (value) {
-						setMarket(value.items || []); setMarketLoaded(true);
-						setSelectedMarket(function (current) { return current ? (value.items || []).find(function (item) { return item.id === current.id; }) || current : null; });
-					}, function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setMarketLoading(false); });
+					return api.call('marketplace', { force: force === true, query: search.trim(), cursor: cursor, limit: 24 }).then(function (value) {
+						if (request !== marketRequest.current) return;
+						var incoming = value.items || [];
+						setMarket(function (current) {
+							if (!append) return incoming;
+							var seen = new Set(current.map(function (item) { return item.id; }));
+							return current.concat(incoming.filter(function (item) { return !seen.has(item.id); }));
+						});
+						setMarketLoaded(true);
+						setMarketNextCursor(value.page && value.page.nextCursor ? value.page.nextCursor : null);
+						setMarketWarning(value.warning || '');
+						if (!append) setSelectedMarket(function (current) { return current ? incoming.find(function (item) { return item.id === current.id; }) || null : null; });
+					}, function (reason) { if (request === marketRequest.current) notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { if (request === marketRequest.current) setMarketLoading(false); });
 				}
 				React.useEffect(function () {
 					var alive = true;
@@ -662,7 +695,11 @@ interface MarketDrawerProps {
 					});
 					return function () { alive = false; if (settleTimer !== null) window.clearTimeout(settleTimer); };
 				}, [attempt]);
-				React.useEffect(function () { if (tab === 'market' && !marketLoaded) loadMarket(false); }, [tab, marketLoaded]);
+				React.useEffect(function () {
+					if (tab !== 'market') return;
+					var timer = window.setTimeout(function () { loadMarket(false, query, '', false); }, query.trim() === '' ? 0 : 320);
+					return function () { window.clearTimeout(timer); };
+				}, [tab, query]);
 				React.useEffect(function () {
 					function onKey(event: KeyboardEvent): void {
 						if (event.key !== 'Escape') return;
@@ -692,7 +729,7 @@ interface MarketDrawerProps {
 				}
 				function remove(server: McpServerView): void {
 					setBusy('delete');
-					api.call('delete', { id: server.id }).then(function () { setDeleting(null); setSelectedServer(null); notify('服务器已删除', false); return Promise.all([loadServers(), marketLoaded ? loadMarket(false) : Promise.resolve()]); }).catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setBusy(''); });
+					api.call('delete', { id: server.id }).then(function () { setDeleting(null); setSelectedServer(null); notify('服务器已删除', false); return Promise.all([loadServers(), marketLoaded ? loadMarket(false, query) : Promise.resolve()]); }).catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setBusy(''); });
 				}
 				function openMarket(item: McpMarketItem): void {
 					setSelectedServer(null); setSelectedMarket(item); setMarketDetail(null); setDetailLoading(true);
@@ -702,7 +739,7 @@ interface MarketDrawerProps {
 					setBusy(item.id);
 					api.call('marketplace.install', { id: item.id }).then(function () {
 						notify('已安装为停用配置；请在服务器页检查环境变量后启用', false);
-						return Promise.all([loadServers(), loadMarket(false)]);
+						return Promise.all([loadServers(), loadMarket(false, query)]);
 					}).catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setBusy(''); });
 				}
 
@@ -714,7 +751,7 @@ interface MarketDrawerProps {
 					if (filter === 'failed') return server.status === 'failed' || server.status === 'needs-environment';
 					return filter === 'disabled' ? server.status === 'disabled' : true;
 				});
-				var visibleMarket = market.filter(function (item) { return needle === '' || item.repository.toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle); });
+				var visibleMarket = market;
 				var filters: Array<[string, string]> = [['all', '全部 ' + servers.length], ['connected', '已连接 ' + connected], ['failed', '连接问题 ' + servers.filter(function (server) { return server.status === 'failed' || server.status === 'needs-environment'; }).length], ['disabled', '已停用 ' + servers.filter(function (server) { return server.status === 'disabled'; }).length]];
 
 				var serverBody;
@@ -740,12 +777,12 @@ interface MarketDrawerProps {
 						}) : h('p', { className: 'mm-empty' }, '没有匹配的 MCP 服务器。')
 					);
 
-					var marketBody = h('div', { className: 'mm-list', 'data-testid': 'market-list' }, marketLoading && !marketLoaded ? h('p', { className: 'mm-loading', role: 'status' }, '正在读取 MCP 市场…') : visibleMarket.length ? visibleMarket.map(function (item) {
+					var marketBody = h(React.Fragment, null, marketWarning ? h('p', { className: 'mm-marketWarning', role: 'status' }, '官方 Registry 暂时不可用：' + marketWarning) : null, h('div', { className: 'mm-list', 'data-testid': 'market-list' }, marketLoading && !marketLoaded ? h('p', { className: 'mm-loading', role: 'status' }, '正在读取 MCP 官方 Registry…') : visibleMarket.length ? visibleMarket.map(function (item) {
 						return h('button', { key: item.id, type: 'button', className: 'mm-row mm-rowClick mm-marketRow' + (selectedMarket && selectedMarket.id === item.id ? ' mm-rowSelected mm-marketRowSelected' : ''), onClick: function () { openMarket(item); } },
-							h('span', { className: 'mm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('span', { className: 'mm-marketCopy' }, h('span', { className: 'mm-marketTitle' }, item.repository), h('span', { className: 'mm-marketDesc' }, item.description))),
-							h('span', { className: 'mm-rowSide mm-marketSide' }, item.status === 'installed' ? h('span', { className: 'mm-installed' }, '已安装') : null, h(P.IconChevronRightOutline14))
+							h('span', { className: 'mm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('span', { className: 'mm-marketCopy' }, h('span', { className: 'mm-marketTitle' }, item.name), h('span', { className: 'mm-marketDesc' }, item.description), h('span', { className: 'mm-marketMeta' }, item.source === 'mcp-registry' ? 'MCP Registry' + (item.version ? ' · ' + item.version : '') : item.repository || '精选'))),
+							h('span', { className: 'mm-rowSide mm-marketSide' }, item.status === 'installed' ? h('span', { className: 'mm-installed' }, '已安装') : !item.installable ? h('span', { className: 'mm-installed' }, '仅查看') : null, h(P.IconChevronRightOutline14))
 						);
-					}) : h('p', { className: 'mm-empty' }, '没有匹配的 MCP 仓库。'));
+					}) : h('p', { className: 'mm-empty' }, '官方 Registry 中没有匹配的 MCP Server。')), marketNextCursor ? h('div', { className: 'mm-loadMore' }, h(Button, { type: 'button', disabled: marketLoading, onClick: function () { if (marketNextCursor) loadMarket(false, query, marketNextCursor, true); } }, marketLoading ? '加载中…' : '加载更多')) : null);
 
 					return h('section', { className: 'mm-root' + (selectedServer || selectedMarket ? ' mm-rootHasDrawer' : ''), 'aria-label': 'MCP Manager' },
 						h('header', { className: 'mm-head' }, h('h2', null, 'MCP')),
@@ -762,8 +799,8 @@ interface MarketDrawerProps {
 							h('div', { className: 'mm-filters' }, filters.map(function (item) { return h('button', { key: item[0], type: 'button', className: 'mm-filter' + (filter === item[0] ? ' mm-filterOn' : ''), onClick: function () { setFilter(item[0]); } }, item[1]); })),
 							serverBody
 						) : h(React.Fragment, null,
-							h('div', { className: 'mm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: '搜索 GitHub 仓库' })),
-							h('p', { className: 'mm-helper' }, '精选自 GitHub · 安装前校验 DSH MCP 安装声明'),
+							h('div', { className: 'mm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: '搜索 MCP Server' })),
+							h('p', { className: 'mm-helper' }, '实时搜索官方 MCP Registry · 仅在配置可唯一、安全推导时允许安装'),
 							marketBody
 						),
 					selectedServer ? h(ServerDrawer, { server: selectedServer, busy: busy === selectedServer.id, onClose: function () { setSelectedServer(null); }, onReconnect: function () { if (selectedServer) reconnect(selectedServer); }, onEdit: function () { if (selectedServer) setEditor(selectedServer); }, onDelete: function () { if (selectedServer) setDeleting(selectedServer); } }) : null,

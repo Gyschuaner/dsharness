@@ -53,6 +53,7 @@ export interface McpManagerOptions extends ProfileOptions {
     deps?: McpDependencies;
     env?: Environment;
     cacheTtlMs?: number;
+    registryUrl?: string;
     logger?: {
         warn?(...values: unknown[]): void;
     };

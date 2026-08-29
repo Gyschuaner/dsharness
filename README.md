@@ -17,11 +17,11 @@ dsharness/
 ├── plugins/
 │   ├── extension-manager/    # 通用“扩展”全页壳与业务分区 Slot
 │   ├── skill-manager/        # SKILL 管理业务分区与 Host API
-│   ├── mcp-manager/          # MCP 服务器管理与精选 GitHub 市场（DSH-026/028）
+│   ├── mcp-manager/          # MCP 服务器管理 + 官方 Registry 市场（DSH-026/028/036）
 │   │   ├── src/              # TypeScript Host、状态与 Client 源码（唯一源码真相）
 │   │   ├── lib/              # tsc 生成的运行时 JS、声明与 source map
 │   │   └── test/             # TypeScript 状态机、安全边界与真实 bundle DOM 测试
-│   ├── plugin-manager/       # 本地插件管理 + GitHub 插件市场（DSH-027）
+│   ├── plugin-manager/       # 本地插件管理 + DSH/npm Registry 市场（DSH-027/030/036）
 │   │   ├── src/              # TypeScript Host、导入事务与 Client 源码
 │   │   ├── lib/              # tsc 生成的运行时产物
 │   │   └── test/             # TypeScript Host 事务与 Client DOM 回归

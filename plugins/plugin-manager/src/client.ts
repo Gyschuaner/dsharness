@@ -27,10 +27,11 @@ interface PluginMarketItem {
 	description: string;
 	iconUrl?: string | null;
 	iconSource?: string;
-	marketSource?: 'featured' | 'registry';
+	marketSource?: 'featured' | 'registry' | 'npm';
 	installable?: boolean;
 	status: string;
 	installedVersion: string | null;
+	latestVersion?: string | null;
 }
 
 interface PluginRegistryInfo {
@@ -43,6 +44,7 @@ interface PluginMarketplaceResponse {
 	items: PluginMarketItem[];
 	registry?: PluginRegistryInfo;
 	page?: { offset: number; limit: number; total: number; hasMore: boolean; nextCursor: string | null };
+	warning?: string | null;
 }
 
 interface PluginMarketDetail {
@@ -50,7 +52,7 @@ interface PluginMarketDetail {
 	description?: string;
 	iconUrl?: string | null;
 	iconSource?: string;
-	marketSource?: 'featured' | 'registry';
+	marketSource?: 'featured' | 'registry' | 'npm';
 	installable?: boolean;
 	status?: string;
 	installedVersion?: string | null;
@@ -74,7 +76,7 @@ interface PluginMarketDetail {
 
 interface PluginApi {
 	call(op: 'list'): Promise<{ plugins: PluginLocalView[] }>;
-	call(op: 'marketplace'): Promise<PluginMarketplaceResponse>;
+	call(op: 'marketplace', payload?: { query?: string; cursor?: string; limit?: number; force?: boolean }): Promise<PluginMarketplaceResponse>;
 	call(op: 'marketplace.detail', payload: { id: string; force?: boolean }): Promise<PluginMarketDetail>;
 	call(op: 'setEnabled', payload: { name: string; enabled: boolean }): Promise<{ restartRequired: boolean }>;
 	call(op: 'import' | 'marketplace.install', payload: Record<string, unknown>): Promise<{ plugin: PluginLocalView | null }>;
@@ -169,6 +171,7 @@ interface RemoteIconProps {
 				'.pm-marketFilterOn{border-bottom-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);font-weight:600}',
 				'.pm-registryState{flex:none;margin:0;padding:0 8px 10px;color:var(--dsw-alias-label-quaternary);font-size:12px}',
 				'.pm-registryStateWarning{color:var(--dsw-alias-status-warning, #9a6700)}',
+				'.pm-loadMore{display:flex;justify-content:center;padding:18px 0 6px}',
 				'.pm-list{min-height:0;overflow:auto;padding:0 8px 32px}',
 				'.pm-row{position:relative;box-sizing:border-box;width:100%;min-height:72px;border:0;border-top:1px solid var(--dsw-alias-border-l2);background:transparent;color:inherit;text-align:left;font:inherit;padding:13px 10px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;align-items:center}',
 				'.pm-row:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
@@ -472,11 +475,14 @@ interface RemoteIconProps {
 				function PluginManagerSection(props: { api: PluginApi }): React.ReactNode {
 					var api = props.api;
 					var [tab, setTab] = React.useState('local');
-					var [marketSource, setMarketSource] = React.useState<'featured' | 'registry'>('featured');
 					var [query, setQuery] = React.useState('');
 					var [local, setLocal] = React.useState<PluginLocalView[]>([]);
 					var [market, setMarket] = React.useState<PluginMarketItem[]>([]);
 					var [registryInfo, setRegistryInfo] = React.useState<PluginRegistryInfo>({ status: 'unavailable', generatedAt: null, warning: null });
+					var [marketLoaded, setMarketLoaded] = React.useState(false);
+					var [marketLoading, setMarketLoading] = React.useState(false);
+					var [marketNextCursor, setMarketNextCursor] = React.useState<string | null>(null);
+					var [marketWarning, setMarketWarning] = React.useState('');
 				var [loading, setLoading] = React.useState(true);
 				var [error, setError] = React.useState('');
 				var [attempt, setAttempt] = React.useState(0);
@@ -487,6 +493,7 @@ interface RemoteIconProps {
 				var [detailLoading, setDetailLoading] = React.useState(false);
 				var [importOpen, setImportOpen] = React.useState(false);
 				var [toast, setToast] = React.useState<{ message: string; error: boolean } | null>(null);
+				var marketRequest = React.useRef(0);
 
 				function notify(message: string, isError: boolean): void {
 					setToast({ message: message, error: isError === true });
@@ -500,11 +507,22 @@ interface RemoteIconProps {
 					});
 				}
 
-				function loadMarket(): Promise<void> {
-					return api.call('marketplace').then(function (value) {
-						setMarket(value.items || []);
+				function loadMarket(search = query, cursor = '', append = false, force = false): Promise<void> {
+					var request = ++marketRequest.current;
+					setMarketLoading(true);
+					return api.call('marketplace', { query: search.trim(), cursor: cursor, limit: 24, force: force }).then(function (value) {
+						if (request !== marketRequest.current) return;
+						var incoming = value.items || [];
+						setMarket(function (current) {
+							if (!append) return incoming;
+							var seen = new Set(current.map(function (item) { return item.id; }));
+							return current.concat(incoming.filter(function (item) { return !seen.has(item.id); }));
+						});
+						setMarketLoaded(true);
+						setMarketNextCursor(value.page && value.page.nextCursor ? value.page.nextCursor : null);
+						setMarketWarning(value.warning || '');
 						setRegistryInfo(value.registry || { status: 'unavailable', generatedAt: null, warning: null });
-					});
+					}).finally(function () { if (request === marketRequest.current) setMarketLoading(false); });
 				}
 
 				React.useEffect(function () {
@@ -512,7 +530,7 @@ interface RemoteIconProps {
 					var settleTimer: number | null = null;
 					var startedAt = Date.now();
 					setLoading(true); setError('');
-					Promise.all([loadLocal(), loadMarket()]).catch(function (reason) {
+					Promise.all([loadLocal()]).catch(function (reason) {
 						if (alive) setError(reason instanceof Error ? reason.message : String(reason));
 					}).finally(function () {
 						if (!alive) return;
@@ -521,6 +539,11 @@ interface RemoteIconProps {
 					});
 					return function () { alive = false; if (settleTimer !== null) window.clearTimeout(settleTimer); };
 				}, [attempt]);
+				React.useEffect(function () {
+					if (tab !== 'market') return;
+					var timer = window.setTimeout(function () { loadMarket(query, '', false, false).catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }); }, query.trim() === '' ? 0 : 320);
+					return function () { window.clearTimeout(timer); };
+				}, [tab, query, attempt]);
 
 				React.useEffect(function () {
 					function onKey(event: KeyboardEvent): void {
@@ -545,7 +568,7 @@ interface RemoteIconProps {
 					setBusy('import');
 					return api.call('import', { source: source }).then(function (result) {
 						notify('已导入 ' + (result.plugin ? result.plugin.name : '插件') + '；重启 Web 后生效', false);
-						return Promise.all([loadLocal(), loadMarket()]);
+						return Promise.all([loadLocal(), loadMarket(query)]);
 					}).finally(function () { setBusy(''); });
 				}
 
@@ -560,16 +583,13 @@ interface RemoteIconProps {
 					setBusy(target.id);
 					api.call('marketplace.install', { id: target.id }).then(function (result) {
 						notify('已安装 ' + (result.plugin ? result.plugin.name : target.repository) + '；重启 Web 后生效', false);
-						return Promise.all([loadLocal(), loadMarket(), api.call('marketplace.detail', { id: target.id, force: true }).then(function (value) { setMarketDetail(value); })]);
+						return Promise.all([loadLocal(), loadMarket(query, '', false, true), api.call('marketplace.detail', { id: target.id, force: true }).then(function (value) { setMarketDetail(value); })]);
 					}).catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setBusy(''); });
 				}
 
 				var needle = query.trim().toLowerCase();
 				var visibleLocal = local.filter(function (plugin) { return needle === '' || plugin.name.toLowerCase().includes(needle) || String(plugin.description || '').toLowerCase().includes(needle); });
-				var visibleMarket = market.filter(function (item) {
-					var itemSource = item.marketSource || 'featured';
-					return itemSource === marketSource && (needle === '' || item.repository.toLowerCase().includes(needle) || String(item.description || '').toLowerCase().includes(needle));
-				});
+				var visibleMarket = market;
 				var registryStatusLabel = registryInfo.status === 'fresh' ? 'Registry 已更新' : registryInfo.status === 'stale' ? 'Registry 使用缓存' : 'Registry 暂不可用，当前保留精选';
 
 				var body;
@@ -581,13 +601,14 @@ interface RemoteIconProps {
 						h('div', { className: 'pm-rowSide' }, h(Switch, { checked: plugin.enabled, disabled: busy === plugin.name || plugin.protected || !plugin.managed, label: (plugin.enabled ? '停用 ' : '启用 ') + plugin.name, title: !plugin.managed ? '此插件由系统组合管理，只读展示' : plugin.protected ? '此插件维持当前管理页面运行' : undefined, onChange: function (enabled) { toggle(plugin, enabled); } }))
 					);
 				}));
-				else body = visibleMarket.length === 0 ? h('p', { className: 'pm-empty' }, '没有匹配的市场插件。') : h('div', { className: 'pm-list', 'data-testid': 'market-list' }, visibleMarket.map(function (item) {
+				else if (marketLoading && !marketLoaded) body = h('p', { className: 'pm-empty', role: 'status' }, '正在搜索 DSH Plugin Registry…');
+				else body = h(React.Fragment, null, visibleMarket.length === 0 ? h('p', { className: 'pm-empty' }, '远程 Registry 中没有匹配且通过 manifest 校验的插件。') : h('div', { className: 'pm-list', 'data-testid': 'market-list' }, visibleMarket.map(function (item) {
 						var statusLabel = item.installable === false ? '仅查看' : item.status === 'installed' ? '已安装' : item.status === 'update-available' ? '可更新' : '未安装';
 					return h('button', { key: item.id, type: 'button', className: 'pm-row pm-rowClick' + (selectedMarket && selectedMarket.id === item.id ? ' pm-rowSelected' : ''), onClick: function () { openMarket(item); } },
-						h('div', { className: 'pm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('div', { className: 'pm-marketCopy' }, h('div', { className: 'pm-rowTitle' }, item.repository), h('div', { className: 'pm-rowDesc' }, item.description))),
+						h('div', { className: 'pm-marketMain' }, h(RemoteIcon, { src: item.iconUrl }), h('div', { className: 'pm-marketCopy' }, h('div', { className: 'pm-rowTitle' }, item.repository), h('div', { className: 'pm-rowDesc' }, item.description), h('div', { className: 'pm-rowMeta' }, item.marketSource === 'npm' ? 'npm Registry' : item.marketSource === 'registry' ? 'DSH Registry' : '精选', item.latestVersion ? ' · ' + item.latestVersion : ''))),
 						h('div', { className: 'pm-rowSide' }, h('span', { className: 'pm-status' + (item.status === 'update-available' ? ' pm-statusUpdate' : '') }, statusLabel), h(P.IconChevronRightOutline14))
 					);
-				}));
+				})), marketNextCursor ? h('div', { className: 'pm-loadMore' }, h(Button, { type: 'button', disabled: marketLoading, onClick: function () { if (marketNextCursor) loadMarket(query, marketNextCursor, true, false); } }, marketLoading ? '加载中…' : '加载更多')) : null);
 
 				return h('section', { className: 'pm-root', 'aria-label': 'Plugin Manager' },
 					h('header', { className: 'pm-head' }, h('h2', null, 'Plugin')),
@@ -595,13 +616,10 @@ interface RemoteIconProps {
 							h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'local' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'local', onClick: function () { setTab('local'); setQuery(''); setSelectedMarket(null); } }, '本地插件'),
 							h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'market' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'market', onClick: function () { setTab('market'); setQuery(''); setSelectedLocal(null); } }, '插件市场')
 						),
-						tab === 'market' ? h('div', { className: 'pm-marketFilters', role: 'tablist', 'data-testid': 'market-channels' },
-							h('button', { type: 'button', role: 'tab', className: 'pm-marketFilter' + (marketSource === 'featured' ? ' pm-marketFilterOn' : ''), 'aria-selected': marketSource === 'featured', onClick: function () { setMarketSource('featured'); setQuery(''); setSelectedMarket(null); } }, '精选'),
-							h('button', { type: 'button', role: 'tab', className: 'pm-marketFilter' + (marketSource === 'registry' ? ' pm-marketFilterOn' : ''), 'aria-selected': marketSource === 'registry', onClick: function () { setMarketSource('registry'); setQuery(''); setSelectedMarket(null); } }, '发现')
-						) : null,
-						h('div', { className: 'pm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: tab === 'local' ? '搜索本地插件' : '搜索插件或 GitHub 仓库' }), tab === 'local' ? h(React.Fragment, null, h(Button, { type: 'button', onClick: function () { setImportOpen(true); } }, h(Icon, { type: 'plus', size: 14 }), '导入插件'), h(Button, { type: 'button', className: 'pm-iconBtn', title: '更多操作', 'aria-label': '更多操作' }, h(Icon, { type: 'dots' }))) : null),
-						tab === 'market' ? h('p', { className: 'pm-helper' }, '精选自 GitHub · Registry 只读发现 · 安装前校验 DSH 插件清单') : null,
+						h('div', { className: 'pm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: tab === 'local' ? '搜索本地插件' : '搜索 DSH 插件或 npm 包' }), tab === 'local' ? h(React.Fragment, null, h(Button, { type: 'button', onClick: function () { setImportOpen(true); } }, h(Icon, { type: 'plus', size: 14 }), '导入插件'), h(Button, { type: 'button', className: 'pm-iconBtn', title: '更多操作', 'aria-label': '更多操作' }, h(Icon, { type: 'dots' }))) : null),
+						tab === 'market' ? h('p', { className: 'pm-helper' }, '自动搜索 npm 与 DSH Registry · 只有含有效 dsh manifest 的精确版本可以一键安装') : null,
 						tab === 'market' ? h('p', { className: 'pm-registryState' + (registryInfo.status === 'fresh' ? '' : ' pm-registryStateWarning'), role: 'status' }, registryStatusLabel) : null,
+						tab === 'market' && marketWarning ? h('p', { className: 'pm-registryState pm-registryStateWarning', role: 'status' }, 'npm 搜索暂时不可用：' + marketWarning) : null,
 					body,
 					selectedLocal ? h(LocalDrawer, { plugin: selectedLocal, busy: busy === selectedLocal.name, onClose: function () { setSelectedLocal(null); }, onToggle: function (enabled) { if (selectedLocal) toggle(selectedLocal, enabled); } }) : null,
 					selectedMarket ? h(MarketDrawer, { item: selectedMarket, detail: marketDetail, loading: detailLoading, busy: busy === selectedMarket.id, onClose: function () { setSelectedMarket(null); }, onInstall: installMarket }) : null,

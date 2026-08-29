@@ -5,29 +5,32 @@ export declare const MARKET_API_VERSION = 1;
  * unrelated project tree.
  */
 export declare const MARKETPLACE: readonly (Readonly<{
-    id: "openai/skills#skills/.curated/cli-creator";
-    name: "cli-creator";
-    repository: "openai/skills";
-    path: "skills/.curated/cli-creator";
+    id: "anthropics/skills#skills/xlsx";
+    name: "xlsx";
+    repository: "anthropics/skills";
+    path: "skills/xlsx";
     ref: "main";
-    description: "Create or improve command-line tools with a focused, testable workflow.";
+    description: "Create, edit, analyze, and verify spreadsheet workbooks.";
     tags: readonly string[];
+    marketSource: "featured";
 }> | Readonly<{
-    id: "openai/skills#skills/.curated/security-best-practices";
-    name: "security-best-practices";
-    repository: "openai/skills";
-    path: "skills/.curated/security-best-practices";
+    id: "anthropics/skills#skills/docx";
+    name: "docx";
+    repository: "anthropics/skills";
+    path: "skills/docx";
     ref: "main";
-    description: "Perform language- and framework-specific security best-practice reviews.";
+    description: "Create, edit, and review Word documents.";
     tags: readonly string[];
+    marketSource: "featured";
 }> | Readonly<{
-    id: "openai/skills#skills/.curated/security-threat-model";
-    name: "security-threat-model";
-    repository: "openai/skills";
-    path: "skills/.curated/security-threat-model";
+    id: "anthropics/skills#skills/skill-creator";
+    name: "skill-creator";
+    repository: "anthropics/skills";
+    path: "skills/skill-creator";
     ref: "main";
-    description: "Create a repository-grounded threat model with actionable mitigations.";
+    description: "Create and improve reusable Agent Skills.";
     tags: readonly string[];
+    marketSource: "featured";
 }> | Readonly<{
     id: "SmileTao/dsh-plugin-dev-skill#skills/dsh-plugin-dev";
     name: "dsh-plugin-dev";
@@ -36,6 +39,7 @@ export declare const MARKETPLACE: readonly (Readonly<{
     ref: "main";
     description: "DeepSeek Harness 插件开发指南，覆盖 Cordis、工具、事件与发布流程。";
     tags: readonly string[];
+    marketSource: "featured";
 }> | Readonly<{
     id: "w2112515/dsh-plugin-development#skills/dsh-plugin-development";
     name: "dsh-plugin-development";
@@ -44,6 +48,7 @@ export declare const MARKETPLACE: readonly (Readonly<{
     ref: "main";
     description: "Portable DeepSeek Harness plugin design, implementation and diagnostics workflow.";
     tags: readonly string[];
+    marketSource: "featured";
 }>)[];
 /** Parse a public GitHub repository or directory URL without accepting an
  * arbitrary download host. Directory URLs use GitHub's /tree/<ref>/<path>
@@ -65,6 +70,11 @@ export declare function createMarketplace(options?: {}): {
     list: (cwd: any, force?: boolean) => Promise<{
         apiVersion: number;
         source: string;
+        registries: {
+            id: "anthropic-agent-skills";
+            label: "Anthropic 官方";
+        }[];
+        warning: string | null;
         items: {
             id: any;
             name: any;
@@ -78,6 +88,7 @@ export declare function createMarketplace(options?: {}): {
             author: any;
             license: any;
             tags: any;
+            marketSource: any;
             latestRevision: any;
             lastPushedAt: any;
             status: string;
@@ -93,6 +104,7 @@ export declare function createMarketplace(options?: {}): {
         repository: any;
         path: any;
         ref: any;
+        marketSource: any;
         url: any;
         description: any;
         iconUrl: any;

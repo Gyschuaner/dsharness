@@ -1,9 +1,10 @@
 /**
- * Versioned, read-only Plugin marketplace Registry (DSH-030).
+ * Versioned Plugin marketplace Registry (DSH-030 / DSH-036).
  *
  * The Registry is data only. It never carries executable code or secrets. The
  * Host validates the document before merging it with the built-in featured
- * list, and Phase 1 deliberately leaves Registry-only entries view-only.
+ * list. A Registry package becomes installable only after npm manifest
+ * validation; repository-only records remain view-only.
  */
 export const REGISTRY_SCHEMA_VERSION = 1 as const;
 export const DEFAULT_REGISTRY_URL = 'https://raw.githubusercontent.com/Gyschuaner/dsharness/main/marketplace/plugin-registry.json';

@@ -8,8 +8,9 @@ Host 路由 `/api/mcp-manager` 管理 web profile 中的 MCP 服务器行。
 
 - **服务器**：查看配置、Loader 运行阶段、真实投影的工具清单和启停状态；新增、编辑、
   删除或触发 Cordis 热重载。
-- **市场**：以去噪的 GitHub 仓库列表展示 5 个精选入口；详情抽屉按需读取 GitHub 与
-  MCP Registry 元数据，包括项目图标、作者、语言、许可证、Stars/Forks、Topics 和最新发布。
+- **市场**：精选入口与官方 MCP Registry 合并展示；搜索词由 Host 发送到 Registry，支持
+  opaque cursor 分页。详情抽屉按需读取 Registry 与 GitHub 元数据，包括项目图标、作者、
+  语言、许可证、Stars/Forks、Topics 和最新发布。
 - 图标优先级是 MCP Registry 的可信 HTTPS 位图、GitHub owner avatar、通用链接图标。
   SVG 和非可信远程域不会直接渲染。
 
@@ -54,8 +55,10 @@ Host 路由 `/api/mcp-manager` 管理 web profile 中的 MCP 服务器行。
 `headers` 都生成为 `!!js process.env.NAME`。启用带 `requiredEnv` 的配置前，Host 会
 检查当前进程环境；缺失时拒绝启用并指出变量名。
 
-市场“安装”只是导入经过审阅的配置，且一律默认停用；点击安装不会运行 `npx`、Docker
-或其他第三方程序。一个仓库包含多个 Server、无法安全推导单一配置时，只允许跳转 GitHub。
+市场“安装”只写入默认停用的配置；点击安装不会运行 `npx`、Docker 或其他第三方程序。
+官方 Registry 条目只有在元数据能唯一推导出一个 HTTPS `streamable-http` Remote，或一个
+固定版本 npm stdio Package 时才可安装；环境变量只记录名称。多 Server、复数传输声明、
+模板 URL、非 HTTPS 远端或不明确的参数都保持“仅查看”。
 
 ## 本地挂载
 

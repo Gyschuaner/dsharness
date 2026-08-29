@@ -3,11 +3,11 @@
 // marketplace tests below.
 // @ts-nocheck
 /**
- * dsh-skill-manager — curated Skill marketplace (DSH-008 / V1.1).
+ * dsh-skill-manager — trusted Registry and GitHub Skill marketplace (DSH-008 / DSH-036).
  *
- * The browser only talks to this Host-owned service.  The catalog is a small
- * reviewed set of public GitHub Skill directories; repository metadata and
- * files are read from GitHub at request time.  Installation copies Markdown
+ * The browser only talks to this Host-owned service. The catalog merges a
+ * reviewed fallback with trusted remote indexes; repository metadata and
+ * files are read from GitHub at request time. Installation copies Markdown
  * and resource files only.  It never runs third-party scripts or package
  * lifecycle hooks.
  */
@@ -42,31 +42,34 @@ const MAX_ARCHIVE_EXPANDED_BYTES = 120 * 1024 * 1024;
  */
 export const MARKETPLACE = Object.freeze([
 	Object.freeze({
-		id: 'openai/skills#skills/.curated/cli-creator',
-		name: 'cli-creator',
-		repository: 'openai/skills',
-		path: 'skills/.curated/cli-creator',
+		id: 'anthropics/skills#skills/xlsx',
+		name: 'xlsx',
+		repository: 'anthropics/skills',
+		path: 'skills/xlsx',
 		ref: 'main',
-		description: 'Create or improve command-line tools with a focused, testable workflow.',
-		tags: Object.freeze(['OpenAI', 'CLI']),
+		description: 'Create, edit, analyze, and verify spreadsheet workbooks.',
+		tags: Object.freeze(['Anthropic', 'Documents']),
+		marketSource: 'featured',
 	}),
 	Object.freeze({
-		id: 'openai/skills#skills/.curated/security-best-practices',
-		name: 'security-best-practices',
-		repository: 'openai/skills',
-		path: 'skills/.curated/security-best-practices',
+		id: 'anthropics/skills#skills/docx',
+		name: 'docx',
+		repository: 'anthropics/skills',
+		path: 'skills/docx',
 		ref: 'main',
-		description: 'Perform language- and framework-specific security best-practice reviews.',
-		tags: Object.freeze(['OpenAI', 'Security']),
+		description: 'Create, edit, and review Word documents.',
+		tags: Object.freeze(['Anthropic', 'Documents']),
+		marketSource: 'featured',
 	}),
 	Object.freeze({
-		id: 'openai/skills#skills/.curated/security-threat-model',
-		name: 'security-threat-model',
-		repository: 'openai/skills',
-		path: 'skills/.curated/security-threat-model',
+		id: 'anthropics/skills#skills/skill-creator',
+		name: 'skill-creator',
+		repository: 'anthropics/skills',
+		path: 'skills/skill-creator',
 		ref: 'main',
-		description: 'Create a repository-grounded threat model with actionable mitigations.',
-		tags: Object.freeze(['OpenAI', 'Security']),
+		description: 'Create and improve reusable Agent Skills.',
+		tags: Object.freeze(['Anthropic', 'Developer Tools']),
+		marketSource: 'featured',
 	}),
 	Object.freeze({
 		id: 'SmileTao/dsh-plugin-dev-skill#skills/dsh-plugin-dev',
@@ -76,6 +79,7 @@ export const MARKETPLACE = Object.freeze([
 		ref: 'main',
 		description: 'DeepSeek Harness 插件开发指南，覆盖 Cordis、工具、事件与发布流程。',
 		tags: Object.freeze(['DSH', 'Cordis']),
+		marketSource: 'featured',
 	}),
 	Object.freeze({
 		id: 'w2112515/dsh-plugin-development#skills/dsh-plugin-development',
@@ -85,6 +89,17 @@ export const MARKETPLACE = Object.freeze([
 		ref: 'main',
 		description: 'Portable DeepSeek Harness plugin design, implementation and diagnostics workflow.',
 		tags: Object.freeze(['DSH', 'Cordis']),
+		marketSource: 'featured',
+	}),
+]);
+
+const TRUSTED_SKILL_INDEXES = Object.freeze([
+	Object.freeze({
+		id: 'anthropic-agent-skills',
+		url: 'https://raw.githubusercontent.com/anthropics/skills/main/.claude-plugin/marketplace.json',
+		repository: 'anthropics/skills',
+		ref: 'main',
+		label: 'Anthropic 官方',
 	}),
 ]);
 
@@ -253,11 +268,13 @@ export function createMarketplace(options = {}) {
 	const entries = normalizeEntries(options.entries);
 	const fetchImpl = options.fetch || globalThis.fetch;
 	const logger = options.logger;
+	const environment = options.env || process.env;
 	const cacheTtlMs = Number.isFinite(options.cacheTtlMs) && options.cacheTtlMs > 0 ? options.cacheTtlMs : DEFAULT_CACHE_TTL_MS;
 	const cache = new Map();
+	const discoveredEntries = new Map();
 
 	function findEntry(id) {
-		return entries.find((entry) => entry.id === id) || null;
+		return entries.find((entry) => entry.id === id) || discoveredEntries.get(id) || null;
 	}
 
 	async function request(url, { optional = false, limit = 2 * 1024 * 1024 } = {}) {
@@ -265,10 +282,12 @@ export function createMarketplace(options = {}) {
 		const signal = globalThis.AbortSignal && typeof globalThis.AbortSignal.timeout === 'function'
 			? globalThis.AbortSignal.timeout(8_000)
 			: undefined;
+		const token = environment.GITHUB_TOKEN || environment.GH_TOKEN;
 		const response = await fetchImpl(url, {
 			headers: {
 				accept: 'application/vnd.github+json, application/json, text/plain',
 				'user-agent': 'dsh-skill-manager/0.2.0',
+				...(token ? { authorization: `Bearer ${token}` } : {}),
 			},
 			...(signal ? { signal } : {}),
 		});
@@ -295,6 +314,66 @@ export function createMarketplace(options = {}) {
 			if (hit) return { value: hit.value, stale: true, error: errorMessage(error) };
 			throw error;
 		}
+	}
+
+	function trustedIndexEntries(index, value) {
+		const document = isRecord(value) ? value : {};
+		const plugins = Array.isArray(document.plugins) ? document.plugins : [];
+		const output = [];
+		for (const pluginValue of plugins) {
+			if (!isRecord(pluginValue)) continue;
+			const pluginName = typeof pluginValue.name === 'string' ? pluginValue.name.trim() : '';
+			const pluginDescription = typeof pluginValue.description === 'string' ? pluginValue.description.trim() : '';
+			for (const skillValue of Array.isArray(pluginValue.skills) ? pluginValue.skills : []) {
+				const path = typeof skillValue === 'string' ? skillValue.replace(/^\.\//, '').replace(/\/$/, '') : '';
+				const name = path.split('/').pop() || '';
+				if (!safeRelativePath(path) || !NAME_RE.test(name)) continue;
+				try {
+					output.push(checkedEntry({
+						id: `${index.repository}#${path}`,
+						name,
+						repository: index.repository,
+						path,
+						ref: index.ref,
+						description: pluginDescription || `来自 ${index.label} 的 ${name} Skill。`,
+						tags: [index.label, pluginName].filter(Boolean),
+						marketSource: 'trusted-registry',
+						registryId: index.id,
+					}));
+				} catch (error) {
+					logger?.warn?.(`skill-manager: 忽略无效远程市场条目 ${index.id}/${path}: ${errorMessage(error)}`);
+				}
+			}
+		}
+		return output;
+	}
+
+	async function discoverEntries(force = false) {
+		const warnings = [];
+		for (const index of TRUSTED_SKILL_INDEXES) {
+			try {
+				const result = await cached(`skill-index:${index.id}`, force, async () => requestJson(index.url));
+				for (const entry of trustedIndexEntries(index, result.value)) discoveredEntries.set(entry.id, entry);
+				if (result.error) warnings.push(`${index.label}：${result.error}`);
+			} catch (error) {
+				warnings.push(`${index.label}：${errorMessage(error)}`);
+			}
+		}
+		const merged = [];
+		const seen = new Set();
+		for (const entry of [...entries, ...discoveredEntries.values()]) {
+			if (seen.has(entry.id)) continue;
+			seen.add(entry.id);
+			merged.push(entry);
+		}
+		return { entries: merged, warning: warnings.join('；') || null };
+	}
+
+	async function resolveEntry(id, force = false) {
+		const current = findEntry(id);
+		if (current !== null && !force) return current;
+		await discoverEntries(force);
+		return findEntry(id);
 	}
 
 	async function repositoryArchive(entry) {
@@ -556,14 +635,15 @@ export function createMarketplace(options = {}) {
 	}
 
 	async function list(cwd, force = false) {
+		const discovery = await discoverEntries(force);
 		let projectRoot = null;
 		let state = null;
 		if (typeof cwd === 'string' && cwd !== '') {
 			projectRoot = await findProjectRoot(cwd);
 			state = await readProjectConfig(projectRoot, options);
 		}
-		const items = await Promise.all(entries.map(async (entry) => {
-			const meta = await metadata(entry, force);
+		const items = await Promise.all(discovery.entries.map(async (entry) => {
+			const meta = entry.marketSource === 'trusted-registry' ? repoFallback(entry) : await metadata(entry, force);
 			const local = projectRoot && state ? await projectItemState(projectRoot, state, entry, meta).catch((error) => ({ status: 'error', existing: null, selection: null, metadataError: errorMessage(error) })) : { status: 'project-required', existing: null, selection: null };
 			return {
 				id: entry.id,
@@ -578,6 +658,7 @@ export function createMarketplace(options = {}) {
 				author: meta.author,
 				license: meta.license,
 				tags: entry.tags || [],
+				marketSource: entry.marketSource || 'featured',
 				latestRevision: meta.revision,
 				lastPushedAt: meta.lastPushedAt,
 				status: local.status,
@@ -586,11 +667,11 @@ export function createMarketplace(options = {}) {
 				metadataError: [meta.metadataError, local.metadataError].filter(Boolean).join('；') || null,
 			};
 		}));
-		return { apiVersion: MARKET_API_VERSION, source: 'curated-github', items };
+		return { apiVersion: MARKET_API_VERSION, source: 'featured+trusted-registries', registries: TRUSTED_SKILL_INDEXES.map((index) => ({ id: index.id, label: index.label })), warning: discovery.warning, items };
 	}
 
 	async function detail(id, cwd, force = false) {
-		const entry = findEntry(id);
+		const entry = await resolveEntry(id, force);
 		if (entry === null) throw new ApiError(404, '市场条目不存在', 'MARKET_NOT_FOUND');
 		const meta = await metadata(entry, force);
 		let bundle = null;
@@ -609,6 +690,7 @@ export function createMarketplace(options = {}) {
 			repository: entry.repository,
 			path: entry.path,
 			ref: entry.ref,
+			marketSource: entry.marketSource || 'featured',
 			url: meta.url,
 			description: meta.description || entry.description,
 			iconUrl: meta.iconUrl,
@@ -673,7 +755,7 @@ export function createMarketplace(options = {}) {
 	}
 
 	async function preview(id, cwd) {
-		const entry = findEntry(id);
+		const entry = await resolveEntry(id);
 		if (entry === null) throw new ApiError(404, '市场条目不存在', 'MARKET_NOT_FOUND');
 		return previewEntry(entry, await loadBundle(entry), cwd, true);
 	}
@@ -763,7 +845,7 @@ export function createMarketplace(options = {}) {
 	}
 
 	async function install(id, cwd) {
-		const entry = findEntry(id);
+		const entry = await resolveEntry(id, true);
 		if (entry === null) throw new ApiError(404, '市场条目不存在', 'MARKET_NOT_FOUND');
 		return installEntry(entry, await loadBundle(entry), cwd, true);
 	}
