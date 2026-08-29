@@ -720,7 +720,7 @@ type ApiPayload = Record<string, DynamicValue>;
 					message ? h('p', { className: 'sk-marketNotice', role: 'status' }, message) : null,
 					error ? h('div', { className: 'sk-marketLoadError', role: 'alert' }, h('p', { className: 'sk-error' }, '加载 Skill 市场失败：' + error), h(Button, { variant: 'outline', onClick: function () { setAttempt(function (value: DynamicValue) { return value + 1; }); } }, '重试')) : null,
 					h('div', { className: 'sk-marketList', 'data-testid': 'skill-market-list' },
-						loading && !loaded ? h('p', { className: 'sk-empty', role: 'status' }, '正在读取 Skill 市场…') : null,
+						loading && !loaded ? h(SkillFindingState, { label: 'Skill Searching', ariaLabel: '正在搜索 Skill 市场' }) : null,
 						!loading && visible.length === 0 ? h('p', { className: 'sk-empty' }, '没有匹配的 Skill。') : null,
 						visible.map(function (item: DynamicValue) {
 							return h('button', { type: 'button', key: item.id, className: 'sk-marketRow' + (selected && selected.id === item.id ? ' sk-marketRowActive' : ''), onClick: function () { openItem(item); } },
@@ -765,7 +765,9 @@ type ApiPayload = Record<string, DynamicValue>;
 				)
 				);
 			}
-			function SkillFindingState() {
+			function SkillFindingState(props: DynamicValue) {
+				var label = props && props.label ? String(props.label) : 'Skill Finding';
+				var ariaLabel = props && props.ariaLabel ? String(props.ariaLabel) : undefined;
 				var particles = [
 					['North', false],
 					['East', true],
@@ -773,7 +775,7 @@ type ApiPayload = Record<string, DynamicValue>;
 				];
 				return h(
 					'div',
-					{ className: 'sk-findingState', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' },
+					{ className: 'sk-findingState', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true', 'aria-label': ariaLabel },
 					h(
 						'div',
 						{ className: 'sk-findingVisual', 'aria-hidden': true },
@@ -786,8 +788,8 @@ type ApiPayload = Record<string, DynamicValue>;
 						}),
 						h('span', { className: 'sk-findingCore' }, h(P.IconSkillOutline16))
 					),
-					h('span', { className: 'sk-findingLabel', 'data-text': 'Skill Finding' },
-						'Skill Finding',
+					h('span', { className: 'sk-findingLabel', 'data-text': label },
+						label,
 						h('span', { className: 'sk-findingCursor', 'aria-hidden': true }))
 				);
 			}

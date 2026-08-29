@@ -513,6 +513,39 @@ test('Skill market uses the shared page chrome and opens a safe repository detai
 	assert.ok(h.dom.window.document.querySelector('.sk-marketInstallBtn'), 'install action stays visually separate');
 });
 
+test('Skill market initial discovery uses the animated searching state', async (t) => {
+	const marketplace = deferred();
+	const router = async (body) => {
+		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable', 'marketplace'] };
+		if (body.op === 'catalog') return view('/project-a', []);
+		if (body.op === 'presets.list') return { presets: [] };
+		if (body.op === 'marketplace') return marketplace.promise;
+		throw new Error(`unexpected op ${body.op}`);
+	};
+	const h = await makeHarness(router);
+	t.after(h.cleanup);
+	await h.open();
+	await h.click(h.button('Skill 市场'));
+
+	const marketList = h.dom.window.document.querySelector('[data-testid="skill-market-list"]');
+	const findingState = marketList.querySelector('.sk-findingState');
+	assert.ok(findingState, 'initial remote discovery renders the optical finding animation');
+	assert.equal(findingState.getAttribute('role'), 'status');
+	assert.equal(findingState.getAttribute('aria-live'), 'polite');
+	assert.equal(findingState.getAttribute('aria-label'), '正在搜索 Skill 市场');
+	assert.equal(findingState.querySelector('.sk-findingLabel').textContent, 'Skill Searching');
+	assert.equal(findingState.querySelector('.sk-findingLabel').getAttribute('data-text'), 'Skill Searching');
+	assert.equal(findingState.querySelectorAll('.sk-findingParticle').length, 3);
+	assert.ok(findingState.querySelector('.sk-findingCursor'));
+	assert.equal(marketList.textContent.includes('正在读取 Skill 市场'), false, 'plain loading copy is removed');
+
+	marketplace.resolve({ apiVersion: 1, source: 'curated-github', items: [] });
+	await h.flush();
+	await h.flush();
+	assert.equal(marketList.querySelector('.sk-findingState'), null, 'searching animation leaves after discovery resolves');
+	assert.ok(marketList.textContent.includes('没有匹配的 Skill。'));
+});
+
 test('Skill market installs an arbitrary GitHub Skill through inspect, preview, and confirm', async (t) => {
 	const calls = [];
 	const router = async (body) => {
