@@ -257,7 +257,6 @@ type ApiPayload = Record<string, DynamicValue>;
 				'.sk-marketCopy{display:flex;flex-direction:column;min-width:0}',
 				'.sk-marketTitle{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
 				'.sk-marketDesc{display:block;margin-top:5px;color:var(--dsw-alias-label-tertiary);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-				'.sk-marketMeta{display:block;margin-top:5px;color:var(--dsw-alias-label-quaternary);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
 				'.sk-marketSide{display:flex;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
 				'.sk-marketStatus{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
 				'.sk-marketStatus-update-available{color:var(--dsw-alias-state-error-primary)}',
@@ -379,7 +378,6 @@ type ApiPayload = Record<string, DynamicValue>;
 					'.sk-marketFallback{margin-top:1px}',
 					'.sk-marketTitle{font-size:13.5px;font-weight:600}',
 					'.sk-marketDesc{margin-top:5px;line-height:1.5}',
-					'.sk-marketMeta{margin-top:7px;font-size:11.5px}',
 					'.sk-marketSide{gap:14px}',
 					'.sk-drawer{position:fixed;top:66px;right:0;bottom:0;left:auto;box-sizing:border-box;width:400px;max-width:calc(100vw - 64px);z-index:230;box-shadow:-10px 0 24px rgba(16,24,40,.06)}',
 					'.sk-marketDrawer{position:fixed;top:66px;right:0;bottom:0;left:auto;width:400px;max-width:calc(100vw - 64px);z-index:230}',
@@ -726,7 +724,7 @@ type ApiPayload = Record<string, DynamicValue>;
 						!loading && visible.length === 0 ? h('p', { className: 'sk-empty' }, '没有匹配的 Skill。') : null,
 						visible.map(function (item: DynamicValue) {
 							return h('button', { type: 'button', key: item.id, className: 'sk-marketRow' + (selected && selected.id === item.id ? ' sk-marketRowActive' : ''), onClick: function () { openItem(item); } },
-								h('span', { className: 'sk-marketMain' }, h(MarketIcon, { src: item.iconUrl }), h('span', { className: 'sk-marketCopy' }, h('span', { className: 'sk-marketTitle' }, item.name), h('span', { className: 'sk-marketDesc' }, item.description), h('span', { className: 'sk-marketMeta' }, item.marketSource === 'trusted-registry' ? '可信 Registry · ' : '精选 · ', item.repository, item.license ? ' · ' + item.license : ''))),
+								h('span', { className: 'sk-marketMain' }, h(MarketIcon, { src: item.iconUrl }), h('span', { className: 'sk-marketCopy' }, h('span', { className: 'sk-marketTitle' }, item.name), h('span', { className: 'sk-marketDesc' }, item.description))),
 								h('span', { className: 'sk-marketSide' }, h('span', { className: 'sk-marketStatus sk-marketStatus-' + item.status }, marketStatusLabel(item.status)), h(P.IconChevronRightOutline14))
 							);
 						})
@@ -740,7 +738,7 @@ type ApiPayload = Record<string, DynamicValue>;
 								activeDetail.description ? h('p', { className: 'sk-descFull' }, activeDetail.description) : null,
 								activeDetail.metadataError ? h('p', { className: 'sk-marketMetaNotice' }, '部分远程信息暂不可用：' + activeDetail.metadataError) : null,
 								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '发现与安装'), h('p', { className: 'sk-slimNote' }, '自动同步可信 Skill Registry，也支持任意公开 GitHub 仓库；安装阶段只校验并写入文件，不执行第三方代码。')),
-								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '仓库信息'), h('div', { className: 'sk-marketFacts' }, h('span', null, '作者：' + (activeDetail.author || '—')), h('span', null, '许可证：' + (activeDetail.license || '—')), h('span', null, 'Stars：' + (activeDetail.stars === null || activeDetail.stars === undefined ? '—' : activeDetail.stars)), h('span', null, '文件：' + (activeDetail.fileCount === null || activeDetail.fileCount === undefined ? '—' : activeDetail.fileCount)))) ,
+								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '仓库信息'), h('div', { className: 'sk-marketFacts' }, h('span', null, '来源：' + (((selected && selected.marketSource) || activeDetail.marketSource) === 'trusted-registry' ? '可信 Registry' : '精选')), h('span', null, '仓库：' + activeDetail.repository), h('span', null, '作者：' + (activeDetail.author || '—')), h('span', null, '许可证：' + (activeDetail.license || '—')), h('span', null, 'Stars：' + (activeDetail.stars === null || activeDetail.stars === undefined ? '—' : activeDetail.stars)), h('span', null, '文件：' + (activeDetail.fileCount === null || activeDetail.fileCount === undefined ? '—' : activeDetail.fileCount)))) ,
 								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '当前状态'), h('div', { className: 'sk-marketState' }, marketStatusLabel(detailStatus), project ? ' · 安装到 ' + project.title : ' · 请选择安装目标项目')),
 								activeDetail.files && activeDetail.files.length > 0 ? h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, 'Skill 文件'), h('div', { className: 'sk-marketFiles' }, activeDetail.files.map(function (file: DynamicValue) { return h('code', { key: file }, file); }))) : null,
 								h('div', { className: 'sk-sec' }, h('div', { className: 'sk-secTitle' }, '安装校验'), h('div', { className: 'sk-marketChecks' }, h('span', null, '✓ SKILL.md frontmatter'), h('span', null, '✓ 路径和文件大小'), h('span', null, '✓ 拒绝符号链接'), h('span', null, '✓ 不执行第三方脚本')))
