@@ -117,6 +117,9 @@ function inferPackageInstall(server, serverName, description) {
 export function normalizeRegistryMarketplaceEntry(value) {
     const response = isRecord(value) ? value : {};
     const server = isRecord(response.server) ? response.server : response;
+    const metadata = isRecord(response._meta) && isRecord(response._meta['io.modelcontextprotocol.registry/official'])
+        ? response._meta['io.modelcontextprotocol.registry/official']
+        : {};
     const registryName = text(server.name);
     if (registryName === null)
         return null;
@@ -141,6 +144,8 @@ export function normalizeRegistryMarketplaceEntry(value) {
         source: 'mcp-registry',
         install,
         installReason: install === null ? 'Registry 元数据无法唯一、安全地推导一个 DSH 配置' : null,
+        publishedAt: text(metadata.publishedAt),
+        updatedAt: text(metadata.updatedAt),
     };
 }
 export const MARKETPLACE = Object.freeze([

@@ -647,11 +647,11 @@ function makeHandler(deps) {
         async capabilities() {
             return {
                 apiVersion: PROJECT_API_VERSION,
-                features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace', 'github-install', 'project-validate', 'read-only-catalog'],
+                features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace', 'market-sort', 'github-install', 'project-validate', 'read-only-catalog'],
             };
         },
         async marketplace(body) {
-            return marketplace.list(body.cwd, body.force === true);
+            return marketplace.list(body.cwd, body.force === true, body.sort);
         },
         async ['marketplace.detail'](body) {
             if (typeof body.id !== 'string' || body.id === '')

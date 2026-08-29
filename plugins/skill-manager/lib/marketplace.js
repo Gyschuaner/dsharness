@@ -272,6 +272,7 @@ export function createMarketplace(options = {}) {
     const environment = options.env || process.env;
     const cacheTtlMs = Number.isFinite(options.cacheTtlMs) && options.cacheTtlMs > 0 ? options.cacheTtlMs : DEFAULT_CACHE_TTL_MS;
     const cache = new Map();
+    const requests = new Map();
     const discoveredEntries = new Map();
     function findEntry(id) {
         return entries.find((entry) => entry.id === id) || discoveredEntries.get(id) || null;
@@ -309,15 +310,28 @@ export function createMarketplace(options = {}) {
         const hit = cache.get(key);
         if (!force && hit && hit.expiresAt > Date.now())
             return { value: hit.value, stale: false };
+        const active = requests.get(key);
+        if (active)
+            return active;
+        const pending = (async () => {
+            try {
+                const value = await load();
+                cache.set(key, { value, expiresAt: Date.now() + cacheTtlMs });
+                return { value, stale: false };
+            }
+            catch (error) {
+                if (hit)
+                    return { value: hit.value, stale: true, error: errorMessage(error) };
+                throw error;
+            }
+        })();
+        requests.set(key, pending);
         try {
-            const value = await load();
-            cache.set(key, { value, expiresAt: Date.now() + cacheTtlMs });
-            return { value, stale: false };
+            return await pending;
         }
-        catch (error) {
-            if (hit)
-                return { value: hit.value, stale: true, error: errorMessage(error) };
-            throw error;
+        finally {
+            if (requests.get(key) === pending)
+                requests.delete(key);
         }
     }
     function trustedIndexEntries(index, value) {
@@ -392,22 +406,12 @@ export function createMarketplace(options = {}) {
         });
         return result.value;
     }
-    async function repository(entry, force = false) {
-        return cached(`repo:${entry.id}`, force, async () => {
+    async function repositorySummary(entry, force = false) {
+        return cached(`repo-summary:${entry.repository}`, force, async () => {
             const value = await requestJson(`https://api.github.com/repos/${entry.repository}`);
             const repo = isRecord(value) ? value : {};
             const owner = isRecord(repo.owner) ? repo.owner : {};
             const license = isRecord(repo.license) ? repo.license : {};
-            let revision = null;
-            try {
-                const basePath = entryBasePath(entry);
-                const commitValue = await requestJson(`https://api.github.com/repos/${entry.repository}/commits?path=${encodeURIComponent(basePath === '' ? 'SKILL.md' : `${basePath}/SKILL.md`)}&sha=${encodeURIComponent(entry.ref)}&per_page=1`, { optional: true });
-                if (Array.isArray(commitValue) && isRecord(commitValue[0]) && typeof commitValue[0].sha === 'string')
-                    revision = commitValue[0].sha;
-            }
-            catch (error) {
-                logger?.warn?.(`skill-manager: GitHub commit metadata unavailable for ${entry.id}: ${errorMessage(error)}`);
-            }
             return {
                 url: typeof repo.html_url === 'string' ? repo.html_url : safeRepositoryUrl(entry.repository),
                 description: typeof repo.description === 'string' && repo.description.trim() !== '' ? repo.description.trim() : entry.description,
@@ -419,8 +423,23 @@ export function createMarketplace(options = {}) {
                 license: typeof license.spdx_id === 'string' && license.spdx_id !== 'NOASSERTION' ? license.spdx_id : null,
                 lastPushedAt: typeof repo.pushed_at === 'string' ? repo.pushed_at : null,
                 topics: cleanTopics(repo.topics),
-                revision,
             };
+        });
+    }
+    async function repository(entry, force = false) {
+        return cached(`repo:${entry.id}`, force, async () => {
+            const summary = await repositorySummary(entry, force);
+            let revision = null;
+            try {
+                const basePath = entryBasePath(entry);
+                const commitValue = await requestJson(`https://api.github.com/repos/${entry.repository}/commits?path=${encodeURIComponent(basePath === '' ? 'SKILL.md' : `${basePath}/SKILL.md`)}&sha=${encodeURIComponent(entry.ref)}&per_page=1`, { optional: true });
+                if (Array.isArray(commitValue) && isRecord(commitValue[0]) && typeof commitValue[0].sha === 'string')
+                    revision = commitValue[0].sha;
+            }
+            catch (error) {
+                logger?.warn?.(`skill-manager: GitHub commit metadata unavailable for ${entry.id}: ${errorMessage(error)}`);
+            }
+            return { ...summary.value, revision };
         });
     }
     async function metadata(entry, force = false) {
@@ -670,16 +689,41 @@ export function createMarketplace(options = {}) {
         }
         return { status: 'installed', existing, selection };
     }
-    async function list(cwd, force = false) {
+    function marketplaceSort(value) {
+        const sort = String(value || 'relevance').trim();
+        if (sort !== 'relevance' && sort !== 'popular' && sort !== 'recent')
+            throw new ApiError(400, 'Skill 市场排序无效', 'MARKET_SORT_INVALID');
+        return sort;
+    }
+    async function list(cwd, force = false, requestedSort = 'relevance') {
+        const sort = marketplaceSort(requestedSort);
         const discovery = await discoverEntries(force);
+        const sortedRepositoryMeta = new Map();
+        if (sort !== 'relevance') {
+            const representatives = new Map();
+            for (const entry of discovery.entries)
+                if (!representatives.has(entry.repository))
+                    representatives.set(entry.repository, entry);
+            await Promise.all([...representatives.values()].map(async (entry) => {
+                try {
+                    sortedRepositoryMeta.set(entry.repository, await repositorySummary(entry, force));
+                }
+                catch {
+                    sortedRepositoryMeta.set(entry.repository, null);
+                }
+            }));
+        }
         let projectRoot = null;
         let state = null;
         if (typeof cwd === 'string' && cwd !== '') {
             projectRoot = await findProjectRoot(cwd);
             state = await readProjectConfig(projectRoot, options);
         }
-        const items = await Promise.all(discovery.entries.map(async (entry) => {
-            const meta = entry.marketSource === 'trusted-registry' ? repoFallback(entry) : await metadata(entry, force);
+        const items = await Promise.all(discovery.entries.map(async (entry, relevanceIndex) => {
+            const sortedMeta = sortedRepositoryMeta.get(entry.repository);
+            const meta = entry.marketSource === 'trusted-registry'
+                ? (sortedMeta && sortedMeta.value ? { ...repoFallback(entry), ...sortedMeta.value, stale: sortedMeta.stale === true, metadataError: sortedMeta.error || null } : repoFallback(entry))
+                : await metadata(entry, force);
             const local = projectRoot && state ? await projectItemState(projectRoot, state, entry, meta).catch((error) => ({ status: 'error', existing: null, selection: null, metadataError: errorMessage(error) })) : { status: 'project-required', existing: null, selection: null };
             return {
                 id: entry.id,
@@ -693,6 +737,8 @@ export function createMarketplace(options = {}) {
                 repositoryUrl: meta.url,
                 author: meta.author,
                 license: meta.license,
+                stars: meta.stars,
+                forks: meta.forks,
                 tags: entry.tags || [],
                 marketSource: entry.marketSource || 'featured',
                 latestRevision: meta.revision,
@@ -701,9 +747,23 @@ export function createMarketplace(options = {}) {
                 installedRevision: local.selection?.marketRevision || null,
                 stale: meta.stale === true,
                 metadataError: [meta.metadataError, local.metadataError].filter(Boolean).join('；') || null,
+                relevanceIndex,
             };
         }));
-        return { apiVersion: MARKET_API_VERSION, source: 'featured+trusted-registries', registries: TRUSTED_SKILL_INDEXES.map((index) => ({ id: index.id, label: index.label })), warning: discovery.warning, items };
+        const ranked = sort === 'relevance' ? items : [...items].sort((left, right) => {
+            if (sort === 'popular') {
+                const delta = Number(right.stars || 0) - Number(left.stars || 0) || Number(right.forks || 0) - Number(left.forks || 0);
+                if (delta !== 0)
+                    return delta;
+            }
+            if (sort === 'recent') {
+                const delta = Date.parse(right.lastPushedAt || '') - Date.parse(left.lastPushedAt || '');
+                if (Number.isFinite(delta) && delta !== 0)
+                    return delta;
+            }
+            return left.relevanceIndex - right.relevanceIndex;
+        });
+        return { apiVersion: MARKET_API_VERSION, source: 'featured+trusted-registries', sort, registries: TRUSTED_SKILL_INDEXES.map((index) => ({ id: index.id, label: index.label })), warning: discovery.warning, items: ranked.map(({ relevanceIndex: _relevanceIndex, ...item }) => item) };
     }
     async function detail(id, cwd, force = false) {
         const entry = await resolveEntry(id, force);

@@ -437,7 +437,9 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 
 test('Skill market uses the shared page chrome and opens a safe repository detail drawer', async (t) => {
 	const currentRow = row('local-skill', 'Local skill');
+	const calls = [];
 	const router = async (body) => {
+		calls.push(body);
 		if (body.op === 'capabilities') return { apiVersion: 6, features: ['project-enable', 'marketplace'] };
 		if (body.op === 'catalog') return view('/project-a', [currentRow]);
 		if (body.op === 'presets.list') return { presets: [] };
@@ -475,6 +477,11 @@ test('Skill market uses the shared page chrome and opens a safe repository detai
 	await h.click(h.button('Skill 市场'));
 	await h.flush();
 	await h.flush();
+	const sort = h.dom.window.document.querySelector('.sk-marketSort');
+	assert.ok(sort);
+	await act(async () => { sort.value = 'popular'; sort.dispatchEvent(new h.dom.window.Event('change', { bubbles: true })); });
+	await h.flush(); await h.flush();
+	assert.ok(calls.some((call) => call.op === 'marketplace' && call.sort === 'popular'));
 	assert.ok(h.dom.window.document.querySelector('[data-testid="skill-market-list"]'));
 	assert.ok(h.dom.window.document.body.textContent.includes('demo'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));

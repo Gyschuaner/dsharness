@@ -442,6 +442,33 @@ test('npm discovery exposes only packages with a valid DSH manifest and pins the
 	assert.equal(detail.manifest.clientEntry, './lib/client.js');
 });
 
+test('npm marketplace supports popularity and recent sorting with one paging contract', async () => {
+	const f = await fixture();
+	const searchUrls: string[] = [];
+	const manifest = (name: string, repository: string) => ({ name, version: '1.0.0', description: `${name} plugin.`, repository: { url: `https://github.com/${repository}.git` }, main: './lib/index.js', dsh: { client: { platform: 'web' } } });
+	const fetch = async (url) => {
+		if (url.includes('/plugin-registry.json')) return response({ schemaVersion: 1, generatedAt: '2026-08-29T00:00:00Z', items: [] });
+		if (url.includes('/-/v1/search')) {
+			searchUrls.push(url);
+			return response({ objects: [
+				{ package: { name: 'dsh-sorted-old', date: '2026-01-01T00:00:00Z' }, score: { detail: { popularity: 0.9 } } },
+				{ package: { name: 'dsh-sorted-new', date: '2026-08-29T00:00:00Z' }, score: { detail: { popularity: 0.1 } } },
+			], total: 2 });
+		}
+		if (url.includes('registry.npmjs.org/dsh-sorted-old')) return response(manifest('dsh-sorted-old', 'example/dsh-sorted-old'));
+		if (url.includes('registry.npmjs.org/dsh-sorted-new')) return response(manifest('dsh-sorted-new', 'example/dsh-sorted-new'));
+		throw new Error(`unexpected URL ${url}`);
+	};
+	const manager = createPluginManager({ profileDir: f.profile, registryUrl: 'https://registry.example/plugin-registry.json', deps: { fetch: fetch as any } });
+	const popular = await manager.call('marketplace', { query: 'sorted', sort: 'popular', limit: 12 });
+	assert.deepEqual(popular.items.map((item) => item.id), ['npm:dsh-sorted-old', 'npm:dsh-sorted-new']);
+	assert.match(searchUrls[0], /popularity=1/);
+	const recent = await manager.call('marketplace', { query: 'sorted', sort: 'recent', limit: 12 });
+	assert.deepEqual(recent.items.map((item) => item.id), ['npm:dsh-sorted-new', 'npm:dsh-sorted-old']);
+	assert.match(searchUrls[1], /size=250/);
+	await assert.rejects(manager.call('marketplace', { sort: 'unknown' }), (error: unknown) => error instanceof ApiError && error.code === 'MARKET_SORT_INVALID');
+});
+
 test('Registry schema rejects unsafe or malformed data', () => {
 	assert.throws(() => normalizeRegistry({ schemaVersion: 2, generatedAt: '2026-08-24T03:00:00Z', items: [] }), /schemaVersion/);
 	assert.throws(() => normalizeRegistry({ schemaVersion: 1, generatedAt: '2026-08-24T03:00:00Z', items: [{ id: 'owner/repo', repository: 'owner/repo', description: 'x', iconUrl: 'http://evil.example/icon.png' }] }), /HTTPS/);

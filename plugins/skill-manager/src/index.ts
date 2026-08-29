@@ -122,6 +122,7 @@ interface ApiBody extends UnknownRecord {
 	url?: string;
 	path?: string;
 	force?: boolean;
+	sort?: string;
 }
 interface ZipValue extends UnknownRecord { __zip: Buffer; filename: string }
 interface RequestLike extends AsyncIterable<Uint8Array> { method?: string }
@@ -727,11 +728,11 @@ function makeHandler(deps: HandlerDeps): RequestHandler {
 		async capabilities() {
 			return {
 				apiVersion: PROJECT_API_VERSION,
-				features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace', 'github-install', 'project-validate', 'read-only-catalog'],
+				features: ['project-enable', 'unified-catalog', 'tags', 'presets', 'slim', 'marketplace', 'market-sort', 'github-install', 'project-validate', 'read-only-catalog'],
 			};
 		},
 		async marketplace(body) {
-			return marketplace.list(body.cwd, body.force === true);
+			return marketplace.list(body.cwd, body.force === true, body.sort);
 		},
 		async ['marketplace.detail'](body) {
 			if (typeof body.id !== 'string' || body.id === '') throw new ApiError(400, '缺少市场条目 id');

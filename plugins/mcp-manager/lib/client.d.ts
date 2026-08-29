@@ -73,7 +73,10 @@ interface McpMarketItem {
     installable: boolean;
     installReason: string | null;
     status: 'installed' | 'not-installed';
+    publishedAt?: string | null;
+    updatedAt?: string | null;
 }
+type McpMarketSort = 'relevance' | 'popular' | 'recent';
 interface McpMarketPage {
     limit: number;
     nextCursor: string | null;
@@ -108,6 +111,7 @@ interface McpApi {
         query?: string;
         cursor?: string;
         limit?: number;
+        sort?: McpMarketSort;
     }): Promise<{
         items: McpMarketItem[];
         page: McpMarketPage;

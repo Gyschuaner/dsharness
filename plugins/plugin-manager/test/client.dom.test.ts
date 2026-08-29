@@ -340,6 +340,11 @@ test('marketplace home stays flat and drawer reveals GitHub data on demand', asy
 	await h.openPlugin();
 	await h.click(h.button('插件市场'));
 	await h.flush();
+	const sort = h.dom.window.document.querySelector('.pm-sort');
+	assert.ok(sort);
+	await act(async () => { sort.value = 'recent'; sort.dispatchEvent(new h.dom.window.Event('change', { bubbles: true })); });
+	await h.flush(); await h.flush();
+	assert.ok(calls.some((call) => call.op === 'marketplace' && call.sort === 'recent'));
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-row').length, 3);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketIcon').length, 2);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .pm-marketFallback').length, 1);

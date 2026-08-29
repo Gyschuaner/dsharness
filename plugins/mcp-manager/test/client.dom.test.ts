@@ -269,6 +269,11 @@ test('market stays flat, uses received icons, opens metadata drawer, and install
 	const h = await makeHarness(router); t.after(h.cleanup);
 	await h.openMcp();
 	await h.click(h.button('市场')); await h.flush(); await h.flush();
+	const sort = h.dom.window.document.querySelector('.mm-sort');
+	assert.ok(sort);
+	await act(async () => { sort.value = 'popular'; sort.dispatchEvent(new h.dom.window.Event('change', { bubbles: true })); });
+	await h.flush(); await h.flush();
+	assert.ok(calls.some((call) => call.op === 'marketplace' && call.sort === 'popular'));
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] .mm-marketRow').length, 2);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="market-list"] img').length, 1);
 	assert.ok(!h.dom.window.document.body.textContent.includes('可靠来源'));

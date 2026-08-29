@@ -77,7 +77,11 @@ interface McpMarketItem {
 	installable: boolean;
 	installReason: string | null;
 	status: 'installed' | 'not-installed';
+	publishedAt?: string | null;
+	updatedAt?: string | null;
 }
+
+type McpMarketSort = 'relevance' | 'popular' | 'recent';
 
 interface McpMarketPage {
 	limit: number;
@@ -107,7 +111,7 @@ interface McpMarketDetail {
 
 interface McpApi {
 	call(op: 'list'): Promise<{ servers: McpServerView[]; connected: number }>;
-	call(op: 'marketplace', payload: { force: boolean; query?: string; cursor?: string; limit?: number }): Promise<{ items: McpMarketItem[]; page: McpMarketPage; warning?: string | null }>;
+	call(op: 'marketplace', payload: { force: boolean; query?: string; cursor?: string; limit?: number; sort?: McpMarketSort }): Promise<{ items: McpMarketItem[]; page: McpMarketPage; warning?: string | null }>;
 	call(op: 'marketplace.detail', payload: { id: string }): Promise<McpMarketDetail>;
 	call(op: string, payload?: Record<string, unknown>): Promise<unknown>;
 }
@@ -205,6 +209,8 @@ interface MarketDrawerProps {
 				'.mm-search{box-sizing:border-box;flex:none;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-module-platform);display:flex;align-items:center;gap:8px;padding:0 11px;color:var(--dsw-alias-label-tertiary)}',
 				'.mm-search:focus-within{border-color:var(--mm-accent);box-shadow:0 0 0 1px var(--mm-accent)}',
 				'.mm-search input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit}',
+				'.mm-sort{box-sizing:border-box;flex:none;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font:inherit;padding:0 30px 0 10px;cursor:pointer}',
+				'.mm-sort:focus{outline:2px solid var(--mm-accent);outline-offset:-1px;border-color:transparent}',
 				'.mm-search input::placeholder{color:var(--dsw-alias-label-quaternary)}',
 				'.mm-filters{flex:none;display:flex;align-items:center;gap:4px;padding:12px 0 13px}',
 				'.mm-filter{appearance:none;height:32px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;padding:0 11px}',
@@ -635,6 +641,7 @@ interface MarketDrawerProps {
 				var [error, setError] = React.useState('');
 				var [attempt, setAttempt] = React.useState(0);
 				var [query, setQuery] = React.useState('');
+				var [marketSort, setMarketSort] = React.useState<McpMarketSort>('relevance');
 				var [filter, setFilter] = React.useState('all');
 				var [selectedServer, setSelectedServer] = React.useState<McpServerView | null>(null);
 				var [editor, setEditor] = React.useState<McpServerView | 'new' | null>(null);
@@ -664,10 +671,10 @@ interface MarketDrawerProps {
 					setRefreshing(true);
 					return loadServers().catch(function (reason) { notify(reason instanceof Error ? reason.message : String(reason), true); }).finally(function () { setRefreshing(false); });
 				}
-				function loadMarket(force: boolean, search = query, cursor = '', append = false): Promise<void> {
+				function loadMarket(force: boolean, search = query, cursor = '', append = false, sort = marketSort): Promise<void> {
 					var request = ++marketRequest.current;
 					setMarketLoading(true);
-					return api.call('marketplace', { force: force === true, query: search.trim(), cursor: cursor, limit: 24 }).then(function (value) {
+					return api.call('marketplace', { force: force === true, query: search.trim(), cursor: cursor, limit: 24, sort: sort }).then(function (value) {
 						if (request !== marketRequest.current) return;
 						var incoming = value.items || [];
 						setMarket(function (current) {
@@ -699,7 +706,7 @@ interface MarketDrawerProps {
 					if (tab !== 'market') return;
 					var timer = window.setTimeout(function () { loadMarket(false, query, '', false); }, query.trim() === '' ? 0 : 320);
 					return function () { window.clearTimeout(timer); };
-				}, [tab, query]);
+				}, [tab, query, marketSort]);
 				React.useEffect(function () {
 					function onKey(event: KeyboardEvent): void {
 						if (event.key !== 'Escape') return;
@@ -799,7 +806,7 @@ interface MarketDrawerProps {
 							h('div', { className: 'mm-filters' }, filters.map(function (item) { return h('button', { key: item[0], type: 'button', className: 'mm-filter' + (filter === item[0] ? ' mm-filterOn' : ''), onClick: function () { setFilter(item[0]); } }, item[1]); })),
 							serverBody
 						) : h(React.Fragment, null,
-							h('div', { className: 'mm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: '搜索 MCP Server' })),
+							h('div', { className: 'mm-toolbar' }, h(Search, { value: query, onChange: setQuery, placeholder: '搜索 MCP Server' }), h('select', { className: 'mm-sort', 'aria-label': 'MCP 市场排序', value: marketSort, onChange: function (event: React.ChangeEvent<HTMLSelectElement>) { setMarketSort(event.target.value as McpMarketSort); } }, h('option', { value: 'relevance' }, '综合排序'), h('option', { value: 'popular' }, '热度优先'), h('option', { value: 'recent' }, '最新优先'))),
 							h('p', { className: 'mm-helper' }, '实时搜索官方 MCP Registry · 仅在配置可唯一、安全推导时允许安装'),
 							marketBody
 						),

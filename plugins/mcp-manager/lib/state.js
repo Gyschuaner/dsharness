@@ -634,13 +634,37 @@ export function createMcpManager(options = {}) {
             registry,
         };
     }
-    async function officialRegistryPage(query, cursor, limit, force) {
+    function marketplaceSort(value) {
+        const sort = cleanText(value, '排序', 20) || 'relevance';
+        if (sort !== 'relevance' && sort !== 'popular' && sort !== 'recent')
+            throw new ApiError(400, '市场排序无效', 'MARKET_SORT_INVALID');
+        return sort;
+    }
+    function rankMarketplace(entries, sort) {
+        if (sort === 'relevance')
+            return entries;
+        return entries.map((entry, index) => ({ entry, index })).sort((left, right) => {
+            if (sort === 'recent') {
+                const delta = Date.parse(right.entry.updatedAt || right.entry.publishedAt || '') - Date.parse(left.entry.updatedAt || left.entry.publishedAt || '');
+                if (Number.isFinite(delta) && delta !== 0)
+                    return delta;
+            }
+            if (sort === 'popular') {
+                const score = (entry) => (entry.source === 'featured' ? 1_000 : 0) + (entry.install !== null ? 100 : 0) + (entry.repository !== null ? 10 : 0);
+                const delta = score(right.entry) - score(left.entry);
+                if (delta !== 0)
+                    return delta;
+            }
+            return left.index - right.index;
+        }).map(({ entry }) => entry);
+    }
+    async function officialRegistryPage(query, cursor, limit, force, sort) {
         const params = new URLSearchParams({ limit: String(limit), version: 'latest' });
         if (query !== '')
             params.set('search', query);
         if (cursor !== '')
             params.set('cursor', cursor);
-        return cached(`official-list:${query}:${cursor}:${limit}`, force, async () => {
+        return cached(`official-list:${sort}:${query}:${cursor}:${limit}`, force, async () => {
             const value = await requestJson(`${registryBaseUrl}/v0.1/servers?${params.toString()}`);
             if (!isRecord(value) || !Array.isArray(value.servers))
                 throw new Error('MCP Registry 列表格式无效');
@@ -687,6 +711,7 @@ export function createMcpManager(options = {}) {
     async function marketplace(input = {}) {
         const query = cleanText(input.query, '搜索词', 120).trim();
         const cursor = cleanText(input.cursor, '分页游标', 1000).trim();
+        const sort = marketplaceSort(input.sort);
         const requestedLimit = Number(input.limit);
         const limit = Number.isInteger(requestedLimit) ? Math.min(50, Math.max(5, requestedLimit)) : 24;
         const force = input.force === true;
@@ -694,7 +719,7 @@ export function createMcpManager(options = {}) {
         let registryResult = null;
         let registryWarning = null;
         try {
-            registryResult = await officialRegistryPage(query, cursor, limit, force);
+            registryResult = await officialRegistryPage(query, cursor, limit, force, sort);
             registryWarning = registryResult.error || null;
         }
         catch (error) {
@@ -710,7 +735,8 @@ export function createMcpManager(options = {}) {
             seen.add(key);
             merged.push(entry);
         }
-        const summaries = await Promise.all(merged.map((entry) => entry.source === 'featured'
+        const ranked = rankMarketplace(merged, sort);
+        const summaries = await Promise.all(ranked.map((entry) => entry.source === 'featured'
             ? marketSummary(entry, force)
             : Promise.resolve({
                 id: entry.id,
@@ -734,13 +760,15 @@ export function createMcpManager(options = {}) {
             apiVersion: API_VERSION,
             source: 'featured+mcp-registry',
             query,
+            sort,
             warning: registryWarning,
             page: {
                 limit,
                 nextCursor: registryResult?.value.nextCursor || null,
                 hasMore: Boolean(registryResult?.value.nextCursor),
             },
-            items: summaries.map((item) => {
+            items: summaries.map((item, index) => {
+                const entry = ranked[index];
                 const installed = servers.find((server) => server.marketId === item.id || (item.repository !== null && server.repository === item.repository));
                 return {
                     id: item.id,
@@ -759,6 +787,8 @@ export function createMcpManager(options = {}) {
                     serverId: installed?.id ?? null,
                     stale: item.stale,
                     metadataError: item.metadataError,
+                    publishedAt: entry.publishedAt || null,
+                    updatedAt: entry.updatedAt || null,
                 };
             }),
         };
@@ -913,7 +943,7 @@ export function createMcpManager(options = {}) {
         // Dynamic operation dispatch intentionally exposes heterogeneous JSON shapes.
         async call(op, body = {}) {
             switch (op) {
-                case 'capabilities': return { apiVersion: API_VERSION, features: ['server-list', 'server-mutate', 'hot-reload', 'tool-projection', 'marketplace', 'official-registry', 'remote-search', 'cursor-pagination', 'safe-install-projection', 'registry-icons', 'github-avatar-fallback'] };
+                case 'capabilities': return { apiVersion: API_VERSION, features: ['server-list', 'server-mutate', 'hot-reload', 'tool-projection', 'marketplace', 'official-registry', 'remote-search', 'cursor-pagination', 'market-sort', 'safe-install-projection', 'registry-icons', 'github-avatar-fallback'] };
                 case 'list': return snapshot();
                 case 'create': return createServer(body.server);
                 case 'update': return updateServer(cleanText(body.id, '服务器 ID', 96, true), body.server);

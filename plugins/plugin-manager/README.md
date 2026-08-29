@@ -51,7 +51,7 @@ dsh plugin --profile web add <source> --ignore-scripts --reporter=append-only
 不经过 shell 拼接。安装后必须在依赖清单中检测到唯一变化，并校验该包包含 DSH 声明；
 校验不通过时通过官方 remove 命令回滚。
 
-市场首页把精选、版本化 DSH Registry 和 npm Registry 合并成一个可搜索列表。Host 使用
+市场首页把精选、版本化 DSH Registry 和 npm Registry 合并成一个可搜索列表，并提供综合、npm 热度、最新发布日期排序。Host 使用
 npm 搜索分页发现候选后，逐个读取精确版本 manifest；只有 `package.json` 含合法 `dsh.client`、
 `dsh.bundle` 或 `dsh.plugin` 声明且能解析到 GitHub 仓库时才显示为可安装，并把安装来源锁定为
 `package@version`。DSH Registry 中声明了 `packageName` 的条目也执行相同校验；未通过者保持

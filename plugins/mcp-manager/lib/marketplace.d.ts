@@ -22,6 +22,8 @@ export interface MarketplaceEntry {
     readonly source: 'featured' | 'mcp-registry';
     readonly install: MarketplaceInstall | null;
     readonly installReason: string | null;
+    readonly publishedAt?: string | null;
+    readonly updatedAt?: string | null;
 }
 /** Normalize one official Registry ServerResponse. Unclear install metadata is
  * kept discoverable but deliberately view-only. */

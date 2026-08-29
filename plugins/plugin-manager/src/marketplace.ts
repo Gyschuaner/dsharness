@@ -24,6 +24,8 @@ export interface MarketplaceEntry {
 	readonly iconUrl?: string | null;
 	/** Manifest facts verified from the exact npm version used for installation. */
 	readonly verifiedManifest?: MarketplaceManifestHint;
+	readonly popularity?: number | null;
+	readonly publishedAt?: string | null;
 }
 
 export const FEATURED_MARKETPLACE = Object.freeze([

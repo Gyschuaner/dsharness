@@ -35,7 +35,10 @@ interface PluginMarketItem {
     status: string;
     installedVersion: string | null;
     latestVersion?: string | null;
+    popularity?: number | null;
+    publishedAt?: string | null;
 }
+type PluginMarketSort = 'relevance' | 'popular' | 'recent';
 interface PluginRegistryInfo {
     status: 'fresh' | 'stale' | 'unavailable';
     generatedAt: string | null;
@@ -88,6 +91,7 @@ interface PluginApi {
         cursor?: string;
         limit?: number;
         force?: boolean;
+        sort?: PluginMarketSort;
     }): Promise<PluginMarketplaceResponse>;
     call(op: 'marketplace.detail', payload: {
         id: string;

@@ -160,6 +160,25 @@ test('marketplace: synchronizes trusted remote Skill indexes and deduplicates fe
 	assert.equal(discovered.status, 'project-required');
 });
 
+test('marketplace: sorts trusted repositories by GitHub popularity and recency', async () => {
+	const entries = [
+		{ id: 'acme/old#skills/old', name: 'old', repository: 'acme/old', path: 'skills/old', ref: 'main', description: 'Old popular skill.', tags: [], marketSource: 'trusted-registry' },
+		{ id: 'acme/new#skills/new', name: 'new', repository: 'acme/new', path: 'skills/new', ref: 'main', description: 'New skill.', tags: [], marketSource: 'trusted-registry' },
+	];
+	const fetch = async (url) => {
+		if (url.includes('/anthropics/skills/main/.claude-plugin/marketplace.json')) return responseJson({ plugins: [] });
+		if (url === 'https://api.github.com/repos/acme/old') return responseJson({ html_url: 'https://github.com/acme/old', owner: { login: 'acme' }, stargazers_count: 100, forks_count: 20, pushed_at: '2026-01-01T00:00:00Z' });
+		if (url === 'https://api.github.com/repos/acme/new') return responseJson({ html_url: 'https://github.com/acme/new', owner: { login: 'acme' }, stargazers_count: 5, forks_count: 1, pushed_at: '2026-08-29T00:00:00Z' });
+		throw new Error(`unexpected GitHub URL: ${url}`);
+	};
+	const market = internals.createMarketplace({ entries, fetch, logger: { warn() {} } });
+	const popular = await market.list(undefined, false, 'popular');
+	assert.deepEqual(popular.items.map((item) => item.name), ['old', 'new']);
+	const recent = await market.list(undefined, false, 'recent');
+	assert.deepEqual(recent.items.map((item) => item.name), ['new', 'old']);
+	await assert.rejects(market.list(undefined, false, 'unknown'), /Skill 市场排序无效/);
+});
+
 test('marketplace: installs disabled, records provenance, and detects updates', async (t) => {
 	const remote = makeRemote();
 	const env = await makeEnv(remote);

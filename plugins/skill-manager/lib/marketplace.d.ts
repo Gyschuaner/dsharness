@@ -67,9 +67,10 @@ export declare function parseGitHubSkillUrl(value: any): {
  */
 export declare function createMarketplace(options?: {}): {
     entries: readonly any[];
-    list: (cwd: any, force?: boolean) => Promise<{
+    list: (cwd: any, force?: boolean, requestedSort?: string) => Promise<{
         apiVersion: number;
         source: string;
+        sort: string;
         registries: {
             id: "anthropic-agent-skills";
             label: "Anthropic 官方";
@@ -87,6 +88,8 @@ export declare function createMarketplace(options?: {}): {
             repositoryUrl: any;
             author: any;
             license: any;
+            stars: any;
+            forks: any;
             tags: any;
             marketSource: any;
             latestRevision: any;

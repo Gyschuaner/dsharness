@@ -23,6 +23,8 @@ export interface MarketplaceEntry {
 	readonly source: 'featured' | 'mcp-registry';
 	readonly install: MarketplaceInstall | null;
 	readonly installReason: string | null;
+	readonly publishedAt?: string | null;
+	readonly updatedAt?: string | null;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -136,6 +138,9 @@ function inferPackageInstall(server: UnknownRecord, serverName: string, descript
 export function normalizeRegistryMarketplaceEntry(value: unknown): MarketplaceEntry | null {
 	const response = isRecord(value) ? value : {};
 	const server = isRecord(response.server) ? response.server : response;
+	const metadata = isRecord(response._meta) && isRecord(response._meta['io.modelcontextprotocol.registry/official'])
+		? response._meta['io.modelcontextprotocol.registry/official']
+		: {};
 	const registryName = text(server.name);
 	if (registryName === null) return null;
 	const description = text(server.description) || '该 MCP Server 没有提供描述。';
@@ -159,6 +164,8 @@ export function normalizeRegistryMarketplaceEntry(value: unknown): MarketplaceEn
 		source: 'mcp-registry',
 		install,
 		installReason: install === null ? 'Registry 元数据无法唯一、安全地推导一个 DSH 配置' : null,
+		publishedAt: text(metadata.publishedAt),
+		updatedAt: text(metadata.updatedAt),
 	};
 }
 

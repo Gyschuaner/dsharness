@@ -965,25 +965,74 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 		return entry;
 	}
 
-	async function npmMarketplacePage(query: string, cursor: string, limit: number, force = false) {
+	type MarketplaceSort = 'relevance' | 'popular' | 'recent';
+
+	function marketplaceSort(value: unknown): MarketplaceSort {
+		const sort = String(value || 'relevance').trim();
+		if (sort !== 'relevance' && sort !== 'popular' && sort !== 'recent') throw new ApiError(400, 'Plugin 市场排序无效', 'MARKET_SORT_INVALID');
+		return sort;
+	}
+
+	function rowPopularity(row: unknown): number | null {
+		const score = isRecord(row) && isRecord(row.score) && isRecord(row.score.detail) ? row.score.detail.popularity : null;
+		return Number.isFinite(score) ? Number(score) : null;
+	}
+
+	function rowPublishedAt(row: unknown): string | null {
+		const pkg = isRecord(row) && isRecord(row.package) ? row.package : {};
+		return typeof pkg.date === 'string' && Number.isFinite(Date.parse(pkg.date)) ? pkg.date : null;
+	}
+
+	function rankResolved(entries: ResolvedMarketplaceEntry[], sort: MarketplaceSort): ResolvedMarketplaceEntry[] {
+		if (sort === 'relevance') return entries;
+		return entries.map((resolved, index) => ({ resolved, index })).sort((left, right) => {
+			if (sort === 'popular') {
+				const delta = Number(right.resolved.entry.popularity || 0) - Number(left.resolved.entry.popularity || 0);
+				if (delta !== 0) return delta;
+			}
+			if (sort === 'recent') {
+				const delta = Date.parse(right.resolved.entry.publishedAt || '') - Date.parse(left.resolved.entry.publishedAt || '');
+				if (Number.isFinite(delta) && delta !== 0) return delta;
+			}
+			return left.index - right.index;
+		}).map(({ resolved }) => resolved);
+	}
+
+	async function npmMarketplacePage(query: string, cursor: string, limit: number, sort: MarketplaceSort, force = false) {
 		const offset = cursor === '' ? 0 : Number(cursor);
 		if (!Number.isInteger(offset) || offset < 0 || offset > 10_000) throw new ApiError(400, 'Plugin 市场分页游标无效', 'MARKET_CURSOR_INVALID');
+		const rankedWindow = sort === 'recent' ? 250 : limit;
 		const params = new URLSearchParams({
 			text: [query, 'keywords:deepseek-harness'].filter(Boolean).join(' '),
-			size: String(limit),
-			from: String(offset),
+			size: String(rankedWindow),
+			from: String(sort === 'recent' ? 0 : offset),
 		});
+		if (sort === 'popular') {
+			params.set('quality', '0');
+			params.set('popularity', '1');
+			params.set('maintenance', '0');
+		}
 		const value = await fetchRemoteJson(`${npmSearchUrl}?${params.toString()}`, deps, 'npm 搜索');
 		const document = isRecord(value) ? value : {};
 		const rows = Array.isArray(document.objects) ? document.objects : [];
-		const entries = (await Promise.all(rows.map(async (row) => {
+		const rankedRows = sort === 'recent'
+			? [...rows].sort((left, right) => Date.parse(rowPublishedAt(right) || '') - Date.parse(rowPublishedAt(left) || ''))
+			: rows;
+		const pageRows = sort === 'recent' ? rankedRows.slice(offset, offset + limit) : rankedRows;
+		const resolvedRows = await Promise.all(pageRows.map(async (row) => {
 			const pkg = isRecord(row) && isRecord(row.package) ? row.package : {};
 			const name = typeof pkg.name === 'string' ? pkg.name : '';
 			if (!PACKAGE_NAME_RE.test(name)) return null;
-			try { return await npmEntry(name, `npm:${name}`, force); } catch { return null; }
-		}))).filter((entry): entry is MarketplaceEntry => entry !== null);
+			try {
+				const entry = await npmEntry(name, `npm:${name}`, force);
+				return entry ? { ...entry, popularity: rowPopularity(row), publishedAt: rowPublishedAt(row) } : null;
+			} catch { return null; }
+		}));
+		const entries: MarketplaceEntry[] = [];
+		for (const entry of resolvedRows) if (entry !== null) entries.push(entry);
 		const total = Number.isFinite(document.total) ? Number(document.total) : offset + rows.length;
-		const next = offset + limit < total ? String(offset + limit) : null;
+		const available = sort === 'recent' ? Math.min(total, rankedRows.length) : total;
+		const next = offset + limit < available ? String(offset + limit) : null;
 		return { entries, total, nextCursor: next };
 	}
 
@@ -1032,6 +1081,7 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 		const query = String(input.query || '').trim();
 		if (query.length > 120) throw new ApiError(400, '搜索词不能超过 120 个字符', 'MARKET_QUERY_INVALID');
 		const cursor = String(input.cursor || '').trim();
+		const sort = marketplaceSort(input.sort);
 		if (cursor.length > 20) throw new ApiError(400, '分页游标无效', 'MARKET_CURSOR_INVALID');
 		const requestedLimit = Number(input.limit);
 		const limit = Number.isInteger(requestedLimit) ? Math.min(50, Math.max(5, requestedLimit)) : 24;
@@ -1041,7 +1091,7 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 		let npmPage: { entries: MarketplaceEntry[]; total: number; nextCursor: string | null } = { entries: [], total: 0, nextCursor: null };
 		let npmWarning: string | null = null;
 		try {
-			npmPage = await npmMarketplacePage(query, cursor, limit, force);
+			npmPage = await npmMarketplacePage(query, cursor, limit, sort, force);
 		} catch (error) {
 			npmWarning = error instanceof Error ? error.message : String(error);
 		}
@@ -1065,10 +1115,12 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 			if (packageKey !== '') seenPackages.add(packageKey);
 			unique.push(resolved);
 		}
+		const ranked = rankResolved(unique, sort);
 		return {
 			apiVersion: API_VERSION,
 			source: 'featured+dsh-registry+npm-registry',
 			query,
+			sort,
 			warning: npmWarning,
 			registry: {
 				status: registry.status,
@@ -1076,7 +1128,7 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 				warning: registry.warning,
 			},
 			page: { offset: cursor === '' ? 0 : Number(cursor), limit, total: npmPage.total, hasMore: npmPage.nextCursor !== null, nextCursor: npmPage.nextCursor },
-			items: unique.map(({ entry, marketSource }) => {
+			items: ranked.map(({ entry, marketSource }) => {
 				const registryIcon = safeOptionalIconUrl((registry.document?.items.find((item) => item.id === entry.id)?.iconUrl) || '');
 				const iconUrl = safeOptionalIconUrl(entry.iconUrl) || registryIcon || githubAvatarUrl(entry.repository);
 				return Object.assign({
@@ -1088,6 +1140,8 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 					marketSource,
 					installable: Boolean(entry.installSource),
 					latestVersion: entry.latestHint || null,
+					popularity: entry.popularity || null,
+					publishedAt: entry.publishedAt || null,
 				}, marketplaceStatus(entry, local));
 			}),
 		};
@@ -1186,7 +1240,7 @@ export function createPluginManager(options: PluginManagerOptions = {}) {
 		// Dynamic operation dispatch intentionally exposes heterogeneous JSON shapes.
 		async call(op: unknown, body: UnknownRecord = {}): Promise<any> {
 			switch (op) {
-				case 'capabilities': return { apiVersion: API_VERSION, features: ['local-list', 'toggle', 'import', 'marketplace', 'github-detail', 'npm-discovery', 'remote-search', 'cursor-pagination', 'manifest-gated-install'] };
+				case 'capabilities': return { apiVersion: API_VERSION, features: ['local-list', 'toggle', 'import', 'marketplace', 'github-detail', 'npm-discovery', 'remote-search', 'cursor-pagination', 'market-sort', 'manifest-gated-install'] };
 				case 'list': return snapshot();
 				case 'setEnabled': return setEnabled(body.name, body.enabled);
 				case 'import': return importPlugin(body.source);

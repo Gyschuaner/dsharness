@@ -265,6 +265,27 @@ test('official Registry search paginates and installs only uniquely inferred dis
 	assert.deepEqual(installed.server.requiredEnv, ['MCP_WEATHER_AUTHORIZATION']);
 });
 
+test('official Registry marketplace supports stable recent and popularity sorting', async (t) => {
+	const installable = {
+		server: { name: 'io.example/installable', title: 'Installable', version: '1.0.0', description: 'Safe install', remotes: [{ type: 'streamable-http', url: 'https://installable.example/mcp' }] },
+		_meta: { 'io.modelcontextprotocol.registry/official': { publishedAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' } },
+	};
+	const newestViewOnly = {
+		server: { name: 'io.example/newest', title: 'Newest', version: '2.0.0', description: 'Ambiguous packages', packages: [] },
+		_meta: { 'io.modelcontextprotocol.registry/official': { publishedAt: '2026-08-28T00:00:00Z', updatedAt: '2026-08-29T00:00:00Z' } },
+	};
+	const fetch = async (url) => url.includes('/v0.1/servers?')
+		? response({ servers: [installable, newestViewOnly], metadata: {} })
+		: response({}, 404);
+	const { manager } = await fixture(t, { fetch, registryUrl: 'https://registry.example' });
+	const recent = await manager.call('marketplace', { query: 'example', sort: 'recent' });
+	assert.equal(recent.sort, 'recent');
+	assert.deepEqual(recent.items.map((item) => item.name), ['Newest', 'Installable']);
+	const popular = await manager.call('marketplace', { query: 'example', sort: 'popular' });
+	assert.deepEqual(popular.items.map((item) => item.name), ['Installable', 'Newest']);
+	await assert.rejects(manager.call('marketplace', { sort: 'unknown' }), (error) => (error as any).code === 'MARKET_SORT_INVALID');
+});
+
 test('empty args serialize as an explicit empty list', async (t) => {
 	const { manager, patchPath } = await fixture(t);
 	await manager.call('create', { server: stdio({ args: [], env: {}, requiredEnv: [] }) });

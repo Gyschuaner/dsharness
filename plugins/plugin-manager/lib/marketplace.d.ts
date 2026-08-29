@@ -23,6 +23,8 @@ export interface MarketplaceEntry {
     readonly iconUrl?: string | null;
     /** Manifest facts verified from the exact npm version used for installation. */
     readonly verifiedManifest?: MarketplaceManifestHint;
+    readonly popularity?: number | null;
+    readonly publishedAt?: string | null;
 }
 export declare const FEATURED_MARKETPLACE: readonly (Readonly<{
     id: "omdsh-dev/DSH-better-sidebar";

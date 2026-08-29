@@ -241,6 +241,8 @@ type ApiPayload = Record<string, DynamicValue>;
 				'.sk-marketToolbar{display:flex;align-items:center;gap:8px;padding:14px 0 9px;flex:none;flex-wrap:wrap}',
 				'.sk-marketProjectPicker{position:relative;flex:none}',
 				'.sk-marketSearch{min-width:180px}',
+				'.sk-marketSort{box-sizing:border-box;flex:none;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;padding:0 30px 0 10px;cursor:pointer}',
+				'.sk-marketSort:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px;border-color:transparent}',
 				'.sk-marketHelper{flex:none;margin:0 0 9px;color:var(--dsw-alias-label-quaternary);font-size:11px;line-height:1.5}',
 				'.sk-marketNotice{flex:none;margin:0 0 9px;padding:7px 9px;border:1px solid color-mix(in srgb,var(--dsw-static-blue-500) 35%,var(--dsw-alias-border-l2));border-radius:8px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.5}',
 				'.sk-marketList{display:flex;flex:1;min-height:0;overflow-y:auto;flex-direction:column;padding:7px 0 26px}',
@@ -539,6 +541,7 @@ type ApiPayload = Record<string, DynamicValue>;
 				var [error, setError] = React.useState<string | null>(null);
 				var [marketWarning, setMarketWarning] = React.useState<string | null>(null);
 				var [query, setQuery] = React.useState('');
+				var [marketSort, setMarketSort] = React.useState('relevance');
 				var [selected, setSelected] = React.useState<DynamicValue>(null);
 				var [detail, setDetail] = React.useState<DynamicValue>(null);
 				var [detailLoading, setDetailLoading] = React.useState(false);
@@ -556,10 +559,10 @@ type ApiPayload = Record<string, DynamicValue>;
 				var [githubBusy, setGithubBusy] = React.useState(false);
 				var [githubError, setGithubError] = React.useState<string | null>(null);
 
-				function loadMarket(force: boolean) {
+				function loadMarket(force: boolean, sort = marketSort) {
 					setLoading(true);
 					setError(null);
-					return apiCallAt('marketplace', { cwd: project ? project.cwd : undefined, force: force === true }, ctx).then(
+					return apiCallAt('marketplace', { cwd: project ? project.cwd : undefined, force: force === true, sort: sort }, ctx).then(
 						function (value: DynamicValue) {
 							var next = Array.isArray(value && value.items) ? value.items : [];
 							setItems(next);
@@ -575,7 +578,7 @@ type ApiPayload = Record<string, DynamicValue>;
 					setSelected(null);
 					setDetail(null);
 					void loadMarket(false);
-				}, [project ? project.cwd : '', attempt]);
+				}, [project ? project.cwd : '', attempt, marketSort]);
 				React.useEffect(function () {
 					function onKey(event: DynamicValue) {
 						if (event.key !== 'Escape') return;
@@ -687,6 +690,7 @@ type ApiPayload = Record<string, DynamicValue>;
 							h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)),
 							h('input', { className: 'sk-search', placeholder: '搜索 Skill 或 GitHub 仓库', value: query, onChange: function (event: DynamicValue) { setQuery(event.target.value); } })
 						),
+						h('select', { className: 'sk-marketSort', 'aria-label': 'Skill 市场排序', value: marketSort, onChange: function (event: DynamicValue) { setMarketSort(event.target.value); } }, h('option', { value: 'relevance' }, '综合排序'), h('option', { value: 'popular' }, '热度优先'), h('option', { value: 'recent' }, '最新优先')),
 						h('button', { type: 'button', className: 'sk-chip', disabled: project === null, onClick: function () { setGithubOpen(true); setGithubError(null); } }, h(P.IconPlusOutline16), '从 GitHub 安装'),
 						h('button', { type: 'button', className: 'sk-chip', disabled: loading, onClick: function () { setAttempt(function (value: DynamicValue) { return value + 1; }); } }, h(P.IconRefreshOutline16), loading ? '刷新中…' : '刷新')
 					),

@@ -9,7 +9,7 @@ Host 路由 `/api/mcp-manager` 管理 web profile 中的 MCP 服务器行。
 - **服务器**：查看配置、Loader 运行阶段、真实投影的工具清单和启停状态；新增、编辑、
   删除或触发 Cordis 热重载。
 - **市场**：精选入口与官方 MCP Registry 合并展示；搜索词由 Host 发送到 Registry，支持
-  opaque cursor 分页。详情抽屉按需读取 Registry 与 GitHub 元数据，包括项目图标、作者、
+  opaque cursor 分页，以及综合、热度、最新排序。详情抽屉按需读取 Registry 与 GitHub 元数据，包括项目图标、作者、
   语言、许可证、Stars/Forks、Topics 和最新发布。
 - 图标优先级是 MCP Registry 的可信 HTTPS 位图、GitHub owner avatar、通用链接图标。
   SVG 和非可信远程域不会直接渲染。
