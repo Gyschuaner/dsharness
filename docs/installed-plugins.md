@@ -20,7 +20,7 @@
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
 | dsh-extension-manager | 0.3.0 | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
-| dsh-skill-manager | 0.2.1（build 27） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008/035 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`；项目与预设控制收进页头右上角紧凑下拉组 |
+| dsh-skill-manager | 0.2.2（build 28） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008/035 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`；项目与预设控制收进页头右上角紧凑下拉组，已启用行不再铺蓝灰底色 |
 | dsh-mcp-manager | 0.1.1 | 本仓库 `plugins/mcp-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-026/028/035 | MCP 服务器管理、Loader 状态、工具清单与精选市场；去除重复的 Web 配置与当前配置摘要 |
 | dsh-plugin-manager | 0.2.2（build 4） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030/035 / BUG-F3AF6354 | 独立 Plugin 分区；本地插件管理、系统 Bundle 只读展示、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager`；去除重复的 Web 配置文案 |
 | dsh-shadow-billing | 0.1.1 | 本仓库 `plugins/shadow-billing` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-032 / BUG-891BCFA7 | 扩展 → Billing；按 DeepSeek / Qwen 官方价目估算真实 Token 用量，价目签名变化时幂等重算历史明细与日聚合 |

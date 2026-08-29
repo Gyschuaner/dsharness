@@ -24,8 +24,8 @@
  * presets with replace/merge preview, and 一键精简. When the running host
  * predates apiVersion 6, the page shows an explicit upgrade state.
  * build 17: the project list no longer regroups rows by enabled state.
- * Catalog order and scroll context stay stable while a soft blue row tint,
- * the switch, and the optional state filters communicate enabled status.
+ * Catalog order and scroll context stay stable while the switch and optional
+ * state filters communicate enabled status.
  * build 18: the redundant unified-library sub-page is removed; merged source
  * selection remains in the project Skill drawer. The drawer now overlays the
  * list at every desktop width without reflowing it, and the SKILL / MCP /
@@ -37,6 +37,8 @@
  * build 20: a single toggle updates its row and project count immediately,
  * shows a quiet pending label while persistence finishes, and restores the
  * exact previous row if the Host rejects or rolls back the mutation.
+ * build 21: enabled rows no longer receive a persistent blue background tint;
+ * the switch remains the sole inline enabled-state accent.
  * build 21: the first catalog load gets a centered Skill scan state with a
  * restrained pulse/sweep animation, descriptive status copy, and a
  * prefers-reduced-motion static fallback.

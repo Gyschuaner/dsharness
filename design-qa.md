@@ -45,6 +45,9 @@ final result: passed
 - Responsive capture: `artifacts/design-qa/DSH-035/skill-compact-context-680.png`
 - Same-input comparisons: `artifacts/design-qa/DSH-035/comparison-skill.png` and
   `artifacts/design-qa/DSH-035/comparison-billing.png`
+- Enabled-row follow-up target: `C:\Users\chuansgu\AppData\Local\Temp\codex-clipboard-a5e88682-8827-4644-a771-172c96b0f7dc.png`
+- Enabled-row browser capture: `artifacts/design-qa/DSH-035/skill-enabled-white-rows.png`
+- Enabled-row same-input comparison: `artifacts/design-qa/DSH-035/comparison-skill-enabled-background.png`
 
 ## Findings
 
@@ -60,6 +63,31 @@ final result: passed
   non-zero estimate, and Settings exposes the official fixed ¥1 / ¥0.1 / ¥3 price table.
 - The final interaction pass produced no new browser error or warning after the QA cutoff. Connection
   messages captured at the restart timestamp were transient startup recovery logs and did not recur.
+- Follow-up comparison treats the user screenshot as the undesirable starting state and the user request
+  as the target direction. At a 1234 × 945 CSS viewport (DPR 1.5), all 11 enabled rows report transparent
+  background, no background image, and no box shadow; enabled switches remain blue (`rgb(65, 118, 230)`).
+  The page has no horizontal overflow, and switching `已启用 11` → `全部 68` preserves the expected counts.
+
+## Enabled-row follow-up fidelity surfaces
+
+- Fonts and typography: unchanged from the verified compact Skill page; row names and descriptions retain
+  the same weights, line heights, truncation, and hierarchy.
+- Spacing and layout rhythm: row height, padding, separators, toolbar geometry, and switch alignment are
+  unchanged; only the persistent enabled-row fill was removed.
+- Colors and visual tokens: enabled rows now inherit the neutral page background. The existing blue switch
+  remains the only inline enabled-state accent; hover and opened-detail states use the shared neutral tokens.
+- Image quality and asset fidelity: no image or icon asset changed. Existing DSH primitive icons and native
+  switches remain intact.
+- Copy and content: Skill names, descriptions, source badges, counts, filters, and accessible labels are
+  unchanged.
+
+## Enabled-row follow-up comparison history
+
+1. The source screenshot showed a P2 visual-noise issue: every enabled row carried a full-width blue-gray
+   fill, which overwhelmed the list and duplicated the blue switch's state signal.
+2. Removed all `.sk-rowEnabled` background overrides from both base and shared-shell styles. The post-fix
+   same-input comparison shows white/transparent rows with unchanged separators and blue switches; no
+   actionable P0/P1/P2 difference remains.
 
 No actionable P0/P1/P2 difference remains in the target regions.
 

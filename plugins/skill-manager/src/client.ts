@@ -24,8 +24,8 @@
  * presets with replace/merge preview, and 一键精简. When the running host
  * predates apiVersion 6, the page shows an explicit upgrade state.
  * build 17: the project list no longer regroups rows by enabled state.
- * Catalog order and scroll context stay stable while a soft blue row tint,
- * the switch, and the optional state filters communicate enabled status.
+ * Catalog order and scroll context stay stable while the switch and optional
+ * state filters communicate enabled status.
  * build 18: the redundant unified-library sub-page is removed; merged source
  * selection remains in the project Skill drawer. The drawer now overlays the
  * list at every desktop width without reflowing it, and the SKILL / MCP /
@@ -37,6 +37,8 @@
  * build 20: a single toggle updates its row and project count immediately,
  * shows a quiet pending label while persistence finishes, and restores the
  * exact previous row if the Host rejects or rolls back the mutation.
+ * build 21: enabled rows no longer receive a persistent blue background tint;
+ * the switch remains the sole inline enabled-state accent.
  * build 21: the first catalog load gets a centered Skill scan state with a
  * restrained pulse/sweep animation, descriptive status copy, and a
  * prefers-reduced-motion static fallback.
@@ -122,10 +124,7 @@ type ApiPayload = Record<string, DynamicValue>;
 				'.sk-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;padding:2px 0 6px}',
 				'.sk-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;cursor:pointer;flex:none}',
 				'.sk-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-				'.sk-rowEnabled{background:var(--dsw-alias-bg-layer-3);background:color-mix(in srgb,var(--dsw-static-blue-500) 8%,var(--dsw-alias-bg-module-platform))}',
-				'.sk-rowEnabled:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 12%,var(--dsw-alias-bg-module-platform))}',
 				'.sk-rowActive{background:var(--dsw-alias-interactive-bg-hover-solid)}',
-				'.sk-rowEnabled.sk-rowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 14%,var(--dsw-alias-bg-module-platform))}',
 				'.sk-check{appearance:none;width:15px;height:15px;flex:none;margin-top:3px;border:1.5px solid var(--dsw-alias-border-l2);border-radius:4px;background:var(--dsw-alias-bg-module-platform);cursor:pointer;position:relative;padding:0}',
 				'.sk-check:hover{border-color:var(--dsw-alias-label-dimmed)}',
 				'.sk-check:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
@@ -355,10 +354,7 @@ type ApiPayload = Record<string, DynamicValue>;
 					'.sk-row{box-sizing:border-box;min-height:72px;border:0;border-top:1px solid var(--dsw-alias-border-l2);border-radius:0;padding:13px 10px}',
 					'.sk-list>.sk-row:last-child{border-bottom:1px solid var(--dsw-alias-border-l2)}',
 					'.sk-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-					'.sk-rowEnabled{background:color-mix(in srgb,var(--dsw-static-blue-500) 7%,var(--dsw-alias-bg-module-platform))}',
-					'.sk-rowEnabled:hover{background:color-mix(in srgb,var(--dsw-static-blue-500) 9%,var(--dsw-alias-bg-module-platform))}',
 					'.sk-rowActive{background:var(--dsw-alias-interactive-bg-hover)}',
-					'.sk-rowEnabled.sk-rowActive{background:color-mix(in srgb,var(--dsw-static-blue-500) 9%,var(--dsw-alias-bg-module-platform))}',
 					'.sk-rowName{font-size:13.5px}',
 					'.sk-rowDesc{margin-top:4px;line-height:1.45}',
 					'.sk-rowSide{gap:12px}',

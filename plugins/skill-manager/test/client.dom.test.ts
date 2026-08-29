@@ -708,6 +708,10 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-groupHead').length, 0, 'all view has no enabled/disabled group headings');
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['enabled-skill']);
+	const styleText = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
+	assert.equal(styleText.includes('.sk-rowEnabled{background'), false, 'enabled rows have no persistent background tint');
+	assert.equal(styleText.includes('.sk-rowEnabled:hover{background'), false, 'enabled rows reuse the neutral row hover state');
+	assert.equal(styleText.includes('.sk-rowEnabled.sk-rowActive{background'), false, 'enabled rows reuse the neutral active state');
 	assert.equal(h.button('全部3').textContent, '全部3');
 	assert.equal(h.button('已启用1').textContent, '已启用1');
 	assert.equal(h.button('未启用2').textContent, '未启用2');

@@ -1,6 +1,6 @@
 {
   "name": "dsh-skill-manager",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "DeepSeek Harness SKILL management center with per-project enablement, unified sources, tags, presets, a curated Skill marketplace, and an Extensions section contribution.",
   "type": "module",
   "main": "lib/index.js",
