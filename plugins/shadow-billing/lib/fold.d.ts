@@ -33,6 +33,7 @@ export declare function readSessionLog(filePath: string, startOffset?: number): 
 };
 interface FoldResult {
     imported: number;
+    repaired: number;
     skipped: number;
     sessionId: string | null;
     skippedUnchanged: boolean;
@@ -47,6 +48,7 @@ export declare function foldSessionFile(store: Store, pricing: PricingConfig, fi
 export declare function foldAllSessions(store: Store, pricing: PricingConfig, sessionsRoot: string, logger?: Logger): {
     scanned: number;
     imported: number;
+    repaired: number;
     skipped: number;
     errors: string[];
 };

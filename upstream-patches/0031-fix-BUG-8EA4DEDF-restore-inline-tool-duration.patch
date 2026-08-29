@@ -1,0 +1,175 @@
+From 2c72d278a080d0d3a6635eb7dbd5159bbbbec522 Mon Sep 17 00:00:00 2001
+From: chuansgu <506946815@qq.com>
+Date: Sat, 29 Aug 2026 11:52:45 +0800
+Subject: [PATCH] fix(BUG-8EA4DEDF): restore inline tool duration
+
+---
+ .../src/client/tool/ToolCallTree.module.css   | 30 +++++++++-------
+ .../ui-tool/src/client/tool/ToolCallTree.tsx  | 35 ++++++++++---------
+ .../tests/tool-call-tree.client.spec.tsx      | 10 ++++++
+ .../tests/tool-row-styles.client.spec.ts      | 22 ++++++++++--
+ 4 files changed, 65 insertions(+), 32 deletions(-)
+
+diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css b/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css
+index 5d8046da19..ef9bf4ab19 100644
+--- a/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css
++++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.module.css
+@@ -1,26 +1,30 @@
+ .callRow {
+-  position: relative;
+   border-radius: 6px;
+ }
+ 
+-/* The timer is owned by the recursive Tool wrapper rather than any keyed
+-   Tool view, so generic, specialized, nested, and plugin-provided rows all
+-   keep the same event-derived duration. Reserve its seat on the rendered
+-   view while leaving the slot wrapper's display:contents contract intact. */
+-.callRow[data-has-tool-timer] > :global([data-slot='tool.call.toolview']) > * {
+-  padding-right: 52px;
++/* Keep the wrapper-owned timer immediately after the Tool title/summary. The
++   keyed slot itself is display:contents, so its rendered view participates in
++   this flex row without changing the public slot contract. */
++.callHead {
++  display: flex;
++  column-gap: 8px;
++  align-items: flex-start;
++  min-width: 0;
++  overflow: hidden;
++}
++
++.callHead > :global([data-slot='tool.call.toolview']) > * {
++  flex: 0 1 auto;
++  width: auto;
++  min-width: 0;
+ }
+ 
+ .timer {
+-  position: absolute;
+-  z-index: 1;
+-  top: 0;
+-  right: 0;
+-  min-width: 44px;
++  flex: none;
+   height: calc(24px + var(--dsh-content-font-delta, 0px));
+   display: inline-flex;
+   align-items: center;
+-  justify-content: flex-end;
++  justify-content: flex-start;
+   pointer-events: none;
+   white-space: nowrap;
+   font-size: var(--dsh-content-font-size-secondary, 13px);
+diff --git a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
+index d831cbda60..e80c79adda 100644
+--- a/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
++++ b/packages/client/ui-tool/src/client/tool/ToolCallTree.tsx
+@@ -49,24 +49,25 @@ const ToolCall = memo(function ToolCall({
+       data-chat-anchor-key={`call:${callId}`}
+       data-chat-call-id={callId}
+       data-selected={selected || undefined}
+-      data-has-tool-timer={timing.startedTime === null ? undefined : true}
+     >
+-      {renderSlot('tool.call.toolview', owner, {
+-        entryKey: toolName,
+-        fallback: <GenericToolCard {...owner} t={t} />,
+-      })}
+-      {timing.startedTime !== null && (
+-        <span
+-          className={css.timer}
+-          data-tool-timer
+-          data-state={timing.finishedTime === undefined ? 'running' : 'settled'}
+-        >
+-          <ElapsedTime
+-            startedTime={timing.startedTime}
+-            finishedTime={timing.finishedTime}
+-          />
+-        </span>
+-      )}
++      <div className={css.callHead}>
++        {renderSlot('tool.call.toolview', owner, {
++          entryKey: toolName,
++          fallback: <GenericToolCard {...owner} t={t} />,
++        })}
++        {timing.startedTime !== null && (
++          <span
++            className={css.timer}
++            data-tool-timer
++            data-state={timing.finishedTime === undefined ? 'running' : 'settled'}
++          >
++            <ElapsedTime
++              startedTime={timing.startedTime}
++              finishedTime={timing.finishedTime}
++            />
++          </span>
++        )}
++      </div>
+       {children}
+     </div>
+   )
+diff --git a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+index a82bb80921..01b4170848 100644
+--- a/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
++++ b/packages/client/ui-tool/tests/tool-call-tree.client.spec.tsx
+@@ -83,6 +83,16 @@ describe('ToolCallTree', () => {
+     expect(timer?.textContent).toBe('2s')
+   })
+ 
++  it('keeps the Tool timer inline with the rendered Tool view', () => {
++    const block = root('inline', { name: 'write', argsRaw: '{"path":"a.ts"}' })
++    const view = render(<ToolCallTree {...props(block)} />)
++    const row = view.container.querySelector('[data-chat-call-id="inline"]')
++    const head = row?.firstElementChild
++    expect(head?.children).toHaveLength(2)
++    expect(head?.children[0]?.getAttribute('data-tool')).toBe('write')
++    expect(head?.children[1]?.hasAttribute('data-tool-timer')).toBe(true)
++  })
++
+   it('recursively renders a selected leaf without selecting its ancestors', () => {
+     const owners: ToolCallOwnerProps[] = []
+     const leaf = {
+diff --git a/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts b/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts
+index 28913a2939..3604fed528 100644
+--- a/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts
++++ b/packages/client/ui-tool/tests/tool-row-styles.client.spec.ts
+@@ -9,14 +9,16 @@ import { fileURLToPath } from 'node:url'
+ import { describe, expect, it } from 'vitest'
+ 
+ const css = readFileSync(fileURLToPath(new URL('../src/client/tool/components/ToolRow.module.css', import.meta.url)), 'utf8')
++const treeCss = readFileSync(fileURLToPath(new URL('../src/client/tool/ToolCallTree.module.css', import.meta.url)), 'utf8')
+ /** Declarations only: the sheet's prose names the properties it explains. */
+ const declarationText = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
++const treeDeclarationText = treeCss.replace(/\/\*[\s\S]*?\*\//g, ' ')
+ 
+-function declarations(selector: string): string[] {
++function declarations(selector: string, source = declarationText): string[] {
+   // Anchored at a rule boundary: an unanchored match would silently read a
+   // compound rule that merely contains the selector (`.root:hover .summarySuffix`)
+   // if one ever lands above the base rule.
+-  const rule = new RegExp(`(?:^|\\})\\s*\\${selector}\\s*\\{([^{}]*)\\}`).exec(declarationText)
++  const rule = new RegExp(`(?:^|\\})\\s*\\${selector}\\s*\\{([^{}]*)\\}`).exec(source)
+   if (rule === null) throw new Error(`ToolRow.module.css has no \`${selector}\` rule`)
+   return (rule[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)
+ }
+@@ -54,4 +56,20 @@ describe('ToolRow.module.css summary line', () => {
+       ]))
+     }
+   })
++
++  it('keeps the wrapper-owned timer inline instead of pinning it to the row edge', () => {
++    expect(declarations('.callHead', treeDeclarationText)).toEqual(expect.arrayContaining([
++      'display: flex',
++      'column-gap: 8px',
++      'overflow: hidden',
++    ]))
++    expect(declarations('.timer', treeDeclarationText)).toEqual(expect.arrayContaining([
++      'flex: none',
++      'justify-content: flex-start',
++    ]))
++    expect(declarations('.timer', treeDeclarationText)).not.toEqual(expect.arrayContaining([
++      'position: absolute',
++      'right: 0',
++    ]))
++  })
+ })
+-- 
+2.51.2.windows.1
+

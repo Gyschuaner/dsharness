@@ -5,14 +5,15 @@ restart-dsh-web.ps1 — 一键重启 dsh web（127.0.0.1:3080）
 用法：
   .\restart-dsh-web.ps1             重启并等待服务恢复，最后验证 skill-manager apiVersion
   .\restart-dsh-web.ps1 -EnableVisionBridge 为旧 profile 临时应用 DP Gateway vision_inspect 覆盖（当前 web profile 默认已启用）
+  .\restart-dsh-web.ps1 -BrowserHandoffFile <临时路径> 供受控内置浏览器验收读取本次进程登录 URL
   .\restart-dsh-web.ps1 -NoLaunch   只停不启动（想自己手动起时用）
   .\restart-dsh-web.ps1 -Port 3080  端口可改（默认 3080）
 
 行为：
-  1. 校验锁定源码 tree、Node/pnpm 工具链，并在停止旧进程前执行 frozen install + 完整构建
-  2. 校验 Gateway/Session Controller/ACP/attachment/vision 构建产物和实际 web profile，拒绝复用 stale lib
+  1. 校验锁定源码 tree、Node/pnpm 工具链，并在停止旧进程前干净构建本仓库插件和上游 Host/Client/Web
+  2. 校验每个本地插件 export、Gateway/Session Controller/ACP/attachment/vision 构建产物和实际 web profile，拒绝复用 stale lib
   3. 直接用刚构建的 apps/cli/lib/bin.js 启动独立 Node 进程，默认隐藏窗口并把日志写入 ~/.dsh/logs
-  4. 读取并立即脱敏 alpha1 一次性登录 URL，校验匿名 401、认证 HTTP 200、监听 PID、实际命令行和插件 API
+  4. 读取并立即脱敏 alpha1 一次性登录 URL，校验匿名 401、认证 HTML 的完整 boot graph、全部首屏脚本、监听 PID、实际命令行和插件 API
 
 注意：
   - 这会重启正在服务本 Web GUI 的宿主进程：进行中的轮次会中断，
@@ -31,6 +32,7 @@ param(
 	[ValidateRange(0, 1000)]
 	[int]$MinimumSkillManagerApiVersion = 6,
 	[switch]$EnableVisionBridge,
+	[string]$BrowserHandoffFile,
 	[switch]$NoLaunch
 )
 
@@ -184,6 +186,114 @@ function Invoke-AuthenticatedJsonPost($Client, [string]$Uri, [string]$Json) {
 	}
 }
 
+function Invoke-AuthenticatedJsonGet($Client, [string]$Uri) {
+	$response = $Client.GetAsync($Uri).GetAwaiter().GetResult()
+	try {
+		$body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+		if ([int]$response.StatusCode -ne 200) {
+			throw "HTTP $([int]$response.StatusCode)"
+		}
+		return $body | ConvertFrom-Json
+	} finally {
+		$response.Dispose()
+	}
+}
+
+function Write-BrowserHandoff([string]$Path, [Uri]$LaunchUri) {
+	if ([string]::IsNullOrWhiteSpace($Path)) { return }
+	$tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd(
+		[IO.Path]::DirectorySeparatorChar,
+		[IO.Path]::AltDirectorySeparatorChar
+	)
+	$resolvedPath = [IO.Path]::GetFullPath($Path)
+	$tempPrefix = $tempRoot + [IO.Path]::DirectorySeparatorChar
+	if (-not $resolvedPath.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+		throw "BrowserHandoffFile 必须位于系统临时目录：$tempRoot"
+	}
+	if (Test-Path -LiteralPath $resolvedPath) {
+		throw "BrowserHandoffFile 已存在，拒绝覆盖：$resolvedPath"
+	}
+	$parent = Split-Path -Parent $resolvedPath
+	if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+		throw "BrowserHandoffFile 父目录不存在：$parent"
+	}
+	$bytes = [Text.UTF8Encoding]::new($false).GetBytes($LaunchUri.AbsoluteUri)
+	$stream = [IO.File]::Open($resolvedPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+	try {
+		$stream.Write($bytes, 0, $bytes.Length)
+		$stream.Flush()
+	} finally {
+		$stream.Dispose()
+	}
+	Write-Step "已创建受控浏览器登录交接文件：$resolvedPath"
+}
+
+function Get-WebBootEvidence([string]$Html) {
+	$match = [regex]::Match(
+		$Html,
+		'globalThis\["__DSH_BOOT__"\]\s*=\s*(\{.*?\})</script>',
+		[Text.RegularExpressions.RegexOptions]::Singleline
+	)
+	if (-not $match.Success) {
+		throw '认证首页没有注入 __DSH_BOOT__。'
+	}
+	try {
+		$boot = $match.Groups[1].Value | ConvertFrom-Json
+	} catch {
+		throw "认证首页的 __DSH_BOOT__ 不是合法 JSON：$($_.Exception.Message)"
+	}
+
+	$entries = @($boot.entries)
+	$batches = @($boot.batches)
+	$clientModulesId = '@deepseek-ai/dsh-client-modules'
+	$clientModulesEntries = @($entries | Where-Object { $_.id -eq $clientModulesId })
+	$bootstrapBatches = @($batches | Where-Object { $_.phase -eq 'bootstrap' })
+	$applicationBatches = @($batches | Where-Object { $_.phase -eq 'application' })
+	$clientModulesBatches = @($bootstrapBatches | Where-Object { @($_.entries) -contains $clientModulesId })
+
+	if ($entries.Count -eq 0) { throw '认证首页的 client boot graph entries 为空。' }
+	if ($batches.Count -eq 0) { throw '认证首页的 client boot graph batches 为空。' }
+	if ($clientModulesEntries.Count -ne 1) { throw "client boot graph 中应有且只有一个 $clientModulesId entry。" }
+	if ($clientModulesBatches.Count -ne 1) { throw "$clientModulesId 未进入唯一 bootstrap batch。" }
+	if ($applicationBatches.Count -eq 0) { throw 'client boot graph 缺少 application batch。' }
+	if (-not $Html.Contains("$clientModulesId/client.js")) {
+		throw "认证首页 HTML 没有预加载 $clientModulesId/client.js。"
+	}
+
+	return [pscustomobject]@{
+		Graph = $boot
+		EntryCount = $entries.Count
+		BatchCount = $batches.Count
+		BootstrapBatchCount = $bootstrapBatches.Count
+		ApplicationBatchCount = $applicationBatches.Count
+		ClientModulesPreloaded = $true
+	}
+}
+
+function Assert-WebBootBatches($Client, [string]$BaseUri, $Evidence) {
+	$verified = 0
+	foreach ($batch in @($Evidence.Graph.batches)) {
+		if ([string]::IsNullOrWhiteSpace([string]$batch.url)) {
+			throw "client boot batch $($batch.rev) 缺少 URL。"
+		}
+		$batchUri = [Uri]::new([Uri]$BaseUri, [string]$batch.url)
+		$response = $Client.GetAsync($batchUri).GetAwaiter().GetResult()
+		try {
+			$body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+			if ([int]$response.StatusCode -ne 200) {
+				throw "client boot batch $($batch.phase) 返回 HTTP $([int]$response.StatusCode)：$batchUri"
+			}
+			if ([string]::IsNullOrWhiteSpace($body)) {
+				throw "client boot batch $($batch.phase) 返回了空脚本：$batchUri"
+			}
+			$verified += 1
+		} finally {
+			$response.Dispose()
+		}
+	}
+	return $verified
+}
+
 # 启动前先验证依赖，避免停掉健康服务后才发现本地源码不可用。
 $resolvedSourceDirectory = $null
 $buildSourceDirectory = $null
@@ -194,6 +304,8 @@ $visionPatchPath = Join-Path $PSScriptRoot 'dev\vision-bridge.dp-gateway.patch.y
 $sourceHead = $null
 $sourceTree = $null
 $buildMetadataPath = $null
+$localPluginArtifacts = @()
+$localPluginPnpmVersion = $null
 if (-not $NoLaunch) {
 	$resolvedSourceDirectory = [IO.Path]::GetFullPath($DshSourceDirectory)
 	if (-not (Test-Path -LiteralPath (Join-Path $resolvedSourceDirectory '.git'))) {
@@ -237,6 +349,75 @@ if (-not $NoLaunch) {
 	if ($pnpmVersion -ne $Lock.pnpmVersion) {
 		throw "pnpm 版本必须是 $($Lock.pnpmVersion)，当前为 $pnpmVersion。"
 	}
+
+	$repoPackage = Get-Content -LiteralPath (Join-Path $RepoRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+	if ($repoPackage.packageManager -notmatch '^pnpm@(.+)$') {
+		throw "本仓库 package.json 必须锁定 pnpm packageManager，当前为：$($repoPackage.packageManager)"
+	}
+	$expectedLocalPluginPnpmVersion = $Matches[1]
+	$previousLocation = Get-Location
+	try {
+		Set-Location -LiteralPath $RepoRoot
+		$localPluginPnpmVersion = (& $corepack.Source pnpm --version).Trim()
+	} finally {
+		Set-Location -LiteralPath $previousLocation
+	}
+	if ($localPluginPnpmVersion -ne $expectedLocalPluginPnpmVersion) {
+		throw "本仓库插件 pnpm 版本必须是 $expectedLocalPluginPnpmVersion，当前为 $localPluginPnpmVersion。"
+	}
+
+	Write-Step "同步锁定依赖并干净构建本仓库插件"
+	$previousCi = $env:CI
+	try {
+		$env:CI = 'true'
+		Invoke-Native $corepack.Source @('pnpm', 'install', '--frozen-lockfile') $RepoRoot
+		Invoke-Native $corepack.Source @('pnpm', 'run', 'clean') $RepoRoot
+		Invoke-Native $corepack.Source @('pnpm', 'run', 'build') $RepoRoot
+	} finally {
+		$env:CI = $previousCi
+	}
+
+	$pluginPackageFiles = @(Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'plugins') -Directory | ForEach-Object {
+		Join-Path $_.FullName 'package.json'
+	} | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+	foreach ($pluginPackageFile in $pluginPackageFiles) {
+		$pluginPackage = Get-Content -LiteralPath $pluginPackageFile -Raw -Encoding UTF8 | ConvertFrom-Json
+		foreach ($export in $pluginPackage.exports.PSObject.Properties) {
+			if ($export.Value -isnot [string] -or -not $export.Value.StartsWith('./lib/', [StringComparison]::Ordinal)) { continue }
+			$relativeArtifact = $export.Value.Substring(2).Replace('/', [IO.Path]::DirectorySeparatorChar)
+			$artifact = Join-Path (Split-Path -Parent $pluginPackageFile) $relativeArtifact
+			if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
+				throw "本仓库插件构建完成但缺少 export 产物：$($pluginPackage.name) $($export.Name) -> $artifact"
+			}
+			$localPluginArtifacts += [ordered]@{
+				package = $pluginPackage.name
+				export = $export.Name
+				path = [IO.Path]::GetFullPath($artifact)
+				sha256 = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash
+			}
+		}
+	}
+	if ($localPluginArtifacts.Count -eq 0) {
+		throw '本仓库插件构建未发现任何 lib export 产物。'
+	}
+	$shadowBillingHostBundle = Join-Path $RepoRoot 'plugins\shadow-billing\lib\index.js'
+	$shadowBillingFoldBundle = Join-Path $RepoRoot 'plugins\shadow-billing\lib\fold.js'
+	$shadowBillingClientBundle = Join-Path $RepoRoot 'plugins\shadow-billing\lib\client.js'
+	$shadowBillingHostText = Get-Content -LiteralPath $shadowBillingHostBundle -Raw -Encoding UTF8
+	$shadowBillingFoldText = Get-Content -LiteralPath $shadowBillingFoldBundle -Raw -Encoding UTF8
+	$shadowBillingClientText = Get-Content -LiteralPath $shadowBillingClientBundle -Raw -Encoding UTF8
+	if ($shadowBillingHostText -notmatch 'repaired' -or $shadowBillingFoldText -notmatch 'repairUnknownUsage') {
+		throw "shadow-billing Host 产物未包含 alpha1 unknown 修复链路：$shadowBillingHostBundle / $shadowBillingFoldBundle"
+	}
+	if (($shadowBillingClientText -notmatch 'extension\.manager\.section') -or ($shadowBillingClientText -notmatch "id:\s*'billing'") -or ($shadowBillingClientText -match 'conversation\.session\.header\.utilities|conversation\.view|sb-badge')) {
+		throw "shadow-billing Client 产物必须只把 Billing 注册到扩展区：$shadowBillingClientBundle"
+	}
+	if (($shadowBillingClientText -notmatch 'billing-dashboard') -or ($shadowBillingClientText -notmatch 'Token 用量') -or
+		($shadowBillingClientText -notmatch 'bl-chartTooltip') -or ($shadowBillingClientText -notmatch 'data-billing-bar') -or
+		($shadowBillingClientText -notmatch '¥1\.50') -or ($shadowBillingClientText -notmatch '¥4\.50')) {
+		throw "shadow-billing Client 产物未包含 DSH-032 定稿仪表盘或当前价目：$shadowBillingClientBundle"
+	}
+
 	$resolvedLogDirectory = [IO.Path]::GetFullPath($LogDirectory)
 	New-Item -ItemType Directory -Path $resolvedLogDirectory -Force | Out-Null
 	$buildMetadataPath = Join-Path $resolvedLogDirectory "dsh-web-$Port.build.json"
@@ -258,7 +439,9 @@ if (-not $NoLaunch) {
 	$acpBundle = Join-Path $buildSourceDirectory 'packages\acp\acp\lib\index.js'
 	$attachmentLocalBundle = Join-Path $buildSourceDirectory 'packages\attachment\attachment-local\lib\index.js'
 	$visionBundle = Join-Path $buildSourceDirectory 'packages\vision\vision-bridge\lib\index.js'
-	foreach ($artifact in @($cliEntry, $gatewayBundle, $sessionControllerBundle, $acpBundle, $attachmentLocalBundle, $visionBundle)) {
+	$uiChatBundle = Join-Path $buildSourceDirectory 'packages\client\ui-chat\lib\client.js'
+	$uiToolBundle = Join-Path $buildSourceDirectory 'packages\client\ui-tool\lib\client.js'
+	foreach ($artifact in @($cliEntry, $gatewayBundle, $sessionControllerBundle, $acpBundle, $attachmentLocalBundle, $visionBundle, $uiChatBundle, $uiToolBundle)) {
 		if (-not (Test-Path -LiteralPath $artifact -PathType Leaf)) {
 			throw "构建完成但缺少产物：$artifact"
 		}
@@ -268,6 +451,8 @@ if (-not $NoLaunch) {
 	$acpBundleText = Get-Content -LiteralPath $acpBundle -Raw -Encoding UTF8
 	$attachmentLocalBundleText = Get-Content -LiteralPath $attachmentLocalBundle -Raw -Encoding UTF8
 	$visionBundleText = Get-Content -LiteralPath $visionBundle -Raw -Encoding UTF8
+	$uiChatBundleText = Get-Content -LiteralPath $uiChatBundle -Raw -Encoding UTF8
+	$uiToolBundleText = Get-Content -LiteralPath $uiToolBundle -Raw -Encoding UTF8
 	if ($gatewayBundleText -notmatch 'TypertRemote|TypertRemoteService') {
 		throw "Gateway 构建产物未包含 alpha1 Typert Remote 入口：$gatewayBundle"
 	}
@@ -282,6 +467,19 @@ if (-not $NoLaunch) {
 	}
 	if ($visionBundleText -notmatch 'imageInputBridge' -or $visionBundleText -notmatch 'reportProgress') {
 		throw "vision-bridge 构建产物未包含 imageInputBridge provider 与 progress：$visionBundle"
+	}
+	if ($uiChatBundleText -notmatch 'tool-activity' -or $uiChatBundleText -notmatch 'activityStartTime') {
+		throw "ui-chat 构建产物未包含流式工具计时起点桥接：$uiChatBundle"
+	}
+	if ($uiChatBundleText -notmatch 'data-reasoning-activity' -or $uiChatBundleText -notmatch 'reasoningTimings') {
+		throw "ui-chat 构建产物未包含思考读秒与流式时序投影：$uiChatBundle"
+	}
+	if ($uiToolBundleText -notmatch 'activityStartedTime' -or $uiToolBundleText -notmatch 'node\.data\.startedTime') {
+		throw "ui-tool 构建产物未从流式活动起点计算耗时：$uiToolBundle"
+	}
+	if ($uiToolBundleText -notmatch 'callHead' -or $uiToolBundleText -notmatch 'column-gap:8px' -or
+		$uiToolBundleText -notmatch 'justify-content:flex-start' -or $uiToolBundleText -match 'data-has-tool-timer') {
+		throw "ui-tool 构建产物未把工具耗时恢复为标题/摘要后的内联布局：$uiToolBundle"
 	}
 
 	$configDumpArguments = @('--profile', 'web')
@@ -324,6 +522,8 @@ if (-not $NoLaunch) {
 		builtAt = (Get-Date).ToString('o')
 		nodeVersion = $nodeVersion
 		pnpmVersion = $pnpmVersion
+		localPluginPnpmVersion = $localPluginPnpmVersion
+		localPluginArtifacts = $localPluginArtifacts
 		cli = $cliEntry
 		gateway = $gatewayBundle
 		sessionController = $sessionControllerBundle
@@ -425,8 +625,13 @@ $runtimeMetadata = [ordered]@{
 	stderr = $stderrLog
 	anonymousHttpStatus = $null
 	authenticatedHttpStatus = $null
+	clientBootEntryCount = $null
+	clientBootBatchCount = $null
+	clientBootBatchHttp200Count = $null
+	clientModulesPreloaded = $null
 	skillManagerApiVersion = $null
 	pluginManagerApiVersion = $null
+	shadowBillingRepairCount = $null
 	verifiedAt = $null
 }
 $runtimeMetadata | ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8
@@ -438,6 +643,9 @@ $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
 $up = $false
 $authenticatedClient = $null
 $launchUri = $null
+$webBootEvidence = $null
+$webBootBatchHttp200Count = $null
+$startupGateError = $null
 while ((Get-Date) -lt $deadline) {
 	if ($startedProcess.HasExited) { break }
 	if ($null -eq $launchUri -and (Test-Path -LiteralPath $stdoutLog -PathType Leaf)) {
@@ -451,6 +659,7 @@ while ((Get-Date) -lt $deadline) {
 				Protect-StartupLog $stdoutLog
 				throw 'alpha1 CLI 返回了非预期的一次性 Web 登录地址。'
 			}
+			Write-BrowserHandoff $BrowserHandoffFile $launchUri
 			Protect-StartupLog $stdoutLog
 		}
 	}
@@ -463,17 +672,29 @@ while ((Get-Date) -lt $deadline) {
 				$handler.CookieContainer = [System.Net.CookieContainer]::new()
 				$candidateClient = [System.Net.Http.HttpClient]::new($handler, $true)
 				$candidateClient.Timeout = [TimeSpan]::FromSeconds(5)
-				$authResponse = $candidateClient.GetAsync($launchUri, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+				$authResponse = $candidateClient.GetAsync($launchUri).GetAwaiter().GetResult()
 				if ([int]$authResponse.StatusCode -eq 200) {
-					$authenticatedClient = $candidateClient
-					$up = $true
-					$authResponse.Dispose()
+					try {
+						$authHtml = $authResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+						$webBootEvidence = Get-WebBootEvidence $authHtml
+						$webBootBatchHttp200Count = Assert-WebBootBatches $candidateClient "http://${HostAddr}:${Port}/" $webBootEvidence
+						$authenticatedClient = $candidateClient
+						$up = $true
+					} catch {
+						$startupGateError = $_.Exception.Message
+						$candidateClient.Dispose()
+					} finally {
+						$authResponse.Dispose()
+					}
 					break
 				}
 				$authResponse.Dispose()
 				$candidateClient.Dispose()
 			}
-		} catch { }
+		} catch {
+			$startupGateError = $_.Exception.Message
+			break
+		}
 	}
 	Start-Sleep -Milliseconds 500
 }
@@ -484,7 +705,8 @@ if (-not $up) {
 		Stop-Process -Id $startedProcess.Id -Force -ErrorAction SilentlyContinue
 	}
 	$stderrTail = Get-LogTail $stderrLog
-	throw "服务未在限定时间内恢复。stderr 尾部：$stderrTail"
+	$gateDetail = if ([string]::IsNullOrWhiteSpace($startupGateError)) { '' } else { "启动门禁：$startupGateError；" }
+	throw "服务未在限定时间内恢复。${gateDetail}stderr 尾部：$stderrTail"
 }
 
 $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -502,7 +724,7 @@ if (-not (Test-DshWebCommandLine $actualProcess.CommandLine $Port) -or
 	Stop-Process -Id $startedProcess.Id -Force -ErrorAction SilentlyContinue
 	throw "监听进程没有使用期望的本地源码 CLI：$($actualProcess.CommandLine)"
 }
-Write-Step "服务已恢复：匿名 HTTP 401、认证 HTTP 200，PID $($startedProcess.Id)，本地源码命令行校验通过"
+Write-Step "服务已恢复：匿名 HTTP 401、认证 HTTP 200、boot graph $($webBootEvidence.EntryCount) entries/$($webBootEvidence.BatchCount) batches（全部脚本 HTTP 200），PID $($startedProcess.Id)，本地源码命令行校验通过"
 
 $runtimeErrors = New-Object 'System.Collections.Generic.List[string]'
 $skillManagerApiVersion = $null
@@ -530,6 +752,26 @@ try {
 } catch {
 	$runtimeErrors.Add("plugin-manager API 验证失败：$($_.Exception.Message)")
 }
+
+$shadowBillingRepairCount = $null
+try {
+	$shadowStatusDeadline = (Get-Date).AddSeconds(5)
+	$shadowStatus = $null
+	do {
+		$shadowStatus = Invoke-AuthenticatedJsonGet $authenticatedClient "http://${HostAddr}:${Port}/api/shadow-billing/status"
+		$lastFold = $shadowStatus.value.lastFold
+		if ($null -ne $lastFold -and $lastFold.PSObject.Properties.Name -contains 'repaired') { break }
+		Start-Sleep -Milliseconds 100
+	} while ((Get-Date) -lt $shadowStatusDeadline)
+	if ($null -eq $lastFold -or $lastFold.PSObject.Properties.Name -notcontains 'repaired') {
+		$runtimeErrors.Add('shadow-billing Host 未加载带 repaired 字段的最新 alpha1 折叠实现。')
+	} else {
+		$shadowBillingRepairCount = [int]$lastFold.repaired
+		Write-Host "shadow-billing host：repaired $shadowBillingRepairCount ✓" -ForegroundColor Green
+	}
+} catch {
+	$runtimeErrors.Add("shadow-billing API 验证失败：$($_.Exception.Message)")
+}
 $authenticatedClient.Dispose()
 
 if ($runtimeErrors.Count -gt 0) {
@@ -539,8 +781,13 @@ if ($runtimeErrors.Count -gt 0) {
 
 $runtimeMetadata.anonymousHttpStatus = 401
 $runtimeMetadata.authenticatedHttpStatus = 200
+$runtimeMetadata.clientBootEntryCount = $webBootEvidence.EntryCount
+$runtimeMetadata.clientBootBatchCount = $webBootEvidence.BatchCount
+$runtimeMetadata.clientBootBatchHttp200Count = $webBootBatchHttp200Count
+$runtimeMetadata.clientModulesPreloaded = $webBootEvidence.ClientModulesPreloaded
 $runtimeMetadata.skillManagerApiVersion = $skillManagerApiVersion
 $runtimeMetadata.pluginManagerApiVersion = $pluginManagerApiVersion
+$runtimeMetadata.shadowBillingRepairCount = $shadowBillingRepairCount
 $runtimeMetadata.verifiedAt = (Get-Date).ToString('o')
 $runtimeMetadata | ConvertTo-Json | Set-Content -LiteralPath $metadataPath -Encoding UTF8
 Write-Step "重启完成"

@@ -2,271 +2,319 @@
 /**
  * dsh-shadow-billing — Client half（DSH-032）。
  *
- * 三个 Slot：
- * - conversation.session.header.utilities：会话头部徽标（累计 token + 估算费用，点击弹详情）；
- * - conversation.view：与「对话 / 轨迹」并列的「用量」页签（统计卡 + 趋势 + 排行 + 明细）；
- * - settings.section：设置页（价目表与口径说明）。
- *
- * 动效：数字滚动（300ms ease-out）、趋势面积图路径绘制入场（800ms）、
- * 统计卡淡入上移（200ms）；prefers-reduced-motion 下全部降级为瞬时。
+ * Billing 只出现在扩展管理器与设置页。仪表盘沿用 DSH-032 最终确认的
+ * 收据标题、三项总览、Token/费用组合图、模型构成和调用明细布局。
  */
-// ---- 工具（不依赖 React） -------------------------------------------------
-function fmtTokens(n) {
-    if (n >= 1_000_000)
-        return (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000)
-        return (n / 1_000).toFixed(1) + 'k';
-    return String(n);
+function fmtTokens(value) {
+    if (value >= 1_000_000_000)
+        return (value / 1_000_000_000).toFixed(2) + 'B';
+    if (value >= 1_000_000)
+        return (value / 1_000_000).toFixed(2) + 'M';
+    if (value >= 1_000)
+        return (value / 1_000).toFixed(1) + 'K';
+    return Math.round(value).toLocaleString('en-US');
 }
 function fmtCost(costNano) {
-    return (costNano / 1e9).toFixed(2);
+    return '¥' + (costNano / 1e9).toFixed(2);
 }
-function fmtTime(ts) {
-    const d = new Date(ts);
-    const p = (x) => String(x).padStart(2, '0');
-    return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+function fmtDay(day) {
+    const parts = day.split('-');
+    return parts.length === 3 ? Number(parts[1]) + '/' + Number(parts[2]) : day;
+}
+function fmtTime(timestamp) {
+    return new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(new Date(timestamp));
 }
 async function apiGet(url) {
-    try {
-        const res = await fetch(url, { headers: { accept: 'application/json' } });
-        if (!res.ok)
-            return null;
-        const body = (await res.json());
-        return body.ok ? (body.value ?? null) : null;
+    const response = await fetch(url, { headers: { accept: 'application/json' } });
+    const body = (await response.json());
+    if (!response.ok || !body.ok || body.value === undefined) {
+        throw new Error(body.error?.message ?? 'Billing 请求失败（' + response.status + '）');
     }
-    catch {
-        return null;
-    }
+    return body.value;
 }
-/** 尊重 prefers-reduced-motion。 */
-function prefersReducedMotion() {
-    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-// ---- 插件入口 -------------------------------------------------------------
 (function () {
     window.__ModuleLoader__.load({
         id: 'dsh-shadow-billing',
         factory: function (require) {
             var React = require('react');
             var h = React.createElement;
-            /** 数字滚动：从旧值缓动滚到新值（300ms ease-out）。 */
-            function useCountUp(target, duration = 300) {
-                const [display, setDisplay] = React.useState(target);
-                const prevRef = React.useRef(target);
-                React.useEffect(() => {
-                    const from = prevRef.current;
-                    if (from === target)
-                        return;
-                    const start = performance.now();
-                    let raf = 0;
-                    const step = (now) => {
-                        const t = Math.min(1, (now - start) / duration);
-                        const eased = 1 - Math.pow(1 - t, 3);
-                        setDisplay(from + (target - from) * eased);
-                        if (t < 1)
-                            raf = requestAnimationFrame(step);
-                        else
-                            prevRef.current = target;
-                    };
-                    raf = requestAnimationFrame(step);
-                    return () => cancelAnimationFrame(raf);
-                }, [target, duration]);
-                return display;
+            function ReceiptIcon(props) {
+                const size = props.size ?? 18;
+                return h('svg', { width: size, height: size, viewBox: '0 0 18 18', fill: 'none', 'aria-hidden': true }, h('path', { d: 'M4 2.25h10v13.5l-2.5-1.5-2.5 1.5-2.5-1.5L4 15.75V2.25Z', stroke: 'currentColor', strokeWidth: 1.35, strokeLinejoin: 'round' }), h('path', { d: 'M6.5 5.75h5M6.5 8.75h5M6.5 11.75h3', stroke: 'currentColor', strokeWidth: 1.25, strokeLinecap: 'round' }));
             }
-            /** 统计卡：淡入上移入场。 */
-            function StatCard(props) {
-                return h('div', { className: 'sb-card' + (props.accent ? ' sb-cardAccent' : ''), style: prefersReducedMotion() ? undefined : { animation: 'sb-card-in .2s ease-out both' } }, h('div', { className: 'sb-cardLabel' }, props.label), h('div', { className: 'sb-cardValue' }, props.value), props.hint ? h('div', { className: 'sb-cardHint' }, props.hint) : null);
+            function RefreshIcon() {
+                return h('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true }, h('path', { d: 'M13 5.5V2.75m0 0h-2.75M13 2.75A5.75 5.75 0 1 0 13.2 10', stroke: 'currentColor', strokeWidth: 1.35, strokeLinecap: 'round', strokeLinejoin: 'round' }));
             }
-            /** 会话头部徽标：累计 token + 估算费用，点击弹详情层。 */
-            function SessionBadge(props) {
-                const sessionId = typeof props.sessionId === 'string' ? props.sessionId : '';
-                const [data, setData] = React.useState(null);
-                const [open, setOpen] = React.useState(false);
-                const [failed, setFailed] = React.useState(false);
-                const costNano = data?.costNano ?? 0;
-                const tokens = (data?.inputTokens ?? 0) + (data?.outputTokens ?? 0) + (data?.cacheReadTokens ?? 0);
-                const shownCost = useCountUp(costNano / 1e9, 300);
-                React.useEffect(() => {
-                    if (!sessionId)
-                        return;
-                    let alive = true;
-                    const load = () => {
-                        apiGet(`/api/shadow-billing/session?sessionId=${encodeURIComponent(sessionId)}`).then((v) => {
-                            if (!alive)
-                                return;
-                            if (v === null)
-                                setFailed(true);
-                            else {
-                                setData(v);
-                                setFailed(false);
-                            }
+            function useBillingData(page) {
+                const [state, setState] = React.useState({ loading: true, refreshing: false, error: '' });
+                const load = React.useCallback(function (fold) {
+                    setState(function (previous) {
+                        return { ...previous, loading: previous.data === undefined, refreshing: fold, error: '' };
+                    });
+                    const prepare = fold
+                        ? fetch('/api/shadow-billing/fold', { method: 'POST' }).then(function () { return undefined; })
+                        : Promise.resolve();
+                    prepare.then(function () {
+                        return Promise.all([
+                            apiGet('/api/shadow-billing/summary?days=7'),
+                            apiGet('/api/shadow-billing/by-model?days=7'),
+                            apiGet('/api/shadow-billing/daily?days=7'),
+                            apiGet('/api/shadow-billing/requests?days=7&page=' + page + '&size=20'),
+                        ]);
+                    }).then(function ([summary, models, daily, requests]) {
+                        setState({
+                            loading: false,
+                            refreshing: false,
+                            error: '',
+                            data: { summary, models: models.models, daily: daily.daily, requests },
                         });
-                    };
-                    load();
-                    const timer = setInterval(load, 30_000);
-                    return () => { alive = false; clearInterval(timer); };
-                }, [sessionId]);
-                if (!sessionId || (data === null && !failed)) {
-                    return h('span', { className: 'sb-badge', 'data-testid': 'sb-badge-loading' }, '…');
-                }
-                const breathe = costNano >= 1e9; // 估算费用 ≥ ¥1 时呼吸提示
-                return h('div', { className: 'sb-badgeWrap' }, h('button', {
-                    type: 'button',
-                    className: 'sb-badge' + (breathe ? ' sb-badgeHot' : '') + (open ? ' sb-badgeOpen' : ''),
-                    onClick: () => setOpen(!open),
-                    'aria-expanded': open,
-                    title: '本会话估算消耗（影子计费）',
-                    'data-testid': 'sb-badge',
-                }, h('span', { className: 'sb-badgeCost' }, `≈¥${shownCost.toFixed(2)}`), h('span', { className: 'sb-badgeTokens' }, fmtTokens(tokens))), open ? h('div', { className: 'sb-popover', role: 'dialog', 'data-testid': 'sb-popover' }, h('div', { className: 'sb-popoverTitle' }, '本会话估算消耗'), data === null ? h('p', { className: 'sb-muted' }, '暂无记录') : h(React.Fragment, null, h('div', { className: 'sb-popoverRow' }, h('span', null, '请求'), h('b', null, String(data.requests))), h('div', { className: 'sb-popoverRow' }, h('span', null, '未命中输入'), h('b', null, fmtTokens(data.inputTokens))), h('div', { className: 'sb-popoverRow' }, h('span', null, '缓存命中'), h('b', null, fmtTokens(data.cacheReadTokens))), h('div', { className: 'sb-popoverRow' }, h('span', null, '输出'), h('b', null, fmtTokens(data.outputTokens))), h('div', { className: 'sb-popoverRow sb-popoverRowTotal' }, h('span', null, '估算费用'), h('b', null, `¥${fmtCost(data.costNano)}`)), data.lastAt !== null ? h('p', { className: 'sb-muted' }, `最近调用 ${fmtTime(data.lastAt)}`) : null), h('p', { className: 'sb-footnote' }, '按 DeepSeek Flash 峰谷价影子计费，非真实账单')) : null);
+                    }, function (error) {
+                        setState(function (previous) {
+                            return {
+                                ...previous,
+                                loading: false,
+                                refreshing: false,
+                                error: error instanceof Error ? error.message : String(error),
+                            };
+                        });
+                    });
+                }, [page]);
+                React.useEffect(function () { load(false); }, [load]);
+                return { ...state, refresh: function () { load(true); } };
             }
-            /** 趋势面积图：SVG 路径绘制入场 + 数据点。 */
-            function TrendChart(props) {
-                const rows = props.daily;
-                const W = 640;
-                const H = 160;
-                const PAD = 4;
-                if (rows.length === 0) {
-                    return h('p', { className: 'sb-muted', style: { padding: '24px 0', textAlign: 'center' } }, '该时间窗暂无用量记录');
-                }
-                const max = Math.max(1, ...rows.map((r) => r.inputTokens + r.outputTokens + r.cacheReadTokens));
-                const stepX = (W - PAD * 2) / Math.max(1, rows.length - 1);
-                const points = rows.map((r, i) => {
-                    const x = PAD + i * stepX;
-                    const y = H - PAD - ((r.inputTokens + r.outputTokens + r.cacheReadTokens) / max) * (H - PAD * 2);
-                    return { x, y, r };
+            function Metric(props) {
+                return h('div', { className: 'bl-metric' }, h('div', { className: 'bl-metricLabel' }, props.label), h('div', { className: 'bl-metricValue' + (props.cost ? ' bl-metricValueCost' : '') }, props.value), h('div', { className: 'bl-metricHint' }, props.hint));
+            }
+            function Metrics(props) {
+                const summary = props.summary;
+                const total = summary.inputTokens + summary.cacheReadTokens + summary.outputTokens;
+                const cacheRate = total === 0 ? 0 : summary.cacheReadTokens / total * 100;
+                return h('div', { className: 'bl-card bl-metrics' }, h(Metric, { label: '最近 7 天 Token', value: fmtTokens(total), hint: summary.requests + ' 次模型调用' }), h(Metric, { label: '估算费用', value: fmtCost(summary.costNano), hint: '影子计费，非真实账单', cost: true }), h(Metric, { label: '缓存命中 Token', value: fmtTokens(summary.cacheReadTokens), hint: '占总量 ' + cacheRate.toFixed(1) + '%' }));
+            }
+            function Chart(props) {
+                const [hoveredIndex, setHoveredIndex] = React.useState(null);
+                const [hoverPosition, setHoverPosition] = React.useState(null);
+                const plotRef = React.useRef(null);
+                const days = props.daily.slice(-7);
+                const totals = days.map(function (day) {
+                    return day.inputTokens + day.cacheReadTokens + day.outputTokens;
                 });
-                const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                const firstX = points[0]?.x ?? PAD;
-                const lastX = points[points.length - 1]?.x ?? PAD;
-                const area = `${line} L${lastX},${H - PAD} L${firstX},${H - PAD} Z`;
-                const reduced = prefersReducedMotion();
-                return h('div', { className: 'sb-trend' }, h('svg', {
-                    viewBox: `0 0 ${W} ${H}`,
-                    preserveAspectRatio: 'none',
-                    className: 'sb-trendSvg',
-                    role: 'img',
-                    'aria-label': 'token 用量趋势',
-                }, h('defs', null, h('linearGradient', { id: 'sb-trend-fill', x1: '0', y1: '0', x2: '0', y2: '1' }, h('stop', { offset: '0%', stopColor: 'var(--dsw-alias-brand-primary)', stopOpacity: 0.35 }), h('stop', { offset: '100%', stopColor: 'var(--dsw-alias-brand-primary)', stopOpacity: 0.02 }))), h('path', { d: area, fill: 'url(#sb-trend-fill)', className: 'sb-trendArea' }), h('path', {
-                    d: line,
-                    fill: 'none',
-                    className: 'sb-trendLine',
-                    style: reduced ? undefined : { strokeDasharray: 600, strokeDashoffset: 600 },
-                }), points.map((p, i) => h('circle', { key: i, cx: p.x, cy: p.y, r: 2.5, className: 'sb-trendDot' }))));
+                const maxTokens = Math.max(1, ...totals);
+                const maxCost = Math.max(0.01, ...days.map(function (day) { return day.costNano / 1e9; }));
+                const points = days.map(function (day, index) {
+                    return {
+                        x: days.length <= 1 ? 50 : (index + 0.5) / days.length * 100,
+                        y: 92 - (day.costNano / 1e9) / maxCost * 80,
+                    };
+                });
+                const costPath = points.length === 0 ? '' : points.map(function (point, index) {
+                    return (index === 0 ? 'M' : 'L') + ' ' + point.x + ' ' + point.y;
+                }).join(' ');
+                const areaPath = costPath === '' ? '' : costPath + ' L ' + points[points.length - 1].x + ' 92 L ' + points[0].x + ' 92 Z';
+                function updateHover(event) {
+                    const plot = plotRef.current;
+                    if (plot === null)
+                        return;
+                    const rect = plot.getBoundingClientRect();
+                    if (rect.width <= 0 || rect.height <= 0)
+                        return;
+                    setHoverPosition({
+                        x: (event.clientX - rect.left) / rect.width * 100,
+                        y: (event.clientY - rect.top) / rect.height * 100,
+                    });
+                }
+                let tooltip = null;
+                if (hoveredIndex !== null && days[hoveredIndex] !== undefined) {
+                    const day = days[hoveredIndex];
+                    const point = points[hoveredIndex];
+                    const left = Math.min(84, Math.max(16, hoverPosition?.x ?? point.x));
+                    const y = hoverPosition?.y ?? point.y;
+                    const top = Math.min(92, Math.max(6, y));
+                    const transform = y >= 55 ? 'translate(-50%, calc(-100% - 12px))' : 'translate(-50%, 12px)';
+                    function tooltipRow(className, label, value, cost = false) {
+                        return h('div', { className: 'bl-chartTooltipRow' }, h('i', { className: 'bl-chartTooltipSwatch ' + className }), h('span', { className: 'bl-chartTooltipLabel' }, label), h('strong', { className: 'bl-chartTooltipValue' + (cost ? ' bl-chartTooltipCost' : '') }, value));
+                    }
+                    tooltip = h('div', {
+                        className: 'bl-chartTooltip',
+                        role: 'tooltip',
+                        style: { left: left + '%', top: top + '%', transform },
+                    }, h('div', { className: 'bl-chartTooltipTitle' }, fmtDay(day.day)), h('div', { className: 'bl-chartTooltipRows' }, tooltipRow('bl-chartTooltipSwatchInput', '输入 Token', fmtTokens(day.inputTokens)), tooltipRow('bl-chartTooltipSwatchCache', '缓存命中 Token', fmtTokens(day.cacheReadTokens)), tooltipRow('bl-chartTooltipSwatchOutput', '输出 Token', fmtTokens(day.outputTokens)), tooltipRow('bl-chartTooltipSwatchCost', '估算费用', fmtCost(day.costNano), true)));
+                }
+                return h('div', { className: 'bl-card bl-chartCard' }, h('div', { className: 'bl-cardHeader' }, h('div', { className: 'bl-cardTitle' }, '最近 7 天'), h('div', { className: 'bl-legend' }, h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchInput' }), '输入 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchCache' }), '缓存命中 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-swatch bl-swatchOutput' }), '输出 Token'), h('span', { className: 'bl-legendItem' }, h('i', { className: 'bl-lineLegend' }), '估算费用（¥）'))), days.length === 0
+                    ? h('div', { className: 'bl-chartEmpty' }, '暂无模型调用记录')
+                    : h('div', {
+                        className: 'bl-chart',
+                        onMouseLeave: function () { setHoveredIndex(null); setHoverPosition(null); },
+                    }, h('div', { className: 'bl-yLabels' }, h('span', null, fmtTokens(maxTokens)), h('span', null, fmtTokens(maxTokens / 2)), h('span', null, '0')), h('div', { className: 'bl-costLabels' }, h('span', null, '¥' + maxCost.toFixed(2)), h('span', null, '¥' + (maxCost / 2).toFixed(2)), h('span', null, '¥0')), h('div', { className: 'bl-chartPlot', ref: plotRef }, h('div', {
+                        className: 'bl-bars',
+                        style: { gridTemplateColumns: 'repeat(' + days.length + ', minmax(0, 1fr))' },
+                    }, days.map(function (day, index) {
+                        const total = totals[index];
+                        return h('div', {
+                            className: 'bl-barColumn',
+                            key: day.day,
+                            tabIndex: 0,
+                            onFocus: function () { setHoveredIndex(index); },
+                        }, h('div', {
+                            className: 'bl-barStack',
+                            'data-billing-bar': day.day,
+                            style: { height: Math.max(1, total / maxTokens * 100) + '%' },
+                            onMouseEnter: function (event) {
+                                setHoveredIndex(index);
+                                updateHover(event);
+                            },
+                            onMouseMove: updateHover,
+                            onMouseLeave: function () { setHoveredIndex(null); setHoverPosition(null); },
+                        }, h('div', { className: 'bl-bar bl-barOutput', style: { flex: day.outputTokens } }), h('div', { className: 'bl-bar bl-barCache', style: { flex: day.cacheReadTokens } }), h('div', { className: 'bl-bar bl-barInput', style: { flex: day.inputTokens } })));
+                    })), h('svg', {
+                        className: 'bl-costLine',
+                        viewBox: '0 0 100 100',
+                        preserveAspectRatio: 'none',
+                        'aria-hidden': true,
+                    }, h('defs', null, h('linearGradient', {
+                        id: 'shadow-billing-cost-fill', x1: '0', y1: '0', x2: '0', y2: '1',
+                    }, h('stop', { offset: '0%', stopColor: '#d18b3d', stopOpacity: '.18' }), h('stop', { offset: '100%', stopColor: '#d18b3d', stopOpacity: '0' }))), areaPath === '' ? null : h('path', { d: areaPath, fill: 'url(#shadow-billing-cost-fill)' }), costPath === '' ? null : h('path', {
+                        d: costPath,
+                        fill: 'none',
+                        stroke: '#d18b3d',
+                        strokeWidth: 2.2,
+                        vectorEffect: 'non-scaling-stroke',
+                    })), tooltip), h('div', { className: 'bl-costPoints' }, days.map(function (day, index) {
+                        const point = points[index];
+                        return h('span', {
+                            key: day.day,
+                            className: 'bl-costPoint',
+                            style: { left: point.x + '%', top: point.y + '%' },
+                        });
+                    })), h('div', {
+                        className: 'bl-xLabels',
+                        style: { gridTemplateColumns: 'repeat(' + days.length + ', minmax(0, 1fr))' },
+                    }, days.map(function (day, index) {
+                        return h('span', {
+                            key: day.day,
+                            className: index === days.length - 1 ? 'bl-xLabelCurrent' : '',
+                        }, fmtDay(day.day));
+                    }))));
             }
-            /** 用量页签主视图。 */
-            function UsageView() {
-                const [days, setDays] = React.useState(7);
-                const [summary, setSummary] = React.useState(null);
-                const [models, setModels] = React.useState([]);
-                const [daily, setDaily] = React.useState([]);
-                const [reqs, setReqs] = React.useState(null);
-                const [page, setPage] = React.useState(0);
-                const [refreshing, setRefreshing] = React.useState(false);
-                const load = React.useCallback((d, p) => {
-                    apiGet(`/api/shadow-billing/summary?days=${d}`).then(setSummary);
-                    apiGet(`/api/shadow-billing/by-model?days=${d}`).then((v) => setModels(v?.models ?? []));
-                    apiGet(`/api/shadow-billing/daily?days=${d}`).then((v) => setDaily(v?.daily ?? []));
-                    apiGet(`/api/shadow-billing/requests?days=${d}&page=${p}&size=10`).then((v) => {
-                        if (v !== null) {
-                            setReqs(v);
-                            setPage(p);
-                        }
-                    });
-                }, []);
-                React.useEffect(() => { load(days, 0); }, [days, load]);
-                const refresh = () => {
-                    setRefreshing(true);
-                    fetch('/api/shadow-billing/fold', { method: 'POST' })
-                        .catch(() => { })
-                        .finally(() => {
-                        load(days, page);
-                        setRefreshing(false);
-                    });
+            function ModelIcon(props) {
+                const lower = props.model.toLowerCase();
+                const kind = lower.includes('deepseek')
+                    ? 'DeepSeek'
+                    : lower.includes('qwen')
+                        ? 'Qwen'
+                        : lower.includes('gpt')
+                            ? 'OpenAI'
+                            : lower.includes('claude')
+                                ? 'Anthropic'
+                                : 'Model';
+                return h('span', {
+                    className: 'bl-modelBrand bl-modelBrand' + kind,
+                    title: kind,
+                }, kind.slice(0, 1));
+            }
+            function TokenComposition(props) {
+                const model = props.model;
+                const total = model.inputTokens + model.cacheReadTokens + model.outputTokens;
+                const percent = function (value) {
+                    return (total > 0 ? value / total * 100 : 0) + '%';
                 };
-                const totalTokens = (summary?.inputTokens ?? 0) + (summary?.outputTokens ?? 0) + (summary?.cacheReadTokens ?? 0);
-                const cacheRate = totalTokens > 0 ? ((summary?.cacheReadTokens ?? 0) / totalTokens) * 100 : 0;
-                const shownCost = useCountUp((summary?.costNano ?? 0) / 1e9, 400);
-                const daysOptions = [[1, '今天'], [7, '7 天'], [30, '30 天'], [90, '90 天'], [0, '全部']];
-                return h('div', { className: 'sb-root', 'data-testid': 'sb-usage-view' }, h('div', { className: 'sb-head' }, h('h2', null, '用量'), h('div', { className: 'sb-headRight' }, h('div', { className: 'sb-days', role: 'tablist' }, daysOptions.map(([d, label]) => h('button', {
-                    key: d,
+                const share = props.allTokens > 0 ? total / props.allTokens * 100 : 0;
+                return h('div', { className: 'bl-modelProgress' }, h('div', { className: 'bl-modelShare' }, '模型占总量 ' + share.toFixed(1) + '%'), h('div', { className: 'bl-progress' }, h('span', { className: 'bl-progressSegment bl-progressInput', style: { width: percent(model.inputTokens) } }), h('span', { className: 'bl-progressSegment bl-progressCache', style: { width: percent(model.cacheReadTokens) } }), h('span', { className: 'bl-progressSegment bl-progressOutput', style: { width: percent(model.outputTokens) } })), h('div', { className: 'bl-modelBreakdown' }, h('span', { className: 'bl-modelBreakdownItem' }, h('i', { className: 'bl-modelBreakdownSwatch bl-modelBreakdownSwatchInput' }), '输入 ' + fmtTokens(model.inputTokens)), h('span', { className: 'bl-modelBreakdownItem' }, h('i', { className: 'bl-modelBreakdownSwatch bl-modelBreakdownSwatchCache' }), '命中 ' + fmtTokens(model.cacheReadTokens)), h('span', { className: 'bl-modelBreakdownItem' }, h('i', { className: 'bl-modelBreakdownSwatch bl-modelBreakdownSwatchOutput' }), '输出 ' + fmtTokens(model.outputTokens))));
+            }
+            function ModelList(props) {
+                const allTokens = props.summary.inputTokens + props.summary.cacheReadTokens + props.summary.outputTokens;
+                return h('div', { className: 'bl-card bl-modelCard' }, h('div', { className: 'bl-cardHeader' }, h('div', { className: 'bl-cardTitle' }, '按模型')), props.models.length === 0
+                    ? h('div', { className: 'bl-empty' }, '暂无可展示的模型调用')
+                    : h(React.Fragment, null, h('div', { className: 'bl-modelHead' }, h('span', null, '模型'), h('span', null, '用量构成'), h('span', null, 'Token'), h('span', null, '请求'), h('span', null, '估算费用（¥）')), props.models.map(function (model) {
+                        const total = model.inputTokens + model.cacheReadTokens + model.outputTokens;
+                        return h('div', { className: 'bl-modelRow', key: model.model }, h('span', { className: 'bl-modelName', title: model.model }, h(ModelIcon, { model: model.model }), model.model), h(TokenComposition, { model, allTokens }), h('span', null, fmtTokens(total)), h('span', null, String(model.requests)), h('span', null, fmtCost(model.costNano)));
+                    }), h('div', { className: 'bl-modelRow bl-total' }, h('span', null, '合计'), h('span', null), h('span', null, fmtTokens(allTokens)), h('span', null, String(props.summary.requests)), h('span', null, fmtCost(props.summary.costNano)))));
+            }
+            function DetailList(props) {
+                const value = props.requests;
+                return h('div', { className: 'bl-card bl-detailCard' }, h('div', { className: 'bl-cardHeader bl-detailHeader' }, h('div', { className: 'bl-cardTitle' }, '调用明细'), h('span', { className: 'bl-status' }, '共 ' + value.total + ' 条')), value.rows.length === 0
+                    ? h('div', { className: 'bl-empty' }, '暂无模型调用记录')
+                    : h('div', { className: 'bl-tableScroll' }, h('table', { className: 'bl-detailTable' }, h('thead', null, h('tr', null, h('th', null, '时间'), h('th', null, '模型'), h('th', null, '输入'), h('th', null, '缓存命中'), h('th', null, '输出'), h('th', null, '估算费用'))), h('tbody', null, value.rows.map(function (row) {
+                        return h('tr', { key: row.record_id }, h('td', null, fmtTime(row.created_at)), h('td', null, row.model), h('td', null, fmtTokens(row.input_tokens)), h('td', null, fmtTokens(row.cache_read_tokens)), h('td', null, fmtTokens(row.output_tokens)), h('td', null, fmtCost(row.cost_nano)));
+                    })))), h('div', { className: 'bl-pager' }, h('button', {
+                    type: 'button',
+                    className: 'bl-pageBtn',
+                    disabled: value.page <= 0,
+                    onClick: function () { props.setPage(value.page - 1); },
+                }, '上一页'), h('span', null, '第 ' + (value.page + 1) + ' 页'), h('button', {
+                    type: 'button',
+                    className: 'bl-pageBtn',
+                    disabled: (value.page + 1) * value.size >= value.total,
+                    onClick: function () { props.setPage(value.page + 1); },
+                }, '下一页')));
+            }
+            function Dashboard() {
+                const [tab, setTab] = React.useState('usage');
+                const [page, setPage] = React.useState(0);
+                const state = useBillingData(page);
+                if (state.loading && state.data === undefined) {
+                    return h('div', { className: 'bl-page' }, h('div', { className: 'bl-loading' }, '正在读取 Token 用量…'));
+                }
+                if (state.data === undefined) {
+                    return h('div', { className: 'bl-page' }, h('div', { className: 'bl-empty' }, state.error || '暂无计费数据'));
+                }
+                const data = state.data;
+                return h('div', { className: 'bl-page', 'data-testid': 'billing-dashboard' }, h('div', { className: 'bl-shell' }, h('div', { className: 'bl-heading' }, h('div', { className: 'bl-headingIcon' }, h(ReceiptIcon, { size: 20 })), h('div', { className: 'bl-headingCopy' }, h('h1', { className: 'bl-title' }, 'Billing'), h('div', { className: 'bl-subtitle' }, '模型调用与 Token 成本')), h('div', { className: 'bl-headingActions' }, h('span', { className: 'bl-range' }, '最近 7 天'), h('button', {
+                    className: 'bl-iconBtn',
+                    type: 'button',
+                    title: '刷新',
+                    'aria-label': '刷新',
+                    disabled: state.refreshing,
+                    onClick: state.refresh,
+                }, h(RefreshIcon)))), h('div', { className: 'bl-tabs', role: 'tablist' }, h('button', {
                     type: 'button',
                     role: 'tab',
-                    'aria-selected': days === d,
-                    className: 'sb-dayTab' + (days === d ? ' sb-dayTabOn' : ''),
-                    onClick: () => setDays(d),
-                }, label))), h('button', { type: 'button', className: 'sb-btn', onClick: refresh, disabled: refreshing, title: '重新折叠日志并刷新' }, refreshing ? '刷新中…' : '刷新'))), h('div', { className: 'sb-cards' }, h(StatCard, { label: '估算费用', value: `¥${shownCost.toFixed(2)}`, hint: '影子计费 · 非真实账单', accent: true }), h(StatCard, { label: 'Token 消耗', value: fmtTokens(totalTokens), hint: `${fmtTokens(summary?.inputTokens ?? 0)} 未命中 + ${fmtTokens(summary?.cacheReadTokens ?? 0)} 命中 + ${fmtTokens(summary?.outputTokens ?? 0)} 输出` }), h(StatCard, { label: '请求次数', value: String(summary?.requests ?? 0), hint: `${days === 0 ? '全部' : '近 ' + days + ' 天'}` }), h(StatCard, { label: '缓存命中率', value: `${cacheRate.toFixed(1)}%`, hint: '缓存命中 token 占比' })), h(TrendChart, { daily }), h('div', { className: 'sb-grid' }, h('section', { className: 'sb-panel' }, h('h3', null, '模型排行'), models.length === 0 ? h('p', { className: 'sb-muted' }, '暂无记录') : h('table', { className: 'sb-table' }, h('thead', null, h('tr', null, h('th', null, '模型'), h('th', { className: 'sb-num' }, '请求'), h('th', { className: 'sb-num' }, 'Token'), h('th', { className: 'sb-num' }, '估算费用'))), h('tbody', null, models.map((m, i) => h('tr', { key: i }, h('td', null, m.model), h('td', { className: 'sb-num' }, String(m.requests)), h('td', { className: 'sb-num' }, fmtTokens(m.inputTokens + m.outputTokens + m.cacheReadTokens)), h('td', { className: 'sb-num' }, `¥${fmtCost(m.costNano)}`)))))), h('section', { className: 'sb-panel' }, h('h3', null, '请求明细'), reqs === null || reqs.rows.length === 0 ? h('p', { className: 'sb-muted' }, '暂无记录') : h(React.Fragment, null, h('table', { className: 'sb-table sb-tableDense' }, h('thead', null, h('tr', null, h('th', null, '时间'), h('th', null, '模型'), h('th', { className: 'sb-num' }, '输入'), h('th', { className: 'sb-num' }, '命中'), h('th', { className: 'sb-num' }, '输出'), h('th', { className: 'sb-num' }, '费用'))), h('tbody', null, reqs.rows.map((r) => h('tr', { key: r.record_id }, h('td', { className: 'sb-mono' }, fmtTime(r.created_at)), h('td', null, r.model), h('td', { className: 'sb-num' }, fmtTokens(r.input_tokens)), h('td', { className: 'sb-num' }, fmtTokens(r.cache_read_tokens)), h('td', { className: 'sb-num' }, fmtTokens(r.output_tokens)), h('td', { className: 'sb-num' }, `¥${fmtCost(r.cost_nano)}`))))), h('div', { className: 'sb-pager' }, h('button', { type: 'button', className: 'sb-btn', disabled: page <= 0, onClick: () => load(days, page - 1) }, '上一页'), h('span', { className: 'sb-muted' }, `第 ${page + 1} 页 · 共 ${reqs.total} 条`), h('button', { type: 'button', className: 'sb-btn', disabled: (page + 1) * 10 >= reqs.total, onClick: () => load(days, page + 1) }, '下一页'))))), h('p', { className: 'sb-footnote' }, '费用按 DeepSeek Flash 官方峰谷价（¥/1M：命中 0.05 / 未命中 1.5 / 输出 4.5，高峰 ×2）影子计费，仅供成本核算参考，非真实账单。'));
+                    className: tab === 'usage' ? 'bl-tab bl-tabActive' : 'bl-tab',
+                    'aria-selected': tab === 'usage',
+                    onClick: function () { setTab('usage'); },
+                }, 'Token 用量'), h('button', {
+                    type: 'button',
+                    role: 'tab',
+                    className: tab === 'detail' ? 'bl-tab bl-tabActive' : 'bl-tab',
+                    'aria-selected': tab === 'detail',
+                    onClick: function () { setTab('detail'); },
+                }, '调用明细')), state.error ? h('div', { className: 'bl-issue' }, '刷新失败，正在展示上次数据：' + state.error) : null, tab === 'usage'
+                    ? h(React.Fragment, null, h(Metrics, { summary: data.summary }), h(Chart, { daily: data.daily }), h(ModelList, { models: data.models, summary: data.summary }))
+                    : h(DetailList, { requests: data.requests, setPage })));
             }
-            /** 设置页：价目表与口径说明。 */
             function SettingsView() {
                 const [status, setStatus] = React.useState(null);
-                React.useEffect(() => {
-                    apiGet('/api/shadow-billing/status').then(setStatus);
+                React.useEffect(function () {
+                    apiGet('/api/shadow-billing/status').then(setStatus, function () { setStatus(null); });
                 }, []);
-                return h('div', { className: 'sb-settings', 'data-testid': 'sb-settings' }, h('h2', null, '用量计费'), h('p', null, '按 DeepSeek Flash 官方峰谷价对本地模型调用做影子计费。数据来自 DSH 会话日志中的真实 token 用量，仅作成本核算参考，不是真实账单。'), h('h3', null, '价目表（¥ / 1M tokens）'), h('table', { className: 'sb-table' }, h('thead', null, h('tr', null, h('th', null, '档位'), h('th', null, '低谷价'), h('th', null, '高峰价（×2）'))), h('tbody', null, h('tr', null, h('td', null, '缓存命中'), h('td', null, '0.05'), h('td', null, '0.10')), h('tr', null, h('td', null, '未命中'), h('td', null, '1.5'), h('td', null, '3.0')), h('tr', null, h('td', null, '输出'), h('td', null, '4.5'), h('td', null, '9.0')))), h('p', { className: 'sb-muted' }, '高峰时段：北京时间 9:00-12:00 / 14:00-18:00；2026-08-23 起周末全天低谷价。峰谷按北京时间判定，不随用户时区漂移。'), h('h3', null, '数据源'), status === null ? h('p', { className: 'sb-muted' }, '读取中…') : h(React.Fragment, null, h('p', { className: 'sb-mono' }, status.sessionsRoot), h('p', { className: 'sb-muted' }, status.lastFold === null
-                    ? '尚未完成日志折叠。'
-                    : `上次折叠：${fmtTime(status.lastFold.at)} · 扫描 ${status.lastFold.scanned} 个会话 · 新增 ${status.lastFold.imported} 条记录。`)));
+                const source = status === null
+                    ? '正在读取本地日志状态…'
+                    : status.sessionsRoot + (status.lastFold === null
+                        ? ' · 尚未完成日志折叠'
+                        : ' · 上次折叠 ' + fmtTime(status.lastFold.at) + ' · 新增 ' + status.lastFold.imported + ' 条');
+                return h('div', { className: 'bl-page', 'data-testid': 'sb-settings' }, h('div', { className: 'bl-shell bl-settings' }, h('div', { className: 'bl-heading' }, h('div', { className: 'bl-headingIcon' }, h(ReceiptIcon, { size: 20 })), h('div', { className: 'bl-headingCopy' }, h('h1', { className: 'bl-title' }, 'Billing'), h('div', { className: 'bl-subtitle' }, '影子计费设置'))), h('div', { className: 'bl-card' }, h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '计价口径'), h('div', { className: 'bl-settingText' }, '以下价格只用于本地估算，不会产生真实扣费。数据来自 DSH 会话日志中的真实 Token 用量。')), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, 'DeepSeek Flash 价目表（¥ / 1M Token）'), h('table', { className: 'bl-rateTable' }, h('thead', null, h('tr', null, h('th', null, 'Token 类型'), h('th', null, '低谷'), h('th', null, '高峰'))), h('tbody', null, h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥1.50'), h('td', null, '¥3.00')), h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥0.05'), h('td', null, '¥0.10')), h('tr', null, h('td', null, '输出'), h('td', null, '¥4.50'), h('td', null, '¥9.00'))))), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '峰谷规则'), h('div', { className: 'bl-settingText' }, '高峰：北京时间工作日 09:00–12:00、14:00–18:00；低谷：其他时段及周末（2026-08-23 起周末全天低谷）。')), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '数据源'), h('div', { className: 'bl-settingText' }, source)))));
             }
             var existingStyle = document.querySelector('style[data-plugin="dsh-shadow-billing"]');
             var style = existingStyle || document.createElement('style');
             style.setAttribute('data-plugin', 'dsh-shadow-billing');
             style.textContent = [
-                /* 徽标 */
-                '.sb-badgeWrap{position:relative;display:inline-flex}',
-                '.sb-badge{appearance:none;display:inline-flex;align-items:baseline;gap:6px;height:24px;padding:0 9px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer;transition:border-color .15s,background .15s;white-space:nowrap}',
-                '.sb-badge:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary)}',
-                '.sb-badgeOpen{border-color:var(--dsw-alias-brand-primary)}',
-                '.sb-badgeCost{font-weight:600;color:var(--dsw-alias-label-primary)}',
-                '.sb-badgeTokens{color:var(--dsw-alias-label-tertiary)}',
-                '.sb-badgeHot{animation:sb-breathe 2s ease-in-out infinite}',
-                '@keyframes sb-breathe{0%,100%{opacity:1}50%{opacity:.72}}',
-                /* 详情浮层 */
-                '.sb-popover{position:absolute;top:calc(100% + 6px);right:0;z-index:50;width:240px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-module-platform);box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:12px}',
-                '.sb-popoverTitle{font-weight:600;color:var(--dsw-alias-label-primary);margin-bottom:6px}',
-                '.sb-popoverRow{display:flex;justify-content:space-between;padding:2px 0;color:var(--dsw-alias-label-secondary)}',
-                '.sb-popoverRowTotal{border-top:1px solid var(--dsw-alias-border-l1);margin-top:4px;padding-top:6px}',
-                '.sb-popoverRowTotal b{color:var(--dsw-alias-label-primary)}',
-                /* 用量页签 */
-                '.sb-root{box-sizing:border-box;max-width:980px;margin:0 auto;padding:8px 8px 24px;color:var(--dsw-alias-label-primary);font-size:13px;display:flex;flex-direction:column;gap:14px}',
-                '.sb-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}',
-                '.sb-head h2{margin:0;font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.02em}',
-                '.sb-headRight{display:flex;align-items:center;gap:10px}',
-                '.sb-days{display:flex;gap:2px;padding:2px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-module-platform)}',
-                '.sb-dayTab{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;padding:3px 10px;border-radius:6px;cursor:pointer}',
-                '.sb-dayTabOn{background:var(--dsw-alias-brand-primary);color:#fff;font-weight:600}',
-                '.sb-btn{appearance:none;height:30px;padding:0 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;cursor:pointer}',
-                '.sb-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}',
-                '.sb-btn:disabled{cursor:not-allowed;opacity:.5}',
-                '.sb-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}',
-                '.sb-card{padding:12px 14px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-module-platform)}',
-                '.sb-cardAccent{border-color:var(--dsw-alias-brand-primary)}',
-                '.sb-cardLabel{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
-                '.sb-cardValue{font-size:20px;font-weight:650;margin-top:4px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}',
-                '.sb-cardHint{font-size:11px;color:var(--dsw-alias-label-quaternary);margin-top:2px}',
-                '@keyframes sb-card-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}',
-                /* 趋势图 */
-                '.sb-trend{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:10px 12px;background:var(--dsw-alias-bg-module-platform)}',
-                '.sb-trendSvg{width:100%;height:160px;display:block}',
-                '.sb-trendLine{stroke:var(--dsw-alias-brand-primary);stroke-width:1.5;animation:sb-draw .8s ease-out forwards}',
-                '@keyframes sb-draw{to{stroke-dashoffset:0}}',
-                '.sb-trendDot{fill:var(--dsw-alias-brand-primary)}',
-                /* 面板与表格 */
-                '.sb-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:12px}',
-                '.sb-panel{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:12px 14px;background:var(--dsw-alias-bg-module-platform);min-width:0}',
-                '.sb-panel h3{margin:0 0 8px;font-size:14px;font-weight:600}',
-                '.sb-table{width:100%;border-collapse:collapse;font-size:12px}',
-                '.sb-table th{text-align:left;color:var(--dsw-alias-label-tertiary);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
-                '.sb-table td{padding:5px 6px;border-bottom:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary)}',
-                '.sb-table tr:last-child td{border-bottom:0}',
-                '.sb-num{text-align:right;font-variant-numeric:tabular-nums}',
-                '.sb-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px}',
-                '.sb-pager{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:8px}',
-                '.sb-muted{color:var(--dsw-alias-label-tertiary);font-size:12px;margin:4px 0}',
-                '.sb-footnote{color:var(--dsw-alias-label-quaternary);font-size:11px;margin:0}',
-                /* 设置页 */
-                '.sb-settings{box-sizing:border-box;max-width:720px;margin:0 auto;padding:8px 8px 24px;color:var(--dsw-alias-label-primary);font-size:13px;display:flex;flex-direction:column;gap:10px}',
-                '.sb-settings h2{margin:0;font-size:22px;font-weight:650;letter-spacing:-.02em}',
-                '.sb-settings h3{margin:8px 0 4px;font-size:14px;font-weight:600}',
-                '@media (prefers-reduced-motion: reduce){.sb-badgeHot,.sb-trendLine,.sb-card{animation:none}}',
+                '.bl-page{box-sizing:border-box;width:100%;height:100%;overflow:auto;padding:30px 34px 46px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}',
+                '.bl-shell{max-width:1180px;margin:0 auto}.bl-heading{display:flex;align-items:flex-start;gap:12px;margin-bottom:26px}.bl-headingIcon{width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,#1677ff 10%,var(--dsw-alias-bg-base));color:#1677ff;display:grid;place-items:center;flex:none}.bl-headingCopy{min-width:0}.bl-title{margin:0;font-size:26px;line-height:34px;font-weight:680;letter-spacing:-.02em}.bl-subtitle{margin-top:5px;color:var(--dsw-alias-label-tertiary);font-size:13px}.bl-headingActions{margin-left:auto;display:flex;align-items:center;gap:8px}.bl-range{height:36px;display:inline-flex;align-items:center;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;padding:0 11px;color:var(--dsw-alias-label-secondary);font-size:13px}.bl-iconBtn{height:36px;width:36px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);cursor:pointer;display:inline-grid;place-items:center}.bl-iconBtn:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+                '.bl-tabs{display:flex;gap:5px;margin:-7px 0 17px}.bl-tab{border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;font-size:13px;padding:7px 11px}.bl-tab:hover{background:var(--dsw-alias-interactive-bg-hover)}.bl-tabActive{background:color-mix(in srgb,#1677ff 10%,var(--dsw-alias-bg-base));color:#1677ff;font-weight:650}',
+                '.bl-card{border:1px solid var(--dsw-alias-border-l2);border-radius:13px;background:var(--dsw-alias-bg-base);box-shadow:0 1px 2px rgba(0,0,0,.02);margin-bottom:16px}.bl-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:18px 24px}.bl-metric{min-width:0;padding:0 24px;border-left:1px solid var(--dsw-alias-border-l2)}.bl-metric:first-child{border-left:0;padding-left:0}.bl-metricLabel{color:var(--dsw-alias-label-secondary);font-size:13px}.bl-metricValue{margin-top:10px;font-size:28px;line-height:32px;font-weight:680;letter-spacing:-.02em}.bl-metricValueCost{color:#bd7b32}.bl-metricHint{margin-top:7px;color:var(--dsw-alias-label-tertiary);font-size:12px}',
+                '.bl-chartCard{padding:18px 22px 13px}.bl-cardHeader{display:flex;align-items:center;gap:12px;margin-bottom:15px}.bl-cardTitle{font-size:15px;font-weight:650}.bl-legend{margin-left:auto;display:flex;gap:16px;color:var(--dsw-alias-label-secondary);font-size:12px}.bl-legendItem{display:inline-flex;align-items:center;gap:6px}.bl-swatch{width:9px;height:9px;border-radius:3px}.bl-swatchInput,.bl-barInput,.bl-progressInput,.bl-chartTooltipSwatchInput{background:#4b8ff7}.bl-swatchCache,.bl-barCache,.bl-progressCache,.bl-chartTooltipSwatchCache{background:#4faf9c}.bl-swatchOutput,.bl-barOutput,.bl-progressOutput,.bl-chartTooltipSwatchOutput{background:#a8c6eb}.bl-lineLegend{width:18px;height:3px;border-radius:3px;background:#d18b3d;display:inline-block}',
+                '.bl-chart{height:258px;position:relative;padding:10px 58px 29px 49px;box-sizing:border-box}.bl-yLabels{position:absolute;top:8px;bottom:29px;left:0;width:42px;display:flex;flex-direction:column;justify-content:space-between;color:var(--dsw-alias-label-tertiary);font-size:11px;text-align:right}.bl-costLabels{position:absolute;top:8px;bottom:29px;right:0;width:50px;display:flex;flex-direction:column;justify-content:space-between;color:var(--dsw-alias-label-tertiary);font-size:11px}.bl-chartPlot{position:relative;height:100%;border-bottom:1px solid var(--dsw-alias-border-l2);background:repeating-linear-gradient(to bottom,transparent 0,transparent calc(25% - 1px),var(--dsw-alias-border-l2) 25%,transparent calc(25% + 1px))}.bl-bars{position:absolute;inset:0;display:grid;align-items:end}.bl-barColumn{height:100%;display:flex;align-items:center;justify-content:flex-end;flex-direction:column}.bl-barStack{width:min(34px,65%);display:flex;flex-direction:column;justify-content:flex-end;border-radius:4px 4px 0 0;overflow:hidden;min-height:1px}.bl-bar{width:100%;min-height:1px}.bl-xLabels{position:absolute;left:49px;right:58px;bottom:0;height:20px;display:grid;color:var(--dsw-alias-label-tertiary);font-size:11px;text-align:center}.bl-xLabelCurrent{color:#1677ff;font-weight:650}.bl-costLine{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.bl-costPoints{position:absolute;left:49px;right:58px;top:10px;bottom:29px;pointer-events:none}.bl-costPoint{position:absolute;width:9px;height:9px;border:2px solid #d18b3d;border-radius:50%;background:var(--dsw-alias-bg-base);transform:translate(-50%,-50%)}.bl-chartEmpty{height:220px;display:grid;place-items:center;color:var(--dsw-alias-label-tertiary)}',
+                '.bl-chartTooltip{position:absolute;z-index:5;min-width:194px;padding:11px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-base);box-shadow:0 10px 28px rgba(15,23,42,.16);pointer-events:none}.bl-chartTooltipTitle{font-size:12px;font-weight:650}.bl-chartTooltipRows{display:grid;gap:7px;margin-top:9px}.bl-chartTooltipRow{display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:7px;font-size:12px}.bl-chartTooltipSwatch{width:8px;height:8px;border-radius:3px}.bl-chartTooltipSwatchCost{background:#d18b3d;border-radius:50%}.bl-chartTooltipLabel{color:var(--dsw-alias-label-secondary)}.bl-chartTooltipValue{font-variant-numeric:tabular-nums}.bl-chartTooltipCost{color:#bd7b32}',
+                '.bl-modelCard{padding:18px 22px 9px}.bl-modelHead,.bl-modelRow{display:grid;grid-template-columns:minmax(210px,1.35fr) minmax(230px,1.8fr) 104px 72px 100px;gap:16px;align-items:center}.bl-modelHead{color:var(--dsw-alias-label-tertiary);font-size:12px;padding-bottom:13px}.bl-modelHead>span:nth-child(n+3),.bl-modelRow>span:nth-child(n+3){text-align:right}.bl-modelRow{min-height:78px;border-top:1px solid var(--dsw-alias-border-l2);font-size:13px}.bl-modelName{min-width:0;display:flex;align-items:center;gap:8px;overflow:hidden;text-overflow:ellipsis}.bl-modelBrand{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex:none;font-weight:700}.bl-modelBrandDeepSeek{background:#eaf1ff;color:#3f7ff2}.bl-modelBrandQwen{background:#f0ecff;color:#7254df}.bl-modelBrandOpenAI{background:#edf1f6;color:#223049}.bl-modelBrandAnthropic{background:#fff0e9;color:#b56b4c}.bl-modelBrandModel{background:#edf1f7;color:#63728b}.bl-modelShare{margin-bottom:7px;color:var(--dsw-alias-label-tertiary);font-size:10px}.bl-progress{height:7px;display:flex;border-radius:9px;background:var(--dsw-alias-fill-tsp-secondary);overflow:hidden}.bl-progressSegment{height:100%}.bl-modelBreakdown{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px;color:var(--dsw-alias-label-tertiary);font-size:10px}.bl-modelBreakdownItem{display:inline-flex;align-items:center;gap:4px}.bl-modelBreakdownSwatch{width:6px;height:6px;border-radius:2px}.bl-total{font-weight:650;padding-top:13px;margin-top:4px}',
+                '.bl-detailCard{overflow:hidden}.bl-detailHeader{padding:18px 22px 0}.bl-detailHeader .bl-status{margin-left:auto}.bl-tableScroll{overflow:auto}.bl-detailTable{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}.bl-detailTable th{color:var(--dsw-alias-label-tertiary);font-weight:500;text-align:left;background:var(--dsw-alias-fill-tsp-secondary);padding:11px 14px}.bl-detailTable td{padding:12px 14px;border-top:1px solid var(--dsw-alias-border-l2)}.bl-detailTable th:nth-child(n+3),.bl-detailTable td:nth-child(n+3){text-align:right}.bl-pager{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:12px 16px;color:var(--dsw-alias-label-tertiary);font-size:12px}.bl-pageBtn{height:28px;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);cursor:pointer}.bl-pageBtn:disabled{opacity:.45;cursor:not-allowed}.bl-status{font-size:12px;color:var(--dsw-alias-label-tertiary)}.bl-issue{padding:11px 13px;border:1px solid color-mix(in srgb,#f0a116 35%,var(--dsw-alias-border-l2));border-radius:9px;color:var(--dsw-alias-label-secondary);font-size:12px;margin-bottom:16px}.bl-empty,.bl-loading{min-height:240px;display:grid;place-items:center;color:var(--dsw-alias-label-tertiary);font-size:13px}',
+                '.bl-settings{max-width:760px}.bl-settingSection{padding:19px 22px;border-bottom:1px solid var(--dsw-alias-border-l2)}.bl-settingSection:last-child{border-bottom:0}.bl-settingTitle{font-size:14px;font-weight:650;margin-bottom:8px}.bl-settingText{font-size:13px;line-height:1.7;color:var(--dsw-alias-label-secondary)}.bl-rateTable{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}.bl-rateTable th,.bl-rateTable td{text-align:left;padding:9px 0;border-top:1px solid var(--dsw-alias-border-l2)}.bl-rateTable th{color:var(--dsw-alias-label-tertiary);font-weight:500}',
+                '@media(max-width:900px){.bl-page{padding:23px 20px 35px}.bl-modelHead,.bl-modelRow{grid-template-columns:minmax(180px,1.25fr) minmax(205px,1.65fr) 90px 60px 80px;gap:10px}.bl-metrics{padding:17px 14px}.bl-metric{padding:0 14px}}@media(max-width:680px){.bl-heading{flex-wrap:wrap}.bl-headingActions{width:100%;margin-left:46px}.bl-metrics{grid-template-columns:1fr;gap:15px}.bl-metric,.bl-metric:first-child{border-left:0;border-top:1px solid var(--dsw-alias-border-l2);padding:15px 0 0}.bl-metric:first-child{border-top:0;padding-top:0}.bl-legend{display:none}.bl-modelHead,.bl-modelRow{grid-template-columns:minmax(150px,1fr) minmax(180px,1.2fr) 80px;gap:10px}.bl-modelHead>span:nth-child(n+4),.bl-modelRow>span:nth-child(n+4){display:none}}',
             ].join('');
             if (!existingStyle)
                 document.head.appendChild(style);
@@ -278,20 +326,13 @@ function prefersReducedMotion() {
                 if (slots === undefined || typeof slots.register !== 'function')
                     return;
                 var activeSlots = slots;
-                activeSlots.inject('conversation.session.header.utilities', function () {
+                activeSlots.inject('extension.manager.section', function () {
                     return activeSlots.register({
-                        name: 'conversation.session.header.utilities',
-                        id: 'shadow-billing',
-                        order: -10,
-                    }, SessionBadge);
-                });
-                activeSlots.inject('conversation.view', function () {
-                    return activeSlots.register({
-                        name: 'conversation.view',
-                        id: 'shadow-billing-usage',
-                        order: 20,
-                        label: function () { return '用量'; },
-                    }, UsageView);
+                        name: 'extension.manager.section',
+                        id: 'billing',
+                        order: 40,
+                        label: function () { return 'Billing'; },
+                    }, Dashboard);
                 });
                 activeSlots.inject('settings.section', function () {
                     return activeSlots.register({

@@ -49,6 +49,8 @@ export interface Watermark {
 	fileMtimeMs: number;
 	title: string | null;
 	lastOffset: number;
+	routeProvider: string | null;
+	routeModel: string | null;
 	updatedAt: number;
 }
 
@@ -77,6 +79,8 @@ CREATE TABLE IF NOT EXISTS fold_watermarks (
   file_mtime_ms INTEGER NOT NULL,
   title         TEXT,
   last_offset   INTEGER NOT NULL DEFAULT 0,
+  route_provider TEXT,
+  route_model    TEXT,
   updated_at    INTEGER NOT NULL
 );
 
@@ -96,6 +100,8 @@ CREATE TABLE IF NOT EXISTS usage_daily_rollups (
 export interface Store {
 	db: import('node:sqlite').DatabaseSync;
 	insertUsage(record: UsageRecord): boolean;
+	hasUnknownUsage(sessionId: string): boolean;
+	repairUnknownUsage(recordId: string, model: string, costNano: number): boolean;
 	putWatermark(watermark: Watermark): void;
 	getWatermark(sessionId: string): Watermark | null;
 	summarySince(dayFloor: string): { requests: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; costNano: number };
@@ -111,6 +117,9 @@ export function openStore(dbPath: string): Store {
 	const DatabaseSync = databaseSync();
 	const db = new DatabaseSync(dbPath);
 	db.exec(SCHEMA);
+	const watermarkColumns = new Set((db.prepare('PRAGMA table_info(fold_watermarks)').all() as Array<{ name: string }>).map(row => row.name));
+	if (!watermarkColumns.has('route_provider')) db.exec('ALTER TABLE fold_watermarks ADD COLUMN route_provider TEXT');
+	if (!watermarkColumns.has('route_model')) db.exec('ALTER TABLE fold_watermarks ADD COLUMN route_model TEXT');
 
 	const insertUsageStmt = db.prepare(`
 		INSERT OR IGNORE INTO usage_requests
@@ -129,6 +138,19 @@ export function openStore(dbPath: string): Store {
 		  cache_write_tokens = cache_write_tokens + excluded.cache_write_tokens,
 		  cost_nano = cost_nano + excluded.cost_nano
 	`);
+	const usageByIdStmt = db.prepare('SELECT * FROM usage_requests WHERE record_id = ?');
+	const updateUsageModelStmt = db.prepare('UPDATE usage_requests SET model = ?, cost_nano = ? WHERE record_id = ? AND model = ?');
+	const subtractRollupStmt = db.prepare(`
+		UPDATE usage_daily_rollups SET
+		  requests = requests - 1,
+		  input_tokens = input_tokens - ?,
+		  output_tokens = output_tokens - ?,
+		  cache_read_tokens = cache_read_tokens - ?,
+		  cache_write_tokens = cache_write_tokens - ?,
+		  cost_nano = cost_nano - ?
+		WHERE day = ? AND model = ?
+	`);
+	const deleteEmptyRollupStmt = db.prepare('DELETE FROM usage_daily_rollups WHERE day = ? AND model = ? AND requests <= 0');
 
 	const store: Store = {
 		db,
@@ -159,16 +181,54 @@ export function openStore(dbPath: string): Store {
 			return true;
 		},
 
+		hasUnknownUsage(sessionId: string): boolean {
+			return db.prepare("SELECT 1 AS found FROM usage_requests WHERE session_id = ? AND model = 'unknown' LIMIT 1")
+				.get(sessionId) !== undefined;
+		},
+
+		repairUnknownUsage(recordId: string, model: string, costNano: number): boolean {
+			if (model === 'unknown') return false;
+			const row = usageByIdStmt.get(recordId) as Record<string, unknown> | undefined;
+			if (row === undefined || row.model !== 'unknown') return false;
+			db.exec('BEGIN IMMEDIATE');
+			try {
+				const changed = updateUsageModelStmt.run(model, costNano, recordId, 'unknown');
+				if (changed.changes !== 1) {
+					db.exec('ROLLBACK');
+					return false;
+				}
+				subtractRollupStmt.run(
+					Number(row.input_tokens), Number(row.output_tokens),
+					Number(row.cache_read_tokens), Number(row.cache_write_tokens),
+					Number(row.cost_nano), String(row.day), 'unknown',
+				);
+				deleteEmptyRollupStmt.run(String(row.day), 'unknown');
+				upsertRollupStmt.run(
+					String(row.day), model,
+					Number(row.input_tokens), Number(row.output_tokens),
+					Number(row.cache_read_tokens), Number(row.cache_write_tokens),
+					costNano,
+				);
+				db.exec('COMMIT');
+				return true;
+			} catch (error) {
+				db.exec('ROLLBACK');
+				throw error;
+			}
+		},
+
 		putWatermark(watermark: Watermark): void {
 			db.prepare(`
-				INSERT INTO fold_watermarks (session_id, log_path, last_seq, file_mtime_ms, title, last_offset, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?)
+				INSERT INTO fold_watermarks (session_id, log_path, last_seq, file_mtime_ms, title, last_offset, route_provider, route_model, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 				ON CONFLICT(session_id) DO UPDATE SET
 				  log_path = excluded.log_path,
 				  last_seq = excluded.last_seq,
 				  file_mtime_ms = excluded.file_mtime_ms,
 				  title = excluded.title,
 				  last_offset = excluded.last_offset,
+				  route_provider = excluded.route_provider,
+				  route_model = excluded.route_model,
 				  updated_at = excluded.updated_at
 			`).run(
 				watermark.sessionId,
@@ -177,6 +237,8 @@ export function openStore(dbPath: string): Store {
 				watermark.fileMtimeMs,
 				watermark.title,
 				watermark.lastOffset,
+				watermark.routeProvider,
+				watermark.routeModel,
 				watermark.updatedAt,
 			);
 		},
@@ -192,6 +254,8 @@ export function openStore(dbPath: string): Store {
 				fileMtimeMs: Number(r.file_mtime_ms),
 				title: r.title === null ? null : String(r.title),
 				lastOffset: Number(r.last_offset),
+				routeProvider: r.route_provider === null || r.route_provider === undefined ? null : String(r.route_provider),
+				routeModel: r.route_model === null || r.route_model === undefined ? null : String(r.route_model),
 				updatedAt: Number(r.updated_at),
 			};
 		},

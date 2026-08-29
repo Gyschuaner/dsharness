@@ -135,10 +135,12 @@ interface StepUsage {
 	outputTokens: number;
 	cacheReadTokens: number;
 	cacheWriteTokens: number;
+	model: string;
 }
 
 interface FoldResult {
 	imported: number;
+	repaired: number;
 	skipped: number;
 	sessionId: string | null;
 	skippedUnchanged: boolean;
@@ -178,32 +180,34 @@ export function foldSessionFile(
 	try {
 		stat = fs.statSync(filePath);
 	} catch {
-		return { imported: 0, skipped: 0, sessionId: null, skippedUnchanged: false, error: 'no-file' };
+		return { imported: 0, repaired: 0, skipped: 0, sessionId: null, skippedUnchanged: false, error: 'no-file' };
 	}
 	const mtimeMs = Math.round(stat.mtimeMs);
 
 	const header = readHeader(filePath);
 	if (header === null) {
-		return { imported: 0, skipped: 0, sessionId: null, skippedUnchanged: false, error: 'no-header' };
+		return { imported: 0, repaired: 0, skipped: 0, sessionId: null, skippedUnchanged: false, error: 'no-header' };
 	}
 	const sessionId = header.id;
 
 	const watermark = store.getWatermark(sessionId);
-	if (watermark !== null && mtimeMs <= watermark.fileMtimeMs) {
-		return { imported: 0, skipped: 0, sessionId, skippedUnchanged: true };
+	const hasUnknownUsage = store.hasUnknownUsage(sessionId);
+	if (watermark !== null && mtimeMs <= watermark.fileMtimeMs && !hasUnknownUsage) {
+		return { imported: 0, repaired: 0, skipped: 0, sessionId, skippedUnchanged: true };
 	}
 	const lastSeq = watermark === null ? -1 : watermark.lastSeq;
-	const startOffset = watermark === null ? 0 : (watermark.lastOffset || 0);
+	let startOffset = watermark === null ? 0 : (watermark.lastOffset || 0);
+	let route = watermark?.routeModel === null || watermark?.routeModel === undefined
+		? null
+		: { provider: watermark.routeProvider ?? '', model: watermark.routeModel };
+	// Old watermarks did not retain the request route. Replay once to recover it
+	// and to repair already-persisted unknown rows; future folds remain byte-incremental.
+	if (startOffset > 0 && (route === null || route.model === 'unknown' || hasUnknownUsage)) {
+		startOffset = 0;
+		route = null;
+	}
 
 	const { events, nextOffset } = readSessionLog(filePath, startOffset);
-
-	let route: { provider: string; model: string } | null = null;
-	if (startOffset > 0 && watermark !== null) {
-		const row = store.db
-			.prepare('SELECT model FROM usage_requests WHERE session_id = ? ORDER BY created_at DESC, record_id DESC LIMIT 1')
-			.get(sessionId) as { model: string } | undefined;
-		if (row !== undefined) route = { provider: '', model: row.model };
-	}
 
 	let title = watermark?.title ?? null;
 	let maxSeq = lastSeq;
@@ -262,6 +266,7 @@ export function foldSessionFile(
 						outputTokens: output,
 						cacheReadTokens: cacheRead,
 						cacheWriteTokens: cacheWrite,
+						model: route?.model ?? 'unknown',
 					});
 				}
 				break;
@@ -272,12 +277,12 @@ export function foldSessionFile(
 	}
 
 	let imported = 0;
+	let repaired = 0;
 	let skipped = 0;
-	const model = route?.model ?? 'unknown';
 	for (const usage of usageByStep.values()) {
-		if (usage.seq <= lastSeq) continue;
 		if (usage.inputTokens === 0 && usage.outputTokens === 0
 			&& usage.cacheReadTokens === 0 && usage.cacheWriteTokens === 0) continue;
+		const model = usage.model;
 		const breakdown = priceTokens(
 			usage.inputTokens,
 			usage.outputTokens,
@@ -288,10 +293,15 @@ export function foldSessionFile(
 		);
 		const costNano = Math.round(breakdown.cost * 1e9);
 		const recordId = `${sessionId}:${usage.turn}:${usage.step}`;
+		const normalizedModel = pricing.aliases[model] ?? model;
+		if (usage.seq <= lastSeq) {
+			if (store.repairUnknownUsage(recordId, normalizedModel, costNano)) repaired += 1;
+			continue;
+		}
 		const inserted = store.insertUsage({
 			recordId,
 			sessionId,
-			model: pricing.aliases[model] ?? model,
+			model: normalizedModel,
 			inputTokens: usage.inputTokens,
 			outputTokens: usage.outputTokens,
 			cacheReadTokens: usage.cacheReadTokens,
@@ -311,10 +321,12 @@ export function foldSessionFile(
 		fileMtimeMs: mtimeMs,
 		title,
 		lastOffset: nextOffset,
+		routeProvider: route?.provider ?? null,
+		routeModel: route?.model ?? null,
 		updatedAt: Date.now(),
 	});
 
-	return { imported, skipped, sessionId, skippedUnchanged: false };
+	return { imported, repaired, skipped, sessionId, skippedUnchanged: false };
 }
 
 /** 扫描全部会话日志并折叠。返回聚合结果。 */
@@ -323,8 +335,8 @@ export function foldAllSessions(
 	pricing: PricingConfig,
 	sessionsRoot: string,
 	logger?: Logger,
-): { scanned: number; imported: number; skipped: number; errors: string[] } {
-	const result = { scanned: 0, imported: 0, skipped: 0, errors: [] as string[] };
+): { scanned: number; imported: number; repaired: number; skipped: number; errors: string[] } {
+	const result = { scanned: 0, imported: 0, repaired: 0, skipped: 0, errors: [] as string[] };
 	let projectDirs: string[];
 	try {
 		projectDirs = fs.readdirSync(sessionsRoot);
@@ -347,6 +359,7 @@ export function foldAllSessions(
 			try {
 				const r = foldSessionFile(store, pricing, logPath, logger);
 				result.imported += r.imported;
+				result.repaired += r.repaired;
 				result.skipped += r.skipped;
 				if (r.error !== undefined) result.errors.push(`${sessionDir}: ${r.error}`);
 			} catch (error) {
