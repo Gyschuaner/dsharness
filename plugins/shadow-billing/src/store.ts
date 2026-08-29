@@ -95,13 +95,29 @@ CREATE TABLE IF NOT EXISTS usage_daily_rollups (
   cost_nano         INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, model)
 );
+
+CREATE TABLE IF NOT EXISTS billing_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
+
+export interface RepriceUsageRecord {
+	model: string;
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	createdAt: number;
+}
 
 export interface Store {
 	db: import('node:sqlite').DatabaseSync;
 	insertUsage(record: UsageRecord): boolean;
 	hasUnknownUsage(sessionId: string): boolean;
 	repairUnknownUsage(recordId: string, model: string, costNano: number): boolean;
+	/** 价目签名变化时重算全部明细和按日聚合；签名相同则跳过。 */
+	repriceUsage(signature: string, price: (record: RepriceUsageRecord) => { model: string; costNano: number }): number;
 	putWatermark(watermark: Watermark): void;
 	getWatermark(sessionId: string): Watermark | null;
 	summarySince(dayFloor: string): { requests: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; costNano: number };
@@ -151,6 +167,13 @@ export function openStore(dbPath: string): Store {
 		WHERE day = ? AND model = ?
 	`);
 	const deleteEmptyRollupStmt = db.prepare('DELETE FROM usage_daily_rollups WHERE day = ? AND model = ? AND requests <= 0');
+	const pricingSignatureStmt = db.prepare("SELECT value FROM billing_meta WHERE key = 'pricing_signature'");
+	const putPricingSignatureStmt = db.prepare(`
+		INSERT INTO billing_meta (key, value) VALUES ('pricing_signature', ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value
+	`);
+	const allUsageStmt = db.prepare('SELECT * FROM usage_requests ORDER BY created_at ASC, record_id ASC');
+	const repriceUsageStmt = db.prepare('UPDATE usage_requests SET model = ?, cost_nano = ? WHERE record_id = ?');
 
 	const store: Store = {
 		db,
@@ -211,6 +234,41 @@ export function openStore(dbPath: string): Store {
 				);
 				db.exec('COMMIT');
 				return true;
+			} catch (error) {
+				db.exec('ROLLBACK');
+				throw error;
+			}
+		},
+
+		repriceUsage(signature: string, price): number {
+			const current = pricingSignatureStmt.get() as { value?: unknown } | undefined;
+			if (current !== undefined && String(current.value) === signature) return 0;
+			const rows = allUsageStmt.all() as Array<Record<string, unknown>>;
+			let changed = 0;
+			db.exec('BEGIN IMMEDIATE');
+			try {
+				db.exec('DELETE FROM usage_daily_rollups');
+				for (const row of rows) {
+					const next = price({
+						model: String(row.model),
+						inputTokens: Number(row.input_tokens),
+						outputTokens: Number(row.output_tokens),
+						cacheReadTokens: Number(row.cache_read_tokens),
+						cacheWriteTokens: Number(row.cache_write_tokens),
+						createdAt: Number(row.created_at),
+					});
+					if (String(row.model) !== next.model || Number(row.cost_nano) !== next.costNano) changed += 1;
+					repriceUsageStmt.run(next.model, next.costNano, String(row.record_id));
+					upsertRollupStmt.run(
+						String(row.day), next.model,
+						Number(row.input_tokens), Number(row.output_tokens),
+						Number(row.cache_read_tokens), Number(row.cache_write_tokens),
+						next.costNano,
+					);
+				}
+				putPricingSignatureStmt.run(signature);
+				db.exec('COMMIT');
+				return changed;
 			} catch (error) {
 				db.exec('ROLLBACK');
 				throw error;

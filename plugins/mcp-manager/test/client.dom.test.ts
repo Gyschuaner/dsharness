@@ -176,7 +176,7 @@ test('initial MCP load uses the endpoint handshake state and reduced-motion fall
 	assert.ok(h.dom.window.document.querySelector('.mm-connectingCore [data-icon="1"]'), 'connection core uses the official Link icon');
 	assert.equal(h.dom.window.document.querySelector('.mm-connectingLabel').textContent, 'MCP Connecting');
 	assert.equal(h.dom.window.document.querySelector('.mm-connectingLabel').getAttribute('data-text'), 'MCP Connecting');
-	assert.ok(h.dom.window.document.querySelector('.mm-summary'), 'stable MCP page chrome stays visible while connecting');
+	assert.ok(h.dom.window.document.querySelector('.mm-head'), 'stable MCP page chrome stays visible while connecting');
 
 	const css = h.dom.window.document.querySelector('style[data-plugin="dsh-mcp-manager"]').textContent;
 	assert.ok(css.includes('@keyframes mm-connectingLocal'));
@@ -229,13 +229,16 @@ test('real MCP contribution renders without shell business placeholders and expo
 	await h.openMcp();
 	assert.ok(h.dom.window.document.querySelector('.mm-root'));
 	assert.equal(h.dom.window.document.querySelector('.mm-head h2').textContent, 'MCP');
-	assert.equal(h.dom.window.document.querySelector('.mm-context').textContent, 'Web 配置');
+	assert.equal(h.dom.window.document.querySelector('.mm-context'), null);
+	assert.equal(h.dom.window.document.querySelector('.mm-summary'), null);
+	assert.ok(!h.dom.window.document.body.textContent.includes('当前配置 web'));
 	assert.ok(h.dom.window.document.querySelector('.mm-toolbar'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('MCP 管理（建设中）'));
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.ext-navBtn')].map((item) => item.textContent.trim()), ['SKILL', 'MCP']);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="server-list"] .mm-serverRow').length, 2);
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="server-list"] .mm-row').length, 2);
-	assert.ok(h.dom.window.document.body.textContent.includes('已连接 1 / 2'));
+	assert.ok(h.dom.window.document.body.textContent.includes('已连接 1'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('已连接 1 / 2'));
 
 	await h.click(h.dom.window.document.querySelector('.mm-serverOpen'));
 	assert.ok(h.dom.window.document.querySelector('.mm-drawer'));

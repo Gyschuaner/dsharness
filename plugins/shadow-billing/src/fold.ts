@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { dayOf, type Store } from './store.js';
-import { priceTokens, type PricingConfig } from './pricing.js';
+import { priceTokens, resolveModel, type PricingConfig } from './pricing.js';
 
 const ZSTD_MAGIC = 0xfd2fb528;
 const SKIPPABLE_MAGIC_MIN = 0x184d2a50;
@@ -293,7 +293,7 @@ export function foldSessionFile(
 		);
 		const costNano = Math.round(breakdown.cost * 1e9);
 		const recordId = `${sessionId}:${usage.turn}:${usage.step}`;
-		const normalizedModel = pricing.aliases[model] ?? model;
+		const normalizedModel = resolveModel(model, pricing);
 		if (usage.seq <= lastSeq) {
 			if (store.repairUnknownUsage(recordId, normalizedModel, costNano)) repaired += 1;
 			continue;

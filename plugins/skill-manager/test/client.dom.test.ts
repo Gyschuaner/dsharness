@@ -317,12 +317,23 @@ test('real client bundle renders a denoised project view, first-sentence rows, f
 	assert.ok(h.dom.window.document.querySelector('[role="tablist"]'));
 	assert.ok(h.button('本地 Skill'));
 	assert.ok(h.button('Skill 市场'));
+	assert.ok(!h.dom.window.document.body.textContent.includes('Web 配置'));
+	assert.equal(h.dom.window.document.querySelector('.sk-projectCard'), null, 'large project card is removed');
+	const contextButton = h.dom.window.document.querySelector('.sk-contextProjectBtn');
+	assert.ok(contextButton, 'compact project context is rendered in the upper-right header');
+	assert.equal(contextButton.getAttribute('aria-expanded'), 'false');
+	await h.click(contextButton);
+	assert.equal(contextButton.getAttribute('aria-expanded'), 'true');
+	assert.equal(h.dom.window.document.querySelector('.sk-headContext [role="menu"]')?.getAttribute('role'), 'menu');
+	await act(async () => { h.dom.window.document.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+	await h.flush();
+	assert.equal(h.dom.window.document.querySelector('.sk-headContext [role="menu"]'), null, 'Escape closes the compact context menu');
 	assert.ok(!h.dom.window.document.body.textContent.includes('统一资源库'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('仅本机，不提交 Git'), 'technical project path is hidden from the primary list');
 	assert.ok(!h.dom.window.document.body.textContent.includes('可纳入 Git 版本管理'));
 	const pluginCss = h.dom.window.document.querySelector('style[data-plugin="dsh-skill-manager"]').textContent;
 	assert.ok(pluginCss.includes('.sk-drawer{position:absolute'), 'drawer is an overlay instead of a flex sibling');
-	assert.ok(!pluginCss.includes('.sk-contentDrawer .sk-projectCard'), 'drawer no longer forces project-card wrapping');
+	assert.ok(!pluginCss.includes('.sk-projectCard{'), 'large project-card chrome is removed');
 	assert.match(pluginCss, /\.sk-root\{[^}]*max-width:980px/, 'Skill uses the shared centered page width');
 	assert.match(pluginCss, /\.sk-tabs\{height:40px/, 'Skill uses the shared tab rhythm');
 	assert.match(pluginCss, /\.sk-row\{box-sizing:border-box;min-height:72px/, 'Skill uses the shared flat row rhythm');
@@ -693,7 +704,7 @@ test('current workspace wins; enabled rows stay in catalog order and bulk select
 	h.dom.window.localStorage.setItem('smgr.v1.project', '/project-a');
 	await h.open();
 	assert.equal(h.dom.window.document.querySelector('.sk-projectTitle').textContent, 'project-b');
-	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('已启用 1 / 3'));
+	assert.ok(h.dom.window.document.querySelector('.sk-contextProjectBtn').textContent.includes('已启用 1 / 3'));
 	assert.equal(h.dom.window.document.querySelectorAll('.sk-groupHead').length, 0, 'all view has no enabled/disabled group headings');
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowName')].map((item) => item.textContent), ['disabled-a', 'enabled-skill', 'disabled-b']);
 	assert.deepEqual([...h.dom.window.document.querySelectorAll('.sk-rowEnabled .sk-rowName')].map((item) => item.textContent), ['enabled-skill']);
@@ -752,7 +763,7 @@ test('single toggle updates optimistically, shows a quiet pending state and roll
 	assert.equal(h.dom.window.document.querySelector('[role="switch"]').getAttribute('aria-checked'), 'true');
 	assert.ok(h.dom.window.document.querySelector('.sk-row').classList.contains('sk-rowEnabled'));
 	assert.equal(h.dom.window.document.querySelector('.sk-saving').textContent, '保存中');
-	assert.ok(h.dom.window.document.querySelector('.sk-projectCard').textContent.includes('已启用 1 / 1'));
+	assert.ok(h.dom.window.document.querySelector('.sk-contextProjectBtn').textContent.includes('已启用 1 / 1'));
 
 	mutation.reject(new Error('target write failed'));
 	await h.flush();

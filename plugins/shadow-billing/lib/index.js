@@ -1,7 +1,7 @@
 /**
  * dsh-shadow-billing — Host half（DSH-032）。
  *
- * 定时折叠 DSH 会话日志（zstd）到 SQLite，按 DeepSeek Flash 峰谷价影子计费，
+ * 定时折叠 DSH 会话日志（zstd）到 SQLite，按模型官方价目影子计费，
  * 通过 /api/shadow-billing/* 只读 JSON 路由暴露聚合查询。Client 无凭证、无跨域，
  * 全部数据留在本机。
  */
@@ -10,7 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { foldAllSessions } from './fold.js';
 import { openStore, dayFloor, dayOf } from './store.js';
-import { resolvePricing } from './pricing.js';
+import { priceTokens, pricingSignature, resolveModel, resolvePricing } from './pricing.js';
 const name = 'shadow-billing';
 const inject = ['webServer', 'timer'];
 const DEFAULT_FOLD_INTERVAL_MS = 300_000; // 5 分钟
@@ -64,6 +64,15 @@ function apply(ctx, rawConfig = {}) {
     const pricing = resolvePricing(isRecord(config.models) ? config.models : undefined, isRecord(config.aliases) ? config.aliases : undefined, config.weekendOffpeakSince);
     fs.mkdirSync(path.dirname(resolveDbPath()), { recursive: true });
     const store = openStore(resolveDbPath());
+    const repriced = store.repriceUsage(pricingSignature(pricing), (record) => {
+        const result = priceTokens(record.inputTokens, record.outputTokens, record.cacheReadTokens, record.createdAt, record.model, pricing);
+        return {
+            model: resolveModel(record.model, pricing),
+            costNano: Math.round(result.cost * 1e9),
+        };
+    });
+    if (repriced > 0)
+        ctx.logger.info?.(`shadow-billing: repriced ${repriced} historical usage records`);
     let folding = false;
     let lastFold = null;
     async function runFold() {

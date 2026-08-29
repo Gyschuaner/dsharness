@@ -25,7 +25,7 @@ dsharness/
 │   │   ├── src/              # TypeScript Host、导入事务与 Client 源码
 │   │   ├── lib/              # tsc 生成的运行时产物
 │   │   └── test/             # TypeScript Host 事务与 Client DOM 回归
-│   ├── shadow-billing/       # 扩展 → Billing：本地 Token 用量与影子计费（DSH-032）
+│   ├── shadow-billing/       # 扩展 → Billing：DeepSeek/Qwen 官方价目的本地 Token 估算（DSH-032）
 │   └── better-sidebar-smooth/ # better-sidebar 会话头动画修复（仅 client）
 ├── dev/
 │   ├── install-dsh-source.ps1     # 拉取、打补丁、构建并注册 dsh
@@ -64,6 +64,11 @@ DSH-005 的视觉桥作为上游源码补丁交付，当前 Windows web profile 
 启用；其余仓库插件也默认挂载。纯文本主模型的视觉调用按
 [`docs/DSH-005-vision-bridge.md`](docs/DSH-005-vision-bridge.md) 走 DP Gateway，
 DSH 不直连视觉模型机。
+
+Billing 插件按官方价目对本地会话日志中的真实 Token 用量做估算。Qwen3.8 Flash Next 使用
+阿里云百炼华北 2 固定原价：输入 ¥1、缓存命中 ¥0.1、输出 ¥3 / 1M Token；价目变化会通过
+签名门禁幂等重算历史明细和日聚合，避免旧的零费用继续污染总览。价格来源见
+[阿里云百炼 Qwen3.8 Flash 文档](https://help.aliyun.com/zh/model-studio/qwen3-8-flash)。
 
 ## 快速开始（构建 DSH）
 

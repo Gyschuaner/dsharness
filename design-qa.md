@@ -34,6 +34,39 @@ final result: passed
 
 ---
 
+# DSH-035 compact extension context and Billing copy QA
+
+## Inputs and evidence
+
+- User Skill target: `C:\Users\chuansgu\AppData\Local\Temp\codex-clipboard-c3023c76-2cbb-408b-ab04-4e90cc200366.png`
+- User Billing target: `C:\Users\chuansgu\AppData\Local\Temp\codex-clipboard-5aa67e9f-706d-4108-ab6b-30659e9c840c.png`
+- Browser captures: `artifacts/design-qa/DSH-035/skill-compact-context.png`, `mcp-clean-header.png`,
+  `plugin-clean-header.png`, `billing-dashboard.png`, `billing-settings-qwen-pricing.png`
+- Responsive capture: `artifacts/design-qa/DSH-035/skill-compact-context-680.png`
+- Same-input comparisons: `artifacts/design-qa/DSH-035/comparison-skill.png` and
+  `artifacts/design-qa/DSH-035/comparison-billing.png`
+
+## Findings
+
+- The repeated `Web 配置` label is absent from Skill, MCP, and Plugin. MCP also no longer repeats
+  `当前配置 web · 已连接 …` above the counted filters.
+- Skill project identity, enabled count, project switcher, and preset actions now occupy one compact
+  upper-right group. Both menus expose semantic `menu`/`menuitem` roles; Escape closes the inner menu
+  without closing Extensions.
+- At 680 × 900, the page reports `scrollWidth === clientWidth === 680`; the project group wraps above
+  the tabs and the toolbar wraps without overlap or horizontal clipping.
+- Billing no longer shows `影子计费，非真实账单` below the total. The exact
+  `Qwen3.8-Flash-Next-FP8` name and Qwen brand icon remain visible, historical Qwen usage now has a
+  non-zero estimate, and Settings exposes the official fixed ¥1 / ¥0.1 / ¥3 price table.
+- The final interaction pass produced no new browser error or warning after the QA cutoff. Connection
+  messages captured at the restart timestamp were transient startup recovery logs and did not recur.
+
+No actionable P0/P1/P2 difference remains in the target regions.
+
+final result: passed
+
+---
+
 # Skill Manager build 19 · Visual-noise reduction QA
 
 ## Inputs

@@ -70,6 +70,11 @@ CREATE TABLE IF NOT EXISTS usage_daily_rollups (
   cost_nano         INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, model)
 );
+
+CREATE TABLE IF NOT EXISTS billing_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
 /** 打开（或创建）数据库并初始化 schema。 */
 export function openStore(dbPath) {
@@ -111,6 +116,13 @@ export function openStore(dbPath) {
 		WHERE day = ? AND model = ?
 	`);
     const deleteEmptyRollupStmt = db.prepare('DELETE FROM usage_daily_rollups WHERE day = ? AND model = ? AND requests <= 0');
+    const pricingSignatureStmt = db.prepare("SELECT value FROM billing_meta WHERE key = 'pricing_signature'");
+    const putPricingSignatureStmt = db.prepare(`
+		INSERT INTO billing_meta (key, value) VALUES ('pricing_signature', ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value
+	`);
+    const allUsageStmt = db.prepare('SELECT * FROM usage_requests ORDER BY created_at ASC, record_id ASC');
+    const repriceUsageStmt = db.prepare('UPDATE usage_requests SET model = ?, cost_nano = ? WHERE record_id = ?');
     const store = {
         db,
         insertUsage(record) {
@@ -142,6 +154,38 @@ export function openStore(dbPath) {
                 upsertRollupStmt.run(String(row.day), model, Number(row.input_tokens), Number(row.output_tokens), Number(row.cache_read_tokens), Number(row.cache_write_tokens), costNano);
                 db.exec('COMMIT');
                 return true;
+            }
+            catch (error) {
+                db.exec('ROLLBACK');
+                throw error;
+            }
+        },
+        repriceUsage(signature, price) {
+            const current = pricingSignatureStmt.get();
+            if (current !== undefined && String(current.value) === signature)
+                return 0;
+            const rows = allUsageStmt.all();
+            let changed = 0;
+            db.exec('BEGIN IMMEDIATE');
+            try {
+                db.exec('DELETE FROM usage_daily_rollups');
+                for (const row of rows) {
+                    const next = price({
+                        model: String(row.model),
+                        inputTokens: Number(row.input_tokens),
+                        outputTokens: Number(row.output_tokens),
+                        cacheReadTokens: Number(row.cache_read_tokens),
+                        cacheWriteTokens: Number(row.cache_write_tokens),
+                        createdAt: Number(row.created_at),
+                    });
+                    if (String(row.model) !== next.model || Number(row.cost_nano) !== next.costNano)
+                        changed += 1;
+                    repriceUsageStmt.run(next.model, next.costNano, String(row.record_id));
+                    upsertRollupStmt.run(String(row.day), next.model, Number(row.input_tokens), Number(row.output_tokens), Number(row.cache_read_tokens), Number(row.cache_write_tokens), next.costNano);
+                }
+                putPricingSignatureStmt.run(signature);
+                db.exec('COMMIT');
+                return changed;
             }
             catch (error) {
                 db.exec('ROLLBACK');

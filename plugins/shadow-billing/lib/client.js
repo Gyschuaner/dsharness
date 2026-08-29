@@ -89,13 +89,13 @@ async function apiGet(url) {
                 return { ...state, refresh: function () { load(true); } };
             }
             function Metric(props) {
-                return h('div', { className: 'bl-metric' }, h('div', { className: 'bl-metricLabel' }, props.label), h('div', { className: 'bl-metricValue' + (props.cost ? ' bl-metricValueCost' : '') }, props.value), h('div', { className: 'bl-metricHint' }, props.hint));
+                return h('div', { className: 'bl-metric' }, h('div', { className: 'bl-metricLabel' }, props.label), h('div', { className: 'bl-metricValue' + (props.cost ? ' bl-metricValueCost' : '') }, props.value), props.hint === undefined ? null : h('div', { className: 'bl-metricHint' }, props.hint));
             }
             function Metrics(props) {
                 const summary = props.summary;
                 const total = summary.inputTokens + summary.cacheReadTokens + summary.outputTokens;
                 const cacheRate = total === 0 ? 0 : summary.cacheReadTokens / total * 100;
-                return h('div', { className: 'bl-card bl-metrics' }, h(Metric, { label: '最近 7 天 Token', value: fmtTokens(total), hint: summary.requests + ' 次模型调用' }), h(Metric, { label: '估算费用', value: fmtCost(summary.costNano), hint: '影子计费，非真实账单', cost: true }), h(Metric, { label: '缓存命中 Token', value: fmtTokens(summary.cacheReadTokens), hint: '占总量 ' + cacheRate.toFixed(1) + '%' }));
+                return h('div', { className: 'bl-card bl-metrics' }, h(Metric, { label: '最近 7 天 Token', value: fmtTokens(total), hint: summary.requests + ' 次模型调用' }), h(Metric, { label: '估算费用', value: fmtCost(summary.costNano), cost: true }), h(Metric, { label: '缓存命中 Token', value: fmtTokens(summary.cacheReadTokens), hint: '占总量 ' + cacheRate.toFixed(1) + '%' }));
             }
             function Chart(props) {
                 const [hoveredIndex, setHoveredIndex] = React.useState(null);
@@ -203,7 +203,12 @@ async function apiGet(url) {
                     }))));
             }
             function displayModelName(model) {
-                return model.toLowerCase() === 'ds-flash' ? 'deepseek-v4-flash-0731' : model;
+                const normalized = model.toLowerCase();
+                if (normalized === 'ds-flash')
+                    return 'deepseek-v4-flash-0731';
+                if (normalized === 'qwen3.8-flash')
+                    return 'Qwen3.8-Flash-Next-FP8';
+                return model;
             }
             function ModelIcon(props) {
                 const lower = displayModelName(props.model).toLowerCase();
@@ -320,7 +325,7 @@ async function apiGet(url) {
                     : status.sessionsRoot + (status.lastFold === null
                         ? ' · 尚未完成日志折叠'
                         : ' · 上次折叠 ' + fmtTime(status.lastFold.at) + ' · 新增 ' + status.lastFold.imported + ' 条');
-                return h('div', { className: 'bl-page', 'data-testid': 'sb-settings' }, h('div', { className: 'bl-shell bl-settings' }, h('div', { className: 'bl-heading' }, h('div', { className: 'bl-headingIcon' }, h(ReceiptIcon, { size: 20 })), h('div', { className: 'bl-headingCopy' }, h('h1', { className: 'bl-title' }, 'Billing'), h('div', { className: 'bl-subtitle' }, '影子计费设置'))), h('div', { className: 'bl-card' }, h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '计价口径'), h('div', { className: 'bl-settingText' }, '以下价格只用于本地估算，不会产生真实扣费。数据来自 DSH 会话日志中的真实 Token 用量。')), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, 'DeepSeek Flash 价目表（¥ / 1M Token）'), h('table', { className: 'bl-rateTable' }, h('thead', null, h('tr', null, h('th', null, 'Token 类型'), h('th', null, '低谷'), h('th', null, '高峰'))), h('tbody', null, h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥1.50'), h('td', null, '¥3.00')), h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥0.05'), h('td', null, '¥0.10')), h('tr', null, h('td', null, '输出'), h('td', null, '¥4.50'), h('td', null, '¥9.00'))))), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '峰谷规则'), h('div', { className: 'bl-settingText' }, '高峰：北京时间工作日 09:00–12:00、14:00–18:00；低谷：其他时段及周末（2026-08-23 起周末全天低谷）。')), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '数据源'), h('div', { className: 'bl-settingText' }, source)))));
+                return h('div', { className: 'bl-page', 'data-testid': 'sb-settings' }, h('div', { className: 'bl-shell bl-settings' }, h('div', { className: 'bl-heading' }, h('div', { className: 'bl-headingIcon' }, h(ReceiptIcon, { size: 20 })), h('div', { className: 'bl-headingCopy' }, h('h1', { className: 'bl-title' }, 'Billing'), h('div', { className: 'bl-subtitle' }, '影子计费设置'))), h('div', { className: 'bl-card' }, h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '计价口径'), h('div', { className: 'bl-settingText' }, '以下价格只用于本地估算，不会产生真实扣费。数据来自 DSH 会话日志中的真实 Token 用量。')), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, 'DeepSeek Flash 价目表（¥ / 1M Token）'), h('table', { className: 'bl-rateTable' }, h('thead', null, h('tr', null, h('th', null, 'Token 类型'), h('th', null, '低谷'), h('th', null, '高峰'))), h('tbody', null, h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥1.50'), h('td', null, '¥3.00')), h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥0.05'), h('td', null, '¥0.10')), h('tr', null, h('td', null, '输出'), h('td', null, '¥4.50'), h('td', null, '¥9.00'))))), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, 'Qwen3.8 Flash Next 价目表（¥ / 1M Token）'), h('div', { className: 'bl-settingText' }, '阿里云百炼华北 2 官方原价，全天固定价。'), h('table', { className: 'bl-rateTable' }, h('thead', null, h('tr', null, h('th', null, 'Token 类型'), h('th', null, '价格'))), h('tbody', null, h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥1.00')), h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥0.10')), h('tr', null, h('td', null, '输出'), h('td', null, '¥3.00'))))), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '峰谷规则'), h('div', { className: 'bl-settingText' }, '高峰：北京时间工作日 09:00–12:00、14:00–18:00；低谷：其他时段及周末（2026-08-23 起周末全天低谷）。')), h('div', { className: 'bl-settingSection' }, h('div', { className: 'bl-settingTitle' }, '数据源'), h('div', { className: 'bl-settingText' }, source)))));
             }
             var existingStyle = document.querySelector('style[data-plugin="dsh-shadow-billing"]');
             var style = existingStyle || document.createElement('style');

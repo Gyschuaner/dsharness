@@ -1,11 +1,12 @@
 /**
  * dsh-shadow-billing — 影子计价格价（DSH-032）。
  *
- * 纯函数模块：按 DeepSeek Flash 官方峰谷价 × 真实 token 用量折算估算费用。
- * 口径（与 luxueliu-usage-command 同源）：
+ * 纯函数模块：按模型官方价目 × 真实 token 用量折算估算费用。
+ * 口径：
  * - 低谷价 ¥/1M tokens：缓存命中 0.05 / 未命中 1.5 / 输出 4.5（ds-flash）；
  * - 高峰（北京时区 9:00-12:00 / 14:00-18:00，即本地小时 9,10,11,14,15,16,17）×2；
  * - 2026-08-23 起周末（周六+周日）全天按低谷价，不区分峰谷；
+ * - qwen3.8-flash 使用阿里云百炼华北 2 原价：缓存命中 0.1 / 未命中 1 / 输出 3，全天固定价；
  * - DSH TokenUsage 语义：inputTokens=未命中输入、cacheReadTokens=缓存命中、outputTokens=输出，三桶不相交。
  * 价目表与别名可经 cordis config 扩展；无价目模型只列 token 不计价（priced=false）。
  */
@@ -17,6 +18,8 @@ export interface PriceEntry {
     miss: number;
     /** 输出单价。 */
     out: number;
+    /** 命中 DeepSeek 高峰窗口时的倍率；固定价模型为 1。 */
+    peakMultiplier: number;
 }
 /** 计价格价配置（resolvePricing 输出）。 */
 export interface PricingConfig {
@@ -37,13 +40,15 @@ export interface CostBreakdown {
     missCost: number;
     /** 输出部分费用（元）。 */
     outCost: number;
-    /** 本次调用是否落在高峰时段。 */
+    /** 本次调用是否实际应用了高峰倍率。 */
     peak: boolean;
     /** 模型是否有价目；false 时 cost 恒为 0（只计 token）。 */
     priced: boolean;
 }
 /** DeepSeek Flash 官方低谷价（¥ / 1M tokens）。 */
 export declare const DS_FLASH_PRICE: PriceEntry;
+/** Qwen3.8 Flash 百炼华北 2 原价（¥ / 1M tokens，全天固定价）。 */
+export declare const QWEN38_FLASH_PRICE: PriceEntry;
 /** 内置别名：本机本地模型（DP Relay / llama.cpp）→ ds-flash。 */
 export declare const DEFAULT_ALIASES: Record<string, string>;
 /** 周末低谷默认生效时间：2026-08-23 00:00 北京时间。 */
@@ -70,6 +75,8 @@ export declare function resolvePricing(userModels?: Record<string, Partial<Price
  * @param config 计价配置。
  */
 export declare function priceTokens(inputTokens: number, outputTokens: number, cacheReadTokens: number, ts: number, rawModel: string, config: PricingConfig): CostBreakdown;
+/** 稳定序列化价目配置，用于判断 SQLite 中的历史费用是否需要重算。 */
+export declare function pricingSignature(config: PricingConfig): string;
 /** 元 → 分（两位小数，用于显示）。 */
 export declare function formatCost(cost: number): string;
 //# sourceMappingURL=pricing.d.ts.map

@@ -1,11 +1,12 @@
 /**
  * dsh-shadow-billing — 影子计价格价（DSH-032）。
  *
- * 纯函数模块：按 DeepSeek Flash 官方峰谷价 × 真实 token 用量折算估算费用。
- * 口径（与 luxueliu-usage-command 同源）：
+ * 纯函数模块：按模型官方价目 × 真实 token 用量折算估算费用。
+ * 口径：
  * - 低谷价 ¥/1M tokens：缓存命中 0.05 / 未命中 1.5 / 输出 4.5（ds-flash）；
  * - 高峰（北京时区 9:00-12:00 / 14:00-18:00，即本地小时 9,10,11,14,15,16,17）×2；
  * - 2026-08-23 起周末（周六+周日）全天按低谷价，不区分峰谷；
+ * - qwen3.8-flash 使用阿里云百炼华北 2 原价：缓存命中 0.1 / 未命中 1 / 输出 3，全天固定价；
  * - DSH TokenUsage 语义：inputTokens=未命中输入、cacheReadTokens=缓存命中、outputTokens=输出，三桶不相交。
  * 价目表与别名可经 cordis config 扩展；无价目模型只列 token 不计价（priced=false）。
  */
@@ -18,6 +19,8 @@ export interface PriceEntry {
 	miss: number;
 	/** 输出单价。 */
 	out: number;
+	/** 命中 DeepSeek 高峰窗口时的倍率；固定价模型为 1。 */
+	peakMultiplier: number;
 }
 
 /** 计价格价配置（resolvePricing 输出）。 */
@@ -40,14 +43,17 @@ export interface CostBreakdown {
 	missCost: number;
 	/** 输出部分费用（元）。 */
 	outCost: number;
-	/** 本次调用是否落在高峰时段。 */
+	/** 本次调用是否实际应用了高峰倍率。 */
 	peak: boolean;
 	/** 模型是否有价目；false 时 cost 恒为 0（只计 token）。 */
 	priced: boolean;
 }
 
 /** DeepSeek Flash 官方低谷价（¥ / 1M tokens）。 */
-export const DS_FLASH_PRICE: PriceEntry = { hit: 0.05, miss: 1.5, out: 4.5 };
+export const DS_FLASH_PRICE: PriceEntry = { hit: 0.05, miss: 1.5, out: 4.5, peakMultiplier: 2 };
+
+/** Qwen3.8 Flash 百炼华北 2 原价（¥ / 1M tokens，全天固定价）。 */
+export const QWEN38_FLASH_PRICE: PriceEntry = { hit: 0.1, miss: 1, out: 3, peakMultiplier: 1 };
 
 /** 内置别名：本机本地模型（DP Relay / llama.cpp）→ ds-flash。 */
 export const DEFAULT_ALIASES: Record<string, string> = {
@@ -55,6 +61,9 @@ export const DEFAULT_ALIASES: Record<string, string> = {
 	'DeepSeek-V4-Flash-0731-Q4_K_XL': 'ds-flash',
 	'deepseek-v4-flash': 'ds-flash',
 	'ds-flash': 'ds-flash',
+	'Qwen3.8-Flash-Next-FP8': 'qwen3.8-flash',
+	'Qwen3.8-Flash-Next': 'qwen3.8-flash',
+	'qwen3.8-flash': 'qwen3.8-flash',
 };
 
 /** 周末低谷默认生效时间：2026-08-23 00:00 北京时间。 */
@@ -109,13 +118,19 @@ export function resolvePricing(
 	userAliases?: Record<string, string>,
 	weekendOffpeakSince?: number,
 ): PricingConfig {
-	const models: Record<string, PriceEntry> = { 'ds-flash': { ...DS_FLASH_PRICE } };
+	const models: Record<string, PriceEntry> = {
+		'ds-flash': { ...DS_FLASH_PRICE },
+		'qwen3.8-flash': { ...QWEN38_FLASH_PRICE },
+	};
 	if (userModels !== undefined) {
 		for (const [name, entry] of Object.entries(userModels)) {
 			models[name] = {
 				hit: Number(entry.hit) || 0,
 				miss: Number(entry.miss) || 0,
 				out: Number(entry.out) || 0,
+				peakMultiplier: Number.isFinite(entry.peakMultiplier) && (entry.peakMultiplier ?? 0) > 0
+					? entry.peakMultiplier!
+					: 1,
 			};
 		}
 	}
@@ -152,8 +167,9 @@ export function priceTokens(
 	if (entry === undefined || (entry.hit === 0 && entry.miss === 0 && entry.out === 0)) {
 		return { cost: 0, hitCost: 0, missCost: 0, outCost: 0, peak: false, priced: false };
 	}
-	const peak = isPeakHour(ts, config.weekendOffpeakSince);
-	const mult = peak ? 2 : 1;
+	const inPeakWindow = isPeakHour(ts, config.weekendOffpeakSince);
+	const mult = inPeakWindow ? entry.peakMultiplier : 1;
+	const peak = mult > 1;
 	const miss = Math.max(0, inputTokens);
 	const hit = Math.max(0, cacheReadTokens);
 	const out = Math.max(0, outputTokens);
@@ -161,6 +177,15 @@ export function priceTokens(
 	const missCost = (miss / 1e6) * entry.miss * mult;
 	const outCost = (out / 1e6) * entry.out * mult;
 	return { cost: hitCost + missCost + outCost, hitCost, missCost, outCost, peak, priced: true };
+}
+
+/** 稳定序列化价目配置，用于判断 SQLite 中的历史费用是否需要重算。 */
+export function pricingSignature(config: PricingConfig): string {
+	const sortedModels: Record<string, PriceEntry> = {};
+	for (const name of Object.keys(config.models).sort()) sortedModels[name] = config.models[name]!;
+	const sortedAliases: Record<string, string> = {};
+	for (const name of Object.keys(config.aliases).sort()) sortedAliases[name] = config.aliases[name]!;
+	return JSON.stringify({ models: sortedModels, aliases: sortedAliases, weekendOffpeakSince: config.weekendOffpeakSince });
 }
 
 /** 元 → 分（两位小数，用于显示）。 */

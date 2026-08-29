@@ -176,11 +176,11 @@ async function apiGet<T>(url: string): Promise<T> {
 				return { ...state, refresh: function () { load(true); } };
 			}
 
-			function Metric(props: { label: string; value: string; hint: string; cost?: boolean }): React.ReactNode {
+			function Metric(props: { label: string; value: string; hint?: string; cost?: boolean }): React.ReactNode {
 				return h('div', { className: 'bl-metric' },
 					h('div', { className: 'bl-metricLabel' }, props.label),
 					h('div', { className: 'bl-metricValue' + (props.cost ? ' bl-metricValueCost' : '') }, props.value),
-					h('div', { className: 'bl-metricHint' }, props.hint),
+					props.hint === undefined ? null : h('div', { className: 'bl-metricHint' }, props.hint),
 				);
 			}
 
@@ -190,7 +190,7 @@ async function apiGet<T>(url: string): Promise<T> {
 				const cacheRate = total === 0 ? 0 : summary.cacheReadTokens / total * 100;
 				return h('div', { className: 'bl-card bl-metrics' },
 					h(Metric, { label: '最近 7 天 Token', value: fmtTokens(total), hint: summary.requests + ' 次模型调用' }),
-					h(Metric, { label: '估算费用', value: fmtCost(summary.costNano), hint: '影子计费，非真实账单', cost: true }),
+					h(Metric, { label: '估算费用', value: fmtCost(summary.costNano), cost: true }),
 					h(Metric, { label: '缓存命中 Token', value: fmtTokens(summary.cacheReadTokens), hint: '占总量 ' + cacheRate.toFixed(1) + '%' }),
 				);
 			}
@@ -354,7 +354,10 @@ async function apiGet<T>(url: string): Promise<T> {
 			}
 
 			function displayModelName(model: string): string {
-				return model.toLowerCase() === 'ds-flash' ? 'deepseek-v4-flash-0731' : model;
+				const normalized = model.toLowerCase();
+				if (normalized === 'ds-flash') return 'deepseek-v4-flash-0731';
+				if (normalized === 'qwen3.8-flash') return 'Qwen3.8-Flash-Next-FP8';
+				return model;
 			}
 
 			function ModelIcon(props: { model: string }): React.ReactNode {
@@ -593,6 +596,18 @@ async function apiGet<T>(url: string): Promise<T> {
 										h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥1.50'), h('td', null, '¥3.00')),
 										h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥0.05'), h('td', null, '¥0.10')),
 										h('tr', null, h('td', null, '输出'), h('td', null, '¥4.50'), h('td', null, '¥9.00')),
+									),
+								),
+							),
+							h('div', { className: 'bl-settingSection' },
+								h('div', { className: 'bl-settingTitle' }, 'Qwen3.8 Flash Next 价目表（¥ / 1M Token）'),
+								h('div', { className: 'bl-settingText' }, '阿里云百炼华北 2 官方原价，全天固定价。'),
+								h('table', { className: 'bl-rateTable' },
+									h('thead', null, h('tr', null, h('th', null, 'Token 类型'), h('th', null, '价格'))),
+									h('tbody', null,
+										h('tr', null, h('td', null, '输入 / 未命中'), h('td', null, '¥1.00')),
+										h('tr', null, h('td', null, '缓存命中'), h('td', null, '¥0.10')),
+										h('tr', null, h('td', null, '输出'), h('td', null, '¥3.00')),
 									),
 								),
 							),

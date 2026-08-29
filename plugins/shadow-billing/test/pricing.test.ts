@@ -5,6 +5,7 @@ import {
   priceTokens,
   isPeakHour,
   resolveModel,
+  pricingSignature,
   DEFAULT_WEEKEND_OFFPEAK_SINCE,
 } from '../src/pricing'
 
@@ -61,6 +62,19 @@ test('别名归一：大小写不敏感回退', () => {
   assert.equal(resolveModel('DeepSeek-V4-Flash-0731-Q8_K_XL', cfg), 'ds-flash')
   assert.equal(resolveModel('deepseek-v4-flash-0731-q8_k_xl', cfg), 'ds-flash')
   assert.equal(resolveModel('deepseek-v4-flash', cfg), 'ds-flash')
+  assert.equal(resolveModel('Qwen3.8-Flash-Next-FP8', cfg), 'qwen3.8-flash')
+  assert.equal(resolveModel('qwen3.8-flash-next-fp8', cfg), 'qwen3.8-flash')
+})
+
+test('Qwen3.8 Flash Next 使用百炼华北 2 固定原价且不套用 DeepSeek 高峰倍率', () => {
+  const cfg = resolvePricing()
+  const r = priceTokens(1_000_000, 1_000_000, 1_000_000, THU + 10 * HOUR, 'Qwen3.8-Flash-Next-FP8', cfg)
+  assert.equal(r.priced, true)
+  assert.equal(r.peak, false)
+  assert.equal(r.hitCost, 0.1)
+  assert.equal(r.missCost, 1)
+  assert.equal(r.outCost, 3)
+  assert.equal(r.cost, 4.1)
 })
 
 test('未知模型只计 token 不计价', () => {
@@ -75,9 +89,16 @@ test('用户配置可扩展价目与别名', () => {
     { 'my-model': { hit: 1, miss: 2, out: 3 } },
     { 'my-alias': 'my-model' },
   )
-  const r = priceTokens(1_000_000, 0, 0, THU + 8 * HOUR, 'my-alias', cfg)
+  const r = priceTokens(1_000_000, 0, 0, THU + 10 * HOUR, 'my-alias', cfg)
   assert.equal(r.priced, true)
   assert.equal(r.missCost, 2)
+  assert.equal(r.peak, false, 'custom models default to fixed pricing unless peakMultiplier is explicit')
+})
+
+test('价目签名与对象插入顺序无关', () => {
+  const a = resolvePricing({ z: { hit: 1 }, a: { miss: 2 } }, { zed: 'z', alpha: 'a' })
+  const b = resolvePricing({ a: { miss: 2 }, z: { hit: 1 } }, { alpha: 'a', zed: 'z' })
+  assert.equal(pricingSignature(a), pricingSignature(b))
 })
 
 test('自定义 weekendOffpeakSince', () => {

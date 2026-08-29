@@ -27,7 +27,7 @@ export interface ShadowBillingConfig {
     foldIntervalMs?: number;
     /** 明细保留天数；默认 60（聚合永久保留）。 */
     retentionDays?: number;
-    /** 额外价目：归一模型名 → { hit, miss, out }（¥/1M tokens）。 */
+    /** 额外价目：归一模型名 → { hit, miss, out, peakMultiplier? }（¥/1M tokens）。 */
     models?: Record<string, Partial<PriceEntry>>;
     /** 额外别名：日志模型名 → 归一模型名。 */
     aliases?: Record<string, string>;

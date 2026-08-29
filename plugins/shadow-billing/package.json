@@ -1,7 +1,7 @@
 {
   "name": "dsh-shadow-billing",
-  "version": "0.1.0",
-  "description": "DSH 本地模型影子计费：按 DeepSeek Flash 峰谷价 + 真实 token 用量折算估算费用（扩展 → Billing）。",
+  "version": "0.1.1",
+  "description": "DSH 本地模型影子计费：按 DeepSeek/Qwen 官方价目与真实 token 用量折算估算费用（扩展 → Billing）。",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

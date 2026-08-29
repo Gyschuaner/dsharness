@@ -6,7 +6,7 @@ import path from 'node:path'
 import zlib from 'node:zlib'
 import { splitZstdFrames, readSessionLog, foldSessionFile } from '../src/fold'
 import { openStore } from '../src/store'
-import { resolvePricing } from '../src/pricing'
+import { priceTokens, pricingSignature, resolveModel, resolvePricing } from '../src/pricing'
 
 /** 把 JSONL 文本压缩成独立 zstd 帧。 */
 function frame(text: string): Buffer {
@@ -195,6 +195,34 @@ test('foldSessionFile 跳过全零 usage 与未知模型不计价', () => {
   assert.equal(r.imported, 1) // 只有 step2 入库，step1 全零跳过
   const row = store.db.prepare('SELECT * FROM usage_requests').get() as Record<string, unknown>
   assert.equal(row.cost_nano, 0) // 未知模型不计价
+  store.close()
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('价目升级会重算既有 Qwen3.8 明细与聚合且重复启动幂等', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-reprice-'))
+  const store = openStore(path.join(dir, 'test.db'))
+  const ts = Date.parse('2026-08-20T10:00:00+08:00')
+  store.insertUsage({
+    recordId: 'qwen-old:1:1', sessionId: 'qwen-old', model: 'Qwen3.8-Flash-Next-FP8',
+    inputTokens: 1_000_000, outputTokens: 1_000_000, cacheReadTokens: 1_000_000, cacheWriteTokens: 0,
+    costNano: 0, day: '2026-08-20', createdAt: ts,
+  })
+  const pricing = resolvePricing()
+  const reprice = (record) => {
+    const result = priceTokens(record.inputTokens, record.outputTokens, record.cacheReadTokens, record.createdAt, record.model, pricing)
+    return { model: resolveModel(record.model, pricing), costNano: Math.round(result.cost * 1e9) }
+  }
+
+  assert.equal(store.repriceUsage(pricingSignature(pricing), reprice), 1)
+  const detail = store.db.prepare('SELECT model, cost_nano FROM usage_requests WHERE record_id = ?')
+    .get('qwen-old:1:1') as { model: string; cost_nano: number }
+  assert.equal(detail.model, 'qwen3.8-flash')
+  assert.equal(detail.cost_nano, 4_100_000_000)
+  assert.equal(store.summarySince('2026-08-20').costNano, 4_100_000_000)
+  assert.equal(store.repriceUsage(pricingSignature(pricing), reprice), 0)
+  assert.equal(store.summarySince('2026-08-20').costNano, 4_100_000_000)
+
   store.close()
   fs.rmSync(dir, { recursive: true, force: true })
 })

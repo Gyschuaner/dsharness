@@ -27,15 +27,6 @@
                 '.sk-root{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%;max-width:1180px;margin:0 auto;color:var(--dsw-alias-label-primary)}',
                 '.sk-content{position:relative;isolation:isolate;display:flex;flex:1;min-height:0}',
                 '.sk-listcol{flex:1;min-width:0;display:flex;flex-direction:column}',
-                '.sk-projectCard{display:flex;align-items:center;gap:14px;margin:6px 0 12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);flex:none}',
-                '.sk-projectIdentity{display:flex;align-items:center;gap:8px;min-width:0;flex:1}',
-                '.sk-projectMeta{display:flex;align-items:center;gap:8px;min-width:0}',
-                '.sk-projectTitleLine{display:flex;align-items:center;gap:7px;flex-wrap:wrap}',
-                '.sk-projectTitle{font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-                '.sk-currentBadge{border-radius:999px;background:var(--dsw-alias-fill-tsp-secondary);padding:2px 7px;font-size:10px;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
-                '.sk-projectStats{display:flex;align-items:center;gap:6px;padding-left:14px;border-left:1px solid var(--dsw-alias-border-l2);flex:none}',
-                '.sk-statValue{font-size:12px;font-weight:600;line-height:1.3;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
-                '.sk-projectActions{display:flex;align-items:center;gap:7px;flex:none}',
                 '.sk-projLabel{font-size:12px;color:var(--dsw-alias-label-tertiary);flex:none}',
                 '.sk-projBtn{appearance:none;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);cursor:pointer;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;max-width:340px}',
                 '.sk-projBtn:hover:not(:disabled){border-color:var(--dsw-alias-label-dimmed)}',
@@ -183,7 +174,6 @@
                 // marketplace — same title / tab / row / drawer language as MCP and Plugin
                 '.sk-head{display:flex;align-items:baseline;gap:10px;flex:none;padding:2px 0 10px}',
                 '.sk-headTitle{margin:0;font-size:18px;font-weight:600}',
-                '.sk-headSub{font-size:13px;color:var(--dsw-alias-label-quaternary);font-weight:500}',
                 '.sk-tabs{display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2);flex:none}',
                 '.sk-tab{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;font-size:13px;line-height:1.4;padding:8px 0 9px}',
                 '.sk-tab:hover{color:var(--dsw-alias-label-primary)}',
@@ -272,25 +262,28 @@
                 '.sk-presetSaveSummary{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-top:1px solid var(--dsw-alias-border-l2);border-bottom:1px solid var(--dsw-alias-border-l2);font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
                 '.sk-presetSaveSummary strong{font-weight:600;color:var(--dsw-alias-label-primary)}',
                 '.sk-presetSaveSummary span{font-size:11px;color:var(--dsw-alias-label-quaternary)}',
-                '@media(max-width:900px){.sk-projectCard{align-items:flex-start;flex-wrap:wrap}.sk-projectStats{order:3;width:100%;padding:10px 0 0;border-left:0;border-top:1px solid var(--dsw-alias-border-l2)}.sk-projectActions{margin-left:auto}.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
-                '@media(max-width:680px){.sk-projectActions{width:100%;margin-left:0}.sk-projectActions .sk-projBtn{flex:1}.sk-projectPath{max-width:75vw}}',
+                '@media(max-width:900px){.sk-toolbar{align-items:stretch}.sk-searchWrap{flex-basis:100%}.sk-bulkbar{flex-wrap:wrap}}',
+                '@media(max-width:680px){.sk-projectPath{max-width:75vw}}',
                 '@media(max-width:600px){[role="dialog"]:has(.sk-presetApply),[role="dialog"]:has(.sk-presetSave){width:calc(100vw - 24px)}.sk-presetApply,.sk-presetSave{width:auto}.sk-presetMode{grid-template-columns:1fr}.sk-presetImpact{align-items:flex-start;flex-direction:column;gap:3px}.sk-presetFooter{flex-wrap:wrap}.sk-presetFooterLeft{width:100%}}',
-                '@media(max-width:480px){.sk-projectCard{padding:12px}.sk-filterBtn{padding:6px 8px}}',
+                '@media(max-width:480px){.sk-filterBtn{padding:6px 8px}}',
                 // build 24: use the same page chrome as MCP / Plugin. Skill keeps
                 // its project controls and richer row semantics, but shares the
                 // centered width, compact toolbar, flat list rhythm, and overlay
                 // drawer geometry of the sibling managers.
                 '.sk-root{box-sizing:border-box;height:100%;min-height:0;max-width:980px;margin:0 auto;font-size:13px}',
-                '.sk-head{padding:6px 8px 16px}',
+                '.sk-head{align-items:center;padding:6px 8px 16px}',
                 '.sk-headTitle{font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.02em}',
-                '.sk-headSub{color:var(--dsw-alias-label-tertiary);font-size:13px;font-weight:400}',
+                '.sk-headContext{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}',
+                '.sk-contextAnchor{position:relative;min-width:0}',
+                '.sk-contextProjectBtn{box-sizing:border-box;height:38px;max-width:420px;padding:0 10px;border-radius:8px;background:transparent}',
+                '.sk-contextCopy{display:flex;align-items:baseline;gap:6px;min-width:0}',
+                '.sk-contextEyebrow{color:var(--dsw-alias-label-tertiary);font-size:11px;font-weight:500;white-space:nowrap}',
+                '.sk-projectTitle{max-width:190px;font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+                '.sk-contextStat{padding-left:7px;border-left:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary);font-size:11px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}',
                 '.sk-tabs{height:40px;align-items:flex-end;gap:28px;padding:0 8px}',
                 '.sk-primaryTabs{gap:28px}',
                 '.sk-tab{height:40px;padding:0 1px;display:inline-flex;align-items:center;font-size:13px;line-height:normal;font-weight:500}',
                 '.sk-tabActive{border-bottom-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);font-weight:600}',
-                '.sk-projectCard{box-sizing:border-box;min-height:60px;margin:16px 8px 14px;padding:10px 14px;border-radius:10px}',
-                '.sk-currentBadge{border-radius:0;background:transparent;padding:0;font-size:12px;color:var(--dsw-alias-label-tertiary)}',
-                '.sk-projectTitle{font-size:14px;font-weight:650}',
                 '.sk-toolbar{margin:0;padding:16px 8px 8px;gap:10px}',
                 '.sk-searchWrap{box-sizing:border-box;height:38px;min-width:0;background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;gap:8px;padding:0 11px;color:var(--dsw-alias-label-tertiary)}',
                 '.sk-searchWrap>.sk-ic{position:static;left:auto;color:var(--dsw-alias-label-tertiary);pointer-events:none}',
@@ -328,7 +321,8 @@
                 '.sk-drawerName{font-size:19px;font-weight:650}',
                 '.sk-drawerBody{padding:0 24px 24px}',
                 '.sk-marketFoot{padding:16px 24px}',
-                '@media(max-width:680px){.sk-root{margin:0}.sk-head,.sk-tabs,.sk-toolbar,.sk-list,.sk-marketList{padding-left:0;padding-right:0}.sk-toolbar{flex-wrap:wrap}.sk-searchWrap{flex-basis:100%}.sk-drawer,.sk-marketDrawer{top:61px;width:calc(100vw - 12px);max-width:none}}'
+                '@media(max-width:680px){.sk-root{margin:0}.sk-head,.sk-tabs,.sk-toolbar,.sk-list,.sk-marketList{padding-left:0;padding-right:0}.sk-head{align-items:flex-start;flex-wrap:wrap}.sk-headContext{width:100%}.sk-contextProject{flex:1;min-width:0}.sk-contextProjectBtn{width:100%;max-width:none}.sk-toolbar{flex-wrap:wrap}.sk-searchWrap{flex-basis:100%}.sk-drawer,.sk-marketDrawer{top:61px;width:calc(100vw - 12px);max-width:none}}',
+                '@media(max-width:480px){.sk-contextEyebrow{display:none}.sk-contextStat{font-size:10px}.sk-projectTitle{max-width:42vw}}'
             ].join('');
             if (!existingStyle)
                 document.head.appendChild(style);
@@ -820,6 +814,36 @@
                     document.addEventListener('keydown', onKey);
                     return function () { document.removeEventListener('keydown', onKey); };
                 }, [drawerName]);
+                // The compact project and preset controls behave as one page-level
+                // context group: Escape or an outside click closes whichever menu is
+                // open without disturbing drawers or modal dialogs.
+                React.useEffect(function () {
+                    if (!projMenuOpen && !presetMenuOpen)
+                        return;
+                    function closeContextMenus() {
+                        setProjMenuOpen(false);
+                        setPresetMenuOpen(false);
+                    }
+                    function onKey(event) {
+                        if (event.key !== 'Escape')
+                            return;
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        closeContextMenus();
+                    }
+                    function onPointerDown(event) {
+                        var target = event.target;
+                        if (target !== null && typeof target.closest === 'function' && target.closest('[data-sk-context-menu]') !== null)
+                            return;
+                        closeContextMenus();
+                    }
+                    document.addEventListener('keydown', onKey, true);
+                    document.addEventListener('mousedown', onPointerDown);
+                    return function () {
+                        document.removeEventListener('keydown', onKey, true);
+                        document.removeEventListener('mousedown', onPointerDown);
+                    };
+                }, [projMenuOpen, presetMenuOpen]);
                 function chooseProject(p) {
                     setProjMenuOpen(false);
                     setPresetMenuOpen(false);
@@ -1404,7 +1428,48 @@
                 }
                 if (recommendedPreset === null && presets.length > 0)
                     recommendedPreset = presets[0];
-                return h('div', { className: 'sk-root' }, h('div', { className: 'sk-head' }, h('h2', { className: 'sk-headTitle' }, 'SKILL'), h('span', { className: 'sk-headSub' }, 'Web 配置')), h('div', { className: 'sk-tabs sk-primaryTabs', role: 'tablist', 'aria-label': 'Skill 页面' }, h('button', { type: 'button', role: 'tab', 'aria-selected': topPage === 'local', className: 'sk-tab' + (topPage === 'local' ? ' sk-tabActive' : ''), onClick: function () { setTopPage('local'); } }, '本地 Skill'), h('button', { type: 'button', role: 'tab', 'aria-selected': topPage === 'market', className: 'sk-tab' + (topPage === 'market' ? ' sk-tabActive' : ''), onClick: function () { setTopPage('market'); } }, 'Skill 市场')), topPage === 'market'
+                return h('div', { className: 'sk-root' }, h('div', { className: 'sk-head' }, h('h2', { className: 'sk-headTitle' }, 'SKILL'), topPage === 'local'
+                    ? h('div', { className: 'sk-headContext', 'aria-label': '当前项目上下文' }, h('div', { className: 'sk-contextAnchor sk-contextProject', 'data-sk-context-menu': 'project' }, h('button', {
+                        type: 'button',
+                        className: 'sk-contextProjectBtn sk-projBtn' + (projMenuOpen ? ' sk-quietBtnOn' : ''),
+                        disabled: projects.length === 0,
+                        'aria-label': (project ? '当前项目 ' + project.title : '选择当前项目') + '，已启用 ' + enabledCount + ' / ' + totalCount,
+                        'aria-haspopup': 'menu',
+                        'aria-expanded': projMenuOpen,
+                        onClick: function () {
+                            setProjects(buildProjectOptions(ctx));
+                            setProjMenuOpen(!projMenuOpen);
+                            setTagMenuOpen(false);
+                            setPresetMenuOpen(false);
+                            setActionMenuOpen(false);
+                        },
+                        title: project ? project.cwd : '选择要管理的项目'
+                    }, h('span', { className: 'sk-contextCopy' }, h('span', { className: 'sk-contextEyebrow' }, project && project.cwd === currentCwd(ctx) ? '当前项目' : '所选项目'), h('span', { className: 'sk-projectTitle' }, project ? project.title : '未选择项目'), h('span', { className: 'sk-contextStat' }, '已启用 ' + enabledCount + ' / ' + totalCount)), h(P.IconChevronDownOutline14)), projMenuOpen
+                        ? h('div', { className: 'sk-menu', role: 'menu', style: { left: 'auto', right: 0 } }, projects.map(function (p) {
+                            var isCurrent = p.cwd === currentCwd(ctx);
+                            return h('button', {
+                                type: 'button', key: p.cwd, role: 'menuitem',
+                                className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''),
+                                onClick: function () { chooseProject(p); }
+                            }, isCurrent ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title), isCurrent ? h('span', { className: 'sk-menuHint' }, '当前工作区') : null);
+                        }), h('div', { className: 'sk-menuSep' }), h('button', { type: 'button', role: 'menuitem', className: 'sk-menuBtn', onClick: function () { setProjMenuOpen(false); addLocalProject(); } }, h(P.IconPlusOutline16), '添加本地项目…'))
+                        : null), h('div', { className: 'sk-contextAnchor', 'data-sk-context-menu': 'preset' }, h('button', {
+                        type: 'button',
+                        className: 'sk-quietBtn' + (presetMenuOpen ? ' sk-quietBtnOn' : ''),
+                        'aria-haspopup': 'menu',
+                        'aria-expanded': presetMenuOpen,
+                        onClick: function () {
+                            setPresetMenuOpen(!presetMenuOpen);
+                            setProjMenuOpen(false);
+                            setTagMenuOpen(false);
+                            setActionMenuOpen(false);
+                        }
+                    }, '预设', h(P.IconChevronDownOutline14)), presetMenuOpen
+                        ? h('div', { className: 'sk-menu', role: 'menu', style: { left: 'auto', right: 0, minWidth: 180 } }, recommendedPreset !== null
+                            ? h('button', { type: 'button', role: 'menuitem', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); openPreset(recommendedPreset); } }, '应用推荐预设')
+                            : null, h('button', { type: 'button', role: 'menuitem', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); setSaveName(''); setSaveDesc(''); setSaveOpen(true); } }, '保存为预设'))
+                        : null))
+                    : null), h('div', { className: 'sk-tabs sk-primaryTabs', role: 'tablist', 'aria-label': 'Skill 页面' }, h('button', { type: 'button', role: 'tab', 'aria-selected': topPage === 'local', className: 'sk-tab' + (topPage === 'local' ? ' sk-tabActive' : ''), onClick: function () { setTopPage('local'); } }, '本地 Skill'), h('button', { type: 'button', role: 'tab', 'aria-selected': topPage === 'market', className: 'sk-tab' + (topPage === 'market' ? ' sk-tabActive' : ''), onClick: function () { setTopPage('market'); } }, 'Skill 市场')), topPage === 'market'
                     ? h(SkillMarketplacePage, {
                         ctx: ctx,
                         project: project,
@@ -1420,42 +1485,7 @@
                             ? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' }, h('strong', null, '配置版本更高（只读）'), ' 项目配置 apiVersion 高于当前 DSH 版本。为保护数据，本页仅可查看；请升级 DSH 后再修改。')
                             : partialWarning !== null
                                 ? h('div', { className: 'sk-banner sk-bannerWarn', role: 'alert' }, h('span', null, partialWarning), h('button', { type: 'button', className: 'sk-chip', onClick: function () { setPartialWarning(null); } }, '知道了'))
-                                : null, h('div', { className: 'sk-content' }, h('div', { className: 'sk-listcol' }, h('div', { className: 'sk-projectCard' }, h('div', { className: 'sk-projectIdentity' }, h('div', { className: 'sk-projectMeta' }, h('span', { className: 'sk-currentBadge' }, project && project.cwd === currentCwd(ctx) ? '当前项目' : '所选项目'), h('span', { className: 'sk-projectTitle', title: project ? project.cwd : undefined }, project ? project.title : '未选择项目'))), h('div', { className: 'sk-projectStats' }, h('div', { className: 'sk-statValue' }, '已启用 ' + enabledCount + ' / ' + totalCount)), h('div', { className: 'sk-projectActions' }, h('div', { style: { position: 'relative' } }, h('button', {
-                        type: 'button',
-                        className: 'sk-quietBtn sk-projBtn' + (projMenuOpen ? ' sk-quietBtnOn' : ''),
-                        disabled: projects.length === 0,
-                        onClick: function () {
-                            setProjects(buildProjectOptions(ctx));
-                            setProjMenuOpen(!projMenuOpen);
-                            setTagMenuOpen(false);
-                            setPresetMenuOpen(false);
-                            setActionMenuOpen(false);
-                        },
-                        title: project ? '当前项目：' + project.cwd : '选择要管理的项目'
-                    }, '切换项目', h(P.IconChevronDownOutline14)), projMenuOpen
-                        ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0 } }, projects.map(function (p) {
-                            var isCurrent = p.cwd === currentCwd(ctx);
-                            return h('button', {
-                                type: 'button', key: p.cwd,
-                                className: 'sk-menuBtn' + (project && project.cwd === p.cwd ? ' sk-menuBtnActive' : ''),
-                                onClick: function () { chooseProject(p); }
-                            }, isCurrent ? h(P.IconCheckOutline14) : h('span', { style: { width: 14, flex: 'none' } }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, p.title), isCurrent ? h('span', { className: 'sk-menuHint' }, '当前工作区') : null);
-                        }), h('div', { className: 'sk-menuSep' }), h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setProjMenuOpen(false); addLocalProject(); } }, h(P.IconPlusOutline16), '添加本地项目…'))
-                        : null), h('div', { style: { position: 'relative' } }, h('button', {
-                        type: 'button',
-                        className: 'sk-quietBtn' + (presetMenuOpen ? ' sk-quietBtnOn' : ''),
-                        'aria-expanded': presetMenuOpen,
-                        onClick: function () {
-                            setPresetMenuOpen(!presetMenuOpen);
-                            setProjMenuOpen(false);
-                            setTagMenuOpen(false);
-                            setActionMenuOpen(false);
-                        }
-                    }, '预设', h(P.IconChevronDownOutline14)), presetMenuOpen
-                        ? h('div', { className: 'sk-menu', style: { left: 'auto', right: 0, minWidth: 180 } }, recommendedPreset !== null
-                            ? h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); openPreset(recommendedPreset); } }, '应用推荐预设')
-                            : null, h('button', { type: 'button', className: 'sk-menuBtn', onClick: function () { setPresetMenuOpen(false); setSaveName(''); setSaveDesc(''); setSaveOpen(true); } }, '保存为预设'))
-                        : null))), h('div', { className: 'sk-toolbar' }, h('div', { className: 'sk-searchWrap' }, h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)), h('input', {
+                                : null, h('div', { className: 'sk-content' }, h('div', { className: 'sk-listcol' }, h('div', { className: 'sk-toolbar' }, h('div', { className: 'sk-searchWrap' }, h('span', { className: 'sk-ic' }, h(P.IconSearchOutline16)), h('input', {
                         className: 'sk-search',
                         placeholder: '搜索 Skill',
                         value: search,

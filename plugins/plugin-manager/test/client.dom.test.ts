@@ -287,6 +287,8 @@ test('real Plugin contribution renders without shell business placeholders and s
 	await h.openPlugin();
 	assert.ok(h.dom.window.document.querySelector('.pm-root'));
 	assert.equal(h.dom.window.document.querySelector('.pm-head h2').textContent, 'Plugin');
+	assert.equal(h.dom.window.document.querySelector('.pm-context'), null);
+	assert.ok(!h.dom.window.document.body.textContent.includes('Web 配置'));
 	assert.ok(!h.dom.window.document.body.textContent.includes('插件管理（建设中）'));
 	assert.equal(h.dom.window.document.querySelectorAll('[data-testid="local-list"] .pm-row').length, 4);
 	assert.equal(h.dom.window.document.querySelectorAll('.pm-switch').length, 4);

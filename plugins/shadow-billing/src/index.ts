@@ -1,7 +1,7 @@
 /**
  * dsh-shadow-billing — Host half（DSH-032）。
  *
- * 定时折叠 DSH 会话日志（zstd）到 SQLite，按 DeepSeek Flash 峰谷价影子计费，
+ * 定时折叠 DSH 会话日志（zstd）到 SQLite，按模型官方价目影子计费，
  * 通过 /api/shadow-billing/* 只读 JSON 路由暴露聚合查询。Client 无凭证、无跨域，
  * 全部数据留在本机。
  */
@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { foldAllSessions } from './fold.js';
 import { openStore, dayFloor, dayOf, type Store } from './store.js';
-import { resolvePricing, type PricingConfig, type PriceEntry } from './pricing.js';
+import { priceTokens, pricingSignature, resolveModel, resolvePricing, type PricingConfig, type PriceEntry } from './pricing.js';
 
 const name = 'shadow-billing';
 const inject = ['webServer', 'timer'];
@@ -38,7 +38,7 @@ export interface ShadowBillingConfig {
 	foldIntervalMs?: number;
 	/** 明细保留天数；默认 60（聚合永久保留）。 */
 	retentionDays?: number;
-	/** 额外价目：归一模型名 → { hit, miss, out }（¥/1M tokens）。 */
+	/** 额外价目：归一模型名 → { hit, miss, out, peakMultiplier? }（¥/1M tokens）。 */
 	models?: Record<string, Partial<PriceEntry>>;
 	/** 额外别名：日志模型名 → 归一模型名。 */
 	aliases?: Record<string, string>;
@@ -103,6 +103,21 @@ function apply(ctx: HostContext, rawConfig: ShadowBillingConfig = {}): void {
 
 	fs.mkdirSync(path.dirname(resolveDbPath()), { recursive: true });
 	const store: Store = openStore(resolveDbPath());
+	const repriced = store.repriceUsage(pricingSignature(pricing), (record) => {
+		const result = priceTokens(
+			record.inputTokens,
+			record.outputTokens,
+			record.cacheReadTokens,
+			record.createdAt,
+			record.model,
+			pricing,
+		);
+		return {
+			model: resolveModel(record.model, pricing),
+			costNano: Math.round(result.cost * 1e9),
+		};
+	});
+	if (repriced > 0) ctx.logger.info?.(`shadow-billing: repriced ${repriced} historical usage records`);
 
 	let folding = false;
 	let lastFold: { at: number; imported: number; repaired: number; scanned: number; errors: string[] } | null = null;

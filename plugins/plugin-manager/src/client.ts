@@ -147,7 +147,6 @@ interface RemoteIconProps {
 				'.pm-root{box-sizing:border-box;height:100%;min-height:0;max-width:980px;margin:0 auto;color:var(--dsw-alias-label-primary);font-size:13px;display:flex;flex-direction:column}',
 				'.pm-head{flex:none;display:flex;align-items:baseline;gap:14px;padding:6px 8px 16px}',
 				'.pm-head h2{margin:0;font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.02em}',
-				'.pm-context{color:var(--dsw-alias-label-tertiary);font-size:13px}',
 				'.pm-tabs{flex:none;height:40px;border-bottom:1px solid var(--dsw-alias-border-l2);display:flex;align-items:flex-end;gap:28px;padding:0 8px}',
 				'.pm-tab{appearance:none;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-weight:500;height:40px;padding:0 1px}',
 				'.pm-tab:hover{color:var(--dsw-alias-label-primary)}',
@@ -591,7 +590,7 @@ interface RemoteIconProps {
 				}));
 
 				return h('section', { className: 'pm-root', 'aria-label': 'Plugin Manager' },
-					h('header', { className: 'pm-head' }, h('h2', null, 'Plugin'), h('span', { className: 'pm-context' }, 'Web 配置')),
+					h('header', { className: 'pm-head' }, h('h2', null, 'Plugin')),
 						h('div', { className: 'pm-tabs', role: 'tablist' },
 							h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'local' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'local', onClick: function () { setTab('local'); setQuery(''); setSelectedMarket(null); } }, '本地插件'),
 							h('button', { type: 'button', role: 'tab', className: 'pm-tab' + (tab === 'market' ? ' pm-tabOn' : ''), 'aria-selected': tab === 'market', onClick: function () { setTab('market'); setQuery(''); setSelectedLocal(null); } }, '插件市场')

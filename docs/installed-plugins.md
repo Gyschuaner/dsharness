@@ -20,9 +20,10 @@
 | 插件 | 版本 | 来源 | 安装通道 | 挂载方式 | 关联 DP | 备注 |
 |---|---|---|---|---|---|---|
 | dsh-extension-manager | 0.3.0 | 本仓库 `plugins/extension-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-006/027 | 通用“扩展”入口、全页壳与 `extension.manager.section` Slot；仅保留 MCP 占位，不包含 Skill / Plugin 业务 |
-| dsh-skill-manager | 0.2.0（build 25） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`，向 extension-manager 贡献页面；catalog 读取零副作用 |
-| dsh-mcp-manager | 0.1.0 | 本仓库 `plugins/mcp-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-026/028 | MCP 服务器管理、Loader 状态、工具清单与精选市场；通过 `/api/mcp-manager` 提供 Host API |
-| dsh-plugin-manager | 0.2.1（build 3） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030 / BUG-F3AF6354 | 独立 Plugin 分区；本地插件管理、系统 Bundle 只读展示、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager` |
+| dsh-skill-manager | 0.2.1（build 27） | 本仓库 `plugins/skill-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-001/002/003/008/035 / BUG-0AA85F45 | 负责本地 Skill、精选及任意 GitHub Skill 安装与 `/api/skill-manager`；项目与预设控制收进页头右上角紧凑下拉组 |
+| dsh-mcp-manager | 0.1.1 | 本仓库 `plugins/mcp-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-026/028/035 | MCP 服务器管理、Loader 状态、工具清单与精选市场；去除重复的 Web 配置与当前配置摘要 |
+| dsh-plugin-manager | 0.2.2（build 4） | 本仓库 `plugins/plugin-manager` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-027/030/035 / BUG-F3AF6354 | 独立 Plugin 分区；本地插件管理、系统 Bundle 只读展示、受控导入、精选 + Registry 只读发现、GitHub 市场、品牌加载动画与 `/api/plugin-manager`；去除重复的 Web 配置文案 |
+| dsh-shadow-billing | 0.1.1 | 本仓库 `plugins/shadow-billing` | `link:` 依赖 + junction | cordis.patch.yml insert（手动） | DSH-032 / BUG-891BCFA7 | 扩展 → Billing；按 DeepSeek / Qwen 官方价目估算真实 Token 用量，价目签名变化时幂等重算历史明细与日聚合 |
 | dsh-better-sidebar | 0.12.3 | github.com/omdsh-dev/DSH-better-sidebar（v0.12.3，提交 f391566，MIT） | **npm 官方通道** `dsh plugin --profile web add dsh-better-sidebar@latest` | bundle 对账（`dsh.profile.bundles` 自动追加 + 插件自带 `dsh.bundle.patch` insert） | DSH-007 | VSCode 风格侧边栏 + 底部面板（文件/编辑/终端/Git/浏览器/后台任务）；`ctx.betterSidebar` 服务化 |
 | dsh-better-sidebar-smooth | 0.1.0 | 本仓库 `plugins/better-sidebar-smooth` | `link:` 依赖 + 符号链接 | cordis.patch.yml insert（手动，BUG-1E130940 注释段） | BUG-1E130940 / DSH-007 | 仅 client：注入 1 条 CSS（session header `padding-right` 过渡与 300ms 布局动画同步），修复侧面板开合时 Session log 胶囊先跳 50px 再滑动的撕裂；上游修复后移除 |
 
@@ -69,6 +70,12 @@ profile 固定通过 DP Gateway 的 `Qwen3.8-Flash-Next-FP8` 提供视觉能力�
   （`.\restart-dsh-web.ps1`，会话持久化在磁盘、可恢复）；client 半变化硬刷新浏览器即可。
 
 ## 变更日志
+
+- **2026-08-29（DSH-035 / BUG-891BCFA7）**：Skill、MCP、Plugin 页面移除重复的
+  “Web 配置”上下文，Skill 项目与预设控制收进页头右上角紧凑下拉组；MCP 同时移除重复的
+  当前配置摘要。Billing 增加 Qwen3.8 Flash Next 华北 2 官方固定价（输入 ¥1、缓存命中
+  ¥0.1、输出 ¥3 / 1M Token），价目签名变化时自动重算既有明细与聚合，并恢复完整模型名
+  `Qwen3.8-Flash-Next-FP8` 展示；费用卡不再显示重复的影子账单提示。
 
 - **2026-08-28（DSH-034）**：同步官方 `dsh-v0.1.2-alpha.1`，Vision Bridge 迁移到
   `attachment-local`、Gateway 与 Session Controller 的原生图片引用链路；base bundle 改为

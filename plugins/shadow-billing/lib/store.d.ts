@@ -30,11 +30,24 @@ export interface Watermark {
     routeModel: string | null;
     updatedAt: number;
 }
+export interface RepriceUsageRecord {
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    createdAt: number;
+}
 export interface Store {
     db: import('node:sqlite').DatabaseSync;
     insertUsage(record: UsageRecord): boolean;
     hasUnknownUsage(sessionId: string): boolean;
     repairUnknownUsage(recordId: string, model: string, costNano: number): boolean;
+    /** 价目签名变化时重算全部明细和按日聚合；签名相同则跳过。 */
+    repriceUsage(signature: string, price: (record: RepriceUsageRecord) => {
+        model: string;
+        costNano: number;
+    }): number;
     putWatermark(watermark: Watermark): void;
     getWatermark(sessionId: string): Watermark | null;
     summarySince(dayFloor: string): {
